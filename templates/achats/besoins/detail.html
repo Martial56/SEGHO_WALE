@@ -69,6 +69,7 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
     </span>
     <span class="badge s-{{ besoin.statut }}" style="margin-left:8px;">{{ besoin.get_statut_display }}</span>
     <div style="flex:1;"></div>
+    {% if perms.achats.can_gerer_achats %}
     {% if besoin.statut == 'brouillon' or besoin.statut == 'soumis' %}
       <a href="{% url 'achats:besoin_edit' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
     {% endif %}
@@ -83,6 +84,7 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
       <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-primary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
     {% elif besoin.statut == 'en_cours' %}
       <a href="{% url 'achats:proforma_create' besoin.pk %}" class="btn btn-secondary"><i class="bi bi-file-earmark-plus"></i> Ajouter un proforma</a>
+    {% endif %}
     {% endif %}
   </div>
 
@@ -161,7 +163,7 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
     <div class="bd-card">
       <div class="bd-card-head">
         <h2><i class="bi bi-file-earmark-text" style="margin-right:6px;"></i>Proformas ({{ proformas.count }})</h2>
-        {% if besoin.statut in 'soumis en_cours' %}
+        {% if perms.achats.can_gerer_achats and besoin.statut in 'soumis en_cours' %}
         <a href="{% url 'achats:proforma_create' besoin.pk %}" style="font-size:12px;color:var(--accent-text-soft);text-decoration:none;font-weight:600;">
           <i class="bi bi-plus-lg"></i> Ajouter
         </a>
@@ -194,7 +196,7 @@ html[data-theme="dark"] .s-annule, html[data-theme="dark"] .s-rejete { backgroun
       {% else %}
       <div style="padding:20px;text-align:center;color:var(--text-faint);font-size:13px;">
         Aucun proforma.
-        {% if besoin.statut in 'soumis en_cours' %}
+        {% if perms.achats.can_gerer_achats and besoin.statut in 'soumis en_cours' %}
         <a href="{% url 'achats:proforma_create' besoin.pk %}" style="color:var(--accent-text-soft);margin-left:6px;">Ajouter un proforma →</a>
         {% endif %}
       </div>

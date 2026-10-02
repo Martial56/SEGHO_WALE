@@ -169,9 +169,11 @@ html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--a
       </div>
       <div style="font-size:11px;color:var(--cg-muted);">{{ today|date:"l d F Y" }} · Année {{ annee }}</div>
     </div>
+    {% if perms.employer.can_gerer_conges and perms.employer.add_conge %}
     <a href="{% url 'conge_nouveau' %}" class="btn-cg" style="padding:6px 14px;font-size:12.5px;">
       <i class="bi bi-plus-circle-fill"></i> Enregistrer une demande
     </a>
+    {% endif %}
   </div>
 
 <div class="db-page">
@@ -356,9 +358,11 @@ html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--a
               {% if a.jours_restants == 0 %}Aujourd'hui{% else %}dans {{ a.jours_restants }}j{% endif %}
             </div>
             {% if not a.conge_existant %}
+            {% if perms.employer.can_gerer_conges and perms.employer.add_conge %}
             <a href="{% url 'conge_nouveau' %}?employe={{ a.employe.pk }}" class="btn-cg-sm" style="font-size:10px;padding:2px 7px;margin-top:3px;">
               <i class="bi bi-plus"></i> Planifier
             </a>
+            {% endif %}
             {% else %}
             <span class="db-planifie"><i class="bi bi-check-circle-fill"></i> Planifié</span>
             {% endif %}

@@ -269,24 +269,32 @@
       </div>
     </div>
     <div class="o-subheader-row">
+      {% if perms.services.add_categoriearticle %}
       <a href="{% url 'services:categorie_create' %}" class="o-btn-create">
         <i class="bi bi-plus-lg"></i> Créer
       </a>
+      {% endif %}
+      {% if perms.services.view_categoriearticle or perms.services.add_categoriearticle %}
       <div class="io-page-wrap" id="io-page-wrap">
         <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
           <i class="bi bi-arrow-left-right"></i> Export / Import
           <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
         </button>
         <div class="io-page-menu" id="io-page-menu">
+          {% if perms.services.view_categoriearticle %}
           <div class="io-pm-section">Exporter les catégories</div>
           <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
           <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
           <a class="io-pm-item" href="{% url 'services:export_categories' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
           <div class="io-pm-sep"></div>
+          {% endif %}
+          {% if perms.services.add_categoriearticle %}
           <div class="io-pm-section">Importer</div>
           <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…</button>
+          {% endif %}
         </div>
       </div>
+      {% endif %}
       {% if q %}
       <a href="{% url 'services:categories' %}" class="o-ctrl-btn"><i class="bi bi-x"></i> Effacer</a>
       <span class="o-filter-tag">{{ q }} <a href="{% url 'services:categories' %}?vue={{ vue }}">×</a></span>
@@ -390,8 +398,8 @@
       style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Effacer</a>
     {% else %}
     Aucune catégorie enregistrée.<br>
-    <a href="{% url 'services:categorie_create' %}"
-      style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une catégorie</a>
+    {% if perms.services.add_categoriearticle %}<a href="{% url 'services:categorie_create' %}"
+      style="color:var(--accent-text-soft);font-weight:600;margin-top:8px;display:inline-block;">Créer une catégorie</a>{% endif %}
     {% endif %}
   </div>
   {% endif %}
@@ -426,7 +434,7 @@ function openImportModal(){document.getElementById('io-modal-backdrop').classLis
 function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
 function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
-{% if request.GET.action == 'import' %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
+{% if request.GET.action == 'import' and perms.services.add_categoriearticle %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
 </script>
 
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>

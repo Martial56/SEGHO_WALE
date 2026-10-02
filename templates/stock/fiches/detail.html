@@ -42,6 +42,7 @@
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
     {% if fiche.statut == 'brouillon' %}
+      {% if peut_gerer_stock and perms.stock.change_fichebesoins %}
       <a href="{% url 'stock_fiche_edit' fiche.pk %}" class="btn-st-outline">
         <i class="bi bi-pencil"></i> Modifier
       </a>
@@ -52,18 +53,21 @@
           <i class="bi bi-send-arrow-up"></i> Envoyer aux achats
         </button>
       </form>
+      {% endif %}
     {% else %}
       {% with besoin=fiche.besoins_achats.first %}
-      {% if besoin %}
+      {% if besoin and perms.achats.view_besoinachat %}
         <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="btn-st">
           <i class="bi bi-send-check"></i> Voir dans Achats — {{ besoin.numero }}
         </a>
       {% endif %}
       {% endwith %}
     {% endif %}
+    {% if perms.stock.view_fichebesoins %}
     <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" title="Imprimer">
       <i class="bi bi-printer"></i> Imprimer
     </a>
+    {% endif %}
   </div>
 </div>
 

@@ -1408,6 +1408,12 @@ def gynecologie_rdv_detail(request, pk):
     # ne doivent plus pouvoir être modifiés (la facture est déjà émise dessus).
     locked_billing = facture_payee and rdv.statut != 'planifie'
 
+    # Chaque étape a sa permission (cf. patients/rdv_droits.py) : `peut_modifier`
+    # vaut pour le statut actuel, `droits_rdv` pour les boutons de changement d'état.
+    from patients import rdv_droits
+    peut_modifier = rdv_droits.peut_modifier(request.user, rdv)
+    droits_rdv = rdv_droits.droits(request.user, rdv)
+
     consultation = None
     constante = None
     try:
@@ -1421,12 +1427,21 @@ def gynecologie_rdv_detail(request, pk):
 
     if request.method == 'POST':
         action = request.POST.get('_action', '')
+        # Le masquage des boutons ne suffit pas : c'est ici que l'écriture est
+        # refusée. Un changement d'état exige la permission de l'action ; tout
+        # autre envoi (fiche, évaluation, registres) celle du statut actuel.
+        if rdv_droits.est_un_changement_d_etat(action):
+            if rdv.statut == 'annule' or not rdv_droits.peut_faire(request.user, action):
+                raise PermissionDenied
+        elif not peut_modifier:
+            if action == 'autosave_registres':
+                return JsonResponse({'ok': False}, status=403)
+            raise PermissionDenied
 
         if action == 'autosave_registres':
             # Enregistrement automatique des registres (requête AJAX de la fiche) :
             # rien n'est perdu si l'on quitte la page sans cliquer « Enregistrer ».
-            if (not request.user.has_perm('patients.change_rendezvous')
-                    or rdv.statut not in ('en_consultation', 'termine')):
+            if rdv.statut not in ('en_consultation', 'termine'):
                 return JsonResponse({'ok': False}, status=403)
             _enregistrer_registres(request, rdv)
             return JsonResponse({'ok': True, 'heure': timezone.localtime().strftime('%H:%M')})
@@ -1602,6 +1617,8 @@ def gynecologie_rdv_detail(request, pk):
         'is_new': False,
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'peut_modifier': peut_modifier,
+        'droits_rdv': droits_rdv,
         'consultation': consultation,
         'constante': constante,
         'medecins': medecins,
@@ -1631,6 +1648,11 @@ def gynecologie_demarrer_consultation(request, pk):
     from django.core.exceptions import ObjectDoesNotExist
 
     rdv = get_object_or_404(RendezVous, pk=pk)
+
+    # Démarrer la consultation est l'étape du médecin (cf. patients/rdv_droits.py).
+    from patients import rdv_droits
+    if rdv.statut == 'annule' or not rdv_droits.peut_faire(request.user, 'en_consultation'):
+        raise PermissionDenied
 
     # Si consultation existe déjà, retourner au RDV
     try:

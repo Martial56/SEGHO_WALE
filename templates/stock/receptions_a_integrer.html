@@ -35,9 +35,11 @@
     <div style="font-size:11.5px;color:var(--st-muted);">Marchandises reçues par les achats, à intégrer dans le stock central</div>
   </div>
   <div style="display:flex;gap:8px;">
+    {% if peut_gerer_stock and perms.stock.add_lotproduit %}
     <a href="{% url 'stock_reception_directe_create' %}" class="btn-st" style="font-size:12px;padding:6px 14px;">
       <i class="bi bi-plus-lg"></i> Nouvelle réception directe
     </a>
+    {% endif %}
     <a href="{% url 'stock_fiche_list' %}" class="btn-st-outline" style="font-size:12px;padding:6px 14px;">
       <i class="bi bi-arrow-left"></i> Fiches de besoins
     </a>
@@ -93,6 +95,7 @@
         <td style="color:var(--st-muted);text-align:center;">{{ rec.lignes.count }}</td>
         <td style="font-size:12px;color:var(--st-muted);">{{ rec.receptionne_par.get_full_name|default:rec.receptionne_par.username|default:"—" }}</td>
         <td style="text-align:center;">
+          {% if peut_gerer_stock %}
           <form method="post" action="{% url 'stock_integrer_reception' rec.pk %}"
                 onsubmit="return confirm('Intégrer la réception {{ rec.numero }} dans le stock central ?');">
             {% csrf_token %}
@@ -100,6 +103,7 @@
               <i class="bi bi-box-arrow-in-down"></i> Intégrer
             </button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

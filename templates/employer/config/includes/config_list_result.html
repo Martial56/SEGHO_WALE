@@ -53,10 +53,14 @@
         {% if slug != 'nationalite' %}<td style="color:var(--rh-muted);">{{ item.description|truncatechars:60|default:'—' }}</td>{% endif %}
         <td>
           <div class="rh-row-actions">
+            {% with mdl=slug|cut:"_" %}{% with p_change="employer.change_"|add:mdl p_delete="employer.delete_"|add:mdl %}
+            {% if p_change in perms %}
             <a href="{% url 'rh_config_edit' slug item.pk %}" class="rh-row-btn" title="Modifier"
                onclick="return rhOpenConfigModal(event, this.href, 'Modifier — {{ item.nom }}');">
               <i class="bi bi-pencil"></i>
             </a>
+            {% endif %}
+            {% if p_delete in perms %}
             <form method="post" action="{% url 'rh_config_delete' slug item.pk %}"
                   onsubmit="return confirm('Supprimer « {{ item.nom }} » ?\nCette action est irréversible.')" style="display:inline;">
               {% csrf_token %}
@@ -64,6 +68,8 @@
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            {% endif %}
+            {% endwith %}{% endwith %}
           </div>
         </td>
       </tr>

@@ -150,7 +150,7 @@ html[data-theme="dark"] .gen-history-row:hover { background: rgba(var(--teal-500
       {% if historique_rapport %}
       <div class="gen-history-list">
         {% for h in historique_rapport %}
-        <a href="{% url 'rapports:retelecharger' h.pk %}" class="gen-history-row" title="Cliquer pour retélécharger">
+        <a {% if perms.rapports.view_historiquerapport %}href="{% url 'rapports:retelecharger' h.pk %}" title="Cliquer pour retélécharger"{% else %}style="cursor:default;"{% endif %} class="gen-history-row">
           <span class="gen-history-nom">{{ h.nom }}</span>
           <span class="gen-history-periode">{{ h.periode_debut|date:"d/m/Y" }}–{{ h.periode_fin|date:"d/m/Y" }}</span>
           <span class="gen-history-user">{% if h.utilisateur %}{{ h.utilisateur.get_full_name|default:h.utilisateur.username }}{% else %}—{% endif %}</span>

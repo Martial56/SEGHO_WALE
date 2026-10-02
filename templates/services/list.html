@@ -555,17 +555,21 @@ sélecteur de colonnes.{% endcomment %}
     <!-- Ligne 2 : créer + contrôles + pagination + vue -->
     <div class="o-subheader-row" id="subheader-controls"
          data-filters="{{ filters|join:"," }}" data-groups="{{ groups|join:"," }}">
+      {% if perms.services.add_articleservice %}
       <a href="{% url 'services:create' %}" class="o-btn-create">
         <i class="bi bi-plus-lg"></i> Créer
       </a>
+      {% endif %}
 
       <!-- Export / Import dropdown -->
+      {% if perms.services.view_articleservice or perms.services.add_articleservice %}
       <div class="io-page-wrap" id="io-page-wrap">
         <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
           <i class="bi bi-arrow-left-right"></i> Export / Import
           <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
         </button>
         <div class="io-page-menu" id="io-page-menu">
+          {% if perms.services.view_articleservice %}
           <div class="io-pm-section">Exporter les prestations</div>
           <a class="io-pm-item" href="{% url 'services:export_articles' %}?format=json">
             <i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON
@@ -577,12 +581,16 @@ sélecteur de colonnes.{% endcomment %}
             <i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel
           </a>
           <div class="io-pm-sep"></div>
+          {% endif %}
+          {% if perms.services.add_articleservice %}
           <div class="io-pm-section">Importer</div>
           <button type="button" class="io-pm-item" onclick="openImportModal()">
             <i class="bi bi-upload" style="color:var(--teal-500);"></i> Importer un fichier…
           </button>
+          {% endif %}
         </div>
       </div>
+      {% endif %}
 
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
@@ -700,7 +708,7 @@ lancerRecherche et le tri serveur, qu'appellent les menus générés.{% endcomme
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeImportModal();
   });
-  {% if request.GET.action == 'import' %}
+  {% if request.GET.action == 'import' and perms.services.add_articleservice %}
   document.addEventListener('DOMContentLoaded', openImportModal);
   {% endif %}
 </script>

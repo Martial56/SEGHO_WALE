@@ -142,12 +142,16 @@
 
   <!-- Actions -->
   <div class="ticket-actions">
+    {% if perms.pharmacie.view_ventepharmacie %}
     <button onclick="window.print()" class="btn-ph-outline" style="font-size:12px;">
       <i class="bi bi-printer"></i> Imprimer
     </button>
+    {% endif %}
+    {% if perms.pharmacie.valider_vente_pharmacie %}
     <a href="{% url 'pharmacie_caisse' pharmacie %}" class="btn-ph" style="font-size:12px;">
       <i class="bi bi-plus-circle"></i> Nouvelle vente
     </a>
+    {% endif %}
     {% if can_annuler and vente.statut == 'payee' %}
     <form method="post" action="{% url 'pharmacie_annuler_vente' pharmacie vente.pk %}"
           onsubmit="return confirm('Annuler la vente {{ vente.numero }} ? Le stock vendu sera restitué.')">

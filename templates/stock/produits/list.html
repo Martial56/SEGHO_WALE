@@ -101,24 +101,32 @@
       </a>
       {% endif %}
     </form>
+    {% if peut_gerer_stock and perms.stock.view_produit or peut_gerer_stock and perms.stock.add_produit %}
     <div class="io-page-wrap" id="io-page-wrap" style="margin-left:auto;">
       <button type="button" class="btn-st-outline io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
         <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
       </button>
       <div class="io-page-menu" id="io-page-menu">
+        {% if perms.stock.view_produit %}
         <div class="io-pm-section">Exporter les produits</div>
         <a class="io-pm-item" href="{% url 'stock_export_produits' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
         <a class="io-pm-item" href="{% url 'stock_export_produits' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
         <a class="io-pm-item" href="{% url 'stock_export_produits' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
-        <div class="io-pm-sep"></div>
+        {% endif %}
+        {% if peut_gerer_stock and perms.stock.add_produit %}
+        {% if perms.stock.view_produit %}<div class="io-pm-sep"></div>{% endif %}
         <div class="io-pm-section">Importer</div>
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
+    {% if peut_gerer_stock and perms.stock.add_produit %}
     <a href="{% url 'stock_produit_create' %}" class="btn-st">
       <i class="bi bi-plus-lg"></i> Nouveau produit
     </a>
+    {% endif %}
   </div>
 </div>
 
@@ -206,8 +214,10 @@
       </td>
       <td style="text-align:center;white-space:nowrap;" onclick="event.stopPropagation();">
         <a href="{% url 'stock_produit_detail' produit.pk %}" class="action-link" title="Détail"><i class="bi bi-eye"></i></a>
+        {% if peut_gerer_stock and perms.stock.change_produit %}
         <span style="color:var(--st-border);margin:0 5px;">|</span>
         <a href="{% url 'stock_produit_edit' produit.pk %}" class="action-link" title="Modifier"><i class="bi bi-pencil"></i></a>
+        {% endif %}
       </td>
     </tr>
 
@@ -310,9 +320,11 @@
   <div class="st-card-body" style="text-align:center;padding:40px;color:var(--st-muted);">
     <i class="bi bi-inbox" style="font-size:24px;display:block;margin-bottom:8px;"></i>
     Aucun produit enregistré.
+    {% if peut_gerer_stock and perms.stock.add_produit %}
     <a href="{% url 'stock_produit_create' %}" class="btn-st" style="margin-top:12px;display:inline-flex;">
       <i class="bi bi-plus-lg"></i> Ajouter un produit
     </a>
+    {% endif %}
   </div>
   {% endif %}
 </div>
@@ -333,7 +345,7 @@ function openImportModal(){document.getElementById('io-modal-backdrop').classLis
 function closeImportModal(){document.getElementById('io-modal-backdrop').classList.remove('active');document.getElementById('io-modal').classList.remove('active');}
 function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
-{% if request.GET.action == 'import' %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
+{% if request.GET.action == 'import' and peut_gerer_stock and perms.stock.add_produit %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
 </script>
 
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>

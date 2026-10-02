@@ -45,12 +45,14 @@
     </div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    {% if perms.pharmacie.gerer_stock_pharmacie %}
     <a href="{% url 'pharmacie_ordonnances' pharmacie %}?statut=emise" class="btn-ph">
       <i class="bi bi-prescription2"></i> Dispenser une ordonnance
     </a>
     <a href="{% url 'pharmacie_demande' pharmacie %}" class="btn-ph-outline">
       <i class="bi bi-bag-plus"></i> Demande dotation
     </a>
+    {% endif %}
   </div>
 </div>
 
@@ -120,9 +122,11 @@
               <span class="badge-ph-emise">{{ ord.lignes.count }} méd.</span>
             </td>
             <td style="">
+              {% if perms.pharmacie.gerer_stock_pharmacie %}
               <a href="{% url 'pharmacie_dispenser' pharmacie ord.pk %}" class="btn-ph" style="font-size:11px;padding:4px 10px;">
                 <i class="bi bi-check2-circle"></i> Dispenser
               </a>
+              {% endif %}
             </td>
           </tr>
           {% empty %}

@@ -661,7 +661,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             <button type="submit" class="btn-save">{% if rdv %}Enregistrer{% else %}Sauvegarder et facturer{% endif %}</button>
             {% endif %}
             <a href="{% if origine and rdv %}{% url 'patients:rdv_list' rdv.patient.pk %}{{ origine_qs }}{% else %}{% url 'patients:rdv_global' %}{% endif %}" class="btn-discard">{% if rdv and not peut_modifier %}Retour{% else %}Ignorer{% endif %}</a>
-            {% if rdv.statut == 'confirme' and peut_modifier %}
+            {% if rdv.statut == 'confirme' and droits_rdv.annuler %}
             <button type="button" class="btn-cancel-rdv" id="btn-annuler-rdv">Annuler RDV</button>
             {% endif %}
         </div>
@@ -677,17 +677,17 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             {% if not rdv %}
                 {# Nouveau RDV — pas encore de boutons d'action #}
             {% elif rdv.statut == 'planifie' %}
-                {% if peut_modifier %}
+                {% if droits_rdv.confirmer %}
                 <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
                     {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
                 {% endif %}
             {% elif rdv.statut == 'confirme' %}
                 {% if consultation and rdv.medecin %}
-                    {% if peut_modifier %}
+                    {% if droits_rdv.en_attente %}
                     <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
                     {% endif %}
                 {% else %}
-                    {% if peut_modifier %}
+                    {% if droits_rdv.en_attente %}
                     <button type="button" class="btn-action btn-teal" id="btn-modifier">
                         <i class="bi bi-pencil"></i> Modifier
                     </button>
@@ -701,11 +701,11 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
                     {% endif %}
                 {% endif %}
             {% elif rdv.statut == 'en_attente' %}
-                {% if peut_modifier %}
+                {% if droits_rdv.consulter %}
                 <button type="submit" name="_action" value="en_consultation" class="btn-action btn-teal">En consultation</button>
                 {% endif %}
             {% elif rdv.statut == 'en_consultation' %}
-                {% if peut_modifier %}
+                {% if droits_rdv.consulter %}
                 <button type="button" class="btn-action" id="btn-pause"><i class="bi bi-pause-fill"></i> Pause</button>
                 {% comment %}Ces quatre actions soumettent la fiche au lieu de
                 la quitter : un simple lien perdait tout ce qui était saisi et pas
@@ -716,6 +716,8 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
                 {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
                 {% if perms.hospitalisation.add_hospitalisation %}<button type="submit" name="_apres" value="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</button>{% endif %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
+                {% endif %}
+                {% if droits_rdv.annuler %}
                 <button type="submit" name="_action" value="annuler" class="btn-action btn-danger-outline">Annuler</button>
                 {% endif %}
             {% endif %}
@@ -962,7 +964,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             {% elif rdv %}Aucune évaluation pour ce rendez-vous.
             {% else %}Sauvegardez d'abord le rendez-vous pour créer une évaluation.{% endif %}
           </span>
-          {% if rdv %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
+          {% if rdv and peut_modifier %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
         </div>
 
         <!-- Résumé lecture seule -->
@@ -1110,8 +1112,8 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             <div class="cpn-row"><span class="cpn-lbl">BDCF</span><input type="text" name="cpn_bdcf" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Terme prévu le</span><input type="date" name="cpn_terme_prevu" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Date de la dernière CPN</span><input type="date" name="cpn_date_derniere_cpn" class="cpn-inp editable"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Semaines d'aménorrhée</span><input type="number" name="cpn_semaines_amenorrhee" class="cpn-inp editable" min="0"></div>
-            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><select name="cpn_proposition_test_vih" class="cpn-sel editable"><option value=""></option><option value="oui">Oui</option><option value="non">Non</option><option value="na">NA</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Semaines d'aménorrhée</span><input type="text" name="cpn_semaines_amenorrhee" class="cpn-inp editable"></div>
+            <div class="cpn-row"><span class="cpn-lbl">Proposition de test VIH</span><select name="cpn_proposition_test_vih" class="cpn-sel editable"><option value=""></option><option value="oui">OUI</option><option value="non">NON</option><option value="na">NA</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Retesting</span><div class="cpn-radios"><label><input type="radio" name="cpn_retesting" value="oui" class="editable"> Oui</label><label><input type="radio" name="cpn_retesting" value="non" class="editable"> Non</label><label><input type="radio" name="cpn_retesting" value="na" class="editable"> NA</label></div></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro de dépistage</span><input type="text" name="cpn_numero_depistage" class="cpn-inp editable"></div>
 

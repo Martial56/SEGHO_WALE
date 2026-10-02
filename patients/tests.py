@@ -417,3 +417,78 @@ class TestLaBarreDActionDuRendezVousEnConsultation(TestCase):
               'patients.change_rendezvous')
         html = _page('u_bar_ecriture', self.url)
         self.assertIn('name="_apres"', html)
+
+
+class TestLesDroitsParEtapeDuRendezVous(TestCase):
+    """Chaque étape de la fiche a sa permission (cf. patients/rdv_droits.py).
+
+    L'accueil confirme, l'infirmier met en attente, le médecin mène la
+    consultation : aucun des trois ne doit pouvoir faire l'étape d'un autre,
+    ni par le bouton ni en postant l'action à la main.
+    """
+
+    LIRE = 'patients.view_rendezvous'
+
+    def setUp(self):
+        self.patient = _patient()
+        _avec('u_accueil', self.LIRE, 'patients.add_rendezvous', 'patients.confirmer_rendezvous')
+        _avec('u_infirmier', self.LIRE, 'patients.mettre_en_attente_rendezvous')
+        _avec('u_medecin', self.LIRE, 'patients.consulter_rendezvous')
+
+    def _rdv(self, statut):
+        rdv = RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(), statut=statut)
+        return rdv, reverse('patients:rdv_edit', args=[rdv.pk])
+
+    def _poster(self, username, url, action):
+        client = Client()
+        client.login(username=username, password='x')
+        return client.post(url, {'_action': action})
+
+    def test_chaque_bouton_n_apparait_qu_a_son_etape(self):
+        _, url = self._rdv('planifie')
+        self.assertIn('value="confirmer"', _page('u_accueil', url))
+        self.assertNotIn('value="confirmer"', _page('u_infirmier', url))
+        self.assertNotIn('value="confirmer"', _page('u_medecin', url))
+
+        _, url = self._rdv('en_attente')
+        self.assertIn('value="en_consultation"', _page('u_medecin', url))
+        self.assertNotIn('value="en_consultation"', _page('u_infirmier', url))
+        self.assertNotIn('value="en_consultation"', _page('u_accueil', url))
+
+        _, url = self._rdv('en_consultation')
+        self.assertIn('value="terminer"', _page('u_medecin', url))
+        self.assertNotIn('value="terminer"', _page('u_infirmier', url))
+
+    def test_poster_l_etape_d_un_autre_est_refuse(self):
+        rdv, url = self._rdv('confirme')
+        self.assertEqual(self._poster('u_accueil', url, 'en_attente').status_code, 403)
+        self.assertEqual(self._poster('u_medecin', url, 'en_attente').status_code, 403)
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'confirme')
+
+        self.assertEqual(self._poster('u_infirmier', url, 'en_attente').status_code, 302)
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'en_attente')
+
+        self.assertEqual(self._poster('u_infirmier', url, 'en_consultation').status_code, 403)
+        self.assertEqual(self._poster('u_medecin', url, 'en_consultation').status_code, 302)
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'en_consultation')
+
+    def test_annuler_exige_sa_propre_permission(self):
+        rdv, url = self._rdv('en_consultation')
+        self.assertNotIn('value="annuler"', _page('u_medecin', url))
+        self.assertEqual(self._poster('u_medecin', url, 'annuler').status_code, 403)
+        _avec('u_annule', self.LIRE, 'patients.annuler_rendezvous')
+        self.assertEqual(self._poster('u_annule', url, 'annuler').status_code, 302)
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'annule')
+
+    def test_change_rendezvous_garde_l_acces_complet(self):
+        from patients import rdv_droits
+        user = _avec('u_complet', self.LIRE, 'patients.change_rendezvous')
+        for statut in ('planifie', 'confirme', 'en_attente', 'en_consultation', 'termine'):
+            rdv, _ = self._rdv(statut)
+            self.assertTrue(rdv_droits.peut_modifier(user, rdv), statut)
+        self.assertTrue(all(rdv_droits.droits(user, rdv).values()))

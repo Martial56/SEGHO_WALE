@@ -67,6 +67,7 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
     </a>
   </div>
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    {% if perms.employer.change_soldeconge %}
     <!-- Recalculer -->
     <form method="post" action="{% url 'conge_solde_recalc' %}" style="display:inline;"
           onsubmit="if(!confirm('Recalculer tous les soldes pour {{ year }} ?')) return false; showPageLoader('Calcul en cours ...'); return true;">
@@ -85,9 +86,12 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
         <i class="bi bi-arrow-right-square"></i> Reporter vers {{ year|add:1 }}
       </button>
     </form>
+    {% endif %}
+    {% if perms.employer.view_conge %}
     <a href="{% url 'conge_export_csv' %}" class="btn-cg-outline">
       <i class="bi bi-download"></i> Export CSV
     </a>
+    {% endif %}
   </div>
 </div>
 
@@ -157,6 +161,7 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
             {% else %}<span style="color:var(--cg-muted);">0</span>{% endif %}
           </td>
           <td style="text-align:right;">
+            {% if perms.employer.change_soldeconge %}
             <form method="post" action="{% url 'conge_solde_ajustement' s.pk %}"
                   style="display:inline-flex;gap:4px;align-items:center;justify-content:flex-end;">
               {% csrf_token %}
@@ -164,6 +169,7 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
                      style="width:46px;padding:3px 5px;border:1px solid var(--cg-border);border-radius:4px;font-size:12px;text-align:right;background:var(--cg-surface);color:var(--cg-text);">
               <button type="submit" class="btn-cg-sm" title="Enregistrer"><i class="bi bi-check-lg"></i></button>
             </form>
+            {% endif %}
           </td>
           <td style="text-align:right;">
             <span class="solde-val
@@ -182,9 +188,11 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
             </span>
           </td>
           <td style="text-align:right;">
+            {% if perms.employer.add_conge %}
             <a href="{% url 'conge_nouveau' %}?employe={{ s.employe.pk }}" class="btn-cg-sm">
               <i class="bi bi-plus"></i>
             </a>
+            {% endif %}
           </td>
         </tr>
         {% endwith %}{% endfor %}

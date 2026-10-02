@@ -185,6 +185,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
         <span class="badge-inactif"><i class="bi bi-pause-circle"></i> Inactif</span>
       {% endif %}
       <div class="bureau-actions">
+        {% if perms.planning.change_bureau %}
         <!-- Monter -->
         <form method="post" action="{% url 'planning_bureau_ordre' bureau.pk %}" style="display:inline">
           {% csrf_token %}
@@ -202,6 +203,8 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
                 onclick="toggleEdit('bureau-edit-{{ bureau.pk }}')">
           <i class="bi bi-pencil"></i> Modifier
         </button>
+        {% endif %}
+        {% if perms.planning.delete_bureau %}
         <!-- Supprimer -->
         <form method="post" action="{% url 'planning_bureau_delete' bureau.pk %}"
               style="display:inline"
@@ -209,6 +212,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
           {% csrf_token %}
           <button type="submit" class="btn-danger-sm"><i class="bi bi-trash"></i></button>
         </form>
+        {% endif %}
       </div>
     </div>
 
@@ -254,11 +258,14 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
           <div class="plage-chip">
             <span>{{ plage.code }}</span>
             <div class="plage-chip-actions">
+              {% if perms.planning.change_plagehoraire %}
               <button type="button" class="btn-chip-edit"
                       title="Modifier"
                       onclick="toggleEdit('plage-edit-{{ plage.pk }}')">
                 <i class="bi bi-pencil"></i>
               </button>
+              {% endif %}
+              {% if perms.planning.delete_plagehoraire %}
               <form method="post" action="{% url 'planning_plage_delete' plage.pk %}"
                     style="display:inline"
                     onsubmit="return confirm('Supprimer la plage « {{ plage.code }} » ?')">
@@ -267,6 +274,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
                   <i class="bi bi-x-lg"></i>
                 </button>
               </form>
+              {% endif %}
             </div>
           </div>
           <!-- Edit plage inline -->
@@ -291,6 +299,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
         <p class="plages-empty">Aucune plage définie pour ce bureau.</p>
       {% endif %}
 
+      {% if perms.planning.add_plagehoraire %}
       <!-- Add plage form -->
       <form method="post" action="{% url 'planning_plage_save' %}" class="add-plage-form">
         {% csrf_token %}
@@ -300,6 +309,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
           <i class="bi bi-plus-lg"></i> Ajouter plage
         </button>
       </form>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -313,6 +323,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
 <!-- ══ AJOUT BUREAU ══ -->
 </div><!-- /padding wrapper -->
 
+{% if perms.planning.add_bureau %}
 <div style="padding: 0 32px 32px;">
 <div class="add-bureau-section">
   <h3><i class="bi bi-plus-circle" style="color:var(--accent-text-soft);"></i> Ajouter un bureau / service</h3>
@@ -336,6 +347,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
   </form>
 </div>
 </div><!-- /padding wrapper -->
+{% endif %}
 
 <!-- ══ CRÉNEAUX DE PERMANENCE ══ -->
 <div style="padding: 0 32px 32px;">
@@ -354,10 +366,13 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
       <div class="plage-chip">
         <span>{{ modele.libelle }}</span>
         <div class="plage-chip-actions">
+          {% if perms.planning.change_permanencecreneaumodele %}
           <button type="button" class="btn-chip-edit" title="Modifier"
                   onclick="toggleEdit('perm-modele-edit-{{ modele.pk }}')">
             <i class="bi bi-pencil"></i>
           </button>
+          {% endif %}
+          {% if perms.planning.delete_permanencecreneaumodele %}
           <form method="post" action="{% url 'planning_permanence_modele_delete' modele.pk %}"
                 style="display:inline"
                 onsubmit="return confirm('Supprimer le créneau « {{ modele.libelle }} » ?')">
@@ -366,6 +381,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
               <i class="bi bi-x-lg"></i>
             </button>
           </form>
+          {% endif %}
         </div>
       </div>
       <div id="perm-modele-edit-{{ modele.pk }}" class="plage-edit-wrap">
@@ -389,6 +405,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
   <p class="plages-empty" style="margin-bottom:16px;">Aucun créneau de permanence défini.</p>
   {% endif %}
 
+  {% if perms.planning.add_permanencecreneaumodele %}
   <form method="post" action="{% url 'planning_permanence_modele_save' %}" class="add-plage-form">
     {% csrf_token %}
     <input type="text" name="libelle" placeholder="Nouveau créneau (ex: 18h-08h)" required>
@@ -396,6 +413,7 @@ html[data-theme="dark"] .plage-edit-wrap input[type="text"]:focus { border-botto
       <i class="bi bi-plus-lg"></i> Ajouter créneau
     </button>
   </form>
+  {% endif %}
 </div>
 </div><!-- /padding wrapper -->
 
