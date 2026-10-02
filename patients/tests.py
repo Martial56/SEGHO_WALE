@@ -558,3 +558,60 @@ class TestLesChiffresNeSEcriventPasDansUnNom(TestCase):
         self.assertIn("normaliserNom('id_nom')", html)
         self.assertIn("normaliserNom('id_prenoms')", html)
 
+
+class TestLaLigneAnnuleeEstGrisee(TestCase):
+    """Le grisé d'un rendez-vous annulé devient la règle commune.
+
+    Il n'était écrit que dans la feuille de `templates/patients/rendez_vous.html`,
+    sous `.rdv-row-annule` : la liste de gynécologie partageait pourtant le même
+    gabarit de ligne et n'en voyait rien. La règle vit désormais dans
+    `static/css/global.css` sous `.ligne-annulee`, partagée avec les soins, les
+    hospitalisations et les factures.
+    """
+
+    def setUp(self):
+        self.patient = _patient()
+        User.objects.create_superuser('su_grise', password='x')
+        self.client = Client()
+        self.client.login(username='su_grise', password='x')
+
+    def _rdv(self, statut):
+        from medecins.models import Departement
+        departement, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        return RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(),
+            motif='Controle', statut=statut, departement=departement,
+        )
+
+    def _html(self, nom):
+        reponse = self.client.get(reverse(nom) + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    #: Le gabarit compose la classe en fin d'attribut — `class="rdv-row
+    #: rdv-etat-annule ligne-annulee"`. On vise ce balisage et non le nom de
+    #: classe nu : celui-ci apparaît aussi dans les commentaires des feuilles de
+    #: style, qui sont rendus dans la page, et les tests passeraient à vide.
+    MARQUE = 'rdv-etat-annule ligne-annulee"'
+
+    def test_un_rdv_annule_est_grise_sur_la_liste_des_patients(self):
+        self._rdv('annule')
+        self.assertIn(self.MARQUE, self._html('patients:rdv_global'))
+
+    def test_un_rdv_annule_est_grise_aussi_en_gynecologie(self):
+        """C'est la liste qui n'avait jamais eu le grisé."""
+        self._rdv('annule')
+        self.assertIn(self.MARQUE, self._html('gynecologie_rdv'))
+
+    def test_un_rdv_confirme_n_est_pas_grise(self):
+        """Sans cette moitié, les tests précédents passeraient si tout l'était."""
+        self._rdv('confirme')
+        for nom in ('patients:rdv_global', 'gynecologie_rdv'):
+            self.assertNotIn('ligne-annulee"', self._html(nom))
+
+    def test_l_ancienne_classe_ne_sert_plus(self):
+        """Elle ne vivait que dans une feuille de page ; la laisser dans le
+        gabarit la rendrait muette sur les listes qui n'ont pas cette feuille."""
+        self._rdv('annule')
+        self.assertNotIn('rdv-row-annule', self._html('patients:rdv_global'))

@@ -933,3 +933,53 @@ class TestLePrixNulSAfficheGratuit(TestCase):
         html = self._html()
         self.assertIn('>Gratuit</span>', html)
         self.assertIn('2500 CFA', html)
+
+
+# ─── Le grisé des lignes annulées ──────────────────────────────────────────────
+
+class TestLaLigneAnnuleeEstGrisee(TestCase):
+    """Une ligne annulée s'efface du regard sans quitter le tableau.
+
+    Le grisé n'existait que sur la liste des rendez-vous des patients, écrit
+    dans la feuille de cette page-là. La règle vit désormais dans
+    `static/css/global.css` sous `.ligne-annulee`, et les six listes qui ont un
+    état « annulé » posent la même classe : rendez-vous, soins, procédures,
+    hospitalisations, factures.
+    """
+
+    def setUp(self):
+        self.user = _soins_user(
+            'u_grise', perms=('view_soin', 'view_proceduresoin'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _html(self, url):
+        reponse = self.client.get(url + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_un_soin_annule_porte_la_classe(self):
+        _soin(statut='annule')
+        self.assertIn('class="ligne-annulee"', self._html(reverse('soins:list')))
+
+    def test_un_soin_en_cours_ne_la_porte_pas(self):
+        """Sans cette moitié, le test précédent passerait si tout était grisé."""
+        _soin(statut='en_cours')
+        self.assertNotIn('class="ligne-annulee"', self._html(reverse('soins:list')))
+
+    def test_une_procedure_annulee_porte_la_classe(self):
+        _procedure(statut='annule')
+        self.assertIn('class="ligne-annulee"',
+                      self._html(reverse('soins:procedure_list')))
+
+    def test_une_procedure_terminee_ne_la_porte_pas(self):
+        _procedure(statut='termine')
+        self.assertNotIn('class="ligne-annulee"',
+                         self._html(reverse('soins:procedure_list')))
+
+    def test_les_deux_cas_cohabitent_dans_la_meme_liste(self):
+        """Une seule ligne grisée sur deux : la classe suit bien l'état."""
+        _soin(statut='annule')
+        _soin(statut='en_cours')
+        self.assertEqual(self._html(reverse('soins:list')).count(
+            'class="ligne-annulee"'), 1)

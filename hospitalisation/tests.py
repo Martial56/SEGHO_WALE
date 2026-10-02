@@ -1234,3 +1234,42 @@ class TestLeBoutonNouvelleEvaluationDansLeFormulaire(TestCase):
         html = self._html(nouvelle=True)
         self.assertIn('name="eval_nouvelle" value="1"', html)
         self.assertIn('les constantes précédentes sont conservées', html)
+
+
+# ─── Le grisé des lignes annulées ──────────────────────────────────────────────
+
+class TestLaLigneAnnuleeEstGrisee(TestCase):
+    """Une hospitalisation annulée s'efface du regard sans quitter le tableau.
+
+    Même règle que les rendez-vous, les soins et les factures :
+    `.ligne-annulee` vit dans `static/css/global.css` et chaque liste qui a un
+    état « annulé » pose la classe sur sa ligne.
+    """
+
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user('u_h_grise', password='x')
+        self.user.user_permissions.add(Permission.objects.get(
+            codename='view_hospitalisation',
+            content_type__app_label='hospitalisation'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _html(self):
+        reponse = self.client.get(reverse('hospitalisation:list') + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_une_hospitalisation_annulee_porte_la_classe(self):
+        _hosp(statut='annule')
+        self.assertIn('class="ligne-annulee"', self._html())
+
+    def test_une_hospitalisation_en_cours_ne_la_porte_pas(self):
+        """Sans cette moitié, le test précédent passerait si tout était grisé."""
+        _hosp(statut='hospitalise')
+        self.assertNotIn('class="ligne-annulee"', self._html())
+
+    def test_les_deux_cas_cohabitent_dans_la_meme_liste(self):
+        _hosp(statut='annule')
+        _hosp(statut='hospitalise')
+        self.assertEqual(self._html().count('class="ligne-annulee"'), 1)
