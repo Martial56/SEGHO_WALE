@@ -61,6 +61,13 @@ class HospitalisationForm(forms.ModelForm):
         self.fields['medecin_referent'].label_from_instance = lambda m: f"{m.nom} {m.prenoms}"
         self.fields['patient'].empty_label          = 'Rechercher un patient…'
         self.fields['medecin_traitant'].empty_label = 'Sélectionner un docteur…'
+        # Une demande d'hospitalisation sans docteur n'a pas de sens : c'est lui
+        # qui la prescrit. Le champ reste facultatif au niveau du modèle — les
+        # dossiers anciens ne doivent pas devenir invalides — mais le formulaire
+        # l'exige, et `required` fait dire au navigateur « Veuillez renseigner
+        # ce champ » avant même l'envoi.
+        self.fields['medecin_traitant'].required = True
+        self.fields['medecin_traitant'].widget.attrs['required'] = 'required'
         self.fields['maladie'].empty_label          = 'Sélectionner une maladie…'
         self.fields['medecin_referent'].empty_label = 'Sélectionner un médecin…'
 

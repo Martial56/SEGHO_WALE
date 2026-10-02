@@ -1923,3 +1923,132 @@ class TestLesBoutonsDeCreationSuiventLaPermission(TestCase):
         client = Client()
         client.login(username='u_bt_sans', password='x')
         self.assertEqual(client.get(reverse('facturation:create')).status_code, 403)
+
+
+# ─── Le prix d'une ligne ───────────────────────────────────────────────────────
+
+class TestLePrixDeLaLigneSuitLaPermission(TestCase):
+    """Le prix du catalogue est un défaut, pas un verrou.
+
+    Une perfusion vaut ce que valent les produits qu'on y a mis : le montant ne
+    se connaît qu'au comptoir. Il fallait auparavant aller corriger la
+    prestation avant de valider la facture. Mais un prix libre est aussi une
+    remise sans trace, d'où la permission.
+    """
+
+    def setUp(self):
+        from services.models import Articleservice, CategorieArticle
+
+        self.patient = _patient('PX')
+        categorie, _ = CategorieArticle.objects.get_or_create(
+            code='PERF', defaults={'nom': 'Perfusions'})
+        self.article = Articleservice.objects.create(
+            nom='PERFUSION', categorie=categorie, prix_vente=Decimal('3500'))
+
+        self.sans = _caisse_user('u_px_sans')
+        self.avec = _caisse_user('u_px_avec')
+        # Rouvrir une facture en brouillon demande son propre droit, distinct
+        # de celui du prix : les deux comptes l'ont, pour que les tests d'écran
+        # ne mesurent que la différence qui nous intéresse.
+        change = Permission.objects.get(content_type__app_label='facturation',
+                                        codename='change_facture')
+        self.sans.user_permissions.add(change)
+        self.avec.user_permissions.add(change)
+        self.avec.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='can_modifier_prix_ligne'))
+
+    def _poster(self, username, prix, reference=True):
+        client = Client()
+        client.login(username=username, password='x')
+        donnees = {
+            'type_facture': 'consultation', 'montant_assurance': '0',
+            'ticket_moderateur': '0', 'notes': '',
+            'ligne_libelle_0': 'PERFUSION',
+            'ligne_qte_0': '2',
+            'ligne_prix_0': prix,
+            'ligne_remise_0': '0',
+            'pay_montant': '0', 'pay_mode': 'especes',
+        }
+        if reference:
+            donnees['ligne_service_0'] = f'a:{self.article.pk}'
+        client.post(reverse('facturation:create') + f'?patient={self.patient.pk}',
+                    donnees, follow=True)
+        return LigneFacture.objects.get()
+
+    # ── Le serveur ─────────────────────────────────────────────────────────
+
+    def test_avec_la_permission_le_prix_saisi_est_retenu(self):
+        ligne = self._poster('u_px_avec', '5000')
+        self.assertEqual(ligne.prix_unitaire, Decimal('5000.00'))
+        self.assertEqual(ligne.facture.montant_total, Decimal('10000.00'))
+
+    def test_sans_la_permission_le_prix_du_catalogue_est_retabli(self):
+        """La case grisée ne protège de rien : un `readonly` se contourne."""
+        ligne = self._poster('u_px_sans', '5000')
+        self.assertEqual(ligne.prix_unitaire, Decimal('3500.00'),
+                         "Le prix posté a été retenu malgré l'absence de droit")
+        self.assertEqual(ligne.facture.montant_total, Decimal('7000.00'))
+
+    def test_le_catalogue_n_est_jamais_modifie(self):
+        self._poster('u_px_avec', '5000')
+        self.article.refresh_from_db()
+        self.assertEqual(self.article.prix_vente, Decimal('3500'))
+
+    def test_une_ligne_sans_reference_garde_son_prix(self):
+        """Tapée à la main, elle n'a aucun prix de catalogue où revenir."""
+        ligne = self._poster('u_px_sans', '4200', reference=False)
+        self.assertEqual(ligne.prix_unitaire, Decimal('4200.00'))
+
+    def test_le_prix_du_catalogue_passe_tel_quel_sans_permission(self):
+        """Le cas ordinaire : l'écran poste le défaut, rien ne change."""
+        ligne = self._poster('u_px_sans', '3500')
+        self.assertEqual(ligne.prix_unitaire, Decimal('3500.00'))
+
+    # ── L'écran ────────────────────────────────────────────────────────────
+
+    def _page(self, username):
+        client = Client()
+        client.login(username=username, password='x')
+        reponse = client.get(
+            reverse('facturation:create') + f'?patient={self.patient.pk}')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_sans_la_permission_les_cases_restent_figees(self):
+        html = self._page('u_px_sans')
+        self.assertNotIn('name="ligne_prix_0" value="0" min="0" step="1" oninput=', html)
+        self.assertIn('name="ligne_prix_0" value="0" min="0" step="1" readonly', html)
+
+    def test_avec_la_permission_les_cases_s_ouvrent(self):
+        html = self._page('u_px_avec')
+        self.assertIn('name="ligne_prix_0" value="0" min="0" step="1" oninput=', html)
+        self.assertNotIn('name="ligne_prix_0" value="0" min="0" step="1" readonly', html)
+
+    def test_la_ligne_ajoutee_en_javascript_suit_la_meme_regle(self):
+        """La case fabriquée par le navigateur lit le même drapeau."""
+        self.assertIn("var FIGE_PRIX = '';", self._page('u_px_avec'))
+        self.assertIn('var FIGE_PRIX = \' readonly', self._page('u_px_sans'))
+
+    def _page_avec_lignes(self, username):
+        """La même page, mais avec des lignes déjà posées.
+
+        C'est un autre bloc du gabarit : la boucle des lignes pré-remplies,
+        qu'une facture neuve ne rend jamais. Sans ce test, on pouvait ouvrir
+        cette case-là à tout le monde sans que rien ne proteste.
+        """
+        facture = _facture(patient=self.patient, statut='brouillon')
+        LigneFacture.objects.create(
+            facture=facture, libelle='PERFUSION', quantite=Decimal('2'),
+            prix_unitaire=Decimal('3500'), remise=0, article=self.article)
+        client = Client()
+        client.login(username=username, password='x')
+        reponse = client.get(reverse('facturation:edit', args=[facture.pk]))
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_les_lignes_deja_posees_suivent_aussi_la_permission(self):
+        sans = self._page_avec_lignes('u_px_sans')
+        avec = self._page_avec_lignes('u_px_avec')
+        self.assertIn('name="ligne_prix_0" value="3500" min="0" step="1" readonly', sans)
+        self.assertIn('name="ligne_prix_0" value="3500" min="0" step="1" oninput=', avec)

@@ -139,6 +139,9 @@ select.field-ul {
   background-repeat:no-repeat; background-position:right 4px center; padding-right:22px; cursor:pointer;
 }
 .field-label { display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:3px; }
+/* Les trois champs sans lesquels une demande ne peut pas être enregistrée.
+   Même marque que les formulaires de rendez-vous. */
+.field-label .required-star { color:var(--rose); margin-left:2px; }
 .field-error { font-size:11.5px; color:#e53935; margin-top:2px; }
 
 /* ── Onglets (comme .det-card / .tab-nav de detail.html) ── */
@@ -167,7 +170,6 @@ select.field-ul {
   border-radius:100px; font-size:10px; font-weight:700;
   background:var(--teal-100); color:var(--accent-text);
 }
-.mo-tab-disabled { opacity:.38; cursor:not-allowed !important; pointer-events:none; }
 .mo-eval-readonly input, .mo-eval-readonly select, .mo-eval-readonly textarea { pointer-events:none; background:var(--bg); opacity:.7; }
 .tab-pane { display:none; padding:24px 28px; }
 .tab-pane.active { display:block; }
@@ -365,7 +367,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         <div class="fields-grid">
 
           <div class="full">
-            <label class="field-label">Patient</label>
+            <label class="field-label">Patient <span class="required-star">*</span></label>
             {% if lock_patient %}
               <div class="field-locked-val" title="Verrouillé — {{ hosp.get_statut_display }}">
                 <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.patient }}
@@ -387,7 +389,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           </div>
 
           <div>
-            <label class="field-label">Date de la demande d'hospitalisation</label>
+            <label class="field-label">Date de la demande d'hospitalisation <span class="required-star">*</span></label>
             {% if mode_chambre_seule and hosp.date_admission or mode_soins_seuls and hosp.date_admission or mode_decharge_seule and hosp.date_admission %}
               <input type="text" class="field-ul" readonly style="pointer-events:none;"
                      value="{{ hosp.date_admission|date:'d/m/Y H:i' }}">
@@ -410,7 +412,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           </div>
 
           <div>
-            <label class="field-label">Docteur</label>
+            <label class="field-label">Docteur <span class="required-star">*</span></label>
             {% if mode_chambre_seule and hosp.medecin_traitant_id or mode_soins_seuls and hosp.medecin_traitant_id or mode_decharge_seule and hosp.medecin_traitant_id %}
               <input type="text" class="field-ul" readonly style="pointer-events:none;"
                      value="{{ hosp.medecin_traitant }}">
@@ -420,10 +422,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
                 <i class="bi bi-lock" style="font-size:10px;opacity:.45;flex-shrink:0;"></i>{{ hosp.medecin_traitant }}
               </div>
               <input type="hidden" name="medecin_traitant" value="{{ hosp.medecin_traitant_id }}">
-            {% elif is_mo %}
+            {% elif is_mo and mo_medecin %}
               <input type="text" class="field-ul" readonly style="pointer-events:none;"
-                     value="{{ mo_medecin|default:'' }}">
-              {% if mo_medecin %}<input type="hidden" name="medecin_traitant" id="id_medecin_traitant" value="{{ mo_medecin.pk }}">{% endif %}
+                     value="{{ mo_medecin }}">
+              <input type="hidden" name="medecin_traitant" id="id_medecin_traitant" value="{{ mo_medecin.pk }}">
+            {% comment %}Mise en observation depuis un rendez-vous sans médecin :
+            la case figée n'envoyait rien, et le champ étant devenu obligatoire,
+            le formulaire refusait l'enregistrement sans offrir où le corriger.
+            On rend donc la liste, comme pour une demande ordinaire.{% endcomment %}
             {% else %}
               {{ form.medecin_traitant }}
               {% if form.medecin_traitant.errors %}<div class="field-error">{{ form.medecin_traitant.errors|join:", " }}</div>{% endif %}
@@ -479,10 +485,10 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     <div class="hist-wrapper"><div class="hist-main">
     <div class="tabs-wrap">
       <div class="tabs-nav">
-        <button type="button" class="tab-btn{% if is_mo %} mo-tab-disabled{% endif %}" {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-general', this)"{% endif %}>
+        <button type="button" class="tab-btn" onclick="switchTab('tab-general', this)">
           <i class="bi bi-info-circle" style="font-size:13px;"></i> Informations
         </button>
-        <button type="button" class="tab-btn{% if is_mo %} mo-tab-disabled{% endif %}" {% if not is_mo and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-controle', this)"{% endif %}>
+        <button type="button" class="tab-btn" onclick="switchTab('tab-controle', this)">
           <i class="bi bi-list-check" style="font-size:13px;"></i> Listes de contrôle
         </button>
         {% comment %}
@@ -490,14 +496,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
           bouton « Nouvelle évaluation » d'un dossier confirmé ou en cours
           ouvrirait un onglet verrouillé.
         {% endcomment %}
-        <button type="button" class="tab-btn" {% if eval_nouvelle or not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-evaluation', this)"{% endif %}>
+        <button type="button" class="tab-btn" onclick="switchTab('tab-evaluation', this)">
           <i class="bi bi-heart-pulse" style="font-size:13px;"></i> Évaluation clinique
         </button>
         <button type="button" class="tab-btn" onclick="switchTab('tab-soins', this)">
           <i class="bi bi-bandaid" style="font-size:13px;"></i> Soins
         </button>
         {% if edit and hosp.statut in 'confirme,hospitalise,decharge,termine' %}
-        <button type="button" class="tab-btn" {% if not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}onclick="switchTab('tab-services', this)"{% endif %}>
+        <button type="button" class="tab-btn" onclick="switchTab('tab-services', this)">
           <i class="bi bi-receipt" style="font-size:13px;"></i> Services à facturer
           {% if saf_non_factures %}<span class="tab-bdg">{{ saf_non_factures }}</span>{% endif %}
         </button>
@@ -699,13 +705,26 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         constantes d'une consultation. Il s'affichait aussi en modification, où
         rien de tel ne se produit. Chaque cas dit maintenant ce qu'il fait
         vraiment.{% endcomment %}
+        {% comment %}Le bouton n'existait que sur la fiche : depuis le
+        formulaire, il fallait en ressortir pour ajouter un relevé. Il mène au
+        même endroit — la page se recharge avec `nouvelle=1`, et les constantes
+        déjà enregistrées sont conservées au lieu d'être corrigées.{% endcomment %}
+        {% if edit and not eval_nouvelle %}
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+          <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=evaluation&amp;nouvelle=1"
+             class="abtn abtn-ghost">
+            <i class="bi bi-plus-lg"></i> Nouvelle évaluation
+          </a>
+        </div>
+        {% endif %}
+
         <div class="ev-note">
           <i class="bi bi-info-circle"></i>
           {% if eval_nouvelle %}
           Nouveau relevé : les constantes précédentes sont conservées, celui-ci s'y ajoute.
           {% elif edit %}
           Vous corrigez le dernier relevé. Pour en enregistrer un nouveau, utilisez
-          « Nouvelle évaluation » depuis la fiche.
+          le bouton « Nouvelle évaluation » ci-dessus.
           {% else %}
           Les mesures reprennent, si elles existent, les dernières constantes relevées
           en consultation. À vérifier avant d'enregistrer.
@@ -895,6 +914,20 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         html[data-theme="dark"] .vs-table tbody tr { border-color:var(--border-strong); }
         html[data-theme="dark"] .vs-input { color:var(--text); }
 
+        /* ── Soin déjà facturé et payé ──
+           La ligne reste lisible et se distingue des autres sans crier. Tout y
+           est figé sauf la colonne Soignant(e) : corriger qui a donné le soin
+           n'est pas une question d'argent. `pointer-events` sur le `select`
+           parce que `readonly` n'existe pas pour lui — le champ reste posté,
+           ce qui garde les index alignés sur les lignes du tableau. */
+        .vs-row-payee { background:var(--surface-muted); }
+        html[data-theme="dark"] .vs-row-payee { background:rgba(255,255,255,.03); }
+        .vs-row-payee .vs-input[readonly],
+        .vs-row-payee .field-ul[readonly],
+        .vs-row-payee .vs-fige { color:var(--text-muted); cursor:default; }
+        .vs-row-payee .vs-fige { pointer-events:none; }
+        .vs-cadenas { color:var(--text-muted); font-size:11px; }
+
         </style>
 
         <!-- Soins infirmiers -->
@@ -911,16 +944,25 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
             </tr>
           </thead>
           <tbody id="tbody-vi">
+            {% comment %}Une ligne dont la facture est payée restait invisible :
+            on ne pouvait plus y nommer le soignant, ni même voir qu'elle
+            existait. Elle s'affiche désormais, figée — le soin, la date et la
+            quantité sont ce qui a été réglé — et seule la colonne Soignant(e)
+            reste ouverte. Les champs gardent leur `name` pour que les index
+            postés restent alignés sur les lignes du tableau ; le serveur, lui,
+            n'en relit que l'infirmière.{% endcomment %}
             {% for v in visites_inf %}
-            {% if v.pk not in vi_payees_ids %}
-            <tr>
+            {% with payee=v.payee %}
+            <tr{% if payee %} class="vs-row-payee" title="Soin déjà facturé et payé"{% endif %}>
               <td>
                 <input type="hidden" name="vi_id[]" value="{{ v.pk }}">
                 <input type="datetime-local" name="vi_date[]" class="field-ul"
-                       value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}">
+                       value="{% if v.date %}{{ v.date|date:'Y-m-d' }}T{{ v.date|date:'H:i' }}{% endif %}"
+                       {% if payee %}readonly tabindex="-1"{% endif %}>
               </td>
               <td>
-                <select name="vi_soin[]" class="vs-select">
+                <select name="vi_soin[]" class="vs-select{% if payee %} vs-fige{% endif %}"
+                        {% if payee %}tabindex="-1"{% endif %}>
                   <option value="">—</option>
                   {% for s in services_list %}
                   <option value="{{ s.pk }}" {% if v.soin_id == s.pk %}selected{% endif %}>{{ s.nom }}</option>
@@ -930,7 +972,8 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
                   {% endif %}
                 </select>
               </td>
-              <td><input type="number" name="vi_quantite[]" class="vs-input" step="1" value="{{ v.quantite|valeur_champ }}"></td>
+              <td><input type="number" name="vi_quantite[]" class="vs-input" step="1" value="{{ v.quantite|valeur_champ }}"
+                         {% if payee %}readonly tabindex="-1"{% endif %}></td>
               <td>
                 <select name="vi_infirmiere[]" class="vs-select">
                   <option value="">—</option>
@@ -939,10 +982,14 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
                   {% endfor %}
                 </select>
               </td>
-              <td><input type="text" name="vi_remarques[]" class="vs-input" value="{{ v.remarques }}" placeholder="Remarques…"></td>
-              <td><button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button></td>
+              <td><input type="text" name="vi_remarques[]" class="vs-input" value="{{ v.remarques }}" placeholder="Remarques…"
+                         {% if payee %}readonly tabindex="-1"{% endif %}></td>
+              {% comment %}Un soin payé ne se supprime pas : la corbeille cède
+              la place au cadenas qui dit pourquoi.{% endcomment %}
+              <td>{% if payee %}<i class="bi bi-lock-fill vs-cadenas" title="Soin facturé et payé"></i>
+                  {% else %}<button type="button" class="vs-del-btn" onclick="this.closest('tr').remove()"><i class="bi bi-trash3"></i></button>{% endif %}</td>
             </tr>
-            {% endif %}
+            {% endwith %}
             {% endfor %}
           </tbody>
         </table>

@@ -270,8 +270,10 @@ def facture_create(request):
                 facture.rendez_vous = rdv_obj
             facture.save()
 
-            total = _save_lignes(facture, request.POST,
-                                 pharmacie_active(request))
+            total = _save_lignes(
+                facture, request.POST, pharmacie_active(request),
+                prix_libre=request.user.has_perm(
+                    'facturation.can_modifier_prix_ligne'))
             facture.montant_total = total
             # Le type suit ce qu'on a mis dedans : une seule nature donne ce
             # type, plusieurs donnent « Mixte ». Le caissier n'a plus à y
@@ -536,8 +538,10 @@ def facture_edit(request, pk):
         if form.is_valid():
             facture = form.save(commit=False)
             facture.lignes.all().delete()
-            total = _save_lignes(facture, request.POST,
-                                 pharmacie_active(request))
+            total = _save_lignes(
+                facture, request.POST, pharmacie_active(request),
+                prix_libre=request.user.has_perm(
+                    'facturation.can_modifier_prix_ligne'))
             facture.montant_total = total
             facture.appliquer_type_deduit(save=False)
             facture.save()
@@ -773,13 +777,53 @@ def _poser_ligne_demande(ligne, brut):
         pass
 
 
-def _save_lignes(facture, POST, pharmacie=None):
+#: Préfixes de `ligne_service_N` : `a:` pour un article du catalogue des
+#: prestations, `p:` pour un produit de la pharmacie (voir `_poser_origine`).
+def _prix_du_catalogue(reference):
+    """Le prix de référence de l'article ou du produit désigné, ou None.
+
+    None pour une ligne tapée à la main : elle n'a aucun prix de référence, et
+    il n'y a donc rien à quoi la ramener.
+    """
+    if not reference or ':' not in reference:
+        return None
+    source, _, brut = reference.partition(':')
+    try:
+        pk = int(brut)
+    except (TypeError, ValueError):
+        return None
+    if source == 'a':
+        from services.models import Articleservice
+        article = Articleservice.objects.filter(pk=pk).values_list(
+            'prix_vente', flat=True).first()
+        return float(article) if article is not None else None
+    if source == 'p':
+        from stock.models import Produit
+        produit = Produit.objects.filter(pk=pk).values_list(
+            'prix_vente', flat=True).first()
+        return float(produit) if produit is not None else None
+    return None
+
+
+def _save_lignes(facture, POST, pharmacie=None, prix_libre=True):
+    """Enregistre les lignes postées et rend le total.
+
+    `prix_libre` dit si la personne a le droit de poser un prix de son choix
+    (`facturation.can_modifier_prix_ligne`). Sans ce droit, le prix du
+    catalogue est rétabli : la case grisée à l'écran ne protège de rien, un
+    champ `readonly` est posté comme les autres et se modifie depuis le
+    navigateur.
+    """
     total = 0
     for i in _indices_des_lignes(POST):
         libelle = POST.get(f'ligne_libelle_{i}')
         if libelle and libelle.strip():
             qte    = _parse_float(POST.get(f'ligne_qte_{i}', 1), 1)
             prix   = _parse_float(POST.get(f'ligne_prix_{i}', 0), 0)
+            if not prix_libre:
+                reference = _prix_du_catalogue(POST.get(f'ligne_service_{i}'))
+                if reference is not None:
+                    prix = reference
             remise = _parse_float(POST.get(f'ligne_remise_{i}', 0), 0)
             ligne  = LigneFacture(
                 facture=facture,

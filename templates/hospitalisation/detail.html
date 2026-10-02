@@ -205,7 +205,6 @@ fiche en ayant plusieurs.{% endcomment %}
 }
 .tab-btn.active { color: var(--accent-text-soft); border-bottom-color: var(--teal-500); font-weight: 700; }
 .tab-btn:hover:not(.active) { color: var(--text); }
-.tab-btn.tab-locked { opacity: .4; cursor: not-allowed; pointer-events: none; }
 .tab-bdg {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px;
@@ -792,8 +791,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           Facturation
           <span class="tab-bdg" id="bdg-factures">{{ nb_factures }}</span>
         </button>
-        <button class="tab-btn{% if hosp.statut not in 'decharge,termine' %} tab-locked{% endif %}" data-tab="decharge" role="tab" aria-selected="false"
-                {% if hosp.statut not in 'decharge,termine' %}title="Disponible une fois le patient déchargé"{% endif %}>
+        {% comment %}La fiche ne fait que montrer : l'onglet Décharge était
+        verrouillé tant que le patient n'était pas sorti, on ne pouvait donc pas
+        consulter ce qui s'y trouvait déjà. Il s'ouvre maintenant comme les
+        autres — c'est le formulaire, et lui seul, qui décide de ce qui
+        s'enregistre.{% endcomment %}
+        <button class="tab-btn" data-tab="decharge" role="tab" aria-selected="false">
           <i class="bi bi-file-medical" style="font-size:13px;"></i>
           Décharge
         </button>

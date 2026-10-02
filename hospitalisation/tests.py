@@ -859,3 +859,378 @@ class TestParcoursDecharge(TestCase):
         self.hosp.refresh_from_db()
         self.assertEqual(self.hosp.statut, 'decharge')
         self.assertEqual(self.hosp.etablissement_destination, 'CHU Yamoussoukro')
+
+
+# ─── Les onglets s'ouvrent tous ────────────────────────────────────────────────
+
+def _compte(username, *codenames):
+    user = User.objects.create_user(username, password='x')
+    for code in codenames:
+        # « app.codename », ou le seul codename pour ce module-ci.
+        app, codename = code.split('.') if '.' in code else ('hospitalisation', code)
+        user.user_permissions.add(Permission.objects.get(
+            content_type__app_label=app, codename=codename))
+    return user
+
+
+class TestLesOngletsSontTousCliquables(TestCase):
+    """Consulter un onglet n'est pas y écrire.
+
+    Quatre onglets du formulaire perdaient leur `onclick` dès qu'on entrait en
+    mode réduit — attribution de chambre, soins seuls, décharge — et les deux
+    premiers étaient grisés en mode M.O. Sur la fiche, l'onglet « Décharge »
+    restait verrouillé tant que le patient n'était pas sorti.
+
+    Ce verrou ne protégeait rien : `hospitalisation_edit` branche la
+    sauvegarde sur le mode, et chaque mode réduit n'enregistre que ce qui le
+    concerne avant de repartir. Il empêchait seulement de **regarder**.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Ong')
+        self.medecin = _medecin('Ong')
+
+    def _page(self, user, url):
+        from django.test import Client
+        client = Client()
+        client.force_login(user)
+        reponse = client.get(url)
+        self.assertEqual(reponse.status_code, 200, url)
+        return reponse.content.decode()
+
+    # ── Le formulaire ──────────────────────────────────────────────────────
+
+    def test_en_mode_soins_seuls_les_onglets_restent_cliquables(self):
+        """Un compte qui ne peut qu'ajouter un soin peut quand même consulter."""
+        hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        user = _compte('u_ong_soins', 'view_hospitalisation', 'can_ajouter_soin')
+        html = self._page(user, reverse('hospitalisation:edit', args=[hosp.pk]))
+        for onglet in ('tab-general', 'tab-controle', 'tab-evaluation', 'tab-soins'):
+            with self.subTest(onglet=onglet):
+                self.assertIn(f"switchTab('{onglet}', this)", html)
+
+    def test_en_mode_decharge_les_onglets_restent_cliquables(self):
+        hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        user = _compte('u_ong_dech', 'view_hospitalisation', 'can_decharger_patient')
+        html = self._page(user, reverse('hospitalisation:edit', args=[hosp.pk]))
+        for onglet in ('tab-general', 'tab-controle', 'tab-evaluation'):
+            with self.subTest(onglet=onglet):
+                self.assertIn(f"switchTab('{onglet}', this)", html)
+
+    def test_plus_aucun_onglet_n_est_grise(self):
+        hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        user = _compte('u_ong_gris', 'view_hospitalisation', 'change_hospitalisation')
+        html = self._page(user, reverse('hospitalisation:edit', args=[hosp.pk]))
+        self.assertNotIn('mo-tab-disabled', html)
+
+    # ── La fiche ───────────────────────────────────────────────────────────
+
+    def test_l_onglet_decharge_de_la_fiche_s_ouvre_avant_la_sortie(self):
+        hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        user = _compte('u_ong_fiche', 'view_hospitalisation')
+        html = self._page(user, reverse('hospitalisation:detail', args=[hosp.pk]))
+        self.assertIn('data-tab="decharge"', html)
+        self.assertNotIn('tab-locked', html)
+
+    # ── Ce que le serveur continue de refuser ──────────────────────────────
+
+    def test_le_mode_soins_seuls_n_enregistre_toujours_que_les_soins(self):
+        """Le verrou est côté serveur, et il n'a pas bougé.
+
+        Sans ce test, ouvrir les onglets aurait pu passer pour une permission
+        d'écrire dedans.
+        """
+        hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        hosp.nom_parent_gardien = 'Avant'
+        hosp.save(update_fields=['nom_parent_gardien'])
+
+        user = _compte('u_ong_post', 'view_hospitalisation', 'can_ajouter_soin')
+        from django.test import Client
+        client = Client()
+        client.force_login(user)
+        client.post(reverse('hospitalisation:edit', args=[hosp.pk]),
+                    {'nom_parent_gardien': 'Après', 'patient': self.patient.pk},
+                    follow=True)
+
+        hosp.refresh_from_db()
+        self.assertEqual(hosp.nom_parent_gardien, 'Avant',
+                         "Un champ hors du mode réduit a été enregistré")
+
+
+# ─── Le soignant d'un soin déjà payé ───────────────────────────────────────────
+
+class TestLeSoignantResteCorrigeableApresPaiement(TestCase):
+    """Un soin payé gardait son soignant pour toujours — y compris vide.
+
+    La ligne disparaissait du tableau (`vi_payees_ids` la filtrait à
+    l'affichage) et le serveur la sautait d'un `continue`. Un soignant oublié
+    au moment de la saisie ne pouvait plus être renseigné nulle part.
+
+    Ce qu'un paiement doit protéger, c'est le soin facturé et son prix. Le nom
+    de la personne qui l'a donné est une correction d'identité : elle reste
+    ouverte, et elle seule.
+    """
+
+    def setUp(self):
+        from .models import ServiceAFacturer, VisiteInfirmiere
+
+        self.patient = _patient('Soi')
+        self.medecin = _medecin('Soi')
+        self.infirmiere = _medecin('Inf')
+        self.hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        self.article = _article()
+
+        self.visite = VisiteInfirmiere.objects.create(
+            hospitalisation=self.hosp, date=timezone.now(), soin=self.article,
+            quantite=Decimal('1'), infirmiere=None, remarques='Avant', ordre=0)
+        # C'est `ordre` qui porte la clé de la visite, côté service à facturer.
+        ServiceAFacturer.objects.create(
+            hospitalisation=self.hosp, service=self.article,
+            quantite=Decimal('1'), date=timezone.now(),
+            source='visite_infirmiere', ordre=self.visite.pk,
+            facture=_facture_payee(self.hosp))
+
+        self.user = _compte('u_soi', 'view_hospitalisation',
+                            'change_hospitalisation', 'can_ajouter_soin')
+
+    def _poster(self, infirmiere_pk, **extra):
+        from django.test import Client
+
+        donnees = {
+            'patient': self.patient.pk,
+            'vi_id[]': str(self.visite.pk),
+            'vi_date[]': '',
+            'vi_soin[]': str(self.article.pk),
+            'vi_quantite[]': '1',
+            'vi_unite[]': '',
+            'vi_infirmiere[]': str(infirmiere_pk) if infirmiere_pk else '',
+            'vi_remarques[]': 'Avant',
+        }
+        donnees.update(extra)
+        client = Client()
+        client.force_login(self.user)
+        client.post(reverse('hospitalisation:edit', args=[self.hosp.pk]),
+                    donnees, follow=True)
+        self.visite.refresh_from_db()
+
+    def test_le_soignant_peut_etre_renseigne_apres_le_paiement(self):
+        self._poster(self.infirmiere.pk)
+        self.assertEqual(self.visite.infirmiere_id, self.infirmiere.pk)
+
+    def test_le_soignant_peut_aussi_etre_retire(self):
+        self.visite.infirmiere = self.infirmiere
+        self.visite.save(update_fields=['infirmiere'])
+        self._poster(None)
+        self.assertIsNone(self.visite.infirmiere_id)
+
+    def test_le_reste_de_la_ligne_demeure_fige(self):
+        """Ce qui a été facturé ne bouge pas, même posté autrement."""
+        autre = Articleservice.objects.create(
+            nom='Autre soin', prix_vente=Decimal('99'))
+        self._poster(self.infirmiere.pk, **{
+            'vi_soin[]': str(autre.pk),
+            'vi_quantite[]': '7',
+            'vi_remarques[]': 'Après',
+        })
+        self.assertEqual(self.visite.soin_id, self.article.pk, 'Le soin a changé')
+        self.assertEqual(self.visite.quantite, Decimal('1'), 'La quantité a changé')
+        self.assertEqual(self.visite.remarques, 'Avant', 'Les remarques ont changé')
+
+    def test_la_ligne_payee_ne_peut_pas_etre_supprimee(self):
+        """Postée sans son identifiant, elle doit survivre."""
+        from django.test import Client
+        from .models import VisiteInfirmiere
+
+        client = Client()
+        client.force_login(self.user)
+        client.post(reverse('hospitalisation:edit', args=[self.hosp.pk]),
+                    {'patient': self.patient.pk}, follow=True)
+        self.assertTrue(VisiteInfirmiere.objects.filter(pk=self.visite.pk).exists())
+
+    def test_le_service_a_facturer_ne_bouge_pas(self):
+        from .models import ServiceAFacturer
+
+        avant = ServiceAFacturer.objects.get(ordre=self.visite.pk)
+        self._poster(self.infirmiere.pk)
+        apres = ServiceAFacturer.objects.get(ordre=self.visite.pk)
+        self.assertEqual(apres.facture_id, avant.facture_id)
+        self.assertEqual(apres.quantite, avant.quantite)
+
+    # ── L'écran ────────────────────────────────────────────────────────────
+
+    def _html(self):
+        from django.test import Client
+
+        client = Client()
+        client.force_login(self.user)
+        reponse = client.get(reverse('hospitalisation:edit', args=[self.hosp.pk]))
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_ligne_payee_s_affiche_de_nouveau(self):
+        html = self._html()
+        self.assertIn('class="vs-row-payee"', html)
+        self.assertIn(f'name="vi_id[]" value="{self.visite.pk}"', html)
+
+    def test_seule_la_colonne_soignant_reste_ouverte(self):
+        html = self._html()
+        self.assertIn('name="vi_soin[]" class="vs-select vs-fige"', html)
+        # La liste des soignants, elle, n'a reçu aucune classe de gel.
+        self.assertIn('name="vi_infirmiere[]" class="vs-select"', html)
+
+    def test_la_corbeille_cede_la_place_au_cadenas(self):
+        html = self._html()
+        self.assertIn('class="bi bi-lock-fill vs-cadenas"', html)
+
+
+# ─── Le docteur de la demande ──────────────────────────────────────────────────
+
+class TestLeDocteurEstObligatoireSurLaDemande(TestCase):
+    """Une demande d'hospitalisation sans docteur n'a pas de sens.
+
+    Le champ était facultatif : on pouvait enregistrer une demande sans
+    préciser qui la prescrit. Il reste facultatif au niveau du **modèle** — les
+    dossiers anciens ne doivent pas devenir invalides — mais le formulaire
+    l'exige, et le navigateur le signale avant même l'envoi.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Doc')
+        self.medecin = _medecin('Doc')
+
+    def test_le_formulaire_refuse_une_demande_sans_docteur(self):
+        from .forms import HospitalisationForm
+
+        form = HospitalisationForm({'patient': self.patient.pk})
+        self.assertFalse(form.is_valid())
+        self.assertIn('medecin_traitant', form.errors)
+        self.assertIn('obligatoire', ' '.join(form.errors['medecin_traitant']).lower())
+
+    def test_la_meme_demande_passe_avec_un_docteur(self):
+        """Sans cette moitié, le test précédent réussirait si tout était refusé."""
+        from .forms import HospitalisationForm
+
+        form = HospitalisationForm({
+            'patient': self.patient.pk,
+            'medecin_traitant': self.medecin.pk,
+            'date_admission': timezone.now().strftime('%Y-%m-%dT%H:%M'),
+        })
+        self.assertNotIn('medecin_traitant', form.errors)
+
+    def test_le_navigateur_le_signale_aussi(self):
+        """`required` sur le widget : le message sort sans aller-retour serveur."""
+        from .forms import HospitalisationForm
+
+        champ = HospitalisationForm().fields['medecin_traitant']
+        self.assertTrue(champ.required)
+        self.assertEqual(champ.widget.attrs.get('required'), 'required')
+
+    def test_le_modele_reste_tolerant(self):
+        """Les dossiers déjà enregistrés sans docteur restent valides."""
+        from .models import Hospitalisation
+
+        champ = Hospitalisation._meta.get_field('medecin_traitant')
+        self.assertTrue(champ.null)
+        self.assertTrue(champ.blank)
+
+    # ── Le piège de la mise en observation ─────────────────────────────────
+
+    def _page_mo(self, rdv):
+        from django.test import Client
+
+        user = _compte('u_doc_mo', 'view_hospitalisation', 'add_hospitalisation')
+        client = Client()
+        client.force_login(user)
+        reponse = client.get(
+            reverse('hospitalisation:create') + f'?rdv={rdv.pk}&patient={self.patient.pk}')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def _rdv(self, medecin):
+        from patients.models import RendezVous
+
+        return RendezVous.objects.create(
+            patient=self.patient, medecin=medecin, date_heure=timezone.now())
+
+    def test_en_mise_en_observation_le_docteur_du_rdv_est_repris(self):
+        html = self._page_mo(self._rdv(self.medecin))
+        self.assertIn(f'name="medecin_traitant" id="id_medecin_traitant" '
+                      f'value="{self.medecin.pk}"', html)
+
+    def test_un_rdv_sans_medecin_laisse_la_liste_ouverte(self):
+        """Sinon : champ obligatoire, rien de posté, et aucune case où corriger."""
+        html = self._page_mo(self._rdv(None))
+        self.assertIn('name="medecin_traitant"', html)
+        self.assertIn('<select', html)
+        self.assertNotIn('id="id_medecin_traitant" value=""', html)
+
+    # ── L'étoile rouge ─────────────────────────────────────────────────────
+
+    def test_les_trois_champs_obligatoires_portent_une_etoile(self):
+        """Marquer un seul des trois ferait croire les autres facultatifs."""
+        from .forms import HospitalisationForm
+
+        html = self._page_mo(self._rdv(self.medecin))
+        obligatoires = [nom for nom, champ in HospitalisationForm().fields.items()
+                        if champ.required]
+        self.assertEqual(sorted(obligatoires),
+                         ['date_admission', 'medecin_traitant', 'patient'])
+        for libelle in ('Patient', "Date de la demande d'hospitalisation", 'Docteur'):
+            with self.subTest(champ=libelle):
+                self.assertIn(
+                    f'{libelle} <span class="required-star">*</span>', html)
+
+
+# ─── « Nouvelle évaluation » depuis le formulaire ──────────────────────────────
+
+class TestLeBoutonNouvelleEvaluationDansLeFormulaire(TestCase):
+    """Le bouton n'existait que sur la fiche.
+
+    Depuis le formulaire, il fallait en ressortir pour ajouter un relevé —
+    alors que l'onglet « Évaluation clinique » est juste là. Il mène au même
+    endroit : la page se recharge avec `nouvelle=1`, et les constantes déjà
+    enregistrées sont conservées au lieu d'être corrigées.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Btn')
+        self.medecin = _medecin('Btn')
+        self.hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
+        self.user = _compte('u_btn', 'view_hospitalisation', 'change_hospitalisation')
+
+    def _html(self, nouvelle=False):
+        from django.test import Client
+
+        url = reverse('hospitalisation:edit', args=[self.hosp.pk])
+        if nouvelle:
+            url += '?nouvelle=1'
+        client = Client()
+        client.force_login(self.user)
+        reponse = client.get(url)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    #: L'adresse exacte vers laquelle il mène.
+    def _lien(self):
+        return (reverse('hospitalisation:edit', args=[self.hosp.pk])
+                + '?tab=evaluation&amp;nouvelle=1')
+
+    def test_le_bouton_est_present_en_modification(self):
+        html = self._html()
+        self.assertIn(self._lien(), html)
+        self.assertIn('Nouvelle évaluation', html)
+
+    def test_il_disparait_quand_on_y_est_deja(self):
+        """Inutile de proposer un nouveau relevé pendant qu'on en saisit un."""
+        self.assertNotIn(self._lien(), self._html(nouvelle=True))
+
+    def test_le_message_ne_renvoie_plus_a_la_fiche(self):
+        html = self._html()
+        self.assertIn('le bouton « Nouvelle évaluation » ci-dessus', html)
+        self.assertNotIn('« Nouvelle évaluation » depuis la fiche', html)
+
+    def test_le_lien_mene_bien_a_un_nouveau_releve(self):
+        """Suivre le bouton doit ouvrir le mode « ajout », pas « correction »."""
+        html = self._html(nouvelle=True)
+        self.assertIn('name="eval_nouvelle" value="1"', html)
+        self.assertIn('les constantes précédentes sont conservées', html)

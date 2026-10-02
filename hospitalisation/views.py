@@ -873,7 +873,18 @@ def _save_visites_infirmieres(hosp, POST, user=None):
                 obj = VisiteInfirmiere.objects.get(pk=int(pk_str), hospitalisation=hosp)
                 seen.add(obj.pk)
                 if obj.pk in payees_pks:
-                    # Ligne payée : on la conserve sans la modifier
+                    # Facture payée : le soin, sa date et sa quantité sont
+                    # figés — c'est eux qu'on a réglés. Nommer qui l'a donné
+                    # est une correction d'identité, pas d'argent : la ligne
+                    # disparaissait de l'écran, et un soignant oublié ne
+                    # pouvait plus être renseigné nulle part.
+                    #
+                    # `update_fields` est volontaire : rien d'autre ne doit
+                    # repartir en base, et `_sync_saf_from_visite` n'est pas
+                    # rappelé — le service à facturer ne bouge pas.
+                    if obj.infirmiere_id != (inf_obj.pk if inf_obj else None):
+                        obj.infirmiere = inf_obj
+                        obj.save(update_fields=['infirmiere'])
                     seen_saf_orders.add(obj.pk)
                     continue
                 obj.date=date_obj; obj.soin=soin_obj; obj.quantite=qte
@@ -1323,6 +1334,11 @@ def hospitalisation_edit(request, pk):
         source='visite_infirmiere', facture__statut='payee'
     ).values_list('ordre', flat=True))
 
+    visites_inf = list(hosp.visites_infirmieres.select_related(
+        'soin', 'unite_mesure', 'infirmiere').all())
+    for visite in visites_inf:
+        visite.payee = visite.pk in vi_payees_ids
+
     soins_pour_visites = list(Articleservice.objects.filter(
         actif=True, categorie__code='SN'
     ).order_by('nom'))
@@ -1364,7 +1380,7 @@ def hospitalisation_edit(request, pk):
         'eval_clin':          None if eval_nouvelle else eval_clin,
         'eval_nouvelle':      eval_nouvelle,
         # Tab 4 - Soins
-        'visites_inf':        list(hosp.visites_infirmieres.select_related('soin','unite_mesure','infirmiere').all()),
+        'visites_inf':        visites_inf,
         'visites_doc':        list(hosp.visites_docteur.select_related('soin','docteur').all()),
         'medecins_list':      medecins_list,
         'unites_list':        unites_list,
