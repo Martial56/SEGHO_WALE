@@ -213,6 +213,18 @@ class LigneFacture(models.Model):
         return arrondi_monetaire(
             self.quantite * self.prix_unitaire * (1 - self.remise / 100))
 
+    class Meta:
+        verbose_name = 'ligne facture'
+        verbose_name_plural = 'lignes facture'
+        # Le prix du catalogue n'est qu'un défaut : une perfusion vaut ce que
+        # valent les produits qu'on y a mis, et le montant ne se connaît qu'au
+        # comptoir. Sans ce droit, la case reste figée sur le prix catalogue —
+        # un prix libre est aussi une remise sans trace.
+        permissions = [
+            ('can_modifier_prix_ligne',
+             "Peut modifier le prix d'une ligne de facture"),
+        ]
+
 
 class Paiement(ModeleCentre):
     MODE = [('especes','Espèces'),('cheque','Chèque'),('mobile_money','Mobile Money'),('virement','Virement'),('assurance','Assurance'),('bon','Bon')]
