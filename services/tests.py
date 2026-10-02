@@ -60,7 +60,18 @@ class BaseListe(TestCase):
         self.client.force_login(User.objects.create_user('u_liste', password='x'))
 
     def noms(self, **params):
-        """Noms des prestations affichées, dans l'ordre du tableau."""
+        """Noms des prestations affichées, dans l'ordre du tableau.
+
+        Chaque appel simule une visite neuve. La liste retient désormais sa
+        dernière sélection (core.memoire_listing) ; sans cet oubli, un appel
+        sans paramètre rejouerait le filtre de l'appel précédent au lieu de
+        montrer le catalogue entier.
+        """
+        session = self.client.session
+        for cle in [c for c in session.keys() if c.startswith('listing:')]:
+            del session[cle]
+        session.save()
+
         reponse = self.client.get(self.url, params)
         self.assertEqual(reponse.status_code, 200)
         contenu = reponse.content.decode()

@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, permission_required
+from core import memoire_listing
 
 from modules_permissions.decorateurs import module_requis
 from django.views.decorators.http import require_POST
@@ -262,6 +263,10 @@ def dashboard_stats_json(request):
 
 @login_required(login_url='login')
 def dashboard(request):
+    # Repasser par l'accueil, c'est repartir de zéro : les sélections retenues
+    # dans les listes sont oubliées (voir core.memoire_listing).
+    memoire_listing.oublier_tout(request)
+
     from patients.models import RendezVous
     from consultations.models import Consultation
 
@@ -1081,6 +1086,12 @@ def gynecologie_registre_naissance(request):
         tri_defaut=('-date_accouchement',),
     )
 
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
+
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)
     qs = listing.appliquer_filtres(qs, filtres, {
@@ -1828,6 +1839,12 @@ def gynecologie_list(request):
         par_page=25,
         tri_defaut=('nom', 'prenoms'),
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)

@@ -8,6 +8,7 @@ from django.db.models import Count, F, Q, Sum
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.urls import reverse
+from core import memoire_listing
 
 from .models import Facture, LigneFacture, Acte, Paiement, Caisse
 from .forms import FactureForm
@@ -66,6 +67,12 @@ def facturation_list(request):
         tri_defaut=('-date_emission',),
         tris=TRIS,
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)

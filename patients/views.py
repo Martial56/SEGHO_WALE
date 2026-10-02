@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
+from core import memoire_listing
 from datetime import date, timedelta
 
 from . import origines as origines_patient
@@ -92,6 +93,12 @@ def patient_list(request):
         par_page=40,
         tri_defaut=('nom', 'prenoms'),
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)
@@ -519,6 +526,14 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     les mêmes menus : seule leur requête de départ diffère. La logique vit dans
     patients/rdv_listing.py pour que les deux ne divergent pas.
     """
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue dans
+    # l'URL (voir core.memoire_listing). Posée ici et non chez les appelants —
+    # les trois adresses passent par cette fonction, et chacune garde sa propre
+    # mémoire puisque la clé est le chemin.
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
+
     from datetime import date
     from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
                               conditions_demandees, menu_filtres, menu_groupes)

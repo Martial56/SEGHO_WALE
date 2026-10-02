@@ -10,7 +10,8 @@ Ces tests vérifient les deux moitiés de la correction : la permission ouvre la
 porte, et le nom du groupe qui la porte n'a aucune importance.
 """
 from django.contrib.auth.models import Group, Permission, User
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 
 from core.permissions import utilisateurs_avec
 
@@ -488,3 +489,90 @@ class TestModelesDImportMedecins(TestCase):
                              'spreadsheetml.sheet')})
 
         self.assertEqual(Specialite.objects.get(code='ZZS').nom, 'Spécialité de test')
+
+
+# ─── La sélection d'une liste survit à un aller-retour ─────────────────────────
+
+class TestMemoireDesListes(TestCase):
+    """Filtrer, ouvrir une fiche, revenir : le filtre doit être encore là.
+
+    Il ne tenait pas : la liste se rouvrait entière, et tout le travail de tri
+    était à refaire. La sélection vit dans l'URL, il suffit donc de l'y remettre
+    — plutôt que d'inventer un état caché que l'adresse affichée démentirait.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('u_mem', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse('patients:rdv_global')
+
+    def _ajax(self, url):
+        return self.client.get(url, headers={'x-requested-with': 'XMLHttpRequest'})
+
+    # ── Retenir et restaurer ───────────────────────────────────────────────
+
+    def test_revenir_sans_parametres_restaure_la_selection(self):
+        self.client.get(self.url + '?filter=aujourdhui&filter=demain&q=kouassi')
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('filter=aujourdhui', reponse.url)
+        self.assertIn('filter=demain', reponse.url)
+        self.assertIn('q=kouassi', reponse.url)
+
+    def test_les_valeurs_repetees_sont_toutes_gardees(self):
+        """Un dictionnaire n'en aurait retenu qu'une : `filter` se répète."""
+        self.client.get(self.url + '?filter=a&filter=b&filter=c')
+        reponse = self.client.get(self.url)
+        for valeur in ('filter=a', 'filter=b', 'filter=c'):
+            with self.subTest(valeur=valeur):
+                self.assertIn(valeur, reponse.url)
+
+    def test_sans_rien_de_retenu_la_liste_s_affiche_normalement(self):
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+
+    # ── Les trois façons d'oublier ─────────────────────────────────────────
+
+    def test_effacer_oublie_la_selection(self):
+        """« Effacer » rafraîchit la liste en AJAX, sans aucun paramètre."""
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.assertEqual(self._ajax(self.url).status_code, 200)
+        self.assertEqual(self.client.get(self.url).status_code, 200,
+                         'La sélection effacée a été restaurée')
+
+    def test_une_nouvelle_selection_ecrase_la_precedente(self):
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.client.get(self.url + '?filter=semaine')
+        reponse = self.client.get(self.url)
+        self.assertIn('filter=semaine', reponse.url)
+        self.assertNotIn('aujourdhui', reponse.url)
+
+    def test_l_accueil_vide_toutes_les_listes(self):
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.client.get(reverse('patients:list') + '?q=kouassi')
+        self.client.get(reverse('dashboard'))
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        self.assertEqual(self.client.get(reverse('patients:list')).status_code, 200)
+
+    # ── Chaque liste a sa propre mémoire ───────────────────────────────────
+
+    def test_deux_listes_ne_se_melangent_pas(self):
+        """Les trois listes de rendez-vous partagent la vue, pas l'adresse."""
+        self.client.get(self.url + '?filter=aujourdhui')
+        autre = reverse('patients:list')
+        self.assertEqual(self.client.get(autre).status_code, 200,
+                         "La sélection d'une liste a débordé sur l'autre")
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    # ── Ce qui ne doit pas être retenu ─────────────────────────────────────
+
+    def test_la_page_n_est_pas_retenue(self):
+        """Retrouver sa liste à la page 7 surprendrait plus que d'aider."""
+        self.client.get(self.url + '?filter=aujourdhui&page=3')
+        reponse = self.client.get(self.url)
+        self.assertNotIn('page=', reponse.url)
+
+    def test_un_parametre_etranger_ne_declenche_rien(self):
+        """`?origine=gynecologie` n'est pas une sélection."""
+        self.client.get(self.url + '?origine=gynecologie')
+        self.assertEqual(self.client.get(self.url).status_code, 200)

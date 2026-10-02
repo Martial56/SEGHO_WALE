@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
+from core import memoire_listing
 
 import openpyxl
 from openpyxl import Workbook
@@ -64,6 +65,12 @@ def services_list(request):
         tri_defaut=('nom',),
         tris=TRIS,
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)

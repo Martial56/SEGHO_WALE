@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from core import memoire_listing
 from .models import (Hospitalisation, Chambre, RegistreDeces,
                       ServiceAFacturer, ListeControleAdmission, ListeVerificationService,
                       ChecklistAdmission, ChecklistVerification, EvaluationClinique,
@@ -68,6 +69,12 @@ def hospitalisation_list(request):
         filtres_defaut=FILTRES_DEFAUT,
         tri_defaut=('-date_admission',),
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)
@@ -1755,6 +1762,12 @@ def chambres_list(request):
         tri_defaut=('salle_no',),
     )
 
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
+
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(Chambre.objects.all(), q)
     qs = listing.appliquer_filtres(qs, filtres)
@@ -1960,6 +1973,12 @@ def registre_deces(request):
         filtres_defaut=FILTRES_DEFAUT,
         tri_defaut=('-date_deces',),
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)

@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
+from core import memoire_listing
 
 _staff_required = user_passes_test(lambda u: u.is_staff, login_url='login')
 from django.contrib import messages
@@ -265,6 +266,12 @@ def soins_list(request):
         tri_defaut=('-date_creation',),
         tris=TRIS,
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)
@@ -796,6 +803,12 @@ def procedure_list(request):
         tri_defaut=('-date',),
         tris=TRIS_PROCEDURE,
     )
+
+    # Revenir d'une fiche sans paramètres : on remet la sélection retenue
+    # dans l'URL (voir core.memoire_listing).
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
 
     filtres = listing.filtres_demandes(request)
     qs = listing.appliquer_recherche(base_qs, q)
