@@ -153,6 +153,25 @@ class PatientForm(forms.ModelForm):
             )
         return value
 
+    @staticmethod
+    def _sans_chiffre(valeur):
+        """Le texte débarrassé de ses chiffres, sans rien reprocher.
+
+        Un chiffre n'a pas sa place dans un nom, mais le refuser au moment
+        d'enregistrer ferait perdre la saisie pour une faute de frappe. À
+        l'écran la touche ne fait déjà rien ; ici on fait la même chose pour ce
+        qui arrive par un autre chemin — un collage, un import, une requête
+        forgée. Les apostrophes et les traits d'union restent : les N'Guessan
+        et les Marie-Claire sont des noms comme les autres.
+        """
+        return re.sub(r'[0-9]', '', valeur or '').strip()
+
+    def clean_nom(self):
+        return self._sans_chiffre(self.cleaned_data.get('nom'))
+
+    def clean_prenoms(self):
+        return self._sans_chiffre(self.cleaned_data.get('prenoms'))
+
     def clean_telephone(self):
         return self._valider_numero_ivoirien(self.cleaned_data.get('telephone'))
 

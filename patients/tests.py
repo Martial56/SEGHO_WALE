@@ -492,3 +492,69 @@ class TestLesDroitsParEtapeDuRendezVous(TestCase):
             rdv, _ = self._rdv(statut)
             self.assertTrue(rdv_droits.peut_modifier(user, rdv), statut)
         self.assertTrue(all(rdv_droits.droits(user, rdv).values()))
+
+
+# ─── Pas de chiffre dans un nom ────────────────────────────────────────────────
+
+class TestLesChiffresNeSEcriventPasDansUnNom(TestCase):
+    """Un chiffre n'a pas sa place dans un nom, et on ne le reproche pas.
+
+    Refuser au moment d'enregistrer ferait perdre la saisie pour une faute de
+    frappe. À l'écran la touche ne fait rien ; le formulaire retire de son côté
+    ce qui arrive par un autre chemin — un collage, un import, une requête
+    forgée. Les apostrophes et les traits d'union restent : sur les 423
+    patients du fichier, douze noms portent une apostrophe et dix un trait
+    d'union.
+    """
+
+    def setUp(self):
+        self.user = _avec('u_chiffre', 'patients.add_patient', 'patients.view_patient')
+
+    def _creer(self, nom, prenoms):
+        client = Client()
+        client.login(username='u_chiffre', password='x')
+        client.post(reverse('patients:create'), {
+            'nom': nom, 'prenoms': prenoms,
+            'date_naissance': '1990-06-01', 'sexe': 'F',
+            'telephone': '0700000000',
+            # Les trois autres champs obligatoires de la fiche.
+            'nationalite': 'Ivoirienne', 'adresse': 'Assabou',
+            'ville': 'Yamoussoukro',
+        }, follow=True)
+        return Patient.objects.order_by('-pk').first()
+
+    def test_le_chiffre_est_retire_sans_message(self):
+        patient = self._creer('KOUASSI2', 'AMA')
+        self.assertIsNotNone(patient, "Le patient devait être créé malgré le chiffre")
+        self.assertEqual(patient.nom, 'KOUASSI')
+
+    def test_le_prenom_suit_la_meme_regle(self):
+        patient = self._creer('KOUASSI', 'AMA 3')
+        self.assertEqual(patient.prenoms, 'AMA')
+
+    def test_l_apostrophe_et_le_trait_d_union_restent(self):
+        """Les N'Guessan et les Marie-Claire sont des noms comme les autres."""
+        patient = self._creer("N'GUESSAN", 'MARIE-CLAIRE')
+        self.assertEqual(patient.nom, "N'GUESSAN")
+        self.assertEqual(patient.prenoms, 'MARIE-CLAIRE')
+
+    def test_les_accents_restent(self):
+        patient = self._creer('KOFFI', 'AMÉLIE')
+        self.assertEqual(patient.prenoms, 'AMÉLIE')
+
+    def test_un_nom_entierement_chiffre_ne_passe_pas(self):
+        """Vidé de ses chiffres il ne reste rien, et le nom est obligatoire."""
+        avant = Patient.objects.count()
+        self._creer('12345', 'AMA')
+        self.assertEqual(Patient.objects.count(), avant,
+                         "Un nom vide a été accepté")
+
+    def test_le_navigateur_empeche_aussi_la_frappe(self):
+        """Le gabarit porte le filtre : sans lui, le chiffre s'afficherait."""
+        client = Client()
+        client.login(username='u_chiffre', password='x')
+        html = client.get(reverse('patients:create')).content.decode()
+        self.assertIn("replace(/[0-9]/g, '')", html)
+        self.assertIn("normaliserNom('id_nom')", html)
+        self.assertIn("normaliserNom('id_prenoms')", html)
+

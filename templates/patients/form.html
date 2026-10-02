@@ -676,19 +676,29 @@
     }
     if (dateInput) { dateInput.addEventListener('change', updateAge); updateAge(); }
 
-    /* ── Nom / prénoms toujours saisis en majuscules ── */
-    function forceUppercase(id) {
+    /* ── Nom / prénoms : majuscules, et jamais de chiffre ──
+       Le chiffre ne s'écrit pas : la touche ne fait rien. Pas de message
+       d'erreur au moment d'enregistrer, qui ferait perdre la saisie pour une
+       faute de frappe. Le formulaire retire de son côté ce qui arriverait par
+       un autre chemin — un collage, un import. */
+    function normaliserNom(id) {
         var el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('input', function () {
             var start = el.selectionStart;
-            var end = el.selectionEnd;
-            el.value = el.value.toUpperCase();
-            el.setSelectionRange(start, end);
+            var end   = el.selectionEnd;
+            var avant = el.value;
+            var apres = avant.toUpperCase().replace(/[0-9]/g, '');
+            if (apres === avant) return;
+            // Le curseur recule d'autant de chiffres qu'on en a ôté avant lui,
+            // sinon il saute en arrière à chaque caractère refusé.
+            var otes = (avant.slice(0, start).match(/[0-9]/g) || []).length;
+            el.value = apres;
+            el.setSelectionRange(start - otes, end - otes);
         });
     }
-    forceUppercase('{{ form.nom.id_for_label }}');
-    forceUppercase('{{ form.prenoms.id_for_label }}');
+    normaliserNom('{{ form.nom.id_for_label }}');
+    normaliserNom('{{ form.prenoms.id_for_label }}');
 })();
 </script>
 
