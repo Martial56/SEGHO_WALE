@@ -271,11 +271,16 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
           <div class="proc-step-connector {% if current_statut != 'brouillon' %}connector-done{% endif %}"></div>
 
           <!-- ─ Étape 2 : En cours ─ -->
-          {% if current_statut == 'brouillon' %}
+          {% if current_statut == 'brouillon' and perms.soins.change_proceduresoin %}
             <button type="submit" name="action" value="en_cours" class="proc-step step-next" title="Passer en cours">
               <div class="proc-step-node step-node-next"><span>2</span></div>
               <span class="proc-step-label">En cours</span>
             </button>
+          {% elif current_statut == 'brouillon' %}
+            <div class="proc-step step-future">
+              <div class="proc-step-node step-node-future"><span>2</span></div>
+              <span class="proc-step-label">En cours</span>
+            </div>
           {% elif current_statut == 'en_cours' %}
             <div class="proc-step step-active">
               <div class="proc-step-node step-node-active"><span>2</span></div>
@@ -291,7 +296,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
           <div class="proc-step-connector {% if current_statut == 'termine' %}connector-done{% endif %}"></div>
 
           <!-- ─ Étape 3 : Terminé ─ -->
-          {% if current_statut == 'en_cours' %}
+          {% if current_statut == 'en_cours' and perms.soins.can_administrer_soin %}
             <button type="submit" name="action" value="termine" class="proc-step step-next" title="Marquer comme terminé">
               <div class="proc-step-node step-node-next"><span>3</span></div>
               <span class="proc-step-label">Terminé</span>
@@ -313,12 +318,12 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
 
       <!-- Actions latérales -->
       <div class="proc-side-actions">
-        {% if not is_new and current_statut != 'annule' and request.user.is_staff %}
+        {% if not is_new and current_statut != 'annule' and request.user.is_staff and perms.soins.can_creer_facture %}
           <a href="{% url 'soins:procedure_facturer' proc.pk %}" class="ab-btn ab-btn-invoice">
             <i class="bi bi-receipt"></i> Facturer
           </a>
         {% endif %}
-        {% if not is_new and current_statut != 'termine' and current_statut != 'annule' %}
+        {% if not is_new and current_statut != 'termine' and current_statut != 'annule' and perms.soins.change_proceduresoin %}
           <button type="submit" name="action" value="annuler" class="ab-btn ab-btn-cancel"
             onclick="return confirm('Annuler cette procédure ?')">
             <i class="bi bi-x-lg"></i> Annuler
@@ -401,7 +406,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
                     data-value="{{ e.pk }}">{{ e.nom }} {{ e.prenoms }}</li>
                 {% endfor %}
               </ul>
-              {% if request.user.is_staff %}
+              {% if request.user.is_staff and perms.employer.add_employe %}
               <div id="inf-create-hint" class="svc-create-hint" style="display:none;">
                 <a id="inf-create-link" href="/employes/nouveau/" class="svc-create-link">
                   <i class="bi bi-plus-circle"></i>
@@ -470,7 +475,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
                     data-value="{{ s.pk }}" data-prix="{{ s.prix_vente }}">{{ s.nom }}</li>
                 {% endfor %}
               </ul>
-              {% if request.user.is_staff %}
+              {% if request.user.is_staff and perms.services.add_articleservice %}
               <div id="soin-create-hint" class="svc-create-hint" style="display:none;">
                 <a id="soin-create-link" href="/services/nouveau/" class="svc-create-link">
                   <i class="bi bi-plus-circle"></i>
@@ -519,7 +524,7 @@ html[data-theme="dark"] .proc-annule-badge  { background: rgba(220,38,38,.15); b
                     data-value="{{ m.pk }}">{{ m.nom }}</li>
                 {% endfor %}
               </ul>
-              {% if request.user.is_staff %}
+              {% if request.user.is_staff and perms.patients.add_pathologie %}
               <div id="mal-create-hint" class="svc-create-hint" style="display:none;">
                 <a id="mal-create-link" href="#" class="svc-create-link">
                   <i class="bi bi-plus-circle"></i>

@@ -512,14 +512,17 @@
         </span>
         <div style="flex:1;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            {% if perms.laboratoire.view_demandeexamen %}
             <a href="{% url 'laboratoire_bulletin' demande.pk %}" target="_blank" class="btn-back" style="display:inline-flex;align-items:center;gap:6px;">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
                 </svg>
                 Bulletin d'examens
             </a>
+            {% endif %}
             {% if demande.statut == 'brouillon' %}
             {% if not demande.facture %}
+            {% if perms.facturation.add_facture %}
             <a href="{{ facture_url }}" class="btn-facturation">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
                     stroke="currentColor" stroke-width="2">
@@ -528,8 +531,10 @@
                 </svg>
                 Facturation
             </a>
+            {% endif %}
             {% else %}
             <span style="font-size:12px;color:var(--text-muted);">Facture {{ demande.facture.numero }} liée</span>
+            {% if perms.laboratoire.change_demandeexamen %}
             <form method="post" style="display:inline;">
                 {% csrf_token %}
                 <button type="submit" name="action" value="envoyer_labo" class="btn-labo">
@@ -541,6 +546,7 @@
                     Envoyer au labo
                 </button>
             </form>
+            {% endif %}
             {% endif %}
             {% else %}
             <span class="btn-sent-disabled">
@@ -641,9 +647,11 @@
                         <span class="lbl">Date du prélèvement</span>
                         <span class="val" id="date-prelevement-view" style="display:inline-flex;align-items:center;gap:6px;">
                             {{ demande.date_prelevement|date:"d/m/Y H:i"|default:"—" }}
+                            {% if perms.laboratoire.change_demandeexamen %}
                             <button type="button" class="o-ctrl-btn" style="padding:1px 5px;display:inline-flex;" onclick="toggleDatePrelevementEdit(true)" title="Modifier la date de prélèvement">
                                 <i class="bi bi-pencil"></i> Modifier
                             </button>
+                            {% endif %}
                         </span>
                         <form method="post" id="date-prelevement-edit" style="display:none;align-items:center;gap:8px;grid-column:1 / -1;">
                             {% csrf_token %}

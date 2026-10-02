@@ -234,6 +234,13 @@ class RendezVous(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = "Rendez-vous"
         ordering = ['date_heure']
+        # Une permission par étape de la fiche (cf. patients/rdv_droits.py).
+        permissions = [
+            ('confirmer_rendezvous', 'Rendez-vous : peut confirmer (Brouillon → Confirmé)'),
+            ('mettre_en_attente_rendezvous', 'Rendez-vous : peut mettre en attente (évaluation, médecin)'),
+            ('consulter_rendezvous', 'Rendez-vous : peut mener la consultation (En attente → Terminé)'),
+            ('annuler_rendezvous', 'Rendez-vous : peut annuler'),
+        ]
 
 
 class RegistreCPN(models.Model):

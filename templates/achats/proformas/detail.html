@@ -77,15 +77,19 @@ html[data-theme="dark"] .modal p { color:var(--text-muted)!important; }
     <div style="flex:1;"></div>
     <div style="display:flex;gap:8px;align-items:center;">
       {% if proforma.statut == 'en_attente' %}
+        {% if perms.achats.can_gerer_achats %}
         <a href="{% url 'achats:proforma_edit' proforma.pk %}" class="btn btn-secondary"><i class="bi bi-pencil"></i> Modifier</a>
         <button type="button" class="btn btn-danger" onclick="openModal('rejeter')"><i class="bi bi-x-circle"></i> Rejeter</button>
         <button type="button" class="btn btn-success" onclick="openModal('valider')"><i class="bi bi-check-circle"></i> Valider</button>
+        {% endif %}
       {% elif proforma.statut == 'valide' and not has_commande %}
+        {% if perms.achats.can_gerer_achats %}
         <a href="{% url 'achats:commande_create' proforma.pk %}" class="btn btn-primary"><i class="bi bi-bag-plus"></i> Créer la commande</a>
+        {% endif %}
       {% elif proforma.statut == 'valide' and has_commande %}
         <a href="{% url 'achats:commande_detail' proforma.commande.pk %}" class="btn btn-secondary"><i class="bi bi-bag-check"></i> Voir la commande</a>
       {% endif %}
-      {% if proforma.fichier %}
+      {% if proforma.fichier and perms.achats.view_proforma %}
       <a href="{{ proforma.fichier.url }}" class="btn btn-secondary"><i class="bi bi-file-pdf"></i> Document</a>
       {% endif %}
     </div>

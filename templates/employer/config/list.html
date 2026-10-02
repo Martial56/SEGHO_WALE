@@ -178,24 +178,34 @@ html[data-theme="dark"] .rh-modal-footer { background: rgba(255,255,255,0.015); 
       Configuration <span style="margin:0 4px;opacity:.4;">/</span> {{ cfg.label_plural }}
     </span>
     <div style="flex:1;"></div>
+    {% with mdl=slug|cut:"_" %}{% with p_view="employer.view_"|add:mdl p_add="employer.add_"|add:mdl %}
+    {% if p_view in perms or p_add in perms %}
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
         <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
       </button>
       <div class="io-page-menu" id="io-page-menu">
+        {% if p_view in perms %}
         <div class="io-pm-section">Exporter — {{ cfg.label_plural }}</div>
         <a class="io-pm-item" href="{% url 'rh_config_export' slug %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
         <a class="io-pm-item" href="{% url 'rh_config_export' slug %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
         <a class="io-pm-item" href="{% url 'rh_config_export' slug %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
-        <div class="io-pm-sep"></div>
+        {% endif %}
+        {% if p_view in perms and p_add in perms %}<div class="io-pm-sep"></div>{% endif %}
+        {% if p_add in perms %}
         <div class="io-pm-section">Importer</div>
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
+    {% if p_add in perms %}
     <a href="{% url 'rh_config_create' slug %}" class="o-btn-create" onclick="return rhOpenConfigModal(event, this.href, 'Nouveau — {{ cfg.label }}');">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
+    {% endif %}
+    {% endwith %}{% endwith %}
   </div>
 </div>
 

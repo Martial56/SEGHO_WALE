@@ -51,9 +51,9 @@ CHAMPS_CPN = [
     ('cpn_atcd_hta', 'HTA', 'choix', (('oui', 'Oui'), ('non', 'Non'))),
     ('cpn_numero_depistage', 'Numéro de dépistage', 'texte', ()),
     ('cpn_parite', 'Parité', 'nombre_json', ()),
-    ('cpn_proposition_test_vih', 'Proposition de test VIH', 'choix', (('oui', 'Oui'), ('non', 'Non'), ('na', 'NA'))),
+    ('cpn_proposition_test_vih', 'Proposition de test VIH', 'choix', (('oui', 'OUI'), ('non', 'NON'), ('na', 'NA'))),
     ('cpn_retesting', 'Retesting', 'choix', (('oui', 'Oui'), ('non', 'Non'), ('na', 'NA'))),
-    ('cpn_semaines_amenorrhee', 'Semaines d\'aménorrhée', 'nombre_json', ()),
+    ('cpn_semaines_amenorrhee', 'Semaines d\'aménorrhée', 'texte', ()),
     ('cpn_terme_prevu', 'Terme prévu le', 'date_json', ()),
     ('cpn_toxemie', 'Toxémie gravidique', 'texte', ()),
     # Constantes physiques

@@ -237,7 +237,7 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
       dès qu'une ordonnance n'avait pas de consultation.
       {% endcomment %}
       {% with pat=ord.patient_effectif med=ord.medecin_effectif %}
-      <tr onclick="window.location='{% if ord.statut == 'emise' and ord.servable %}{% url 'pharmacie_dispenser' pharmacie ord.pk %}{% else %}{% url 'ordonnance_detail' ord.pk %}{% endif %}'">
+      <tr onclick="window.location='{% if ord.statut == 'emise' and ord.servable and perms.pharmacie.gerer_stock_pharmacie %}{% url 'pharmacie_dispenser' pharmacie ord.pk %}{% else %}{% url 'ordonnance_detail' ord.pk %}{% endif %}'">
         <td style="font-family:var(--font-mono);font-weight:700;color:var(--accent-text);">{{ ord.numero }}</td>
         <td>
           {% if pat %}{{ pat.nom|upper }} {{ pat.prenoms }}
@@ -260,9 +260,13 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
         <td><span class="o-badge badge-ord-{{ ord.statut }}">{{ ord.get_statut_display }}</span></td>
         <td onclick="event.stopPropagation();">
           {% if ord.statut == 'emise' and ord.servable %}
+          {% if perms.pharmacie.gerer_stock_pharmacie %}
           <a href="{% url 'pharmacie_dispenser' pharmacie ord.pk %}" class="btn-ph-outline" style="padding:3px 10px;font-size:11.5px;">
             <i class="bi bi-capsule"></i> Servir
           </a>
+          {% else %}
+          <span style="color:var(--ph-muted);font-size:11px;">—</span>
+          {% endif %}
           {% elif ord.statut == 'emise' %}
           {% comment %}La dispensation exige une facture réglée. Le bouton
           rebondissait avec un message ; il annonce maintenant la raison avant
@@ -270,7 +274,7 @@ html[data-theme="dark"] .badge-ord-expiree   { background: rgba(var(--rose-rgb),
           <span class="btn-ph-bloque" title="{{ ord.motif_blocage }} — rien ne peut être servi tant que la facture n'est pas réglée">
             <i class="bi bi-lock"></i> {{ ord.motif_blocage }}
           </span>
-          {% elif ord.dispensation %}
+          {% elif ord.dispensation and perms.pharmacie.view_dispensationordonnance %}
           <a href="{% url 'pharmacie_fiche_dispensation' pharmacie ord.dispensation.pk %}" class="btn-ph-outline" style="padding:3px 10px;font-size:11.5px;">
             <i class="bi bi-file-earmark-text"></i> Fiche
           </a>

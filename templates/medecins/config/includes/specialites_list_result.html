@@ -3,7 +3,7 @@
 <!-- ── VUE KANBAN ── -->
 <div class="o-kanban" id="view-grille" style="{% if vue|default:'liste' != 'kanban' %}display:none;{% endif %}">
   {% for sp in page_obj %}
-  <div class="o-card" onclick="mdOpenConfigModal(event, '{% url 'medecins_specialite_edit' sp.pk %}', 'Modifier — {{ sp.nom }}', 'bi-heart-pulse')">
+  <div class="o-card" {% if perms.medecins.change_specialite %}onclick="mdOpenConfigModal(event, '{% url 'medecins_specialite_edit' sp.pk %}', 'Modifier — {{ sp.nom }}', 'bi-heart-pulse')"{% else %}style="cursor:default;"{% endif %}>
     <div class="o-avatar"><i class="bi bi-award"></i></div>
     <div class="o-card-body">
       <div class="o-card-name">{{ sp.nom }}</div>
@@ -22,7 +22,7 @@
     <thead>
       <tr>
         <th style="width:36px;">
-          <input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;">
+          {% if perms.medecins.delete_specialite %}<input type="checkbox" id="select-all" style="width:14px;height:14px;cursor:pointer;">{% endif %}
         </th>
         <th style="width:130px;">Code</th>
         <th>Nom</th>
@@ -32,22 +32,26 @@
     </thead>
     <tbody>
       {% for sp in page_obj %}
-      <tr onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))mdOpenConfigModal(event, '{% url 'medecins_specialite_edit' sp.pk %}', 'Modifier — {{ sp.nom }}', 'bi-heart-pulse')">
+      <tr {% if perms.medecins.change_specialite %}onclick="if(event.target.type!=='checkbox'&&!event.target.closest('.row-actions'))mdOpenConfigModal(event, '{% url 'medecins_specialite_edit' sp.pk %}', 'Modifier — {{ sp.nom }}', 'bi-heart-pulse')"{% else %}style="cursor:default;"{% endif %}>
         <td onclick="event.stopPropagation()">
-          <input type="checkbox" class="row-check" value="{{ sp.pk }}" style="width:14px;height:14px;cursor:pointer;">
+          {% if perms.medecins.delete_specialite %}<input type="checkbox" class="row-check" value="{{ sp.pk }}" style="width:14px;height:14px;cursor:pointer;">{% endif %}
         </td>
         <td><span class="badge-code">{{ sp.code }}</span></td>
         <td style="font-weight:600;">{{ sp.nom }}</td>
         <td style="color:var(--text-muted);">{{ sp.description|default:"—"|truncatechars:80 }}</td>
         <td class="row-actions" onclick="event.stopPropagation()">
+          {% if perms.medecins.change_specialite %}
           <a href="{% url 'medecins_specialite_edit' sp.pk %}" class="o-ctrl-btn" title="Modifier"
              onclick="return mdOpenConfigModal(event, this.href, 'Modifier — {{ sp.nom }}', 'bi-heart-pulse');">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
+          {% if perms.medecins.delete_specialite %}
           <button type="button" class="o-ctrl-btn" title="Supprimer"
                   onclick="openRowDelete('{{ sp.pk }}', '{{ sp.nom|escapejs }}')">
             <i class="bi bi-trash3" style="color:#c62828;"></i>
           </button>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -72,7 +76,7 @@
 <div class="o-empty">
   <i class="bi bi-award"></i>
   {% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucune spécialité enregistrée{% endif %}<br>
-  {% if not q %}
+  {% if not q and perms.medecins.add_specialite %}
   <a href="{% url 'medecins_specialite_create' %}" style="color:var(--md-500);font-weight:600;margin-top:8px;display:inline-block;"
      onclick="return mdOpenConfigModal(event, this.href, 'Nouvelle spécialité', 'bi-heart-pulse');">Créer une première spécialité</a>
   {% endif %}

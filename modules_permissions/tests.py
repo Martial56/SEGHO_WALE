@@ -315,3 +315,40 @@ class TestCustomUserAdminModulesParGroupeView(TestCase):
         response = self.user_admin.modules_par_groupe_view(request)
         data = json.loads(response.content)
         self.assertEqual(data['modules'], [])
+
+
+# ─── Tests francisation des permissions ───────────────────────────────────────
+
+class TestFrancisationPermissions(TestCase):
+
+    def test_aucune_permission_anglaise_apres_migrate(self):
+        # La base de test est créée par migrate : le post_migrate a déjà tourné.
+        from django.contrib.auth.models import Permission
+        anglaises = Permission.objects.filter(name__startswith='Can ')
+        self.assertFalse(anglaises.exists(), list(anglaises.values_list('name', flat=True)[:5]))
+
+    def test_nom_anglais_renomme_codename_inchange(self):
+        from django.contrib.auth.models import Permission
+        from modules_permissions.francisation import franciser_permissions
+        perm = Permission.objects.get(content_type__app_label='auth', codename='add_group')
+        perm.name = 'Can add group'
+        perm.save()
+        self.assertEqual(franciser_permissions(), 1)
+        perm.refresh_from_db()
+        self.assertEqual(perm.name, 'Peut créer : groupe')
+        self.assertEqual(perm.codename, 'add_group')
+
+    def test_nom_ecrit_a_la_main_jamais_reecrit(self):
+        from django.contrib.auth.models import Permission
+        from modules_permissions.francisation import franciser_permissions
+        perm = Permission.objects.get(content_type__app_label='auth', codename='view_group')
+        perm.name = 'Peut voir les groupes'
+        perm.save()
+        franciser_permissions()
+        perm.refresh_from_db()
+        self.assertEqual(perm.name, 'Peut voir les groupes')
+
+    def test_sigle_garde_sa_majuscule(self):
+        from modules_permissions.francisation import nom_francais
+        self.assertEqual(nom_francais('view', None, 'VIH dépistage'), 'Peut consulter : VIH dépistage')
+        self.assertEqual(nom_francais('add', None, 'Patient'), 'Peut créer : patient')

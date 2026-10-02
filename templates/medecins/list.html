@@ -57,19 +57,23 @@
 
   <!-- Ligne 2 : créer + contrôles -->
   <div class="o-subheader-row">
+    {% if perms.medecins.add_medecin and perms.medecins.can_gerer_medecins %}
     <a href="{% url 'medecin_create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouveau médecin
     </a>
+    {% endif %}
 
     <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 
       <div class="o-ctrl-sep"></div>
 
       <!-- Export CSV -->
+      {% if perms.medecins.view_medecin and perms.medecins.can_gerer_medecins %}
       <a href="{% url 'medecins_export_csv' %}?q={{ q }}"
          class="o-ctrl-btn" title="Exporter en CSV">
         <i class="bi bi-filetype-csv"></i>
       </a>
+      {% endif %}
 
       <div class="o-ctrl-sep"></div>
 
@@ -153,10 +157,12 @@
           </td>
           <td style="white-space:nowrap;">
             <div style="display:flex;align-items:center;gap:5px;">
+              {% if perms.medecins.change_medecin and perms.medecins.can_gerer_medecins %}
               <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 10px;font-size:11.5px;" title="Modifier">
                 <i class="bi bi-pencil"></i>
               </a>
-              {% if can_manage %}
+              {% endif %}
+              {% if can_manage and perms.medecins.delete_medecin %}
               <form method="post" action="{% url 'medecin_supprimer' med.pk %}" style="display:inline;"
                     onsubmit="return confirm('Supprimer {{ med.titre }} {{ med.nom }} {{ med.prenoms }} ?\nCette action est irréversible.')">
                 {% csrf_token %}
@@ -239,10 +245,12 @@
             <span class="badge-inactif">Inactif</span>
             {% endif %}
             <div class="kb-card-actions">
+              {% if perms.medecins.change_medecin and perms.medecins.can_gerer_medecins %}
               <a href="{% url 'medecin_edit' med.pk %}" class="btn-md-outline" style="padding:3px 9px;font-size:11.5px;" title="Modifier">
                 <i class="bi bi-pencil"></i>
               </a>
-              {% if can_manage %}
+              {% endif %}
+              {% if can_manage and perms.medecins.delete_medecin %}
               <form method="post" action="{% url 'medecin_supprimer' med.pk %}" style="display:inline;"
                     onsubmit="return confirm('Supprimer {{ med.titre }} {{ med.nom }} {{ med.prenoms }} ?')">
                 {% csrf_token %}

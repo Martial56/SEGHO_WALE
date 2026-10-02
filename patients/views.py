@@ -772,7 +772,11 @@ def rdv_edit(request, pk):
     # Un rendez-vous annulé est clos : sa fiche (et la facturation associée,
     # verrouillée séparément côté `facturation`) reste consultable mais figée,
     # même pour qui a la permission de modifier.
-    peut_modifier = request.user.has_perm('patients.change_rendezvous') and rdv.statut != 'annule'
+    # Chaque étape a sa permission (cf. patients/rdv_droits.py) : `peut_modifier`
+    # vaut pour le statut actuel, `droits_rdv` pour les boutons de changement d'état.
+    from patients import rdv_droits
+    peut_modifier = rdv_droits.peut_modifier(request.user, rdv)
+    droits_rdv = rdv_droits.droits(request.user, rdv)
     ctx_origine = origines_patient.contexte(request)
 
     try:
@@ -802,9 +806,14 @@ def rdv_edit(request, pk):
     if request.method == 'POST':
         # Le grisage des champs est une commodité d'affichage ; c'est ici que
         # l'écriture est réellement refusée.
-        if not peut_modifier:
-            raise PermissionDenied
         action = request.POST.get('_action', '')
+        if rdv_droits.est_un_changement_d_etat(action):
+            if rdv.statut == 'annule' or not rdv_droits.peut_faire(request.user, action):
+                raise PermissionDenied
+        elif not peut_modifier:
+            if action == 'autosave_registres':
+                return JsonResponse({'ok': False}, status=403)
+            raise PermissionDenied
 
         if action == 'autosave_registres':
             # Enregistrement automatique des registres (requête AJAX de la fiche) :
@@ -1052,6 +1061,7 @@ def rdv_edit(request, pk):
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
         'peut_modifier': peut_modifier,
+        'droits_rdv':    droits_rdv,
         **ctx_origine,
         'is_new':        False,
         'consultation':  consultation,

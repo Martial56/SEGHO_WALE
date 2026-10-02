@@ -64,10 +64,12 @@
     <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="o-search-input">
     <input type="hidden" name="page_size" value="{{ page_size }}">
   </form>
+  {% if perms.conges.add_typeconge %}
   <a href="{% url 'conge_type_create' %}" class="o-btn-create"
     onclick="return cgOpenConfigModal(event, this.href, 'Nouveau type de demande', 'bi-tags');">
     <i class="bi bi-plus-lg"></i> Créer
   </a>
+  {% endif %}
 </div>
 
 <div class="cgcfg-body">
@@ -105,10 +107,13 @@
           {% else %}<span class="cg-cfg-badge-inactif">Inactif</span>{% endif %}
         </td>
         <td style="text-align:right;white-space:nowrap;">
+          {% if perms.conges.change_typeconge %}
           <a href="{% url 'conge_type_edit' t.pk %}" class="o-ctrl-btn" title="Modifier"
             onclick="return cgOpenConfigModal(event, this.href, 'Modifier — {{ t.nom }}', 'bi-tags');">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
+          {% if perms.conges.delete_typeconge %}
           <form method="post" action="{% url 'conge_type_delete' t.pk %}" style="display:inline;"
             onsubmit="return confirm('Supprimer le type « {{ t.nom }} » ?');">
             {% csrf_token %}
@@ -116,6 +121,7 @@
               <i class="bi bi-trash"></i>
             </button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% empty %}

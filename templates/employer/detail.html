@@ -294,7 +294,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
     {% endif %}
   </div>
   <div class="rh-page-head-right">
-    {% if can_manage %}
+    {% if can_manage and perms.medecins.add_medecin %}
       {% if employe.fiche_medecin %}
       <span class="btn-rh-outline" aria-disabled="true"
             style="opacity:.55;cursor:not-allowed;pointer-events:none;border-color:#9ca3af;color:#6b7280;"
@@ -310,7 +310,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
       </button>
       {% endif %}
     {% endif %}
-    {% if can_manage %}
+    {% if can_manage and perms.employer.change_employe %}
     <button type="button"
        class="btn-rh-outline"
        title="{% if employe.code_ancien_badge %}Re-scanner l'ancienne carte pour la relier{% else %}Lier l'ancienne carte physique de cet employé pour qu'elle fonctionne au pointage{% endif %}"
@@ -318,21 +318,27 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
       <i class="bi bi-qr-code-scan"></i> {% if employe.code_ancien_badge %}Ancien badge lié{% else %}Lier un ancien badge{% endif %}
     </button>
     {% endif %}
+    {% if perms.employer.view_employe %}
     <a href="{% url 'rh_fiche_pdf' employe.pk %}" class="btn-rh-outline" title="Imprimer la fiche">
       <i class="bi bi-printer"></i> Imprimer
     </a>
-    {% if can_manage and employe.date_fin_contrat %}
+    {% endif %}
+    {% if can_manage and perms.employer.change_employe and employe.date_fin_contrat %}
     <button onclick="document.getElementById('modal-renouveler').style.display='flex'" class="btn-rh-outline">
       <i class="bi bi-arrow-repeat"></i> Renouveler
     </button>
     {% endif %}
     {% if can_manage %}
+    {% if perms.employer.change_employe %}
     <a href="{% url 'rh_modifier' employe.pk %}" class="btn-rh">
       <i class="bi bi-pencil-fill"></i> Modifier
     </a>
+    {% endif %}
+    {% if perms.employer.view_employe %}
     <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-outline" title="Imprimer le badge">
       <i class="bi bi-credit-card-2-front-fill"></i> Badge
     </a>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -906,7 +912,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
               <a href="{{ doc.fichier.url }}" class="btn-rh-sm" title="Télécharger">
                 <i class="bi bi-download"></i>
               </a>
-              {% if can_manage %}
+              {% if can_manage and perms.employer.delete_documentemploye %}
               <form method="post" action="{% url 'rh_doc_delete' employe.pk doc.pk %}"
                     onsubmit="return confirm('Supprimer ce document ?');" style="display:inline;">
                 {% csrf_token %}
@@ -927,7 +933,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
         {% endif %}
 
         <!-- Formulaire d'ajout de document -->
-        {% if can_manage %}
+        {% if can_manage and perms.employer.add_documentemploye %}
         <div class="rh-upload-form">
           <div class="rh-upload-title">
             <i class="bi bi-upload"></i> Ajouter un document
@@ -984,9 +990,11 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
           <i class="bi bi-person-badge-fill" style="color:var(--rh-500);"></i>
           Identification — Pointage
         </div>
+        {% if perms.employer.view_employe %}
         <a href="{% url 'rh_badge' employe.pk %}" class="btn-rh-sm">
           <i class="bi bi-credit-card-2-front-fill"></i> Imprimer badge
         </a>
+        {% endif %}
       </div>
       <div class="rh-card-body">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:start;">
@@ -1034,7 +1042,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
               <div style="font-size:11px;color:var(--rh-muted);">Non enregistrée</div>
             </div>
             {% endif %}
-            {% if can_manage %}
+            {% if can_manage and perms.employer.change_employe %}
             <form method="post" action="{% url 'rh_biometric_save' employe.pk %}" style="margin-top:8px;display:flex;gap:6px;">
               {% csrf_token %}
               <input type="text" name="biometric_id" value="{{ employe.biometric_id }}"
@@ -1068,7 +1076,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
             <td class="ik">{{ info.cle }}</td>
             <td class="iv">{{ info.valeur }}</td>
             <td style="text-align:right; width:40px;">
-              {% if can_manage %}
+              {% if can_manage and perms.employer.delete_infosupplementaire %}
               <form method="post" action="{% url 'rh_info_delete' employe.pk info.pk %}"
                     onsubmit="return confirm('Supprimer cet élément ?');" style="display:inline;">
                 {% csrf_token %}
@@ -1088,7 +1096,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
         {% endif %}
 
         <!-- Formulaire ajout info supp -->
-        {% if can_manage %}
+        {% if can_manage and perms.employer.add_infosupplementaire %}
         <div class="rh-upload-form">
           <div class="rh-upload-title">
             <i class="bi bi-plus-circle"></i> Ajouter une information
@@ -1152,7 +1160,7 @@ html[data-theme="dark"] .biometric-ok { color:var(--rh-300); }
           <i class="bi bi-calendar-check-fill" style="color:var(--rh-500);"></i>
           Congés
         </div>
-        {% if can_manage %}
+        {% if can_manage and perms.employer.add_conge %}
         <a href="{% url 'conge_nouveau' %}?employe={{ employe.pk }}" class="btn-rh-sm">
           <i class="bi bi-plus-lg"></i> Nouvelle demande
         </a>

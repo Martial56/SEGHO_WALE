@@ -109,12 +109,16 @@
             <form id="palier-edit-{{ p.pk }}" method="post" action="{% url 'conge_palier_edit' p.pk %}" style="display:inline;">
               {% csrf_token %}
             </form>
+            {% if perms.conges.change_palieranciennete %}
             <button type="submit" form="palier-edit-{{ p.pk }}" class="o-ctrl-btn" title="Enregistrer"><i class="bi bi-check-lg"></i></button>
+            {% endif %}
+            {% if perms.conges.delete_palieranciennete %}
             <form method="post" action="{% url 'conge_palier_delete' p.pk %}" style="display:inline;"
               onsubmit="return confirm('Supprimer ce palier ({{ p.annees_min }} ans) ?');">
               {% csrf_token %}
               <button type="submit" class="o-ctrl-btn" title="Supprimer" style="color:var(--rose-btn);"><i class="bi bi-trash"></i></button>
             </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -124,12 +128,14 @@
     <p style="font-size:13px;color:var(--cg-muted);font-style:italic;margin-bottom:14px;">Aucun palier configuré — seule la base mensuelle s'applique.</p>
     {% endif %}
 
+    {% if perms.conges.add_palieranciennete %}
     <form method="post" action="{% url 'conge_palier_create' %}" class="palier-inline-form" style="padding-top:12px;border-top:1px dashed var(--cg-border);">
       <input type="number" name="annees_min" placeholder="Ex : 5" min="0" required> ans
       <span style="flex:1;"></span>
       <input type="text" name="jours_bonus" placeholder="Ex : 1" required> jours
       <button type="submit" class="o-ctrl-btn" title="Ajouter"><i class="bi bi-plus-lg"></i></button>
     </form>
+    {% endif %}
   </div>
 
 </div>

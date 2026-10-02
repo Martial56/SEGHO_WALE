@@ -48,9 +48,11 @@ html[data-theme="dark"] .fr-table tr:hover td { background:var(--surface-muted);
       <span style="color:var(--text);font-weight:500;">Fournisseurs</span>
     </span>
     <div style="flex:1;"></div>
+    {% if perms.achats.can_gerer_achats %}
     <a href="{% url 'achats:fournisseur_create' %}" style="padding:7px 16px;border-radius:6px;background:var(--teal-600);color:#fff;text-decoration:none;font-size:13px;font-weight:600;">
       <i class="bi bi-plus-lg"></i> Nouveau fournisseur
     </a>
+    {% endif %}
   </div>
 
   <div class="fr-kpis">
@@ -113,7 +115,7 @@ html[data-theme="dark"] .fr-table tr:hover td { background:var(--surface-muted);
         <td style="text-align:center;"><span class="fr-actif {% if f.actif %}yes{% else %}no{% endif %}"></span></td>
         <td class="fr-actions" style="white-space:nowrap;">
           <a href="{% url 'achats:fournisseur_detail' f.pk %}" title="Voir"><i class="bi bi-eye"></i></a>
-          <a href="{% url 'achats:fournisseur_edit' f.pk %}" title="Modifier"><i class="bi bi-pencil"></i></a>
+          {% if perms.achats.can_gerer_achats %}<a href="{% url 'achats:fournisseur_edit' f.pk %}" title="Modifier"><i class="bi bi-pencil"></i></a>{% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -123,7 +125,9 @@ html[data-theme="dark"] .fr-table tr:hover td { background:var(--surface-muted);
     <div style="padding:48px;text-align:center;color:var(--text-faint);">
       <i class="bi bi-building" style="font-size:36px;display:block;margin-bottom:12px;"></i>
       Aucun fournisseur trouvé.
+      {% if perms.achats.can_gerer_achats %}
       <a href="{% url 'achats:fournisseur_create' %}" style="display:block;margin-top:12px;color:var(--accent-text-soft);">Créer le premier fournisseur</a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

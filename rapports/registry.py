@@ -609,7 +609,7 @@ def _cdip_gynecologie(periode_debut, periode_fin):
 
 
 VIH_STATUT_ACCUEIL_LABELS = {'inconnu': 'Inconnu', 'negatif': 'Négatif', 'positif': 'Positif'}
-VIH_PROPOSITION_LABELS = {'oui': 'Oui', 'non': 'Non', 'na': 'NA'}
+VIH_PROPOSITION_LABELS = {'oui': 'OUI', 'non': 'NON', 'na': 'NA'}
 VIH_RESULTAT_LABELS = {'negatif': 'Négatif', 'positif': 'Positif', 'na': 'NA'}
 
 

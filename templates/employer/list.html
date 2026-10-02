@@ -275,11 +275,13 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     <span class="rh-count-badge">{{ page_obj.paginator.count }} personne{% if page_obj.paginator.count != 1 %}s{% endif %}</span>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
+    {% if perms.employer.view_employe %}
     <a href="{% url 'rh_export_excel' %}?q={{ q }}&service={{ f_service }}&statut={{ f_statut }}"
        class="btn-rh-outline" title="Exporter en Excel">
       <i class="bi bi-file-earmark-excel"></i> Excel
     </a>
-    {% if can_manage %}
+    {% endif %}
+    {% if can_manage and perms.employer.add_employe %}
     <a href="{% url 'rh_nouveau' %}" class="btn-rh">
       <i class="bi bi-person-plus-fill"></i> Nouvel employé
     </a>
@@ -404,9 +406,12 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
               <i class="bi bi-eye"></i>
             </a>
             {% if can_manage %}
+            {% if perms.employer.change_employe %}
             <a href="{% url 'rh_modifier' emp.pk %}" class="rh-icon-btn" title="Modifier">
               <i class="bi bi-pencil"></i>
             </a>
+            {% endif %}
+            {% if perms.employer.delete_employe %}
             <form method="post" action="{% url 'rh_supprimer' emp.pk %}" style="display:inline;"
                   onsubmit="return confirm('Supprimer {{ emp.nom_complet }} ?\nCette action est irréversible.')">
               {% csrf_token %}
@@ -414,6 +419,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            {% endif %}
             {% endif %}
           </div>
         </td>
@@ -474,7 +480,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
       </div>
     {% else %}
       <small>Aucun dossier employé n'a encore été créé.</small>
-      {% if can_manage %}
+      {% if can_manage and perms.employer.add_employe %}
       <div style="margin-top:16px;">
         <a href="{% url 'rh_nouveau' %}" class="btn-rh">
           <i class="bi bi-person-plus-fill"></i> Créer le premier dossier

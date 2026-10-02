@@ -47,9 +47,11 @@
           {% else %}<span class="badge-inactif">Inactif</span>{% endif %}
         </td>
         <td class="row-actions" onclick="event.stopPropagation()">
+          {% if perms.medecins.change_service %}
           <a href="{% url 'employer_service_edit' svc.pk %}" class="o-ctrl-btn" title="Modifier">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -100,7 +102,7 @@
 <div class="o-empty">
   <i class="bi bi-building"></i>
   {% if q %}Aucun résultat pour « {{ q }} »{% else %}Aucun service enregistré{% endif %}<br>
-  {% if not q %}
+  {% if not q and perms.medecins.add_service %}
   <a href="{% url 'employer_service_create' %}" style="color:var(--rh-500);font-weight:600;margin-top:8px;display:inline-block;">Créer un premier service</a>
   {% endif %}
 </div>

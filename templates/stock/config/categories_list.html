@@ -24,25 +24,33 @@
       <i class="bi bi-search o-search-btn"></i>
       <input type="text" name="q" value="{{ q }}" placeholder="Rechercher…" class="o-search-input">
     </form>
+    {% if perms.stock.view_categoriestock or perms.stock.add_categoriestock %}
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
         <i class="bi bi-arrow-left-right"></i> Export / Import
         <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
       </button>
       <div class="io-page-menu" id="io-page-menu">
+        {% if perms.stock.view_categoriestock %}
         <div class="io-pm-section">Exporter les catégories</div>
         <a class="io-pm-item" href="{% url 'stock_export_categories_produit' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
         <a class="io-pm-item" href="{% url 'stock_export_categories_produit' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
         <a class="io-pm-item" href="{% url 'stock_export_categories_produit' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
-        <div class="io-pm-sep"></div>
+        {% endif %}
+        {% if perms.stock.add_categoriestock %}
+        {% if perms.stock.view_categoriestock %}<div class="io-pm-sep"></div>{% endif %}
         <div class="io-pm-section">Importer</div>
         <button type="button" class="io-pm-item" onclick="openImportModal()"><i class="bi bi-upload" style="color:var(--accent-text-soft);"></i> Importer un fichier…</button>
+        {% endif %}
       </div>
     </div>
+    {% endif %}
+    {% if peut_gerer_stock and perms.stock.add_categoriestock %}
     <a href="{% url 'stock_categorie_create' %}" class="o-btn-create"
       onclick="return stOpenConfigModal(event, this.href, 'Nouvelle catégorie de produit', 'bi-tags');">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
+    {% endif %}
   </div>
 </div>
 
@@ -75,10 +83,13 @@
           {% else %}<span class="stc-badge-inactif">Inactive</span>{% endif %}
         </td>
         <td style="text-align:right;white-space:nowrap;">
+          {% if peut_gerer_stock and perms.stock.change_categoriestock %}
           <a href="{% url 'stock_categorie_edit' cat.pk %}" class="o-ctrl-btn" title="Modifier"
             onclick="return stOpenConfigModal(event, this.href, 'Modifier — {{ cat.nom }}', 'bi-tags');">
             <i class="bi bi-pencil"></i>
           </a>
+          {% endif %}
+          {% if peut_gerer_stock and perms.stock.delete_categoriestock %}
           <form method="post" action="{% url 'stock_categorie_delete' cat.pk %}" style="display:inline;"
             onsubmit="return confirm('Supprimer la catégorie « {{ cat.nom }} » ?');">
             {% csrf_token %}
@@ -86,6 +97,7 @@
               <i class="bi bi-trash"></i>
             </button>
           </form>
+          {% endif %}
         </td>
       </tr>
       {% empty %}
