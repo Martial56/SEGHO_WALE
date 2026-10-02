@@ -1055,9 +1055,9 @@ def gynecologie_registre_naissance(request):
 
     from django.core.paginator import Paginator
 
-    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
-                              conditions_demandees, menu_filtres, menu_groupes,
-                              paginer_groupes)
+    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from patients.models import Naissance
     from patients.naissance_listing import (CHAMPS_RECHERCHE, champs_naissances,
                                             construire_dimensions,
@@ -1110,14 +1110,16 @@ def gynecologie_registre_naissance(request):
         return _export_naissances(qs)
 
     # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
-    # les lignes des groupes affichés sont chargées, si bien qu'un groupe visible
-    # s'ouvre toujours et que déplier n'appelle jamais le serveur.
+    # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
+    # la page porterait, repliées, toutes les lignes de tous les groupes.
     toutes = dict(declarees)
     toutes.update({d.cle: d for d in dims_perso})
     dims = [toutes[g] for g in groupes if g in toutes]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
@@ -1830,9 +1832,9 @@ def gynecologie_list(request):
 
     from django.core.paginator import Paginator
 
-    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
-                              conditions_demandees, menu_filtres, menu_groupes,
-                              paginer_groupes)
+    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from patients.models import Patient, RendezVous
     from patients.patient_listing import (CHAMPS_RECHERCHE, construire_dimensions,
                                           champs_patients, dimensions_personnalisees,
@@ -1887,7 +1889,9 @@ def gynecologie_list(request):
     dims = [toutes[g] for g in groupes if g in toutes]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))

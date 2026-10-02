@@ -34,7 +34,8 @@ def hospitalisation_list(request):
     from django.core.paginator import Paginator
     from django.utils import timezone as tz
 
-    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+                              menu_groupes, paginer_groupes)
     from .hospitalisation_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                           construire_dimensions,
                                           familles_hospitalisations, libelle_periode)
@@ -96,7 +97,9 @@ def hospitalisation_list(request):
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des dossiers.
         total = qs.count()
@@ -1745,7 +1748,8 @@ def chambres_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+                              menu_groupes, paginer_groupes)
     from .chambre_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                   construire_dimensions, familles_chambres)
 
@@ -1776,7 +1780,9 @@ def chambres_list(request):
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         total = qs.count()
     else:
         nb_groupes = 0
@@ -1949,7 +1955,8 @@ def registre_deces(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+                              menu_groupes, paginer_groupes)
     from .deces_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                 construire_dimensions, familles_deces, libelle_periode)
 
@@ -1990,7 +1997,9 @@ def registre_deces(request):
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         total = qs.count()
     else:
         nb_groupes = 0

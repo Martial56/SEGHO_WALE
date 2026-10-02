@@ -64,9 +64,9 @@ def patient_list(request):
     """
     from datetime import date as _date
 
-    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
-                              conditions_demandees, menu_filtres, menu_groupes,
-                              paginer_groupes)
+    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from .patient_listing import (CHAMPS_RECHERCHE, champs_patients,
                                   construire_dimensions, dimensions_personnalisees,
                                   familles_patients)
@@ -112,14 +112,16 @@ def patient_list(request):
     qs = listing.trier(qs, groupes)
 
     # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
-    # les lignes des groupes affichés sont chargées, si bien qu'un groupe visible
-    # s'ouvre toujours et que déplier n'appelle jamais le serveur.
+    # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
+    # la page porterait, repliées, toutes les lignes de tous les groupes.
     toutes = dict(declarees)
     toutes.update({d.cle: d for d in dims_perso})
     dims = [toutes[g] for g in groupes if g in toutes]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
@@ -579,15 +581,17 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     qs = trier_pour_groupes(qs, groupes, today)
 
     # Avec un regroupement actif, on pagine les **groupes** et non les lignes :
-    # toutes les lignes des groupes affichés sont chargées, si bien qu'un groupe
-    # visible s'ouvre toujours et que déplier n'appelle jamais le serveur.
-    from core.listing import paginer_groupes
+    # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
+    # la page porterait, repliées, toutes les lignes de tous les groupes.
+    from core.listing import PARAM_GROUPE, paginer_groupes
     declarees = dict(construire_dimensions(today))
     declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         annoter_diagnostics([o for n in _feuilles(arbre) for o in n['lignes']])
     else:
         nb_groupes = 0

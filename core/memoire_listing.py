@@ -25,6 +25,9 @@ from urllib.parse import urlencode
 
 from django.shortcuts import redirect
 
+# Importé plutôt que recopié : c'est la brique des listes qui définit ce nom.
+from core.listing import PARAM_GROUPE
+
 #: Paramètres qui composent une sélection. `page` en est volontairement absent :
 #: revenir sur une fiche puis retrouver sa liste à la page 7 surprendrait plus
 #: que de repartir du début.
@@ -74,6 +77,13 @@ def selection_memorisee(request):
     l'URL — la vue n'a alors qu'à la retourner — et None dans tous les autres
     cas, où elle poursuit normalement.
     """
+    # Déplier un groupe redemande la page avec `_groupe` : ce n'est ni une
+    # sélection ni un effacement, et il ne doit donc ni être retenu ni effacer
+    # ce qui l'est. Sans ce garde-fou, ouvrir un groupe sur une liste filtrée
+    # perdrait le filtre retenu.
+    if PARAM_GROUPE in request.GET:
+        return None
+
     cle = _cle(request)
     selection = _selection(request)
 

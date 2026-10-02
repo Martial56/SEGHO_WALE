@@ -22,7 +22,13 @@ ajoutée en configuration devient filtrable sans toucher au code.
 
 from collections import OrderedDict, defaultdict
 
+from django.core.paginator import Page, Paginator
 from django.db.models import Count, Q
+
+#: Paramètre d'URL par lequel le navigateur réclame les lignes d'un groupe
+#: qu'il vient de déplier. Préfixé d'un tiret bas : ce n'est pas un filtre,
+#: et la mémoire des listes doit l'ignorer (voir core.memoire_listing).
+PARAM_GROUPE = '_groupe'
 
 
 # ── Déclarations ────────────────────────────────────────────────────────────
@@ -294,13 +300,19 @@ def _totaux_feuilles_sql(qs, dims):
                 .values(*champs).annotate(_n=Count('id')))
     racine = dims[0]
     totaux, brutes = {}, defaultdict(set)
+    # Valeurs brutes de **chaque** niveau, par chemin complet : c'est ce qui
+    # permet de ne charger qu'un groupe précis quand on le déplie.
+    brutes_chemin = defaultdict(lambda: [set() for _ in dims])
     for ligne in lignes:
         chemin = tuple(dim.label(ligne) for dim in dims)
         totaux[chemin] = totaux.get(chemin, 0) + ligne['_n']
         # Valeurs brutes du premier niveau, sous forme de tuple : elles servent à
         # ne recharger que les lignes des groupes affichés.
         brutes[chemin[0]].add(tuple(ligne[champ] for champ in racine.values))
-    return totaux, dict(brutes)
+        for niveau, dim in enumerate(dims):
+            brutes_chemin[chemin][niveau].add(
+                tuple(ligne[champ] for champ in dim.values))
+    return totaux, dict(brutes), dict(brutes_chemin)
 
 
 def _totaux_feuilles_python(qs, dims):
@@ -311,13 +323,16 @@ def _totaux_feuilles_python(qs, dims):
     dimensions : les en-têtes sortent donc dans le même ordre qu'en SQL.
     """
     totaux, brutes = {}, defaultdict(set)
+    brutes_chemin = defaultdict(lambda: [set() for _ in dims])
     for objet in qs:
         for chemin in _chemins(objet, dims):
             totaux[chemin] = totaux.get(chemin, 0) + 1
             # Pas de valeur brute en base ici : on transmet le libellé lui-même,
             # que le `filtre` de la dimension saura retraduire.
             brutes[chemin[0]].add((chemin[0],))
-    return totaux, dict(brutes)
+            for niveau, libelle in enumerate(chemin):
+                brutes_chemin[chemin][niveau].add((libelle,))
+    return totaux, dict(brutes), dict(brutes_chemin)
 
 
 def _chemins(objet, dims):
@@ -341,48 +356,190 @@ def _sommes_par_prefixe(totaux):
     return sommes
 
 
-def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=8):
+class _PageDeGroupes(Page):
+    """Une page de groupes, dont l'étendue dépend des pages qui la précèdent.
+
+    `Page` déduit ses bornes d'une taille de page constante ; ici elle varie,
+    et les deux numéros se lisent donc sur le découpage réel.
+    """
+
+    def start_index(self):
+        return self.paginator.debut(self.number)
+
+    def end_index(self):
+        return self.paginator.debut(self.number) + len(self.object_list) - 1
+
+
+class _PaginateurDeGroupes(Paginator):
+    """Pagine les groupes en visant un nombre d'**en-têtes** par page.
+
+    En mode groupé, seuls les en-têtes racines sont visibles : les lignes de
+    données et les sous-groupes partent repliés (`display:none` dans
+    includes/listing/groupes.html). Ce qu'on lit à l'écran, ce sont donc des
+    en-têtes, et une page doit en porter autant qu'une page à plat porte de
+    lignes. Huit, le réglage d'origine, remplissait le quart d'un écran.
+
+    Le plafond ne sert que d'amortisseur : les lignes des groupes affichés
+    partent toutes dans le HTML même repliées, et une page de groupes énormes
+    pèserait lourd pour rien. Il ne peut jamais réduire une page en dessous de
+    `MINIMUM_GROUPES_PAR_PAGE` — mieux vaut une page lourde qu'une page qui
+    n'affiche qu'un seul groupe.
+
+    `per_page` ne sert qu'à satisfaire `Paginator` : le découpage ne passe pas
+    par lui, `page()` et `num_pages` sont redéfinis.
+    """
+
+    #: Au-delà, on coupe la page : personne ne dépliera dix mille lignes.
+    PLAFOND_LIGNES_CHARGEES = 1000
+    #: En dessous, la page n'a plus de sens, le plafond cède.
+    MINIMUM_GROUPES_PAR_PAGE = 5
+
+    def __init__(self, libelles, tailles, groupes_par_page):
+        super().__init__(libelles, per_page=max(1, groupes_par_page))
+        self._pages = self._decouper(libelles, tailles, max(1, groupes_par_page))
+
+    @classmethod
+    def _decouper(cls, libelles, tailles, par_page):
+        pages, courante, lignes = [], [], 0
+        for libelle in libelles:
+            taille = tailles.get(libelle, 1)
+            trop_de_groupes = len(courante) >= par_page
+            trop_de_lignes = (lignes + taille > cls.PLAFOND_LIGNES_CHARGEES
+                              and len(courante) >= cls.MINIMUM_GROUPES_PAR_PAGE)
+            if courante and (trop_de_groupes or trop_de_lignes):
+                pages.append(courante)
+                courante, lignes = [], 0
+            courante.append(libelle)
+            lignes += taille
+        if courante:
+            pages.append(courante)
+        # Jamais zéro page : une sélection vide en garde une, vide.
+        return pages or [[]]
+
+    @property
+    def num_pages(self):
+        return len(self._pages)
+
+    def debut(self, numero):
+        """Rang du premier groupe de cette page, à partir de 1."""
+        return sum(len(p) for p in self._pages[:numero - 1]) + 1
+
+    def page(self, numero):
+        numero = self.validate_number(numero)
+        return _PageDeGroupes(self._pages[numero - 1], numero, self)
+
+
+def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
+                    chemin_demande=None):
     """Pagine les **groupes** plutôt que les lignes, à la manière d'Odoo.
 
     Avec un regroupement actif, paginer les lignes conduit à afficher des groupes
     dont les lignes sont sur une autre page : on les déplie et rien n'apparaît.
-    Ici on pagine les groupes racines, puis on charge **toutes** les lignes de
-    ceux affichés — un groupe visible s'ouvre donc toujours.
+    On pagine donc les groupes racines, et un groupe visible contient toujours
+    tout ce qu'il annonce.
+
+    `groupes_par_page` est le `par_page` de la liste appelante : une page
+    regroupée porte autant d'en-têtes qu'une page à plat porte de lignes, les
+    lignes de données étant repliées. Une page peut en porter moins quand ses
+    groupes sont énormes (voir `_PaginateurDeGroupes`).
+
+    Les lignes de données ne sont chargées **que** pour le groupe nommé par
+    `chemin_demande`, celui qu'on vient de déplier. Les charger toutes d'avance
+    mettait dans le HTML, repliées et souvent jamais lues, toutes les lignes de
+    tous les groupes affichés : une ligne pèse plus d'un kilo-octet, et un
+    regroupement à gros groupes produisait une page de plusieurs dizaines de
+    méga-octets.
+
+    Le navigateur redemande donc la page avec `_groupe=<chemin>` et n'y prend
+    que les lignes du groupe (static/js/listing_groupes.js), exactement comme
+    `rafraichir()` ne prend que les zones qui l'intéressent. Un dépliage déjà
+    chargé ne rappelle plus le serveur.
 
     Retourne (arbre, page_de_groupes, nombre_total_de_groupes).
     """
-    from django.core.paginator import Paginator
+    arbre, page, nombre, _, brutes_chemin = _page_de_groupes(
+        qs_filtre, dims, numero_page, groupes_par_page)
+    if chemin_demande:
+        noeud = _noeud_par_chemin(arbre, chemin_demande)
+        # Un nœud qui a des enfants n'a pas de lignes à lui : ses sous-groupes
+        # sont déjà dans la page, et ce sont eux qui en demanderont.
+        if noeud is not None and not noeud['enfants']:
+            noeud['lignes'] = _lignes_du_groupe(
+                qs_filtre, dims, brutes_chemin, noeud['cle'])
+    return arbre, page, nombre
 
-    totaux, brutes = (_totaux_feuilles_sql(qs_filtre, dims)
-                      if all(d.agregeable for d in dims)
-                      else _totaux_feuilles_python(qs_filtre, dims))
+
+def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
+    """Le découpage en pages et l'arbre d'en-têtes, sans aucune ligne.
+
+    Séparé du chargement des lignes parce que les deux n'ont rien à voir : ceci
+    ne dépend que de l'agrégation, cela d'un chemin réclamé par le navigateur.
+    La séparation rend aussi les en-têtes testables sans toucher aux lignes.
+
+    Retourne (arbre, page, nombre_de_groupes, totaux, valeurs_brutes_par_chemin).
+    """
+    totaux, _, brutes_chemin = (
+        _totaux_feuilles_sql(qs_filtre, dims)
+        if all(d.agregeable for d in dims)
+        else _totaux_feuilles_python(qs_filtre, dims))
+
+    # Nombre de lignes de chaque groupe racine : l'agrégation l'a déjà compté au
+    # niveau le plus fin, il n'y a qu'à replier les sous-groupes dessus.
+    tailles = defaultdict(int)
+    for chemin, n in totaux.items():
+        tailles[chemin[0]] += n
 
     # Groupes racines dans l'ordre de l'agrégation, sans doublon.
     racines_libelles = list(dict.fromkeys(chemin[0] for chemin in totaux))
-    page = Paginator(racines_libelles, groupes_par_page).get_page(numero_page)
+    page = _PaginateurDeGroupes(
+        racines_libelles, tailles, groupes_par_page).get_page(numero_page)
     retenus = set(page.object_list)
 
-    # Ne recharger que les lignes des groupes affichés, quand la dimension
-    # racine sait se traduire en filtre ; sinon on parcourt toute la sélection
-    # (cas d'une valeur en JSONField ou d'une appartenance multiple).
-    racine = dims[0]
-    if racine.filtrable and brutes:
-        valeurs = set()
-        for libelle in retenus:
-            valeurs |= brutes.get(libelle, set())
-        if valeurs:
-            # L'annotation doit précéder le filtre : une dimension calculée
-            # (tranche d'âge, mois) se filtre sur son annotation.
-            base = qs_filtre.annotate(**racine.annotate) if racine.annotate else qs_filtre
-            lignes = list(base.filter(racine.filtre(valeurs)))
-        else:
-            lignes = []
-    else:
-        lignes = list(qs_filtre)
-
     totaux_page = {c: n for c, n in totaux.items() if c[0] in retenus}
-    arbre = _arbre(totaux_page, lignes, dims, retenus)
-    return arbre, page, len(racines_libelles)
+    arbre = _arbre(totaux_page, [], dims, retenus)
+    return arbre, page, len(racines_libelles), totaux_page, brutes_chemin
+
+
+def _noeud_par_chemin(noeuds, chemin):
+    """Le nœud dont le chemin positionnel est donné ('0', '2-1'…), ou None."""
+    for n in noeuds:
+        if n['chemin'] == chemin:
+            return n
+        if chemin.startswith(n['chemin'] + '-'):
+            trouve = _noeud_par_chemin(n['enfants'], chemin)
+            if trouve is not None:
+                return trouve
+    return None
+
+
+def _condition_du_chemin(dims, brutes_chemin, cle):
+    """Condition retenant exactement les lignes d'un groupe feuille, ou None.
+
+    None dès qu'une dimension ne sait pas se traduire en filtre (valeur dans un
+    JSONField, appartenance multiple) : l'appelant retombe alors sur un tri en
+    Python, plus lent mais exact.
+    """
+    par_niveau = brutes_chemin.get(cle)
+    if par_niveau is None or not all(d.filtrable for d in dims):
+        return None
+    condition = Q()
+    for dim, valeurs in zip(dims, par_niveau):
+        condition &= dim.filtre(valeurs)
+    return condition
+
+
+def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
+    """Les lignes d'un groupe feuille, désigné par son chemin en libellés."""
+    annotations = {}
+    for dim in dims:
+        annotations.update(dim.annotate)
+    base = qs_filtre.annotate(**annotations) if annotations else qs_filtre
+
+    condition = _condition_du_chemin(dims, brutes_chemin, cle)
+    if condition is not None:
+        return list(base.filter(condition))
+    # Repli : la dimension ne s'exprime pas en base, on trie en Python.
+    return [o for o in qs_filtre if cle in _chemins(o, dims)]
 
 
 def _arbre(totaux, lignes, dims, retenus=None):
@@ -412,6 +569,9 @@ def _arbre(totaux, lignes, dims, retenus=None):
         cree = {
             'chemin':   (parent['chemin'] + '-' if parent else '') + str(len(freres)),
             'parent':   parent['chemin'] if parent else '',
+            # Chemin en libellés, celui de `totaux` : le chargement différé s'en
+            # sert pour retrouver les lignes du groupe (`lignes_du_groupe`).
+            'cle':      cle_complete,
             'niveau':   niveau,
             # Retrait calculé ici pour éviter toute arithmétique dans le gabarit.
             'indent':   14 + niveau * 20,

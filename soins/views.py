@@ -218,7 +218,8 @@ def soins_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+                              menu_groupes, paginer_groupes)
     from .soin_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
                                construire_dimensions, familles_soins, libelle_periode)
 
@@ -287,7 +288,9 @@ def soins_list(request):
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         # Avec un regroupement, la pagination porte sur les groupes : le compteur
         # du titre doit rester celui des soins, pas celui des bandes.
         total = qs.count()
@@ -771,7 +774,8 @@ def procedure_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import Listing, menu_filtres, menu_groupes, paginer_groupes
+    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+                              menu_groupes, paginer_groupes)
     from .procedure_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                     TRIS as TRIS_PROCEDURE,
                                     construire_dimensions, familles_procedures,
@@ -821,7 +825,9 @@ def procedure_list(request):
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
-        arbre, page_obj, nb_groupes = paginer_groupes(qs, dims, request.GET.get('page'))
+        arbre, page_obj, nb_groupes = paginer_groupes(
+            qs, dims, request.GET.get('page'), listing.par_page,
+            request.GET.get(PARAM_GROUPE))
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des procédures.
         total = qs.count()

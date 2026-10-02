@@ -6,12 +6,17 @@ ligne de données — porte `data-parent`, le chemin de son groupe parent : c'es
 qui permet de replier en cascade **sans aucun appel au serveur**, toutes les
 lignes des groupes affichés étant déjà chargées.
 
+Les lignes de données n'arrivent qu'au dépliage : `n.lignes` est vide sauf
+pour le groupe réclamé par `_groupe` dans l'URL, et `data-feuille` dit à
+listing_groupes.js quels en-têtes doivent aller les chercher.
+
 Attend : noeuds, listing_colonnes (nombre de colonnes du tableau) et
 listing_ligne_tpl (gabarit d'une ligne de données).
 {% endcomment %}
 {% for n in noeuds %}
 <tr class="lst-groupe{% if n.niveau %} lst-groupe-fils{% endif %}"
     data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}"
+    {% if not n.enfants %}data-feuille="1"{% endif %}
     {% if n.niveau %}style="display:none;"{% endif %}
     onclick="lstBasculerGroupe(this)">
   <td colspan="{{ listing_colonnes }}" style="padding-left:{{ n.indent }}px;">

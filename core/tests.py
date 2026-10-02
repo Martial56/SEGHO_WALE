@@ -576,3 +576,175 @@ class TestMemoireDesListes(TestCase):
         """`?origine=gynecologie` n'est pas une sélection."""
         self.client.get(self.url + '?origine=gynecologie')
         self.assertEqual(self.client.get(self.url).status_code, 200)
+
+
+# ─── Pagination des groupes ────────────────────────────────────────────────────
+
+class TestLaPaginationDesGroupes(TestCase):
+    """Une page groupée doit porter autant d'en-têtes qu'une page à plat de lignes.
+
+    En mode groupé, seuls les en-têtes racines sont visibles : les lignes de
+    données et les sous-groupes partent repliés (`display:none` dans
+    includes/listing/groupes.html). Le réglage d'origine, huit groupes par page
+    quelle que soit la liste, remplissait donc le quart d'un écran — alors que
+    les mêmes listes affichent 25, 40 ou 80 lignes sans regroupement.
+    """
+
+    def _pagineur(self, tailles, par_page):
+        from core.listing import _PaginateurDeGroupes
+        return _PaginateurDeGroupes(list(tailles), tailles, par_page)
+
+    def _etendue(self, pagineur, numero):
+        page = pagineur.page(numero)
+        return len(page.object_list), page.start_index(), page.end_index()
+
+    def test_une_page_porte_autant_d_en_tetes_que_la_liste_de_lignes(self):
+        pagineur = self._pagineur({f'g{i}': 1 for i in range(30)}, 25)
+        self.assertEqual(pagineur.num_pages, 2)
+        self.assertEqual(self._etendue(pagineur, 1), (25, 1, 25))
+        self.assertEqual(self._etendue(pagineur, 2), (5, 26, 30))
+
+    def test_chaque_liste_garde_sa_propre_taille(self):
+        """80 pour les rendez-vous de gynécologie, 25 pour les factures."""
+        tailles = {f'g{i}': 1 for i in range(100)}
+        self.assertEqual(self._pagineur(tailles, 80).num_pages, 2)
+        self.assertEqual(self._pagineur(tailles, 25).num_pages, 4)
+
+    def test_un_groupe_gros_n_empeche_pas_les_autres_de_tenir(self):
+        """Un regroupement très déséquilibré — une ville qui pèse presque tout —
+        ne doit pas renvoyer les petits groupes à la page suivante."""
+        villes = {'Yamoussoukro': 363, 'Abidjan': 30, 'Bouaké': 12,
+                  'Daloa': 8, 'Korhogo': 6, 'Man': 4}
+        self.assertEqual(self._pagineur(villes, 40).num_pages, 1)
+
+    def test_le_plafond_coupe_une_page_de_groupes_enormes(self):
+        """Les lignes des groupes affichés partent dans le HTML même repliées :
+        une page de cinquante gros groupes pèserait pour rien."""
+        pagineur = self._pagineur({f'G{i}': 100 for i in range(50)}, 25)
+        self.assertEqual(len(pagineur.page(1).object_list), 10)
+
+    def test_le_plafond_ne_descend_jamais_sous_le_minimum(self):
+        """Mieux vaut une page lourde qu'une page à un seul groupe."""
+        from core.listing import _PaginateurDeGroupes as P
+        pagineur = self._pagineur({f'G{i}': 5000 for i in range(5)}, 25)
+        self.assertEqual(len(pagineur.page(1).object_list),
+                         P.MINIMUM_GROUPES_PAR_PAGE)
+
+    def test_les_bornes_suivent_le_decoupage_reel(self):
+        """`Page` les déduit d'une taille constante ; ici elle varie."""
+        tailles = {'a': 1, 'b': 1, 'c': 1200, 'd': 2, 'e': 3, 'f': 4, 'g': 5}
+        pagineur = self._pagineur(tailles, 25)
+        rangs = [self._etendue(pagineur, n)[1:]
+                 for n in range(1, pagineur.num_pages + 1)]
+        # Les bornes s'enchaînent sans trou ni recouvrement.
+        self.assertEqual(rangs[0][0], 1)
+        for (_, fin), (debut, _) in zip(rangs, rangs[1:]):
+            self.assertEqual(debut, fin + 1)
+        self.assertEqual(rangs[-1][1], len(tailles))
+
+    def test_une_selection_vide_garde_une_page(self):
+        pagineur = self._pagineur({}, 25)
+        self.assertEqual(pagineur.num_pages, 1)
+        self.assertEqual(pagineur.count, 0)
+        self.assertEqual(list(pagineur.page(1).object_list), [])
+
+    def test_les_onze_listes_passent_leur_taille(self):
+        """Le paramètre avait une valeur par défaut et personne ne l'envoyait :
+        les onze listes héritaient du même 8."""
+        import pathlib
+        racine = pathlib.Path(__file__).resolve().parent.parent
+        appels = 0
+        for fichier in racine.glob('*/views.py'):
+            texte = fichier.read_text()
+            appels += texte.count('paginer_groupes(')
+            self.assertNotIn("paginer_groupes(qs, dims, request.GET.get('page'))",
+                             texte, f'{fichier.name} n\'envoie pas sa taille')
+        self.assertEqual(appels, 11)
+
+
+# ─── Chargement différé des lignes d'un groupe ────────────────────────────────
+
+class TestLesLignesArriventAuDepliage(TestCase):
+    """Une liste regroupée ne porte plus les lignes de tous ses groupes.
+
+    Toutes les lignes des groupes affichés partaient dans le HTML, repliées et
+    souvent jamais lues. Une ligne pèse plus d'un kilo-octet : un regroupement
+    à gros groupes produisait une page de plusieurs dizaines de méga-octets
+    pour un écran qui ne montrait que des en-têtes. Elles n'arrivent désormais
+    qu'au dépliage, groupe par groupe.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from facturation.models import Facture
+        from patients.models import Patient
+
+        User.objects.create_superuser('su_lazy', password='x')
+        self.client = Client()
+        self.client.login(username='su_lazy', password='x')
+
+        patient = Patient.objects.create(
+            nom='Lazy', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000')
+        for statut, combien in (('emise', 3), ('payee', 2)):
+            for _ in range(combien):
+                Facture.objects.create(
+                    patient=patient, type_facture='consultation', statut=statut,
+                    montant_total=1000, date_emission=timezone.now())
+        self.url = reverse('facturation:list') + '?filter=&group=statut'
+
+    def _html(self, suffixe=''):
+        reponse = self.client.get(self.url + suffixe)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    @staticmethod
+    def _nb_lignes(html):
+        """Les lignes de données, repérées par le balisage de leur première
+        cellule — jamais par un nom de classe nu, qui vit aussi dans le CSS."""
+        return html.count('<td data-col="1" class="td-num">')
+
+    def test_la_page_groupee_ne_porte_aucune_ligne(self):
+        html = self._html()
+        self.assertIn('data-feuille="1"', html)
+        self.assertEqual(self._nb_lignes(html), 0)
+
+    def test_deplier_un_groupe_rend_ses_lignes(self):
+        html = self._html('&_groupe=0')
+        self.assertEqual(self._nb_lignes(html), 3)
+
+    def test_chaque_groupe_rend_les_siennes_et_pas_celles_du_voisin(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=1')), 2)
+
+    def test_les_lignes_portent_le_chemin_de_leur_groupe(self):
+        """C'est par là que le navigateur les retrouve dans la page renvoyée."""
+        self.assertIn('data-parent="0"', self._html('&_groupe=0'))
+
+    def test_un_chemin_inconnu_ne_casse_rien(self):
+        """Une page rafraîchie pendant qu'un dépliage était en vol."""
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=42-7')), 0)
+
+    def test_un_groupe_qui_a_des_sous_groupes_ne_rend_pas_de_lignes(self):
+        """Ses sous-groupes sont déjà dans la page : ce sont eux qui demanderont."""
+        html = self._html('&group=type&_groupe=0')
+        self.assertEqual(self._nb_lignes(html), 0)
+
+    def test_un_sous_groupe_rend_bien_les_siennes(self):
+        html = self._html('&group=type&_groupe=0-0')
+        self.assertEqual(self._nb_lignes(html), 3)
+
+    def test_sans_regroupement_les_lignes_sont_toujours_la(self):
+        """Le chargement différé ne concerne que le mode groupé."""
+        reponse = self.client.get(reverse('facturation:list') + '?filter=')
+        self.assertEqual(self._nb_lignes(reponse.content.decode()), 5)
+
+    def test_deplier_ne_fait_pas_oublier_la_selection_retenue(self):
+        """`_groupe` n'est ni une sélection ni un effacement : la mémoire des
+        listes doit le laisser passer sans y toucher."""
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(self.url)                      # mémorise le regroupement
+        cle = PREFIXE_CLE + reverse('facturation:list')
+        retenue = self.client.session[cle]
+
+        self.client.get(reverse('facturation:list') + '?_groupe=0')
+        self.assertEqual(self.client.session[cle], retenue)
