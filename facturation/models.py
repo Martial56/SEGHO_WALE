@@ -162,6 +162,10 @@ class Facture(ModeleCentre):
         ordering = ['-date_emission']
         permissions = [
             ('can_valider_facture', 'Peut valider une facture (brouillon → émise)'),
+            # Annuler, chez nous, veut dire rembourser : l'argent ressort de la
+            # caisse. Ce n'est donc pas la même main que celle qui corrige une
+            # facture, d'où un droit distinct de `change_facture`.
+            ('can_annuler_facture', 'Peut annuler une facture (et rembourser)'),
         ]
 
 
@@ -346,6 +350,12 @@ class Caisse(models.Model):
         départ, des sorties, des versements en banque, dont l'application ne
         sait rien. Promettre un solde serait promettre plus qu'on ne tient.
 
+        Les factures annulées sont écartées : chez nous annuler vaut
+        remboursement, l'argent est ressorti du tiroir. Leurs paiements restent
+        en base — la trace de ce qui est entré puis reparti — mais ils ne
+        comptent plus ici, comme ils ne comptent plus dans les totaux de la
+        liste des factures. Les deux écrans doivent dire le même chiffre.
+
         La vue de liste pose l'annotation `total` pour éviter une requête par
         ligne ; cette propriété sert les appels isolés.
         """
@@ -354,8 +364,8 @@ class Caisse(models.Model):
         # centre, qui ne rend rien hors d'une requête HTTP — le total serait 0
         # dans un shell ou une commande. L'annotation de la vue de liste compte
         # elle aussi tous les centres, les deux chiffres doivent concorder.
-        return Paiement.all_objects.filter(caisse=self).aggregate(
-            s=Sum('montant'))['s'] or 0
+        return Paiement.all_objects.filter(caisse=self).exclude(
+            facture__statut='annulee').aggregate(s=Sum('montant'))['s'] or 0
 
     class Meta:
         verbose_name = "Caisse"

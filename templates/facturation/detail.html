@@ -397,6 +397,14 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
           <i class="bi bi-eye"></i> Aperçu
         </a>
         {% endif %}
+        {% comment %}Annuler, chez nous, veut dire rembourser : l'argent ressort
+        de la caisse, et la facture cesse de compter dans les totaux de la
+        liste. D'où un droit à part et une cause obligatoire.{% endcomment %}
+        {% if facture.statut != 'annulee' and perms.facturation.can_annuler_facture %}
+        <button type="button" class="fac-btn fac-btn-annuler" id="btn-annuler-facture">
+          <i class="bi bi-x-circle"></i> Annuler la facture
+        </button>
+        {% endif %}
         <a href="{{ back_url }}" class="fac-btn fac-btn-back" style="text-decoration:none;">
           <i class="bi bi-arrow-left"></i> Retour
         </a>
@@ -928,4 +936,80 @@ document.querySelectorAll('.fac-tab-btn').forEach(function(btn){
      modale d'encaissement (z-index 2000) : on cliquait et rien n'apparaissait. */
   .ts-dropdown { z-index: 10000 !important; }
 </style>
+
+{% if facture.statut != 'annulee' and perms.facturation.can_annuler_facture %}
+<style>
+.fac-btn-annuler{background:#fff;color:var(--rose-text);border:1px solid var(--rose-text);}
+.fac-btn-annuler:hover{background:var(--rose-text);color:#fff;}
+html[data-theme="dark"] .fac-btn-annuler{background:transparent;}
+/* Mêmes classes que la modale d'annulation d'un rendez-vous : un seul geste,
+   une seule apparence. */
+.am-overlay{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:9500;display:flex;align-items:center;justify-content:center;}
+.am-box{background:#fff;width:440px;max-width:92vw;border-radius:6px;box-shadow:0 8px 40px rgba(0,0,0,.28);}
+.am-hd{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e0e0e0;}
+.am-title{font-size:14px;font-weight:700;color:#111;font-family:'Sora',sans-serif;}
+.am-close{background:none;border:none;font-size:18px;color:#888;cursor:pointer;padding:2px 6px;line-height:1;border-radius:3px;}
+.am-close:hover{background:#f0f0f0;color:#111;}
+.am-body{padding:16px;display:flex;flex-direction:column;gap:8px;}
+.am-hint{font-size:12px;color:rgba(0,0,0,.5);margin:0 0 4px;}
+.am-lbl{font-size:12.5px;font-weight:600;color:rgba(0,0,0,.6);}
+.am-textarea{width:100%;border:1.5px solid #d1dde3;border-radius:6px;padding:8px 10px;font-size:13px;font-family:'Sora',sans-serif;color:var(--text);background:#fff;outline:none;resize:vertical;}
+.am-textarea:focus{border-color:var(--teal-500);}
+.am-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid #eee;}
+html[data-theme="dark"] .am-box{background:var(--surface);}
+html[data-theme="dark"] .am-hd{border-bottom-color:var(--border);}
+html[data-theme="dark"] .am-title{color:var(--text);}
+html[data-theme="dark"] .am-hint{color:rgba(255,255,255,.55);}
+html[data-theme="dark"] .am-lbl{color:var(--text);}
+html[data-theme="dark"] .am-textarea{background:var(--surface);border-color:var(--border-strong);color:var(--text);}
+html[data-theme="dark"] .am-footer{border-top-color:var(--border);}
+</style>
+
+<div class="am-overlay" id="annuler-facture-modal" style="display:none;">
+  <div class="am-box">
+    <div class="am-hd">
+      <span class="am-title">Annuler la facture {{ facture.numero }}</span>
+      <button type="button" class="am-close" id="am-close">&#10005;</button>
+    </div>
+    <form method="post" action="{% url 'facturation:annuler' facture.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ back_url }}">
+      <div class="am-body">
+        <p class="am-hint">
+          La facture cessera de compter dans le total facturé et dans l'encaissé,
+          et les produits déjà sortis reviennent en stock.
+          {% if facture.montant_paye %}Le patient a réglé
+          {{ facture.montant_paye|floatformat:0 }} F : pensez au remboursement.{% endif %}
+        </p>
+        <label class="am-lbl" for="am-motif">Cause d'annulation <span style="color:var(--rose-text);">*</span></label>
+        <textarea name="motif_annulation" id="am-motif" class="am-textarea" rows="3" required
+                  placeholder="Précisez la raison de l'annulation…"></textarea>
+      </div>
+      <div class="am-footer">
+        <button type="button" class="fac-btn fac-btn-back" id="am-cancel">Fermer</button>
+        <button type="submit" class="fac-btn fac-btn-annuler">Confirmer l'annulation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('annuler-facture-modal');
+  var btnOpen = document.getElementById('btn-annuler-facture');
+  if (!overlay || !btnOpen) return;
+  function ouvrir(){ overlay.style.display='flex'; document.body.style.overflow='hidden';
+                     document.getElementById('am-motif').focus(); }
+  function fermer(){ overlay.style.display='none'; document.body.style.overflow=''; }
+  btnOpen.addEventListener('click', ouvrir);
+  document.getElementById('am-close').addEventListener('click', fermer);
+  document.getElementById('am-cancel').addEventListener('click', fermer);
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) fermer(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.style.display === 'flex') fermer();
+  });
+})();
+</script>
+{% endif %}
+
 {% endblock %}

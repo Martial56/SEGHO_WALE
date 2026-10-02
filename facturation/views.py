@@ -99,12 +99,20 @@ def facturation_list(request):
     # l'ouverture, ce qui ne se rapportait à rien de ce qu'on avait sous les yeux.
     # `order_by()` vide l'ordre : il n'a pas de sens dans une agrégation, et
     # laissé en place il ajouterait ses colonnes au GROUP BY.
+    # Une facture annulée a été remboursée : son montant ne doit peser ni sur
+    # ce qui est dû, ni sur ce qui est entré. Elle reste comptée dans
+    # `nb_factures` — ses lignes sont sous les yeux, le compte doit tomber
+    # juste — et son montant s'affiche à part, pour qu'il ne disparaisse pas
+    # des totaux sans laisser de trace.
+    _active = ~Q(statut='annulee')
     sommes = qs.order_by().aggregate(
-        total=Sum('montant_total'),
-        paye=Sum('montant_paye'),
+        total=Sum('montant_total', filter=_active),
+        paye=Sum('montant_paye', filter=_active),
+        annule=Sum('montant_total', filter=Q(statut='annulee')),
         nb=Count('id'),
         nb_payees=Count('id', filter=Q(statut='payee')),
         nb_emises=Count('id', filter=Q(statut='emise')),
+        nb_annulees=Count('id', filter=Q(statut='annulee')),
     )
     montant_total = sommes['total'] or 0
     montant_recu  = sommes['paye'] or 0
@@ -113,9 +121,11 @@ def facturation_list(request):
         'montant_total':   int(montant_total),
         'montant_recu':    int(montant_recu),
         'montant_attente': int(montant_total - montant_recu),
+        'montant_annule':  int(sommes['annule'] or 0),
         'nb_factures':     sommes['nb'],
         'nb_payees':       sommes['nb_payees'],
         'nb_emises':       sommes['nb_emises'],
+        'nb_annulees':     sommes['nb_annulees'],
     }
 
     return render(request, 'facturation/list.html', {
@@ -404,6 +414,54 @@ def facture_valider(request, pk):
 
 
 @login_required(login_url='login')
+@permission_required('facturation.can_annuler_facture', raise_exception=True)
+def facture_annuler(request, pk):
+    """Annule une facture et rend les produits déjà sortis.
+
+    Chez nous, annuler veut dire **rembourser** : l'argent ressort de la caisse.
+    Les cartes du haut de la liste cessent donc de compter cette facture, aussi
+    bien dans le total facturé que dans l'encaissé (voir `facturation_list`).
+
+    Le motif est obligatoire et part dans le journal, comme pour l'annulation
+    d'un rendez-vous (`patients.views.rdv_edit`) : la fiche le relit dans son
+    historique, et aucun champ de plus n'est à porter sur le modèle.
+
+    La porte est distincte de `facture_edit` : celle-ci refuse les factures
+    payées aux non-administrateurs, or c'est précisément une facture payée
+    qu'on annule quand on rembourse.
+    """
+    facture  = get_object_or_404(Facture, pk=pk)
+    back_url = request.POST.get('next', reverse('facturation:list'))
+    detour = f"{reverse('facturation:detail', kwargs={'pk': pk})}?next={back_url}"
+
+    if request.method != 'POST':
+        return redirect(detour)
+
+    if facture.statut == 'annulee':
+        messages.error(request, 'Cette facture est déjà annulée.')
+        return redirect(detour)
+
+    motif = request.POST.get('motif_annulation', '').strip()
+    if not motif:
+        messages.error(request, "La cause d'annulation est requise.")
+        return redirect(detour)
+
+    facture.statut = 'annulee'
+    facture.save(update_fields=['statut'])
+    log_event(facture, request.user, f'Facture annulée. Cause : {motif}', type='statut')
+
+    # Les produits déjà sortis retournent en rayon : la facture annulée ne les
+    # a finalement pas remis au patient.
+    rendus = rendre_les_produits(facture, pharmacie_active(request), request.user)
+    if rendus:
+        log_event(facture, request.user,
+                  f'{rendus} produit(s) remis en stock.', type='modif')
+
+    messages.success(request, f'Facture {facture.numero} annulée.')
+    return redirect(detour)
+
+
+@login_required(login_url='login')
 def facture_payer(request, pk):
     if not can_manage_paiement(request.user):
         raise PermissionDenied
@@ -517,20 +575,10 @@ def facture_edit(request, pk):
                 messages.success(request, 'Facture marquée comme payée.')
             return redirect(f'{detail_url}?next={back_url}')
 
-        if 'action_annuler' in request.POST:
-            if facture.statut != 'annulee' or is_admin:
-                facture.statut = 'annulee'
-                facture.save()
-                log_event(facture, request.user, 'Facture annulée', type='statut')
-                # Les produits déjà sortis retournent en rayon : la facture
-                # annulée ne les a finalement pas remis au patient.
-                rendus = rendre_les_produits(facture, pharmacie_active(request),
-                                             request.user)
-                if rendus:
-                    log_event(facture, request.user,
-                              f'{rendus} produit(s) remis en stock.', type='modif')
-                messages.success(request, 'Facture annulée.')
-            return redirect(f'{detail_url}?next={back_url}')
+        # L'annulation vivait ici, sans motif et sous le seul `change_facture`.
+        # Aucun gabarit ne la postait — c'était une porte sans poignée, qu'une
+        # requête forgée ouvrait quand même. Elle a sa vue à elle,
+        # `facture_annuler`, son droit et sa cause obligatoire.
 
         if 'action_brouillon' in request.POST:
             if facture.statut == 'emise' or is_admin:
@@ -1048,11 +1096,16 @@ def _est_ajax(request):
 def caisses_list(request):
     q = request.GET.get('q', '').strip()
     # `total` annoté ici plutôt que via la propriété `Caisse.total_encaisse` :
-    # celle-ci ferait une requête par ligne du tableau.
+    # celle-ci ferait une requête par ligne du tableau. Le `filter` reprend sa
+    # règle — une facture annulée a été remboursée, son encaissement ne pèse
+    # plus dans la caisse — et les deux chiffres doivent rester d'accord.
     # `order_by` explicite : le GROUP BY ajouté par l'annotation fait tomber
     # l'ordre déclaré dans Meta, et la pagination avertit alors sur une liste
     # non triée.
-    qs = Caisse.objects.annotate(total=Sum('paiements__montant')).order_by('nom')
+    qs = Caisse.objects.annotate(
+        total=Sum('paiements__montant',
+                  filter=~Q(paiements__facture__statut='annulee'))
+    ).order_by('nom')
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
     page_obj = Paginator(qs, 25).get_page(request.GET.get('page', 1))

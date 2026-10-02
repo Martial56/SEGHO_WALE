@@ -15,8 +15,10 @@
   html[data-theme="dark"] .fac-stat-card.card-total   .fac-stat-icon { background: rgba(var(--teal-500-rgb),.15); }
   html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-icon { background: rgba(22,169,107,.12); }
   html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-icon { background: rgba(var(--amber-rgb),.12); }
+  html[data-theme="dark"] .fac-stat-card.card-annule  .fac-stat-icon { background: rgba(var(--rose-rgb),.12); }
   html[data-theme="dark"] .fac-stat-card.card-recu    .fac-stat-value { color: #4cde9a; }
   html[data-theme="dark"] .fac-stat-card.card-attente .fac-stat-value { color: #f6c05a; }
+  html[data-theme="dark"] .fac-stat-card.card-annule  .fac-stat-value { color: #f09090; }
   html[data-theme="dark"] .o-subheader        { background: var(--surface); border-bottom-color: var(--border); }
   html[data-theme="dark"] .o-list-wrap        { background: var(--surface); }
   html[data-theme="dark"] .o-list-table thead th    { background: var(--surface); color: var(--text-muted); border-bottom-color: var(--border); }
@@ -46,13 +48,18 @@
      STATS
   ══════════════════════════════════════════════════ */
   .fac-stats {
-    display: grid; grid-template-columns: repeat(3, 1fr);
+    display: grid; grid-template-columns: repeat(4, 1fr);
     background: #fff;
     border-bottom: 1px solid var(--border);
   }
+  /* Quatre cartes tiennent mal sur un portable : elles se remettent sur deux
+     rangs plutôt que de se tasser jusqu'à tronquer les montants. */
+  @media (max-width: 1100px) {
+    .fac-stats { grid-template-columns: repeat(2, 1fr); }
+  }
   .fac-stat-card {
-    padding: 20px 28px; display: flex; align-items: center; gap: 16px;
-    position: relative; transition: background .15s;
+    padding: 18px 20px; display: flex; align-items: center; gap: 13px;
+    position: relative; transition: background .15s; min-width: 0;
   }
   .fac-stat-card:not(:last-child)::after {
     content: ''; position: absolute; right: 0; top: 20%; bottom: 20%;
@@ -64,20 +71,22 @@
   .fac-stat-card.card-total::before  { background: linear-gradient(90deg, var(--teal-500), var(--teal-400)); }
   .fac-stat-card.card-recu::before   { background: linear-gradient(90deg, #16a96b, #34d399); }
   .fac-stat-card.card-attente::before{ background: linear-gradient(90deg, var(--amber), #fbbf24); }
+  .fac-stat-card.card-annule::before { background: linear-gradient(90deg, var(--rose-text), #f09090); }
   .fac-stat-card:hover { background: #fafcfd; }
 
   .fac-stat-icon {
-    width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+    width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+    font-size: 18px;
   }
   .fac-stat-card.card-total   .fac-stat-icon { background: var(--teal-50);  color: var(--accent-text-soft); }
   .fac-stat-card.card-recu    .fac-stat-icon { background: #eafaf3; color: var(--color-success); }
   .fac-stat-card.card-attente .fac-stat-icon { background: #fff8eb; color: var(--color-warning); }
+  .fac-stat-card.card-annule  .fac-stat-icon { background: rgba(var(--rose-rgb),.09); color: var(--rose-text); }
 
   .fac-stat-body { display: flex; flex-direction: column; min-width: 0; }
   .fac-stat-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 5px; font-weight: 600; }
-  .fac-stat-value { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; white-space: nowrap; }
+  .fac-stat-value { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1; white-space: nowrap; }
   .fac-stat-card.card-recu    .fac-stat-value { color: var(--color-success); }
   .fac-stat-card.card-attente .fac-stat-value { color: var(--color-warning); }
   .fac-stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
@@ -311,6 +320,20 @@ l'affichage précédent après un clic sur un filtre.{% endcomment %}
       <div class="fac-stat-label">En attente</div>
       <div class="fac-stat-value">{{ stats.montant_attente|intcomma }} F</div>
       <div class="fac-stat-sub">{{ stats.nb_emises }} émise{{ stats.nb_emises|pluralize }}</div>
+    </div>
+  </div>
+  {% comment %}Les trois cartes de gauche ignorent les factures annulées :
+  annuler vaut remboursement, l'argent est ressorti. Celle-ci dit à part ce qui
+  a été repris, pour que la somme retombe sur le tableau. Elle paraît toujours,
+  même à zéro : une carte qui apparaît et disparaît selon la sélection fait
+  bouger la rangée, et son absence se lit comme un oubli plutôt que comme un
+  « rien à signaler ».{% endcomment %}
+  <div class="fac-stat-card card-annule">
+    <div class="fac-stat-icon"><i class="bi bi-arrow-counterclockwise"></i></div>
+    <div class="fac-stat-body">
+      <div class="fac-stat-label">Annulé</div>
+      <div class="fac-stat-value">{{ stats.montant_annule|intcomma }} F</div>
+      <div class="fac-stat-sub">{{ stats.nb_annulees }} annulée{{ stats.nb_annulees|pluralize }}</div>
     </div>
   </div>
 </div>

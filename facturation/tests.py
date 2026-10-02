@@ -752,6 +752,8 @@ class TestTotalEncaisse(TestCase):
         client.post(reverse('facturation:payer', args=[facture.pk]),
                     {'pay_journal': str(caisse.pk), 'pay_montant': str(montant),
                      'pay_mode': 'especes'})
+        facture.refresh_from_db()
+        return facture
 
     def test_une_caisse_sans_paiement_est_a_zero(self):
         self.assertEqual(self.caisse.total_encaisse, 0)
@@ -790,6 +792,52 @@ class TestTotalEncaisse(TestCase):
         contenu = client.get(reverse('facturation:caisses_list')).content.decode()
         noms = re.findall(r'<td style="font-weight:600;">([^<]+)</td>', contenu)
         self.assertEqual(noms, sorted(noms))
+
+    # ── Une facture annulée a été remboursée : son argent quitte la caisse ──
+
+    def test_une_facture_annulee_sort_du_total(self):
+        """Annuler vaut remboursement : le tiroir ne garde pas cet argent.
+
+        Le paiement reste en base — on veut pouvoir lire ce qui est entré puis
+        reparti — mais il cesse de compter, exactement comme dans les cartes de
+        la liste des factures.
+        """
+        self._encaisser(3000, self.caisse)
+        annulee = self._encaisser(2000, self.caisse)
+        self.assertEqual(self.caisse.total_encaisse, Decimal('5000'))
+
+        annulee.statut = 'annulee'
+        annulee.save(update_fields=['statut'])
+
+        self.assertEqual(self.caisse.total_encaisse, Decimal('3000'))
+        # Le paiement n'a pas été effacé, il a seulement cessé de compter.
+        self.assertTrue(Paiement.all_objects.filter(facture=annulee).exists())
+
+    def test_le_tableau_des_caisses_ignore_lui_aussi_les_annulees(self):
+        """Le tableau annote le total à part : les deux calculs doivent concorder."""
+        self._encaisser(3000, self.caisse)
+        annulee = self._encaisser(2000, self.caisse)
+        annulee.statut = 'annulee'
+        annulee.save(update_fields=['statut'])
+
+        client = Client()
+        client.force_login(User.objects.create_superuser('su_tot_ann', password='x'))
+        contenu = client.get(reverse('facturation:caisses_list')).content.decode()
+        self.assertIn('<td class="cfg-solde">3000 F</td>', contenu)
+        self.assertNotIn('<td class="cfg-solde">5000 F</td>', contenu)
+
+    def test_une_caisse_dont_tout_est_annule_retombe_a_zero(self):
+        """`Sum` rend None quand le filtre ne laisse rien : sans le `or 0`,
+        l'écran afficherait « None F »."""
+        annulee = self._encaisser(3000, self.caisse)
+        annulee.statut = 'annulee'
+        annulee.save(update_fields=['statut'])
+        self.assertEqual(self.caisse.total_encaisse, 0)
+
+        client = Client()
+        client.force_login(User.objects.create_superuser('su_tot_zero', password='x'))
+        contenu = client.get(reverse('facturation:caisses_list')).content.decode()
+        self.assertNotIn('None', contenu)
 
 
 # ─── Modes de paiement acceptés par caisse ─────────────────────────────────────
@@ -1697,8 +1745,8 @@ class TestProduitsSurLaFacture(TestCase):
             [(f'p:{self.gants.pk}', 'Gants de test', 200, 3)], payer=600)
         self.assertEqual(self._en_rayon(self.gants), Decimal('17'))
 
-        self.client.post(reverse('facturation:edit', args=[facture.pk]),
-                         {'action_annuler': '1'}, follow=True)
+        self.client.post(reverse('facturation:annuler', args=[facture.pk]),
+                         {'motif_annulation': 'Patient remboursé'}, follow=True)
 
         facture.refresh_from_db()
         self.assertEqual(facture.statut, 'annulee')
@@ -1707,8 +1755,10 @@ class TestProduitsSurLaFacture(TestCase):
     def test_annuler_une_facture_jamais_payee_ne_rend_rien(self):
         """Sinon l'annulation créditerait un stock qui n'a rien donné."""
         facture = self._creer_facture([(f'p:{self.gants.pk}', 'Gants de test', 200, 3)])
-        self.client.post(reverse('facturation:edit', args=[facture.pk]),
-                         {'action_annuler': '1'}, follow=True)
+        self.client.post(reverse('facturation:annuler', args=[facture.pk]),
+                         {'motif_annulation': 'Saisie erronée'}, follow=True)
+        facture.refresh_from_db()
+        self.assertEqual(facture.statut, 'annulee')
         self.assertEqual(self._en_rayon(self.gants), Decimal('20'))
 
 
@@ -2052,3 +2102,166 @@ class TestLePrixDeLaLigneSuitLaPermission(TestCase):
         avec = self._page_avec_lignes('u_px_avec')
         self.assertIn('name="ligne_prix_0" value="3500" min="0" step="1" readonly', sans)
         self.assertIn('name="ligne_prix_0" value="3500" min="0" step="1" oninput=', avec)
+
+
+# ─── Annuler une facture ───────────────────────────────────────────────────────
+
+class TestAnnulationDUneFacture(TestCase):
+    """Annuler, ici, veut dire rembourser.
+
+    Le montant d'une facture annulée ne doit plus peser ni sur le total
+    facturé ni sur l'encaissé — l'argent est ressorti de la caisse. Et le
+    geste demande une cause, comme l'annulation d'un rendez-vous.
+
+    Il n'existait aucun bouton : `action_annuler` vivait dans `facture_edit`,
+    sans motif et sous le seul `change_facture`, et aucun gabarit ne le
+    postait. Une porte sans poignée, qu'une requête forgée ouvrait quand même.
+    """
+
+    def setUp(self):
+        self.patient = _patient('AN')
+        self.facture = _facture(self.patient, statut='emise',
+                                montant_total=Decimal('10000'))
+        self.sans = _caisse_user('u_an_sans')
+        self.avec = _caisse_user('u_an_avec')
+        self.avec.user_permissions.add(
+            Permission.objects.get(content_type__app_label='facturation',
+                                   codename='can_annuler_facture'))
+
+    def _annuler(self, username, motif='Patient remboursé'):
+        client = Client()
+        client.login(username=username, password='x')
+        return client.post(reverse('facturation:annuler', args=[self.facture.pk]),
+                           {'motif_annulation': motif}, follow=True)
+
+    # ── La porte ───────────────────────────────────────────────────────────
+
+    def test_sans_la_permission_la_facture_n_est_pas_annulee(self):
+        client = Client()
+        client.login(username='u_an_sans', password='x')
+        reponse = client.post(reverse('facturation:annuler', args=[self.facture.pk]),
+                              {'motif_annulation': 'Essai'})
+        self.assertEqual(reponse.status_code, 403)
+        self.facture.refresh_from_db()
+        self.assertEqual(self.facture.statut, 'emise')
+
+    def test_avec_la_permission_elle_est_annulee(self):
+        self._annuler('u_an_avec')
+        self.facture.refresh_from_db()
+        self.assertEqual(self.facture.statut, 'annulee')
+
+    def test_la_cause_est_obligatoire(self):
+        self._annuler('u_an_avec', motif='   ')
+        self.facture.refresh_from_db()
+        self.assertEqual(self.facture.statut, 'emise',
+                         'Une facture a été annulée sans cause')
+
+    def test_la_cause_part_dans_le_journal(self):
+        """Comme pour un rendez-vous : pas de champ de plus sur le modèle."""
+        from core.views import get_logs
+
+        self._annuler('u_an_avec', motif='Erreur de saisie')
+        textes = ' '.join(log.message for log in get_logs(self.facture))
+        self.assertIn('Erreur de saisie', textes)
+
+    def test_l_ancienne_porte_sans_motif_a_disparu(self):
+        """`action_annuler` contournait le droit et n'exigeait rien."""
+        import io as _io
+
+        from django.conf import settings
+
+        source = _io.open(f'{settings.BASE_DIR}/facturation/views.py',
+                          encoding='utf-8').read()
+        self.assertNotIn("'action_annuler' in request.POST", source)
+
+    # ── Les cartes du haut ─────────────────────────────────────────────────
+
+    def _stats(self):
+        client = Client()
+        client.login(username='u_an_avec', password='x')
+        reponse = client.get(reverse('facturation:list') + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.context['stats']
+
+    def test_le_montant_annule_sort_du_total_facture(self):
+        avant = self._stats()['montant_total']
+        self._annuler('u_an_avec')
+        self.assertEqual(self._stats()['montant_total'], avant - 10000)
+
+    def test_le_montant_annule_sort_aussi_de_l_encaisse(self):
+        self.facture.montant_paye = Decimal('10000')
+        self.facture.save(update_fields=['montant_paye'])
+        self.assertEqual(self._stats()['montant_recu'], 10000)
+        self._annuler('u_an_avec')
+        self.assertEqual(self._stats()['montant_recu'], 0)
+
+    def test_la_facture_reste_comptee_dans_le_nombre(self):
+        """Sa ligne est sous les yeux : le compte doit tomber juste."""
+        avant = self._stats()['nb_factures']
+        self._annuler('u_an_avec')
+        self.assertEqual(self._stats()['nb_factures'], avant)
+
+    def test_le_montant_repris_s_affiche_a_part(self):
+        self._annuler('u_an_avec')
+        stats = self._stats()
+        self.assertEqual(stats['montant_annule'], 10000)
+        self.assertEqual(stats['nb_annulees'], 1)
+
+    def test_la_carte_parait_meme_sans_annulation(self):
+        """À zéro aussi : une carte qui va et vient fait sauter la rangée, et
+        son absence se lit comme un oubli plutôt que comme « rien à signaler »."""
+        client = Client()
+        client.login(username='u_an_avec', password='x')
+        html = client.get(reverse('facturation:list') + '?filter=').content.decode()
+        self.assertIn('class="fac-stat-card card-annule"', html)
+        self.assertIn('0 annulée', html)
+
+    def test_avec_une_annulation_la_carte_dit_le_montant(self):
+        self._annuler('u_an_avec')
+        client = Client()
+        client.login(username='u_an_avec', password='x')
+        html = client.get(reverse('facturation:list') + '?filter=').content.decode()
+        self.assertIn('class="fac-stat-card card-annule"', html)
+        self.assertIn('1 annulée', html)
+
+    def test_les_quatre_cartes_tiennent_sur_une_rangee(self):
+        """La grille était à trois colonnes : la quatrième passait à la ligne."""
+        client = Client()
+        client.login(username='u_an_avec', password='x')
+        html = client.get(reverse('facturation:list') + '?filter=').content.decode()
+        self.assertIn('grid-template-columns: repeat(4, 1fr)', html)
+        self.assertEqual(html.count('class="fac-stat-card'), 4)
+
+    def test_la_ligne_annulee_est_grisee(self):
+        """Même traitement que les rendez-vous annulés : la ligne reste là,
+        mais elle ne se lit plus comme les autres."""
+        client = Client()
+        client.login(username='u_an_avec', password='x')
+        html = client.get(reverse('facturation:list') + '?filter=').content.decode()
+        self.assertNotIn('class="ligne-annulee"', html)
+
+        self._annuler('u_an_avec')
+        html = client.get(reverse('facturation:list') + '?filter=').content.decode()
+        self.assertIn('class="ligne-annulee"', html)
+
+    # ── L'écran de la fiche ────────────────────────────────────────────────
+
+    def _fiche(self, username):
+        client = Client()
+        client.login(username=username, password='x')
+        reponse = client.get(reverse('facturation:detail', args=[self.facture.pk]))
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_le_bouton_suit_la_permission(self):
+        self.assertNotIn('id="btn-annuler-facture"', self._fiche('u_an_sans'))
+        self.assertIn('id="btn-annuler-facture"', self._fiche('u_an_avec'))
+
+    def test_une_facture_deja_annulee_ne_propose_plus_le_bouton(self):
+        self._annuler('u_an_avec')
+        self.assertNotIn('id="btn-annuler-facture"', self._fiche('u_an_avec'))
+
+    def test_la_modale_demande_la_cause(self):
+        html = self._fiche('u_an_avec')
+        self.assertIn('name="motif_annulation"', html)
+        self.assertIn('id="annuler-facture-modal"', html)

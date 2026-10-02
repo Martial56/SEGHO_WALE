@@ -10,6 +10,7 @@ urlpatterns = [
     path('<int:pk>/modifier/', views.facture_edit, name='edit'),
     path('<int:pk>/valider/', views.facture_valider, name='valider'),
     path('<int:pk>/payer/', views.facture_payer, name='payer'),
+    path('<int:pk>/annuler/', views.facture_annuler, name='annuler'),
     path('<int:pk>/imprimer/', views.facture_print, name='print'),
     path('<int:pk>/apercu/', views.facture_apercu, name='apercu'),
 
