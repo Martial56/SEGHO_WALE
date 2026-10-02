@@ -11,7 +11,12 @@ qui la contient, vide quand la liste n'est pas regroupée.
         <td data-col="1" style="font-weight:500;">{{ objet.patient.nom }} {{ objet.patient.prenoms }}</td>
         <td data-col="3" style="font-size:12px;color:var(--text-muted);">{{ objet.soin_type.nom|default:"—" }}</td>
         <td data-col="4" style="font-size:12px;white-space:nowrap;text-align:right;">
-          {% if objet.prix %}{{ objet.prix|floatformat:0 }} CFA{% else %}<span style="opacity:.4;">—</span>{% endif %}
+          {% comment %}`prix` ne peut pas être vide — null=False, default=0 —, donc
+          un prix absent n'existe pas : zéro veut dire gratuit. Le `{% if objet.prix %}`
+          d'origine mettait les deux dans le même panier et affichait un tiret,
+          qui se lit « on ne sait pas » au lieu de « rien à payer ». « Gratuit »
+          est le mot déjà employé par le filtre des prestations.{% endcomment %}
+          {% if objet.prix %}{{ objet.prix|floatformat:0 }} CFA{% else %}<span style="color:var(--text-muted);">Gratuit</span>{% endif %}
         </td>
         <td data-col="5" style="color:var(--text-muted);font-size:12px;">
           {% if objet.infirmier %}{{ objet.infirmier.nom }} {{ objet.infirmier.prenoms }}{% else %}<span style="opacity:.4;">—</span>{% endif %}

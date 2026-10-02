@@ -884,3 +884,52 @@ class TestPermissionsDuModule(TestCase):
         redacteur = Client()
         redacteur.login(username='u_red', password='x')
         self.assertContains(redacteur.get(reverse('soins:list')), 'Nouveau soin')
+
+
+# ─── Un soin gratuit se lit « Gratuit » ────────────────────────────────────────
+
+class TestLePrixNulSAfficheGratuit(TestCase):
+    """Zéro n'est pas une absence de prix.
+
+    `ProcedureSoin.prix` est `null=False, default=0` : il n'existe pas de prix
+    non renseigné. Le gabarit testait pourtant `{% if objet.prix %}`, faux pour
+    zéro comme pour vide, et affichait un tiret — qui se lit « on ne sait pas »
+    au lieu de « rien à payer ».
+    """
+
+    def setUp(self):
+        self.user = _soins_user('u_gratuit', perms=('view_proceduresoin',))
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.url = reverse('soins:procedure_list')
+
+    def _html(self):
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_un_prix_nul_s_affiche_gratuit(self):
+        _procedure(prix=Decimal('0'))
+        html = self._html()
+        self.assertIn('>Gratuit</span>', html)
+
+    def test_un_prix_renseigne_s_affiche_en_francs(self):
+        """Sans cette moitié, le test précédent passerait si tout était gratuit."""
+        _procedure(prix=Decimal('1500'))
+        html = self._html()
+        self.assertIn('1500 CFA', html)
+        self.assertNotIn('>Gratuit</span>', html)
+
+    def test_le_tiret_ne_s_affiche_plus_pour_un_prix(self):
+        """Il voulait dire « prix inconnu », un cas que le modèle interdit."""
+        _procedure(prix=Decimal('0'))
+        html = self._html()
+        colonne = html[html.find('data-col="4"'):]
+        self.assertNotIn('—', colonne[:400])
+
+    def test_les_deux_cas_cohabitent_dans_la_meme_liste(self):
+        _procedure(prix=Decimal('0'))
+        _procedure(prix=Decimal('2500'))
+        html = self._html()
+        self.assertIn('>Gratuit</span>', html)
+        self.assertIn('2500 CFA', html)
