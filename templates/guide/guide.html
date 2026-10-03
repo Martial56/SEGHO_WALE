@@ -1,0 +1,117 @@
+{% extends 'guide/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .guide-layout { min-height: calc(100vh - var(--header-h, 101px)); }
+  .guide-sidebar {
+    width: 270px; background: var(--surface);
+    border-right: 1px solid var(--border);
+    position: fixed; top: var(--header-h, 101px); left: 32px;
+    height: calc(100vh - var(--header-h, 101px));
+    padding: 6px 0 10px;
+  }
+  .guide-group { border-bottom: 1px solid var(--border); }
+  .guide-group:last-child { border-bottom: none; }
+  .guide-group-header {
+    display: flex; align-items: center; gap: 7px; width: 100%;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--text-muted); padding: 10px 18px; margin: 0;
+  }
+  .guide-group-header:hover { color: var(--text); }
+  .guide-group-header .chevron { font-size: 11px; transition: transform .2s ease; margin-left: auto; }
+  .guide-group.open .guide-group-header .chevron { transform: rotate(90deg); }
+  .guide-group.open .guide-group-header { color: var(--teal-600); }
+  .guide-group-body { max-height: 0; overflow: hidden; transition: max-height .22s ease; }
+  .guide-group.open .guide-group-body { max-height: 600px; }
+  .guide-sidebar a {
+    display: flex; align-items: center; gap: 7px; padding: 6px 18px 6px 28px;
+    font-size: 13px; line-height: 1.3; color: var(--text); text-decoration: none;
+    border-left: 3px solid transparent;
+  }
+  .guide-sidebar a i { font-size: 13px; color: var(--text-muted); width: 15px; text-align: center; }
+  .guide-sidebar a:hover { background: rgba(var(--teal-600-rgb, 0, 121, 107), .06); }
+  .guide-sidebar a.active {
+    border-left-color: var(--teal-600); background: rgba(var(--teal-600-rgb, 0, 121, 107), .08);
+    color: var(--teal-600); font-weight: 600;
+  }
+  .guide-sidebar a.active i { color: var(--teal-600); }
+  .guide-content { margin-left: 290px; padding: 28px 40px 60px; max-width: 920px; }
+  .guide-content h1 { font-size: 22px; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  .guide-desc { color: var(--text-muted); font-size: 13.5px; margin-bottom: 22px; }
+  .guide-capture {
+    max-width: 100%; display: block; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0,0,0,.08); margin-bottom: 28px;
+  }
+  .guide-article { margin-bottom: 26px; }
+  .guide-article h2 {
+    font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;
+    color: var(--teal-600); margin: 0 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+  }
+  .guide-article .contenu { font-size: 14px; line-height: 1.75; color: var(--text); }
+  .guide-article .contenu p { margin: 0 0 12px; }
+  .guide-empty { padding: 60px 20px; text-align: center; color: var(--text-muted); }
+  @media (max-width: 900px) {
+    .guide-sidebar { width: 100%; position: static; height: auto; left: 0; border-right: none; border-bottom: 1px solid var(--border); }
+    .guide-content { margin-left: 0; padding: 20px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="guide-layout">
+  <aside class="guide-sidebar">
+    {% for section in sections %}
+    <div class="guide-group{% if categorie and categorie.groupe == section.nom %} open{% endif %}">
+      <button type="button" class="guide-group-header">
+        {{ section.nom }}
+        <i class="bi bi-chevron-right chevron"></i>
+      </button>
+      <div class="guide-group-body">
+        {% for cat in section.categories %}
+        <a href="{% url 'guide:categorie' cat.code %}" class="{% if categorie and categorie.code == cat.code %}active{% endif %}">
+          <i class="bi {{ cat.icone }}"></i> {{ cat.nom }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </aside>
+
+  <div class="guide-content">
+    {% if categorie %}
+      <h1><i class="bi {{ categorie.icone }}" style="color:var(--teal-600);"></i> {{ categorie.nom }}</h1>
+      {% if categorie.description %}<div class="guide-desc">{{ categorie.description }}</div>{% endif %}
+
+      {% if capture_url %}
+      <img src="{{ capture_url }}" alt="Capture d'écran — {{ categorie.nom }}" class="guide-capture">
+      {% endif %}
+
+      {% for article in articles %}
+      <div class="guide-article">
+        <h2><i class="bi {{ article.icone }}"></i> {{ article.titre }}</h2>
+        {% if article.titre == "Mode d'emploi" and formulaire_capture_url %}
+        <img src="{{ formulaire_capture_url }}" alt="Formulaire de saisie — {{ categorie.nom }}" class="guide-capture" style="margin-bottom:16px;">
+        {% endif %}
+        <div class="contenu">{{ article.contenu|linebreaks }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="guide-empty">Sélectionnez une rubrique dans le sommaire.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.guide-group-header').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var group = btn.closest('.guide-group');
+    var wasOpen = group.classList.contains('open');
+    document.querySelectorAll('.guide-group.open').forEach(function (g) { g.classList.remove('open'); });
+    if (!wasOpen) group.classList.add('open');
+  });
+});
+</script>
+{% endblock %}
