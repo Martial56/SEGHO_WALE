@@ -615,3 +615,48 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         gabarit la rendrait muette sur les listes qui n'ont pas cette feuille."""
         self._rdv('annule')
         self.assertNotIn('rdv-row-annule', self._html('patients:rdv_global'))
+
+
+class TestLAgeEstDetailleSurLaListeDesRdv(TestCase):
+    """Même correction que sur la liste des soins, sur le gabarit de ligne
+    partagé par les rendez-vous des patients et ceux de gynécologie.
+
+    `templates/includes/rdv_row.html` écrivait « {{ patient.age }} ans ». La
+    liste des patients, elle, affiche `age_detail` depuis toujours : deux
+    listes du même dossier ne donnaient pas le même âge.
+    """
+
+    def setUp(self):
+        self.patient = _patient()
+        # `_patient` pose la date de naissance sous forme de chaîne : tant
+        # qu'on n'a pas relu la ligne, `age_detail` travaille sur un `str`.
+        self.patient.refresh_from_db()
+        User.objects.create_superuser('su_age_rdv', password='x')
+        self.client = Client()
+        self.client.login(username='su_age_rdv', password='x')
+        from medecins.models import Departement
+        departement, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(),
+            motif='Controle', statut='confirme', departement=departement,
+        )
+
+    #: Les deux listes partagent `includes/rdv_row.html` : la correction doit
+    #: se voir sur les deux, sinon elle n'est écrite qu'à moitié.
+    LISTES = ('patients:rdv_global', 'gynecologie_rdv')
+
+    def _html(self, nom):
+        reponse = self.client.get(reverse(nom) + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_les_deux_listes_portent_l_age_detaille(self):
+        for nom in self.LISTES:
+            self.assertIn(self.patient.age_detail, self._html(nom))
+
+    def test_l_ancien_format_en_annees_seules_a_disparu(self):
+        """Sans cette moitié, le test précédent passerait si les deux
+        cohabitaient."""
+        for nom in self.LISTES:
+            self.assertNotIn(f'{self.patient.age} ans', self._html(nom))

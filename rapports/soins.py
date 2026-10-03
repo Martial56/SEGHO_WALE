@@ -60,8 +60,8 @@ def _recap_mo(premier_jour, dernier_jour):
 # à la main), comme les indicateurs sans champ du rapport maternité.
 # PERFUSION est un cas particulier (voir _compte_mo_avec_soin_facture) : pas
 # d'article "PERFUSION" au catalogue, mais compté quand même via les mises en
-# observation ayant reçu au moins un soin apporté (services_a_facturer,
-# source='soin') et facturé/payé.
+# observation ayant reçu au moins un soin facturé/payé, quel que soit celui des
+# deux chemins de saisie emprunté (voir SOURCES_SOIN_EN_MO).
 SOINS = [
     ('PERFUSION', 'MO_AVEC_SOIN_FACTURE'),
     ('TRANSFUSION', ['TRANSFUSION']),
@@ -69,7 +69,7 @@ SOINS = [
     ("BAIN D'OREILLE", ["LAVAGE D'OREILLE"]),
     ('INJECTION EXTERNE', ['INJECTION EXTERNE']),
     ('INJECTION INTERNE', ['INJECTION INTERNE']),
-    ('Mise en Observation simple', ['MISE EN OBSERVATION (VENTE)']),
+    ('Mise en Observation simple', 'MO_SIMPLE'),
     ('Suture', ['FIL + SUTURE']),
 ]
 
@@ -84,21 +84,62 @@ AUTRES_SOINS = [
 ]
 
 
+#: Origines d'un acte de soin posé pendant une mise en observation. Les deux
+#: comptent : l'application offre deux chemins pour poser un soin sur une MO —
+#: le bouton « Ajouter un soin » (`soin`) et l'onglet des visites infirmières
+#: (`visite_infirmiere`) — et n'écarter que l'un des deux revenait à ne rien
+#: compter, le premier n'ayant jamais servi une seule fois.
+SOURCES_SOIN_EN_MO = ('soin', 'visite_infirmiere')
+
+
 def _compte_mo_avec_soin_facture(premier_jour, dernier_jour):
-    """PERFUSION : pas d'article dédié, donc compté comme le nombre de mises
-    en observation (Hospitalisation) du mois ayant reçu au moins un soin
-    apporté (services_a_facturer, source='soin') dont la facture est payée."""
+    """PERFUSION : pas d'article dédié au catalogue, donc comptée comme le
+    nombre de mises en observation (Hospitalisation) admises dans le mois ayant
+    reçu au moins un soin dont la facture est payée.
+
+    Les deux conditions tiennent dans un seul `filter` à dessein : sur une
+    relation multiple, Django les applique alors à la **même** ligne liée. En
+    deux appels, une MO passerait avec un soin non facturé d'un côté et une
+    toute autre ligne payée de l'autre.
+    """
     from hospitalisation.models import Hospitalisation
     return Hospitalisation.objects.filter(
         date_admission__date__gte=premier_jour, date_admission__date__lte=dernier_jour,
-        services_a_facturer__source='soin',
+        services_a_facturer__source__in=SOURCES_SOIN_EN_MO,
         services_a_facturer__facture__statut='payee',
     ).distinct().count()
+
+
+def _compte_mo_simple(premier_jour, dernier_jour):
+    """« Mise en Observation simple » : une MO pendant laquelle aucun soin n'a
+    été posé — c'est exactement le complément de la ligne PERFUSION.
+
+    La ligne visait l'article « MISE EN OBSERVATION (VENTE) », qui n'a jamais
+    servi ; les mises en observation réelles portent « MISE EN OBSERVATION ».
+    Elle affichait donc zéro quoi qu'il arrive. On ne compte plus un article
+    mais les MO elles-mêmes, dont on écarte celles qui ont reçu un soin, par
+    l'un ou l'autre des deux chemins de saisie.
+
+    `exclude` sur une relation multiple écarte la MO dès qu'**une** de ses
+    lignes porte une de ces origines, ce qui est bien la question posée : a-t-on
+    posé un soin, oui ou non.
+
+    « Payé » se juge comme dans le tableau MO du haut de la fiche, pour que les
+    deux parties comptent les mêmes mises en observation.
+    """
+    from hospitalisation.models import Hospitalisation
+    qs = (Hospitalisation.objects
+          .filter(date_admission__date__gte=premier_jour,
+                  date_admission__date__lte=dernier_jour)
+          .exclude(services_a_facturer__source__in=SOURCES_SOIN_EN_MO))
+    return sum(1 for h in qs if _facture_statut_hospitalisation(h) == 'Payé')
 
 
 def _compte_soin(premier_jour, dernier_jour, noms_articles):
     if noms_articles == 'MO_AVEC_SOIN_FACTURE':
         return _compte_mo_avec_soin_facture(premier_jour, dernier_jour)
+    if noms_articles == 'MO_SIMPLE':
+        return _compte_mo_simple(premier_jour, dernier_jour)
     if not noms_articles:
         return None
     from soins.models import ProcedureSoin
@@ -114,7 +155,9 @@ def _detail_ligne(noms_articles):
     article(s) du catalogue sont regroupés dans ce chiffre (utile dès qu'une
     ligne agrège plusieurs articles, ex. PANSEMENT ou Autres petites chirurgies)."""
     if noms_articles == 'MO_AVEC_SOIN_FACTURE':
-        return 'MO ayant reçu au moins un soin apporté facturé/payé'
+        return 'MO ayant reçu au moins un soin (apporté ou visite infirmière) payé'
+    if noms_articles == 'MO_SIMPLE':
+        return 'MO payée sans aucun soin'
     if not noms_articles:
         return None
     if len(noms_articles) == 1:

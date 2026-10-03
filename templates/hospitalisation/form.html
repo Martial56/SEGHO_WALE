@@ -249,12 +249,16 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
       {% if mode_decharge_seule %}
       {% comment %}Un garde-fou, parce que la décharge ne se reprend pas : au
       statut Déchargé, get_actions_disponibles cache confirmer, installer,
-      décharger et annuler — pour le superuser compris. La transition fige
+      décharger et annuler — pour le superuser compris. La transition pose
       heure_sortie, libère la chambre et synchronise le dossier de soins.
-      La modale qui jouait ce rôle a disparu avec l'ancien parcours.{% endcomment %}
-      <button type="submit" form="hosp-form" class="abtn abtn-dark"
-              title="Enregistrer le résumé et décharger le patient"
-              onclick="return confirm('Décharger le patient ? La sortie médicale sera enregistrée et ne pourra plus être annulée depuis cet écran.');">
+
+      La modale propose l'heure du moment et laisse la corriger : on décharge
+      rarement à la seconde où le patient sort, et cette heure part dans le
+      tableau MO de la fiche d'activité de soins. Son champ est bien lu par le
+      serveur — l'ancienne modale l'affichait et _transition_decharger écrasait
+      avec now(), ce qui la rendait décorative.{% endcomment %}
+      <button type="button" class="abtn abtn-dark" id="btn-valider-decharge"
+              title="Enregistrer le résumé et décharger le patient">
         <i class="bi bi-door-open"></i> Valider la décharge
       </button>
       {% endif %}
@@ -279,11 +283,10 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
       {% endif %}
       {% comment %}Plus de bouton « Décharger » ici : on décharge depuis
       l'onglet « Résumé de décharge », dont le bouton « Valider la décharge »
-      enregistre le résumé et décharge d'un seul geste. La modale qu'ouvrait ce
-      bouton ne portait aucun champ du résumé et le vidait donc à chaque
-      décharge ; elle imposait en prime une « Date de sortie » que le serveur
-      n'a jamais lue — _transition_decharger pose heure_sortie = now().
-      {% endcomment %}
+      enregistre le résumé et décharge d'un seul geste. L'ancienne modale de ce
+      bouton ne portait aucun champ du résumé et le vidait à chaque décharge ;
+      celle d'aujourd'hui ne demande que l'heure de sortie et laisse le
+      formulaire principal partir avec elle.{% endcomment %}
       {% if hosp.statut == 'hospitalise' and perms.laboratoire.add_demandeexamen %}
       <a href="{{ url_labo }}" class="abtn abtn-neutral">
         <i class="bi bi-flask"></i> Demande de labo
@@ -410,6 +413,51 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
               {% if form.date_admission.errors %}<div class="field-error">{{ form.date_admission.errors|join:", " }}</div>{% endif %}
             {% endif %}
           </div>
+
+          {% comment %}Heures d'observation, corrigeables.
+
+          Elles ne paraissent qu'une fois le patient installé — avant, elles
+          n'existent pas — et seulement en édition complète : les modes
+          restreints (chambre, soins, décharge) ne passent pas par la
+          sauvegarde du formulaire, leurs champs seraient décoratifs.
+
+          Préfixées `obs_` pour ne pas se confondre avec le `heure_sortie` que
+          poste la modale de décharge, qui est un autre geste. Voir
+          _save_heures_observation : une clé absente du POST ne touche à rien.
+          {% endcomment %}
+          {% if edit and hosp.heure_entree and not mode_chambre_seule and not mode_soins_seuls and not mode_decharge_seule %}
+          <div>
+            <label class="field-label">Heure d'entrée en observation</label>
+            <input type="datetime-local" name="obs_heure_entree" class="field-ul"
+                   value="{{ hosp.heure_entree|date:'Y-m-d\TH:i' }}">
+          </div>
+
+          <div>
+            <label class="field-label">Heure de sortie</label>
+            <input type="datetime-local" name="obs_heure_sortie" class="field-ul"
+                   value="{{ hosp.heure_sortie|date:'Y-m-d\TH:i' }}"
+                   min="{{ hosp.heure_entree|date:'Y-m-d\TH:i' }}">
+            <div class="field-hint" style="font-size:11.5px;color:var(--text-muted);margin-top:4px;">
+              La différence des deux donne la durée d'observation du rapport.
+            </div>
+          </div>
+
+          {% comment %}Ce que le système avait enregistré, pour les superadmins
+          seuls : c'est l'écart avec les heures ci-dessus qui dit qu'une décharge
+          a été faite en retard, et permet d'y revenir.{% endcomment %}
+          {% if user.is_superuser and hosp.heures_corrigees %}
+          <div style="grid-column:1/-1;background:rgba(var(--amber-rgb),.08);border:1px solid rgba(var(--amber-rgb),.3);border-radius:6px;padding:10px 12px;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--color-warning);margin-bottom:5px;">
+              <i class="bi bi-clock-history"></i> Heures enregistrées par le système
+            </div>
+            <div style="font-size:12.5px;color:var(--text-muted);">
+              Entrée : {{ hosp.heure_entree_systeme|date:"d/m/Y à H:i"|default:"—" }}
+              &nbsp;·&nbsp;
+              Sortie : {{ hosp.heure_sortie_systeme|date:"d/m/Y à H:i"|default:"—" }}
+            </div>
+          </div>
+          {% endif %}
+          {% endif %}
 
           <div>
             <label class="field-label">Docteur <span class="required-star">*</span></label>
@@ -705,26 +753,25 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
         constantes d'une consultation. Il s'affichait aussi en modification, où
         rien de tel ne se produit. Chaque cas dit maintenant ce qu'il fait
         vraiment.{% endcomment %}
-        {% comment %}Le bouton n'existait que sur la fiche : depuis le
-        formulaire, il fallait en ressortir pour ajouter un relevé. Il mène au
-        même endroit — la page se recharge avec `nouvelle=1`, et les constantes
-        déjà enregistrées sont conservées au lieu d'être corrigées.{% endcomment %}
-        {% if edit and not eval_nouvelle %}
-        <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-          <a href="{% url 'hospitalisation:edit' hosp.pk %}?tab=evaluation&amp;nouvelle=1"
-             class="abtn abtn-ghost">
-            <i class="bi bi-plus-lg"></i> Nouvelle évaluation
-          </a>
-        </div>
-        {% endif %}
+        {% comment %}Pas de bouton « Nouvelle évaluation » ici, et c'est voulu.
+
+        Il y en avait un : un lien de navigation posé au milieu d'un
+        formulaire. Cliquer dessus rechargeait la page et emportait tout ce qui
+        n'avait pas encore été enregistré — un résumé de décharge en cours, un
+        service ajouté, une heure d'entrée corrigée — sans le moindre
+        avertissement.
+
+        Le geste vit désormais sur la fiche seulement, juste au-dessus de la
+        liste des relevés : on voit ce qui existe, on en ajoute un, et il n'y a
+        rien à perdre puisque la fiche ne se saisit pas.{% endcomment %}
 
         <div class="ev-note">
           <i class="bi bi-info-circle"></i>
           {% if eval_nouvelle %}
           Nouveau relevé : les constantes précédentes sont conservées, celui-ci s'y ajoute.
           {% elif edit %}
-          Vous corrigez le dernier relevé. Pour en enregistrer un nouveau, utilisez
-          le bouton « Nouvelle évaluation » ci-dessus.
+          Vous corrigez le dernier relevé. Pour en enregistrer un nouveau, passez
+          par « Nouvelle évaluation » sur la fiche du dossier.
           {% else %}
           Les mesures reprennent, si elles existent, les dernières constantes relevées
           en consultation. À vérifier avant d'enregistrer.
@@ -1333,9 +1380,107 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
 </div><!-- /.hosp-page-layout -->
 
 
-<!-- ── Modale décharge ── -->
+{% if mode_decharge_seule %}
+{% comment %}
+Modale de décharge : l'heure de sortie, proposée à l'instant et corrigeable.
+
+Elle vit ici et non dans la fiche parce que c'est d'ici qu'on décharge. Le champ
+caché appartient à `hosp-form` (attribut `form`), si bien que l'heure part avec
+le résumé de décharge dans le même envoi — pas de second formulaire, pas de
+risque d'en perdre un.
+
+Mêmes classes `modal-*` que la modale d'annulation de la fiche : un seul geste,
+une seule apparence.
+{% endcomment %}
+<input type="hidden" name="heure_sortie" id="dc-heure-sortie" form="hosp-form">
+
+<style>
+.dc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;}
+.dc-overlay.open{display:flex;}
+.dc-box{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:100%;max-width:460px;overflow:hidden;}
+.dc-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--border);}
+.dc-title{font-size:15px;font-weight:700;color:var(--text);}
+.dc-cls{background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;padding:2px 6px;border-radius:4px;line-height:1;}
+.dc-cls:hover{color:var(--text);}
+.dc-bdy{padding:20px 22px;display:flex;flex-direction:column;gap:12px;}
+.dc-hint{font-size:13px;color:var(--text-muted);line-height:1.55;margin:0;}
+.dc-lbl{font-size:12.5px;font-weight:600;color:var(--text);}
+.dc-input{width:100%;border:1.5px solid var(--border-strong);border-radius:var(--radius-xs);padding:8px 10px;font-size:13px;color:var(--text);background:var(--surface);outline:none;}
+.dc-input:focus{border-color:var(--teal-500);}
+.dc-err{font-size:11.5px;color:var(--color-danger);margin-top:3px;display:none;}
+.dc-err.on{display:block;}
+.dc-ftr{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+</style>
+
+<div class="dc-overlay" id="modal-decharge">
+  <div class="dc-box">
+    <div class="dc-hdr">
+      <span class="dc-title"><i class="bi bi-door-open"></i> Confirmer la décharge</span>
+      <button type="button" class="dc-cls" id="dc-close">&times;</button>
+    </div>
+    <div class="dc-bdy">
+      <p class="dc-hint">
+        La sortie médicale sera enregistrée et ne pourra plus être annulée depuis
+        cet écran. Corrigez l'heure si le patient est sorti avant que vous ne
+        validiez : c'est elle qui donne la durée d'observation.
+      </p>
+      <div>
+        <label class="dc-lbl" for="dc-saisie">Date et heure de sortie</label>
+        <input type="datetime-local" id="dc-saisie" class="dc-input"
+               value="{% now 'Y-m-d\TH:i' %}"
+               {% if hosp.heure_entree %}min="{{ hosp.heure_entree|date:'Y-m-d\TH:i' }}"{% endif %}>
+        <div class="dc-err" id="dc-err">L'heure de sortie ne peut pas précéder l'heure d'entrée
+          {% if hosp.heure_entree %}({{ hosp.heure_entree|date:'d/m/Y à H:i' }}){% endif %}.</div>
+      </div>
+    </div>
+    <div class="dc-ftr">
+      <button type="button" class="abtn abtn-discard" id="dc-annuler">Retour</button>
+      <button type="button" class="abtn abtn-dark" id="dc-ok">
+        <i class="bi bi-check-lg"></i> Décharger
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var overlay = document.getElementById('modal-decharge');
+  var saisie  = document.getElementById('dc-saisie');
+  var cache   = document.getElementById('dc-heure-sortie');
+  var erreur  = document.getElementById('dc-err');
+  var bouton  = document.getElementById('btn-valider-decharge');
+  if (!overlay || !bouton) return;
+
+  var entree = {% if hosp.heure_entree %}'{{ hosp.heure_entree|date:"Y-m-d\TH:i" }}'{% else %}null{% endif %};
+
+  function ouvrir(){ overlay.classList.add('open'); saisie.focus(); }
+  function fermer(){ overlay.classList.remove('open'); erreur.classList.remove('on'); }
+
+  bouton.addEventListener('click', ouvrir);
+  document.getElementById('dc-close').addEventListener('click', fermer);
+  document.getElementById('dc-annuler').addEventListener('click', fermer);
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) fermer(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && overlay.classList.contains('open')) fermer();
+  });
+
+  document.getElementById('dc-ok').addEventListener('click', function(){
+    // Comparaison de chaînes « YYYY-MM-DDTHH:MM » : elles s'ordonnent comme les
+    // dates qu'elles représentent, pas besoin de Date().
+    if (entree && saisie.value && saisie.value < entree) {
+      erreur.classList.add('on');
+      return;
+    }
+    cache.value = saisie.value;
+    document.getElementById('hosp-form').submit();
+  });
+})();
+</script>
+{% endif %}
+
 </div><!-- /#page-wrap -->
 {% endblock %}
+
 
 {% block extra_js %}
 {{ block.super }}

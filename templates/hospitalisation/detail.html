@@ -157,8 +157,8 @@ fiche en ayant plusieurs.{% endcomment %}
 /* ── Chronomètres du dossier (rangée pleine largeur dans .det-block,
      comme .timing-section de patients/rendez_vous_form.html) ── */
 .timing-section {
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  gap: 16px 40px; padding: 18px 20px; position: relative;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 16px 32px; padding: 18px 20px; position: relative;
 }
 .timing-card { display: flex; flex-direction: column; gap: 6px; }
 .timing-label {
@@ -748,12 +748,26 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
     {# ── Chronomètres du dossier (comme .timing-section de patients/rendez_vous_form.html) ── #}
     <div class="timing-section" id="dur-card"
          data-statut="{{ hosp.statut }}"
-         data-heure-entree="{{ hosp.date_admission|date:'c' }}"
+         data-heure-entree="{{ hosp.heure_entree|date:'c' }}"
          data-heure-sortie="{{ hosp.heure_sortie|date:'c' }}"
          data-date-termine="{{ hosp.date_termine|date:'c' }}">
+      {% comment %}Quatre repères, dans l'ordre du parcours : on demande, le
+      patient entre, il reste, il sort.
+
+      La carte « Date d'entrée » montrait en réalité la date de la **demande**,
+      et la durée se comptait depuis elle. Le rapport, lui, compte depuis
+      l'entrée en chambre : deux chiffres pour le même dossier, jusqu'à quatre
+      fois d'écart quand un lit s'est fait attendre. L'écran dit désormais la
+      même chose que le rapport.{% endcomment %}
       <div class="timing-card">
-        <div class="timing-label">Date d'entrée</div>
+        <div class="timing-label">Date de la demande</div>
         <div class="timing-value" style="font-size:16px;">{{ hosp.date_admission|date:"d/m/Y H:i:s" }}</div>
+      </div>
+      <div class="timing-card">
+        <div class="timing-label">Date d'entrée en chambre</div>
+        <div class="timing-value{% if not hosp.heure_entree %} zero{% endif %}" style="font-size:16px;" id="dur-entree">
+          {% if hosp.heure_entree %}{{ hosp.heure_entree|date:"d/m/Y H:i:s" }}{% else %}—{% endif %}
+        </div>
       </div>
       <div class="timing-card">
         <div class="timing-label">Durée d'hospitalisation</div>
@@ -764,6 +778,26 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
         <div class="timing-value zero" id="dur-sortie">—</div>
       </div>
     </div>
+
+    {% comment %}Ce que le système avait lui-même enregistré, face aux heures
+    reprises à la main. Pour les superadmins seuls, et seulement quand les deux
+    diffèrent : c'est cet écart qui dit qu'une décharge a été faite en retard et
+    permet d'en reparler à qui de droit. Les heures affichées au-dessus, elles,
+    sont celles qui comptent — ce sont elles qui donnent la durée du rapport.
+    {% endcomment %}
+    {% if user.is_superuser and hosp.heures_corrigees %}
+    <div class="det-block" style="background:rgba(var(--amber-rgb),.07);border:1px solid rgba(var(--amber-rgb),.3);border-radius:6px;padding:10px 14px;margin-bottom:14px;">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--color-warning);">
+        <i class="bi bi-clock-history"></i> Heures enregistrées par le système
+      </span>
+      <span style="font-size:12.5px;color:var(--text-muted);margin-left:10px;">
+        Entrée : {{ hosp.heure_entree_systeme|date:"d/m/Y à H:i"|default:"—" }}
+        &nbsp;·&nbsp;
+        Sortie : {{ hosp.heure_sortie_systeme|date:"d/m/Y à H:i"|default:"—" }}
+        &nbsp;—&nbsp;les heures ci-dessus ont été corrigées à la main.
+      </span>
+    </div>
+    {% endif %}
 
     {# ── Rangée onglets + historique, séparée par la bordure de la rangée du dessus ── #}
     <div class="hist-wrapper"><div class="hist-main">
@@ -1292,10 +1326,21 @@ function renderFrozenDuree(heureSortieIso, dateTermineIso) {
 }
 
 function updateDuration(data) {
-  /* _durEntreeTs (date_admission) ne change jamais après création. Le
-     décompte s'arrête dès que le dossier a une date de fin connue :
+  /* L'entrée n'est plus la date de la demande mais l'heure d'entrée en
+     chambre, comme dans le rapport : elle arrive à l'installation et se
+     corrige ensuite, donc on la relit à chaque rafraîchissement.
+     Le décompte s'arrête dès que le dossier a une date de fin connue :
      heure_sortie (Décharger) OU date_termine (Clôturer sans passage par
      Décharger — ex. dossier clos administrativement). */
+  if (data.heure_entree !== undefined) {
+    _durEntreeTs = data.heure_entree
+      ? Math.floor(new Date(data.heure_entree).getTime() / 1000) : 0;
+    var elE = document.getElementById('dur-entree');
+    if (elE) {
+      elE.textContent = data.heure_entree ? fmtDatetime(data.heure_entree) : '—';
+      elE.classList.toggle('zero', !data.heure_entree);
+    }
+  }
   var fin = data.heure_sortie || data.date_termine;
   _durSortieTs = fin ? Math.floor(new Date(fin).getTime() / 1000) : 0;
   if (_durEntreeTs && _durSortieTs) {
