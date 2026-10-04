@@ -91,6 +91,9 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
         // d'écouteur. Sans ce rappel, « Ajouter un filtre personnalisé » ne
         // répond plus après le premier changement de filtre.
         if (window.lstfInit) window.lstfInit();
+        // La liste a été remplacée : ses groupes repartent sans lignes, on les
+        // reprécharge pour que déplier reste instantané.
+        if (window.lstPrecharger) window.lstPrecharger();
         if (window.initListe) window.initListe();
       })
       .catch(function (err) {
@@ -113,6 +116,9 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
 
   function appliquer(params) {
     params.delete('page');
+    // Les chemins dépliés sont positionnels : ceux d'une sélection ne
+    // désignent rien sur une autre. Changer de critère les abandonne.
+    params.delete('ouverts');
     // Aucun filtre retenu : on émet « filter= » vide plutôt que rien du tout,
     // sinon la vue considère que l'utilisateur n'a rien demandé et réapplique
     // la période par défaut.

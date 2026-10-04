@@ -352,3 +352,63 @@ class TestFrancisationPermissions(TestCase):
         from modules_permissions.francisation import nom_francais
         self.assertEqual(nom_francais('view', None, 'VIH dépistage'), 'Peut consulter : VIH dépistage')
         self.assertEqual(nom_francais('add', None, 'Patient'), 'Peut créer : patient')
+
+
+class TestChaqueMenuDuNavEstCochable(TestCase):
+    """Un menu qui se masque doit avoir sa case dans l'admin, et inversement.
+
+    Les barres de navigation testent `'<code>' not in hidden_navitem_codes`.
+    Si aucune ligne `NavItem` ne porte ce code, le gabarit interroge un
+    identifiant que la base ignore : le menu s'affiche toujours, et il
+    n'apparaît nulle part dans la checklist — impossible de le retirer à un
+    groupe, puisqu'il n'y a rien à décocher. Rien ne le signale : le menu
+    fonctionne, seul le masquage est muet.
+
+    C'était le cas de `facturation.config` et de `presence.biometrie`. À
+    l'inverse `caisse.list` existait en base sans qu'aucun gabarit ne le
+    consulte : une case qu'on coche et qui ne fait rien, ce qui est pire que
+    pas de case du tout.
+
+    Le test lit les gabarits plutôt qu'une liste écrite à la main : une liste
+    recopiée se serait désynchronisée au premier menu ajouté, c'est-à-dire
+    exactement ce qu'on veut attraper.
+    """
+
+    #: `'patients.pathologie_config' not in hidden_navitem_codes`
+    MOTIF = r"""['"]([a-z_]+\.[a-z_0-9]+)['"]\s+not in\s+hidden_navitem_codes"""
+
+    def _codes_des_gabarits(self):
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+        codes = set()
+        for gabarit in Path(settings.BASE_DIR, 'templates').rglob('*.html'):
+            codes.update(re.findall(self.MOTIF, gabarit.read_text()))
+        return codes
+
+    def _codes_en_base(self):
+        from modules_permissions.models import NavItem
+        return set(NavItem.objects.values_list('code', flat=True))
+
+    def test_le_relevé_des_gabarits_n_est_pas_vide(self):
+        """Témoin : sans lui, une expression régulière cassée rendrait les deux
+        tests suivants verts sans rien vérifier."""
+        codes = self._codes_des_gabarits()
+        self.assertGreater(len(codes), 50,
+                           'le relevé des gabarits a cessé de fonctionner')
+        self.assertIn('facturation.config', codes)
+
+    def test_chaque_menu_masquable_a_sa_ligne(self):
+        manquants = sorted(self._codes_des_gabarits() - self._codes_en_base())
+        self.assertEqual(
+            manquants, [],
+            'ces menus se testent contre hidden_navitem_codes sans exister en '
+            'base : ils ne peuvent pas être décochés')
+
+    def test_aucune_ligne_ne_promet_un_masquage_mort(self):
+        orphelins = sorted(self._codes_en_base() - self._codes_des_gabarits())
+        self.assertEqual(
+            orphelins, [],
+            "ces lignes n'ont plus de gabarit : on coche la case et rien ne se "
+            'passe')

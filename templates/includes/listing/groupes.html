@@ -14,10 +14,10 @@ Attend : noeuds, listing_colonnes (nombre de colonnes du tableau) et
 listing_ligne_tpl (gabarit d'une ligne de données).
 {% endcomment %}
 {% for n in noeuds %}
-<tr class="lst-groupe{% if n.niveau %} lst-groupe-fils{% endif %}"
-    data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}"
-    {% if not n.enfants %}data-feuille="1"{% endif %}
-    {% if n.niveau %}style="display:none;"{% endif %}
+<tr class="lst-groupe{% if n.niveau %} lst-groupe-fils{% endif %}{% if n.ouvert %} open{% endif %}"
+    data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}" data-total="{{ n.total }}"
+    {% if not n.enfants %}data-feuille="1"{% endif %}{% if n.ouvert %} data-charge="1"{% endif %}
+    {% if not n.visible %}style="display:none;"{% endif %}
     onclick="lstBasculerGroupe(this)">
   <td colspan="{{ listing_colonnes }}" style="padding-left:{{ n.indent }}px;">
     <i class="bi bi-chevron-right lst-chevron"></i>
@@ -30,7 +30,7 @@ listing_ligne_tpl (gabarit d'une ligne de données).
   {% include 'includes/listing/groupes.html' with noeuds=n.enfants %}
 {% else %}
   {% for objet in n.lignes %}
-    {% include listing_ligne_tpl with objet=objet parent=n.chemin %}
+    {% include listing_ligne_tpl with objet=objet parent=n.chemin ouvert=n.ouvert %}
   {% endfor %}
 {% endif %}
 {% endfor %}

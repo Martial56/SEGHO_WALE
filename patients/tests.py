@@ -718,9 +718,22 @@ class TestLeDepliageNeMelangePasLesDeuxVues(TestCase):
     def test_le_script_ne_cherche_plus_les_lignes_dans_tout_le_document(self):
         """Le seul garde-fou possible ici : la portée de la recherche.
 
-        Les deux bandes étant indiscernables à l'échelle du document, une
-        recherche sur `document` reverse l'autre vue dans celle qu'on déplie.
-        Tout doit partir du conteneur de l'en-tête cliqué.
+        Les deux bandes étant indiscernables à l'échelle du document, chercher
+        des **lignes** sur `document` reverse l'autre vue dans celle qu'on
+        déplie. Lignes et sous-groupes doivent donc partir du conteneur de
+        l'en-tête visé.
+
+        Chercher des **bandes** sur le document reste permis, et deux
+        mécanismes le font à bon droit : le préchargement, qui a besoin de
+        toutes les bandes de la page pour les ranger par conteneur, et la
+        restauration des groupes ouverts, qui doit justement rouvrir le groupe
+        dans les deux vues à la fois. Ce que le premier en tire repasse par
+        `lignesDu`, qui cloisonne ; le second ne fait que basculer une classe.
+
+        On vise donc précisément `[data-chemin^=`, le repli en cascade des
+        sous-groupes — le seul de ces trois usages qui doive rester dans son
+        conteneur, puisqu'il referme des bandes. Viser `.lst-groupe` tout court,
+        ou même `[data-chemin`, condamnerait les deux autres.
         """
         from django.contrib.staticfiles import finders
         source = open(finders.find('js/listing_groupes.js')).read()
@@ -728,7 +741,7 @@ class TestLeDepliageNeMelangePasLesDeuxVues(TestCase):
             "document.querySelectorAll('[data-parent=", source,
             'les lignes sont de nouveau cherchées dans tout le document')
         self.assertNotIn(
-            "document.querySelectorAll('.lst-groupe", source,
+            "document.querySelectorAll('.lst-groupe[data-chemin^=", source,
             'les sous-groupes sont de nouveau cherchés dans tout le document')
         self.assertIn(
             'racine.querySelectorAll', source,

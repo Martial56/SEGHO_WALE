@@ -252,3 +252,78 @@ def construire_dimensions():
 
     return {cle: Dimension(cle=cle, libelle=libelle, sous_menu=sous_menu, **d)
             for cle, libelle, sous_menu, d in brut}
+
+
+# ── Filtres et regroupements personnalisés ──────────────────────────────────
+#
+# Les familles déclarées couvrent ce qu'on demande tous les jours d'un registre
+# d'hospitalisations : l'état, la période, la chambre, le médecin. Elles ne
+# couvrent pas « celles dont l'établissement de destination contient X », ni
+# « celles signalées à la police », ni « celles dont le motif de transfert est
+# rempli » — des questions qu'on ne pose qu'une fois, et pour lesquelles
+# déclarer un filtre serait disproportionné. Le constructeur de conditions de
+# `core.listing` y répond sans qu'on ait eu à les prévoir, et les champs
+# découverts lui servent de liste blanche.
+
+#: Chemins traversant une relation : utiles au filtrage, mais non découvrables
+#: sans exposer tout le schéma. Le second élément range le champ sous un titre.
+#:
+#: `Medecin` n'a ni nom ni prénoms à lui — ce sont des propriétés calculées
+#: depuis l'employé rattaché. On passe donc par `employe__`, seul chemin que la
+#: base sache suivre ; viser `medecin_traitant__nom` lèverait une erreur de
+#: champ au premier filtrage.
+CHAMPS_EXTRA = (
+    ('patient__nom', 'Patient'),
+    ('patient__prenoms', 'Patient'),
+    ('patient__code_patient', 'Patient'),
+    ('patient__sexe', 'Patient'),
+    ('patient__telephone', 'Patient'),
+    ('patient__date_naissance', 'Patient'),
+    ('medecin_traitant__employe__nom', 'Médecin traitant'),
+    ('medecin_traitant__employe__prenoms', 'Médecin traitant'),
+    ('medecin_traitant__employe__matricule', 'Médecin traitant'),
+    ('medecin_traitant__specialite__nom', 'Médecin traitant'),
+    ('medecin_traitant__departement__nom', 'Médecin traitant'),
+    ('medecin_referent__employe__nom', 'Médecin référent'),
+    ('medecin_referent__employe__prenoms', 'Médecin référent'),
+    ('infirmiere_primaire__employe__nom', 'Infirmière primaire'),
+    ('infirmiere_primaire__employe__prenoms', 'Infirmière primaire'),
+    ('chambre__nom', 'Chambre'),
+    ('chambre__salle_no', 'Chambre'),
+    ('chambre__type_chambre', 'Chambre'),
+    ('chambre__genre', 'Chambre'),
+    ('chambre__prive', 'Chambre'),
+    ('maladie__nom', 'Maladie'),
+    ('cree_par__username', 'Suivi'),
+    ('termine_par__username', 'Suivi'),
+)
+
+#: Champs déjà couverts par une dimension déclarée : les proposer une seconde
+#: fois dans « Ajouter un groupement personnalisé » n'offrirait qu'un doublon,
+#: et le doublon serait le moins parlant des deux.
+CHAMPS_DEJA_GROUPABLES = (
+    'statut', 'patient', 'medecin_traitant', 'chambre', 'maladie',
+    'patient__sexe', 'maladie__nom', 'patient__nom', 'patient__prenoms',
+    'medecin_traitant__employe__nom', 'medecin_traitant__employe__prenoms',
+    'chambre__nom', 'chambre__salle_no',
+)
+
+
+def champs_hospitalisations():
+    """Champs proposés au filtrage et au regroupement personnalisés."""
+    from core.listing import champs_filtrables
+
+    from .models import Hospitalisation
+    return champs_filtrables(Hospitalisation, extra=CHAMPS_EXTRA,
+                             groupe='Hospitalisation')
+
+
+def dimensions_personnalisees(champs=None):
+    """Dimensions générées pour « Ajouter un groupement personnalisé ».
+
+    L'appelant qui tient déjà la liste des champs la passe : la construire
+    interroge la base, autant ne pas le faire deux fois par requête.
+    """
+    from core.listing import dimensions_auto
+    return dimensions_auto(champs or champs_hospitalisations(),
+                           exclure=CHAMPS_DEJA_GROUPABLES)

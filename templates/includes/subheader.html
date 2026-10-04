@@ -302,6 +302,9 @@
     // Le constructeur de conditions vit dans la barre de contrôles, remplacée à
     // chaque échange : ses lignes sont donc à reconstruire depuis l'URL.
     if (window.lstfInit) window.lstfInit();
+    // La liste a été remplacée : ses groupes repartent sans lignes, on les
+    // reprécharge pour que déplier reste instantané.
+    if (window.lstPrecharger) window.lstPrecharger();
     document.querySelectorAll('.o-list').forEach(initResizableCols);
   }
   if (document.readyState !== 'loading') initListeInteractions();
@@ -380,6 +383,9 @@
     autres.forEach(function(v) { params.append('filter', v); });
     params.append('filter', value);
     params.delete('page');
+    // Les chemins dépliés sont positionnels : ceux d'une sélection ne
+    // désignent rien sur une autre. Changer de critère les abandonne.
+    params.delete('ouverts');
     refreshList(window.location.pathname + '?' + params.toString(), true);
   }
   window.setPeriode = setPeriode;
@@ -400,7 +406,7 @@
     if (key === 'filter' && params.getAll('filter').length === 0) {
       params.append('filter', 'tous');
     }
-    params.delete('page');
+    params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + '?' + params.toString(), true);
   }
   window.toggleParam = toggleParam;
@@ -411,7 +417,7 @@
     if (input) input.value = '';
     if (btn) btn.style.display = 'none';
     var params = new URLSearchParams(window.location.search);
-    params.delete('q'); params.delete('page');
+    params.delete('q'); params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
   }
   window.clearSearch = clearSearch;
@@ -431,7 +437,7 @@
     var params = new URLSearchParams(window.location.search);
     if (from && from.value) params.set('date_from', from.value); else params.delete('date_from');
     if (to && to.value) params.set('date_to', to.value); else params.delete('date_to');
-    params.delete('page');
+    params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
   }
   window.applyDateFilter = applyDateFilter;
@@ -588,7 +594,7 @@
       timer = setTimeout(function() {
         var params = new URLSearchParams(window.location.search);
         if (val) params.set('q', val); else params.delete('q');
-        params.delete('page');
+        params.delete('page'); params.delete('ouverts');
         refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
       }, 300);
     });

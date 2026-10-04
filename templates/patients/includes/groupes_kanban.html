@@ -9,10 +9,10 @@ permet à listing_groupes.js de replier en cascade sans appeler le serveur.
 Attend : noeuds.
 {% endcomment %}
 {% for n in noeuds %}
-<div class="lst-groupe lst-groupe-bande{% if n.niveau %} lst-groupe-fils{% endif %}"
-     data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}"
-     {% if not n.enfants %}data-feuille="1"{% endif %}
-     {% if n.niveau %}style="display:none;"{% endif %}
+<div class="lst-groupe lst-groupe-bande{% if n.niveau %} lst-groupe-fils{% endif %}{% if n.ouvert %} open{% endif %}"
+     data-chemin="{{ n.chemin }}" data-parent="{{ n.parent }}" data-total="{{ n.total }}"
+     {% if not n.enfants %}data-feuille="1"{% endif %}{% if n.ouvert %} data-charge="1"{% endif %}
+     {% if not n.visible %}style="display:none;"{% endif %}
      onclick="lstBasculerGroupe(this)">
   <span style="padding-left:{{ n.indent }}px;">
     <i class="bi bi-chevron-right lst-chevron"></i>
@@ -25,7 +25,7 @@ Attend : noeuds.
   {% include 'patients/includes/groupes_kanban.html' with noeuds=n.enfants %}
 {% else %}
   {% for objet in n.lignes %}
-    {% include 'patients/includes/pk_card.html' with objet=objet parent=n.chemin %}
+    {% include 'patients/includes/pk_card.html' with objet=objet parent=n.chemin ouvert=n.ouvert %}
   {% endfor %}
 {% endif %}
 {% endfor %}

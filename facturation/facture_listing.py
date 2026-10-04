@@ -322,3 +322,58 @@ TRIS = {
     'reste':    ('reste',),
     'statut':   ('statut',),
 }
+
+
+# ── Filtres et regroupements personnalisés ──────────────────────────────────
+#
+# Les familles déclarées couvrent ce qu'on demande tous les jours d'un registre
+# de factures : l'état, la période, le type, la caisse. Elles ne couvrent pas
+# « celles dont le ticket modérateur dépasse X », ni « celles dont l'échéance
+# est passée », ni « celles sans note » — des questions qu'on ne pose qu'une
+# fois, et pour lesquelles déclarer un filtre serait disproportionné. Le
+# constructeur de conditions de `core.listing` y répond sans qu'on ait eu à les
+# prévoir, et les champs découverts lui servent de liste blanche.
+
+#: Chemins traversant une relation : utiles au filtrage, mais non découvrables
+#: sans exposer tout le schéma. Le second élément range le champ sous un titre.
+CHAMPS_EXTRA = (
+    ('patient__nom', 'Patient'),
+    ('patient__prenoms', 'Patient'),
+    ('patient__code_patient', 'Patient'),
+    ('patient__sexe', 'Patient'),
+    ('patient__telephone', 'Patient'),
+    ('patient__date_naissance', 'Patient'),
+    ('consultation__numero', 'Consultation'),
+    ('hospitalisation__numero', 'Hospitalisation'),
+    ('hospitalisation__statut', 'Hospitalisation'),
+    ('rendez_vous__code_rdv', 'Rendez-vous'),
+    ('rendez_vous__statut', 'Rendez-vous'),
+    ('cree_par__username', 'Suivi'),
+)
+
+#: Champs déjà couverts par une dimension déclarée : les proposer une seconde
+#: fois dans « Ajouter un groupement personnalisé » n'offrirait qu'un doublon,
+#: et le doublon serait le moins parlant des deux.
+CHAMPS_DEJA_GROUPABLES = (
+    'statut', 'type_facture', 'patient', 'patient__nom', 'patient__prenoms',
+    'patient__sexe',
+)
+
+
+def champs_factures():
+    """Champs proposés au filtrage et au regroupement personnalisés."""
+    from core.listing import champs_filtrables
+
+    from .models import Facture
+    return champs_filtrables(Facture, extra=CHAMPS_EXTRA, groupe='Facture')
+
+
+def dimensions_personnalisees(champs=None):
+    """Dimensions générées pour « Ajouter un groupement personnalisé ».
+
+    L'appelant qui tient déjà la liste des champs la passe : la construire
+    interroge la base, autant ne pas le faire deux fois par requête.
+    """
+    from core.listing import dimensions_auto
+    return dimensions_auto(champs or champs_factures(),
+                           exclure=CHAMPS_DEJA_GROUPABLES)

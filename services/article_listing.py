@@ -307,3 +307,62 @@ TRIS = {
     'prix':      ('prix_vente',),
     'statut':    ('actif',),
 }
+
+
+# ── Filtres et regroupements personnalisés ──────────────────────────────────
+#
+# Les familles ci-dessus couvrent ce qu'on demande tous les jours d'un
+# catalogue : la catégorie, la famille, l'état, le tarif. Elles ne couvrent pas
+# « les articles dont le code produit commence par X », ni « ceux dont le coût
+# dépasse le prix de vente » — des questions qu'on ne pose qu'une fois, et pour
+# lesquelles déclarer un filtre serait disproportionné. Le constructeur de
+# conditions de `core.listing` y répond sans qu'on ait eu à les prévoir, et les
+# champs découverts lui servent de liste blanche.
+
+#: Chemins traversant une relation : utiles au filtrage, mais non découvrables
+#: sans exposer tout le schéma. Le second élément range le champ sous un titre.
+CHAMPS_EXTRA = (
+    ('categorie__nom', 'Catégorie'),
+    ('categorie__code', 'Catégorie'),
+    ('famille__nom', 'Famille'),
+    ('famille__code', 'Famille'),
+    ('compagnie_pharmaceutique__nom', 'Compagnie pharmaceutique'),
+    ('compagnie_pharmaceutique__code', 'Compagnie pharmaceutique'),
+    ('unite_mesure__nom', 'Unité de mesure'),
+    ('unite_mesure__code', 'Unité de mesure'),
+    ('departement__nom', 'Département'),
+    ('departement__code', 'Département'),
+    ('responsable__username', 'Responsable'),
+    ('responsable__last_name', 'Responsable'),
+    ('responsable__first_name', 'Responsable'),
+)
+
+#: Champs déjà couverts par une dimension déclarée : les proposer une seconde
+#: fois dans « Ajouter un groupement personnalisé » n'offrirait qu'un doublon,
+#: et le doublon serait le moins parlant des deux — regrouper sur `actif`
+#: donnerait « True » et « False » là où « État » donne « Actif » et « Archivé ».
+CHAMPS_DEJA_GROUPABLES = (
+    'categorie', 'famille', 'type_produit_hospitalier', 'type_article',
+    'actif', 'prix_vente', 'compagnie_pharmaceutique', 'unite_mesure',
+    'departement', 'favori', 'peut_etre_vendu', 'peut_etre_achete',
+)
+
+
+def champs_articles():
+    """Champs proposés au filtrage et au regroupement personnalisés."""
+    from core.listing import champs_filtrables
+
+    from .models import Articleservice
+    return champs_filtrables(Articleservice, extra=CHAMPS_EXTRA,
+                             groupe='Prestation')
+
+
+def dimensions_personnalisees(champs=None):
+    """Dimensions générées pour « Ajouter un groupement personnalisé ».
+
+    L'appelant qui tient déjà la liste des champs la passe : la construire
+    interroge la base, autant ne pas le faire deux fois par requête.
+    """
+    from core.listing import dimensions_auto
+    return dimensions_auto(champs or champs_articles(),
+                           exclure=CHAMPS_DEJA_GROUPABLES)

@@ -30,6 +30,22 @@ from django.db.models import Count, Q
 #: et la mémoire des listes doit l'ignorer (voir core.memoire_listing).
 PARAM_GROUPE = '_groupe'
 
+#: Paramètre d'URL portant les groupes à rendre déjà dépliés, sous la forme
+#: `<page>:<chemin>,<chemin>`. Il voyage avec les filtres et le regroupement, et
+#: la mémoire des listes le retient comme eux (voir core.memoire_listing) : la
+#: page revient donc dépliée comme on l'avait laissée, sans rien à rattraper
+#: après l'affichage.
+#:
+#: Le numéro de page fait partie de la valeur parce qu'un chemin est positionnel
+#: — « 0 » désigne le premier groupe *de la page affichée*. Sans lui, passer à la
+#: page suivante aurait déplié un groupe sans rapport, en silence.
+PARAM_OUVERTS = 'ouverts'
+
+#: Valeur de `PARAM_GROUPE` réclamant les lignes de **tous** les groupes de la
+#: page, en une seule requête. C'est ce que le navigateur demande en tâche de
+#: fond une fois la page affichée, pour que déplier ne fasse plus attendre.
+TOUS_LES_GROUPES = '*'
+
 
 # ── Déclarations ────────────────────────────────────────────────────────────
 
@@ -430,7 +446,7 @@ class _PaginateurDeGroupes(Paginator):
 
 
 def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
-                    chemin_demande=None):
+                    chemin_demande=None, ouverts=''):
     """Pagine les **groupes** plutôt que les lignes, à la manière d'Odoo.
 
     Avec un regroupement actif, paginer les lignes conduit à afficher des groupes
@@ -455,18 +471,79 @@ def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
     `rafraichir()` ne prend que les zones qui l'intéressent. Un dépliage déjà
     chargé ne rappelle plus le serveur.
 
+    `chemin_demande = TOUS_LES_GROUPES` réclame d'un coup les lignes de tous les
+    groupes de la page. C'est ce que le navigateur demande en tâche de fond
+    aussitôt la page affichée : l'affichage reste aussi rapide qu'avec les
+    en-têtes seuls, et quand on déplie, les lignes sont déjà là. On retrouve
+    ainsi le dépliage instantané d'avant le chargement différé, sans retrouver
+    sa page de plusieurs méga-octets — c'est le même volume, mais après coup et
+    sans bloquer.
+
     Retourne (arbre, page_de_groupes, nombre_total_de_groupes).
     """
-    arbre, page, nombre, _, brutes_chemin = _page_de_groupes(
+    arbre, page, nombre, totaux_page, brutes_chemin, brutes = _page_de_groupes(
         qs_filtre, dims, numero_page, groupes_par_page)
-    if chemin_demande:
+    if chemin_demande == TOUS_LES_GROUPES:
+        retenus = set(page.object_list)
+        arbre = _arbre(totaux_page,
+                       _lignes_des_groupes(qs_filtre, dims, brutes, retenus),
+                       dims, retenus)
+    elif chemin_demande:
         noeud = _noeud_par_chemin(arbre, chemin_demande)
         # Un nœud qui a des enfants n'a pas de lignes à lui : ses sous-groupes
         # sont déjà dans la page, et ce sont eux qui en demanderont.
         if noeud is not None and not noeud['enfants']:
             noeud['lignes'] = _lignes_du_groupe(
                 qs_filtre, dims, brutes_chemin, noeud['cle'])
+
+    # En dernier : l'arbre a pu être rebâti juste au-dessus par le
+    # préchargement, et les marques posées avant auraient été perdues.
+    _ouvrir(arbre, chemins_ouverts(ouverts, numero_page),
+            lambda n: _lignes_du_groupe(qs_filtre, dims, brutes_chemin, n['cle']))
     return arbre, page, nombre
+
+
+def chemins_ouverts(valeur, numero_page):
+    """Les chemins à déplier, s'ils concernent bien la page affichée.
+
+    `valeur` est ce que porte `PARAM_OUVERTS` : « 2:0,1-3 ». Le numéro en tête
+    dit de quelle page ces chemins parlent. Il ne s'agit pas de prudence
+    gratuite : un chemin est positionnel, « 0 » désigne le premier groupe de la
+    page affichée. Les liens de pagination recopient les paramètres courants,
+    donc sans cette vérification, passer à la page suivante aurait déplié un
+    groupe sans rapport — et rien ne l'aurait signalé.
+    """
+    if not valeur:
+        return ()
+    page, _, chemins = str(valeur).partition(':')
+    if not chemins:
+        return ()
+    if (page or '1') != (str(numero_page) if numero_page else '1'):
+        return ()
+    return tuple(c for c in chemins.split(',') if c)
+
+
+def _ouvrir(arbre, chemins, charger_lignes):
+    """Marque les groupes dépliés et leur donne leurs lignes.
+
+    Les ancêtres s'ouvrent avec eux : la bande d'un sous-groupe est masquée tant
+    que son parent est fermé, un chemin « 0-1 » déplié seul ne se verrait donc
+    pas. Le navigateur les note déjà tous, mais le serveur ne doit pas dépendre
+    de cette politesse.
+    """
+    for chemin in chemins:
+        morceaux = chemin.split('-')
+        for profondeur in range(1, len(morceaux) + 1):
+            noeud = _noeud_par_chemin(arbre, '-'.join(morceaux[:profondeur]))
+            if noeud is None:
+                break
+            noeud['ouvert'] = True
+            for enfant in noeud['enfants']:
+                enfant['visible'] = True
+            # Un nœud à enfants n'a pas de lignes à lui, et celles d'un groupe
+            # déjà servi par `_groupe` ou par le préchargement sont là.
+            if not noeud['enfants'] and not noeud['lignes']:
+                noeud['lignes'] = charger_lignes(noeud)
 
 
 def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
@@ -476,9 +553,10 @@ def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
     ne dépend que de l'agrégation, cela d'un chemin réclamé par le navigateur.
     La séparation rend aussi les en-têtes testables sans toucher aux lignes.
 
-    Retourne (arbre, page, nombre_de_groupes, totaux, valeurs_brutes_par_chemin).
+    Retourne (arbre, page, nombre_de_groupes, totaux,
+    valeurs_brutes_par_chemin, valeurs_brutes_par_racine).
     """
-    totaux, _, brutes_chemin = (
+    totaux, brutes, brutes_chemin = (
         _totaux_feuilles_sql(qs_filtre, dims)
         if all(d.agregeable for d in dims)
         else _totaux_feuilles_python(qs_filtre, dims))
@@ -497,7 +575,8 @@ def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
 
     totaux_page = {c: n for c, n in totaux.items() if c[0] in retenus}
     arbre = _arbre(totaux_page, [], dims, retenus)
-    return arbre, page, len(racines_libelles), totaux_page, brutes_chemin
+    return (arbre, page, len(racines_libelles), totaux_page, brutes_chemin,
+            brutes)
 
 
 def _noeud_par_chemin(noeuds, chemin):
@@ -526,6 +605,36 @@ def _condition_du_chemin(dims, brutes_chemin, cle):
     for dim, valeurs in zip(dims, par_niveau):
         condition &= dim.filtre(valeurs)
     return condition
+
+
+def _lignes_des_groupes(qs_filtre, dims, brutes, retenus):
+    """Les lignes de tous les groupes racines affichés, en une seule requête.
+
+    Le dépliage groupe par groupe fait attendre à chaque ouverture, et refait
+    l'agrégation complète pour n'en tirer que quelques lignes. Le navigateur
+    demande donc tout d'un coup une fois la page à l'écran : il paie un
+    aller-retour pendant qu'on lit les en-têtes, et chaque dépliage devient
+    instantané ensuite.
+
+    Une seule condition suffit : la page retient des groupes **racines
+    entiers**, jamais une partie d'un groupe. Filtrer sur la première dimension
+    ramène donc exactement les lignes de la page, et `_arbre` les range ensuite
+    dans leurs feuilles.
+    """
+    racine = dims[0]
+    annotations = {}
+    for dim in dims:
+        annotations.update(dim.annotate)
+    base = qs_filtre.annotate(**annotations) if annotations else qs_filtre
+    if not racine.filtrable:
+        # La dimension ne s'exprime pas en base : `_arbre` fera le tri lui-même.
+        return list(base)
+    valeurs = set()
+    for libelle in retenus:
+        valeurs |= brutes.get(libelle, set())
+    if not valeurs:
+        return []
+    return list(base.filter(racine.filtre(valeurs)))
 
 
 def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
@@ -579,6 +688,12 @@ def _arbre(totaux, lignes, dims, retenus=None):
             'total':    sommes.get(cle_complete, 0),
             'sur_page': 0,
             'partiel':  False,
+            # Déplié dès le rendu : la page arrive ouverte, sans que rien n'ait
+            # à la rouvrir après coup (voir `chemins_ouverts`).
+            'ouvert':   False,
+            # Une bande de sous-groupe ne se montre que si son parent est
+            # déplié — c'est l'état du parent qui décide, jamais le sien.
+            'visible':  niveau == 0,
             'enfants':  [],
             'lignes':   [],
         }

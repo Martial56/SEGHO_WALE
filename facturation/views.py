@@ -37,10 +37,12 @@ def facturation_list(request):
     s'imbriquent, et les comptes des en-têtes sont calculés en base sur toute la
     sélection.
     """
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
-                              menu_groupes, paginer_groupes)
+    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from .facture_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
-                                  construire_dimensions, familles_factures,
+                                  champs_factures, construire_dimensions,
+                                  dimensions_personnalisees, familles_factures,
                                   libelle_periode)
 
     today = date.today()
@@ -58,11 +60,17 @@ def facturation_list(request):
                # ne serait pas triable sans cette annotation.
                .annotate(reste=F('montant_total') - F('montant_paye')))
 
+    # Dimensions déclarées, complétées par celles générées depuis les champs du
+    # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
+    # liste des champs est établie une fois et sert aussi au constructeur de
+    # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
+    champs = champs_factures()
+    dims_perso = dimensions_personnalisees(champs)
     declarees = construire_dimensions()
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
         familles=familles_factures(),
-        dimensions=list(declarees.values()),
+        dimensions=list(declarees.values()) + dims_perso,
         par_page=25,
         filtres_defaut=FILTRES_DEFAUT,
         tri_defaut=('-date_emission',),
@@ -80,15 +88,23 @@ def facturation_list(request):
     qs = listing.appliquer_filtres(qs, filtres, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
+    # liste des champs découverts : une condition portant sur autre chose est
+    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
     tri, tri_sens = listing.tri_demande(request)
     qs = listing.trier(qs, groupes, tri, tri_sens)
 
+    declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
-            request.GET.get(PARAM_GROUPE))
+            request.GET.get(PARAM_GROUPE),
+            request.GET.get(PARAM_OUVERTS, ''))
         # La pagination porte alors sur les groupes : le compteur du titre doit
         # rester celui des factures.
         total = qs.count()
@@ -145,10 +161,14 @@ def facturation_list(request):
         'date_from':         date_from,
         'date_to':           date_to,
         'filtre_pose':       bool(filtres),
-        'selection_active':  bool(q or groupes or filtres),
+        'conditions':        conditions,
+        'mode_conditions':   mode_conditions,
+        'selection_active':  bool(q or groupes or filtres or conditions),
         'periode_libelle':   libelle_periode(filtres, date_from, date_to),
         'listing_filtres':   menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes':   menu_groupes(list(declarees.values()), groupes),
+        'listing_filtre_perso': True,
+        'listing_champs_json': champs_pour_navigateur(champs),
         'today':             today,
         # Largeur des bandes de groupe : la colonne Centre n'existe
         # que pour le superutilisateur.

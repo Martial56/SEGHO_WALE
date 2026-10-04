@@ -9,10 +9,13 @@ le moindre message.
 Ces tests vérifient les deux moitiés de la correction : la permission ouvre la
 porte, et le nom du groupe qui la porte n'a aucune importance.
 """
+import re
+
 from django.contrib.auth.models import Group, Permission, User
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from core.listing import TOUS_LES_GROUPES
 from core.permissions import utilisateurs_avec
 
 
@@ -554,6 +557,42 @@ class TestMemoireDesListes(TestCase):
         self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.get(reverse('patients:list')).status_code, 200)
 
+    # ── L'état déplié, qui ne recharge rien ────────────────────────────────
+
+    def test_la_note_de_depliage_est_retenue(self):
+        """Déplier un groupe ne recharge pas la page : l'état déplié n'arrivait
+        donc jamais jusqu'ici, et revenir par le bouton « Retour » d'une fiche
+        ramenait le filtre et le regroupement, mais la liste repliée. Le
+        navigateur envoie désormais cette note de fond à chaque dépliage."""
+        self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('ouverts=1%3A0', reponse.url)
+
+    def test_la_note_de_depliage_ne_rend_aucune_page(self):
+        """Tout son intérêt : elle ne coûte que ce qu'il faut pour retenir."""
+        reponse = self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        self.assertEqual(reponse.status_code, 204)
+        self.assertFalse(reponse.content)
+
+    def test_replier_le_dernier_groupe_oublie_l_etat(self):
+        """La note suivante ne porte plus `ouverts` : elle doit l'emporter,
+        sinon la liste rouvrirait un groupe qu'on vient de fermer."""
+        self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        self._ajax(self.url + '?group=statut&_memo=1')
+        self.assertNotIn('ouverts', self.client.get(self.url).url)
+
+    def test_une_note_sans_selection_n_efface_rien(self):
+        """Elle voyage en AJAX, comme « Effacer ». Sans le retour anticipé de
+        `selection_memorisee`, une note dépourvue de critères passerait pour un
+        effacement que personne n'a demandé."""
+        self.client.get(self.url + '?filter=aujourdhui')
+        self._ajax(self.url + '?_memo=1')
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302,
+                         'la note a effacé la sélection retenue')
+        self.assertIn('filter=aujourdhui', reponse.url)
+
     # ── Chaque liste a sa propre mémoire ───────────────────────────────────
 
     def test_deux_listes_ne_se_melangent_pas(self):
@@ -670,8 +709,12 @@ class TestLesLignesArriventAuDepliage(TestCase):
     Toutes les lignes des groupes affichés partaient dans le HTML, repliées et
     souvent jamais lues. Une ligne pèse plus d'un kilo-octet : un regroupement
     à gros groupes produisait une page de plusieurs dizaines de méga-octets
-    pour un écran qui ne montrait que des en-têtes. Elles n'arrivent désormais
-    qu'au dépliage, groupe par groupe.
+    pour un écran qui ne montrait que des en-têtes.
+
+    La page part donc avec ses seuls en-têtes. Un groupe sait rendre ses lignes
+    à lui (`_groupe=<chemin>`), et la page sait les rendre toutes d'un coup
+    (`_groupe=*`) : c'est ce que le navigateur demande en tâche de fond une fois
+    la page affichée, pour que déplier ne fasse plus attendre.
     """
 
     def setUp(self):
@@ -762,13 +805,88 @@ class TestLesLignesArriventAuDepliage(TestCase):
         Si ce nombre change pour une raison étrangère, relancez la mesure
         plutôt que de l'ajuster à l'aveugle — c'est l'écart d'une requête qui
         compte, pas sa valeur absolue.
+
+        Il est passé de 18 à 25 le jour où la liste des factures a reçu le
+        filtre personnalisé : `champs_pour_navigateur` interroge chaque champ
+        lié pour en proposer les valeurs. Ces requêtes-là sont les mêmes qu'on
+        déplie un parent ou une feuille, elles ne disent donc rien du balayage
+        que ce test surveille — seul l'écart compte, et il reste nul.
         """
-        with self.assertNumQueries(18):
+        with self.assertNumQueries(25):
             self.client.get(self.url + '&group=type&_groupe=0')
 
     def test_un_sous_groupe_rend_bien_les_siennes(self):
         html = self._html('&group=type&_groupe=0-0')
         self.assertEqual(self._nb_lignes(html), 3)
+
+    def test_tout_precharger_rend_les_lignes_de_tous_les_groupes(self):
+        """`_groupe=*` : une seule requête pour les deux groupes.
+
+        C'est ce qui rend le dépliage instantané. Demander groupe par groupe
+        donnait 3 lignes puis 2 ; ici les 5 arrivent ensemble.
+        """
+        html = self._html('&_groupe=' + TOUS_LES_GROUPES)
+        self.assertEqual(self._nb_lignes(html), 5)
+        self.assertIn('data-parent="0"', html)
+        self.assertIn('data-parent="1"', html,
+                      'le second groupe est resté sans lignes')
+
+    def test_un_groupe_reclame_ouvert_arrive_deja_deplie(self):
+        """La page rendue est la bonne du premier coup.
+
+        Rouvrir les groupes après l'affichage marchait, mais se voyait : la
+        liste arrivait fermée puis sautait. Les filtres n'ont jamais ce défaut
+        parce qu'ils sont appliqués au rendu — l'état déplié suit désormais le
+        même chemin.
+        """
+        html = self._html('&ouverts=1:0')
+        self.assertRegex(html, r'<tr class="lst-groupe[^"]*open"[^>]*data-chemin="0"',
+                         "la bande n'est pas marquée ouverte")
+        self.assertEqual(self._nb_lignes(html), 3,
+                         'les lignes du groupe ouvert devraient être rendues')
+
+    def test_les_lignes_d_un_groupe_ouvert_ne_sont_pas_masquees(self):
+        """Rendre la bande ouverte sans montrer ses lignes donnerait un groupe
+        béant : c'est le `display:none` des gabarits de ligne qui devait suivre."""
+        html = self._html('&ouverts=1:0')
+        lignes = re.findall(r'<tr data-parent="0"[^>]*>', html)
+        self.assertEqual(len(lignes), 3)
+        for ligne in lignes:
+            self.assertNotIn('display:none', ligne)
+
+    def test_la_bande_ouverte_se_declare_deja_chargee(self):
+        """Sinon le préchargement y reverserait les mêmes lignes, en double."""
+        self.assertRegex(self._html('&ouverts=1:0'),
+                         r'data-chemin="0"[^>]*data-charge="1"|data-charge="1"[^>]*data-chemin="0"')
+
+    def test_un_etat_pris_sur_une_autre_page_est_ignore(self):
+        """Un chemin est positionnel : « 0 » est le premier groupe *de la page
+        affichée*. Les liens de pagination recopiant les paramètres courants,
+        sans le numéro en tête de la valeur, changer de page aurait déplié un
+        groupe sans rapport — en silence."""
+        html = self._html('&ouverts=2:0')
+        self.assertNotRegex(html, r'<tr class="lst-groupe[^"]*open"')
+        self.assertEqual(self._nb_lignes(html), 0)
+
+    def test_un_chemin_ouvert_inconnu_ne_casse_rien(self):
+        """Une sélection qui a changé depuis que l'état a été noté."""
+        self.assertEqual(self._nb_lignes(self._html('&ouverts=1:99')), 0)
+
+    def test_l_etat_deplie_est_retenu_comme_les_filtres(self):
+        """C'est ce qui le ramène au retour d'une fiche : la vue redirige vers
+        l'URL portant la sélection retenue, et `ouverts` en fait partie."""
+        self.client.get(self.url + '&ouverts=1:0')
+        reponse = self.client.get(reverse('facturation:list'))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('ouverts=1%3A0', reponse['Location'])
+
+    def test_les_bandes_annoncent_leur_taille(self):
+        """Le navigateur s'en sert pour renoncer au préchargement quand la page
+        est énorme (MAX_LIGNES_PRECHARGEES). Sans cet attribut il précharge
+        tout, et on retombe sur la page de plusieurs méga-octets."""
+        html = self._html()
+        self.assertIn('data-total="3"', html)
+        self.assertIn('data-total="2"', html)
 
     def test_sans_regroupement_les_lignes_sont_toujours_la(self):
         """Le chargement différé ne concerne que le mode groupé."""
@@ -807,6 +925,96 @@ class TestLesLignesArriventAuDepliage(TestCase):
                         headers={'x-requested-with': 'XMLHttpRequest'})
         self.assertIn(cle, self.client.session,
                       'le dépliage a été pris pour un « Effacer »')
+
+
+
+class TestLePrechargementSArreteALaPage(TestCase):
+    """Précharger, ce n'est pas tout charger.
+
+    `_groupe=*` rend les lignes de tous les groupes **de la page affichée**, et
+    d'eux seuls. Sans cette borne, un regroupement à mille groupes ramènerait
+    toute la sélection à chaque affichage : exactement la page de plusieurs
+    méga-octets que le chargement différé avait supprimée.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from facturation.models import Facture
+        from patients.models import Patient
+
+        patient = Patient.objects.create(
+            nom='Borne', prenoms='Page', date_naissance='1990-06-01',
+            sexe='F', telephone='0700000000')
+        # Un montant distinct par facture : trente groupes d'une ligne.
+        for i in range(30):
+            Facture.objects.create(
+                patient=patient, type_facture='consultation', statut='emise',
+                montant_total=1000 + i, date_emission=timezone.now())
+
+    def _page(self, numero, chemin_demande):
+        from facturation.models import Facture
+        from core.listing import Dimension, paginer_groupes
+        dimension = Dimension(
+            cle='montant', libelle='Montant',
+            valeur=lambda o: str(o.montant_total),
+            values=('montant_total',),
+            label=lambda ligne: str(ligne['montant_total']))
+        return paginer_groupes(Facture.all_objects.all(), [dimension], numero,
+                               groupes_par_page=25,
+                               chemin_demande=chemin_demande)
+
+    @staticmethod
+    def _nb_lignes(arbre):
+        return sum(len(n['lignes']) + sum(len(e['lignes']) for e in n['enfants'])
+                   for n in arbre)
+
+    def test_la_page_un_ne_precharge_que_ses_vingt_cinq_groupes(self):
+        arbre, page, nombre = self._page(1, TOUS_LES_GROUPES)
+        self.assertEqual(nombre, 30, 'les trente groupes doivent exister')
+        self.assertEqual(len(arbre), 25)
+        self.assertEqual(self._nb_lignes(arbre), 25,
+                         'le préchargement a débordé sur la page suivante')
+
+    def test_la_derniere_page_ne_precharge_que_son_reste(self):
+        arbre, page, nombre = self._page(2, TOUS_LES_GROUPES)
+        self.assertEqual(len(arbre), 5)
+        self.assertEqual(self._nb_lignes(arbre), 5)
+
+    def test_sans_demande_aucune_ligne_n_est_chargee(self):
+        """Le témoin : c'est bien `_groupe=*` qui les amène, pas la page."""
+        arbre, page, nombre = self._page(1, None)
+        self.assertEqual(len(arbre), 25)
+        self.assertEqual(self._nb_lignes(arbre), 0)
+
+
+class TestLaListeRafraichieReprechargeSesGroupes(TestCase):
+    """Un changement de filtre remplace la liste : ses groupes repartent sans
+    lignes, et le préchargement doit repartir avec eux.
+
+    Sans ce rappel, la première liste de la session serait instantanée et toutes
+    les suivantes feraient attendre à chaque dépliage — le genre de différence
+    qu'on met longtemps à relier à sa cause.
+    """
+
+    #: Les cinq endroits qui remplacent une liste par AJAX. Chacun rappelle
+    #: `lstfInit` pour les filtres ; il doit rappeler le préchargement aussi.
+    GABARITS = (
+        'templates/includes/listing/page_js.html',
+        'templates/includes/subheader.html',
+        'templates/gynecologie/list.html',
+        'templates/gynecologie/registre_naissance.html',
+        'templates/patients/list.html',
+    )
+
+    def test_chaque_rafraichissement_relance_le_prechargement(self):
+        from pathlib import Path
+        from django.conf import settings
+        for nom in self.GABARITS:
+            texte = Path(settings.BASE_DIR, nom).read_text()
+            self.assertIn('window.lstfInit()', texte,
+                          f'{nom} ne rafraîchit plus les filtres')
+            self.assertIn('window.lstPrecharger()', texte,
+                          f'{nom} ne reprécharge pas ses groupes')
 
 
 class TestLesAdressesStatiquesPortentLaDateDuFichier(TestCase):

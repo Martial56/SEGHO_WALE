@@ -36,10 +36,12 @@ def services_list(request):
     demander « Services » puis « Favoris » effaçait le premier critère, et
     « Archivé » faisait doublon avec « Inactif ».
     """
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
-                              menu_groupes, paginer_groupes)
+    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from .article_listing import (CHAMPS_RECHERCHE, CODES_PERIODE, FILTRES_DEFAUT,
-                                  TRIS, construire_dimensions, familles_articles,
+                                  TRIS, champs_articles, construire_dimensions,
+                                  dimensions_personnalisees, familles_articles,
                                   libelle_periode)
 
     today = timezone.now().date()
@@ -56,11 +58,17 @@ def services_list(request):
         'categorie', 'famille', 'compagnie_pharmaceutique', 'unite_mesure', 'departement'
     )
 
+    # Dimensions déclarées, complétées par celles générées depuis les champs du
+    # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
+    # liste des champs est établie une fois et sert aussi au constructeur de
+    # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
+    champs = champs_articles()
+    dims_perso = dimensions_personnalisees(champs)
     declarees = construire_dimensions()
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
         familles=familles_articles(),
-        dimensions=list(declarees.values()),
+        dimensions=list(declarees.values()) + dims_perso,
         par_page=24 if vue == 'kanban' else 40,
         filtres_defaut=FILTRES_DEFAUT,
         tri_defaut=('nom',),
@@ -78,6 +86,12 @@ def services_list(request):
     qs = listing.appliquer_filtres(qs, filtres, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
+    # liste des champs découverts : une condition portant sur autre chose est
+    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
     tri, tri_sens = listing.tri_demande(request)
     qs = listing.trier(qs, groupes, tri, tri_sens)
 
@@ -86,12 +100,14 @@ def services_list(request):
     if vue == 'kanban':
         groupes = []
 
+    declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
-            request.GET.get(PARAM_GROUPE))
+            request.GET.get(PARAM_GROUPE),
+            request.GET.get(PARAM_OUVERTS, ''))
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des prestations.
         total = qs.count()
@@ -113,7 +129,10 @@ def services_list(request):
         'date_from': date_from,
         'date_to': date_to,
         'filtre_pose': bool(filtres),
-        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'conditions': conditions,
+        'mode_conditions': mode_conditions,
+        'selection_active': bool(q or groupes or conditions
+                                 or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
         # Un catalogue s'ouvre entier : la mention de période n'a de sens que
         # lorsqu'une période est réellement demandée, sinon le titre répète
@@ -122,6 +141,8 @@ def services_list(request):
         # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'listing_filtre_perso': True,
+        'listing_champs_json': champs_pour_navigateur(champs),
         'vue': vue,
         'today': today,
     })

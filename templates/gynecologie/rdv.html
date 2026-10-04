@@ -25,26 +25,54 @@
   html[data-theme="dark"] .badge-termine    { background: rgba(var(--violet-rgb),.22); color: #b79aec; }
   html[data-theme="dark"] .badge-annule     { background: rgba(var(--rose-rgb),.22); color: #f09090; }
 
-  {% comment %}Teinte de ligne selon l'état, de la même famille que la pastille
-  mais à peine posée : on doit lire la couleur d'un coup d'œil sur toute la
-  largeur sans qu'elle dispute la place au texte. Les teintes chaudes — ambre,
-  rose — sont encore plus diluées : à opacité égale elles sautent aux yeux bien
-  avant les froides. Le survol reste prioritaire, sa règle étant plus
-  spécifique (`.o-list tbody tr:hover`).{% endcomment %}
-  .rdv-row.rdv-etat-planifie        { background: rgba(var(--sky-rgb),.12); }
-  .rdv-row.rdv-etat-confirme        { background: rgba(var(--green-rgb),.12); }
-  .rdv-row.rdv-etat-en_attente,
-  .rdv-row.rdv-etat-absent          { background: rgba(var(--amber-rgb),.08); }
-  .rdv-row.rdv-etat-en_consultation { background: rgba(var(--teal-500-rgb),.135); }
-  .rdv-row.rdv-etat-termine         { background: rgba(var(--violet-rgb),.12); }
-  .rdv-row.rdv-etat-annule          { background: rgba(var(--rose-rgb),.028); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-planifie        { background: rgba(var(--sky-rgb),.19); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-confirme        { background: rgba(var(--green-rgb),.19); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-en_attente,
-  html[data-theme="dark"] .rdv-row.rdv-etat-absent          { background: rgba(var(--amber-rgb),.135); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-en_consultation { background: rgba(var(--teal-500-rgb),.21); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-termine         { background: rgba(var(--violet-rgb),.19); }
-  html[data-theme="dark"] .rdv-row.rdv-etat-annule          { background: rgba(var(--rose-rgb),.05); }
+  {% comment %}La couleur de l'état porte sur l'écriture de la ligne, et non sur
+  son fond. Teindre la ligne entière posait de larges bandes qui disputaient la
+  place au texte et brouillaient le survol ; la même information tient dans la
+  couleur des mots. Ce sont exactement les couleurs des pastilles : une ligne et
+  sa pastille ne peuvent donc plus se contredire.
+
+  La spécificité passe par `.o-list tbody` à dessein. Sans elle, la colonne
+  Diagnostic garderait son gris — `.o-list tbody td.td-diagnostic`, écrite plus
+  bas, l'emporterait à spécificité égale.
+
+  Les pastilles gardent la leur, posée sur l'élément lui-même ; le survol reste
+  prioritaire, étant un fond et non une couleur de texte.{% endcomment %}
+  .o-list tbody .rdv-row.rdv-etat-planifie        td { color: var(--sky); }
+  .o-list tbody .rdv-row.rdv-etat-confirme        td { color: var(--green); }
+  .o-list tbody .rdv-row.rdv-etat-en_attente      td,
+  .o-list tbody .rdv-row.rdv-etat-absent          td { color: var(--amber-text); }
+  .o-list tbody .rdv-row.rdv-etat-en_consultation td { color: var(--accent-text-soft); }
+  .o-list tbody .rdv-row.rdv-etat-termine         td { color: var(--violet); }
+  .o-list tbody .rdv-row.rdv-etat-annule          td { color: var(--rose-text); }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-planifie        td { color: #7ec4ec; }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-confirme        td { color: #8fd98a; }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-en_attente      td,
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-absent          td { color: #f0c060; }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-en_consultation td { color: var(--teal-300); }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-termine         td { color: #b79aec; }
+  html[data-theme="dark"] .o-list tbody .rdv-row.rdv-etat-annule          td { color: #f09090; }
+
+  {% comment %}Un voile gris derrière toutes les lignes, le même pour chacune.
+  Il ne dit rien — c'est l'écriture qui porte l'état — mais il détache le corps
+  du tableau de la page et redonne le relief que la teinte par état assurait
+  avant, sans la disputer.
+
+  Posé sur `.rdv-row` et non sur `tr` : les bandes de groupe ont leur propre
+  fond. Le survol reste prioritaire, sa règle étant écrite plus bas, dans le
+  `<style>` de la barre de contrôles.{% endcomment %}
+  {% comment %}`of .rdv-row` ne compte que les lignes de données. Sans lui,
+  `nth-child` compterait aussi les bandes de groupe, qui sont des `<tr>` du même
+  `<tbody>` : en mode groupé l'alternance serait décidée par le nombre de bandes
+  au-dessus, et repartirait de travers à chaque groupe déplié. La règle simple
+  qui précède sert de repli aux navigateurs qui ignorent `of` — ils gardent une
+  alternance, fausse sous les groupes, plutôt que pas d'alternance du tout.
+  {% endcomment %}
+  .o-list tbody tr.rdv-row:nth-child(even) { background: rgba(0,0,0,.02); }
+  .o-list tbody tr.rdv-row:nth-child(even of .rdv-row) { background: rgba(0,0,0,.02); }
+  .o-list tbody tr.rdv-row:nth-child(odd of .rdv-row) { background: transparent; }
+  html[data-theme="dark"] .o-list tbody tr.rdv-row:nth-child(even) { background: rgba(255,255,255,.02); }
+  html[data-theme="dark"] .o-list tbody tr.rdv-row:nth-child(even of .rdv-row) { background: rgba(255,255,255,.02); }
+  html[data-theme="dark"] .o-list tbody tr.rdv-row:nth-child(odd of .rdv-row) { background: transparent; }
 </style>
 
 
