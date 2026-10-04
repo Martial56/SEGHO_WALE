@@ -46,6 +46,24 @@ PARAM_OUVERTS = 'ouverts'
 #: fond une fois la page affichée, pour que déplier ne fasse plus attendre.
 TOUS_LES_GROUPES = '*'
 
+#: Paramètre d'URL portant le rang de la première ligne réclamée dans un groupe.
+#: Un gros groupe ne sort pas d'un bloc : « Charger plus » redemande le même
+#: groupe à partir de là où le lot précédent s'est arrêté.
+PARAM_DECALAGE = '_decalage'
+
+#: Nombre de lignes rendues d'un coup pour un groupe déplié.
+#:
+#: Sans ce plafond, déplier un groupe de trente mille lignes les rendait toutes :
+#: la réponse pesait des dizaines de méga-octets et la page se figeait le temps
+#: de les poser. On n'en montre donc qu'un lot, suivi d'une entrée « Charger
+#: plus » tant qu'il en reste — c'est la pagination des groupes, à l'intérieur
+#: d'un groupe.
+#:
+#: Le préchargement, lui, ne passe pas par ici : il a son propre garde-fou
+#: côté navigateur (MAX_LIGNES_PRECHARGEES dans listing_groupes.js), qui renonce
+#: à précharger une page trop lourde plutôt que de la tronquer.
+TAILLE_LOT_GROUPE = 80
+
 
 # ── Déclarations ────────────────────────────────────────────────────────────
 
@@ -446,7 +464,7 @@ class _PaginateurDeGroupes(Paginator):
 
 
 def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
-                    chemin_demande=None, ouverts=''):
+                    chemin_demande=None, ouverts='', decalage=0):
     """Pagine les **groupes** plutôt que les lignes, à la manière d'Odoo.
 
     Avec un regroupement actif, paginer les lignes conduit à afficher des groupes
@@ -479,8 +497,17 @@ def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
     sa page de plusieurs méga-octets — c'est le même volume, mais après coup et
     sans bloquer.
 
+    `decalage` dit à partir de quelle ligne servir le groupe demandé : c'est le
+    « Charger plus » d'un gros groupe (voir TAILLE_LOT_GROUPE). Il vient de
+    l'URL, donc de n'importe où : tout ce qui n'est pas un rang positif vaut
+    zéro, et on repart du début plutôt que de refuser la page.
+
     Retourne (arbre, page_de_groupes, nombre_total_de_groupes).
     """
+    try:
+        decalage = max(0, int(decalage or 0))
+    except (TypeError, ValueError):
+        decalage = 0
     arbre, page, nombre, totaux_page, brutes_chemin, brutes = _page_de_groupes(
         qs_filtre, dims, numero_page, groupes_par_page)
     if chemin_demande == TOUS_LES_GROUPES:
@@ -493,13 +520,14 @@ def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
         # Un nœud qui a des enfants n'a pas de lignes à lui : ses sous-groupes
         # sont déjà dans la page, et ce sont eux qui en demanderont.
         if noeud is not None and not noeud['enfants']:
-            noeud['lignes'] = _lignes_du_groupe(
-                qs_filtre, dims, brutes_chemin, noeud['cle'])
+            _poser_lot(noeud, _lignes_du_groupe(
+                qs_filtre, dims, brutes_chemin, noeud['cle'], decalage), decalage)
 
     # En dernier : l'arbre a pu être rebâti juste au-dessus par le
     # préchargement, et les marques posées avant auraient été perdues.
     _ouvrir(arbre, chemins_ouverts(ouverts, numero_page),
-            lambda n: _lignes_du_groupe(qs_filtre, dims, brutes_chemin, n['cle']))
+            lambda n: _poser_lot(n, _lignes_du_groupe(
+                qs_filtre, dims, brutes_chemin, n['cle'])))
     return arbre, page, nombre
 
 
@@ -524,7 +552,12 @@ def chemins_ouverts(valeur, numero_page):
 
 
 def _ouvrir(arbre, chemins, charger_lignes):
-    """Marque les groupes dépliés et leur donne leurs lignes.
+    """Marque les groupes dépliés et leur donne leur premier lot de lignes.
+
+    `charger_lignes` reçoit le nœud et s'occupe d'y ranger ce qu'il faut — le
+    lot comme ce qu'il en reste (voir `_poser_lot`). Un groupe restauré ouvert
+    revient donc sur son premier lot, avec son « Charger plus » s'il est gros :
+    on ne retient pas jusqu'où on avait déroulé, seulement qu'il était ouvert.
 
     Les ancêtres s'ouvrent avec eux : la bande d'un sous-groupe est masquée tant
     que son parent est fermé, un chemin « 0-1 » déplié seul ne se verrait donc
@@ -543,7 +576,7 @@ def _ouvrir(arbre, chemins, charger_lignes):
             # Un nœud à enfants n'a pas de lignes à lui, et celles d'un groupe
             # déjà servi par `_groupe` ou par le préchargement sont là.
             if not noeud['enfants'] and not noeud['lignes']:
-                noeud['lignes'] = charger_lignes(noeud)
+                charger_lignes(noeud)
 
 
 def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
@@ -637,8 +670,16 @@ def _lignes_des_groupes(qs_filtre, dims, brutes, retenus):
     return list(base.filter(racine.filtre(valeurs)))
 
 
-def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
-    """Les lignes d'un groupe feuille, désigné par son chemin en libellés."""
+def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle, decalage=0,
+                      limite=TAILLE_LOT_GROUPE):
+    """Un lot des lignes d'un groupe feuille, désigné par son chemin en libellés.
+
+    Le lot va de `decalage` à `decalage + limite` : voir TAILLE_LOT_GROUPE pour
+    la raison de ce découpage. La tranche est posée sur le queryset, donc la base
+    ne renvoie que ces lignes-là — sauf pour le repli en Python, où une dimension
+    qui ne s'exprime pas en filtre oblige de toute façon à tout parcourir ; le
+    plafond n'y protège que le rendu.
+    """
     annotations = {}
     for dim in dims:
         annotations.update(dim.annotate)
@@ -646,9 +687,24 @@ def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
 
     condition = _condition_du_chemin(dims, brutes_chemin, cle)
     if condition is not None:
-        return list(base.filter(condition))
+        return list(base.filter(condition)[decalage:decalage + limite])
     # Repli : la dimension ne s'exprime pas en base, on trie en Python.
-    return [o for o in qs_filtre if cle in _chemins(o, dims)]
+    retenues = [o for o in qs_filtre if cle in _chemins(o, dims)]
+    return retenues[decalage:decalage + limite]
+
+
+def _poser_lot(noeud, lignes, decalage=0):
+    """Range un lot dans son nœud et calcule ce qu'il reste à charger.
+
+    Le compte ne vient pas des lignes mais de `total`, qui sort de l'agrégation :
+    on sait donc ce qui manque sans l'avoir lu, et « Charger plus » peut annoncer
+    combien de lignes il reste avant qu'on ait touché à la base.
+    """
+    noeud['lignes'] = lignes
+    reste = max(0, noeud['total'] - decalage - len(lignes))
+    noeud['suite'] = decalage + len(lignes) if reste and lignes else None
+    noeud['reste'] = reste
+    noeud['prochain'] = min(reste, TAILLE_LOT_GROUPE)
 
 
 def _arbre(totaux, lignes, dims, retenus=None):
@@ -688,6 +744,12 @@ def _arbre(totaux, lignes, dims, retenus=None):
             'total':    sommes.get(cle_complete, 0),
             'sur_page': 0,
             'partiel':  False,
+            # Rang du lot suivant, et ce qu'il restera après celui-ci : de quoi
+            # écrire l'entrée « Charger plus ». `suite` est None quand le groupe
+            # est entier — il n'y a alors rien à proposer.
+            'suite':    None,
+            'reste':    0,
+            'prochain': 0,
             # Déplié dès le rendu : la page arrive ouverte, sans que rien n'ait
             # à la rouvrir après coup (voir `chemins_ouverts`).
             'ouvert':   False,
@@ -720,6 +782,14 @@ def _arbre(totaux, lignes, dims, retenus=None):
     def marquer(noeuds):
         for n in noeuds:
             n['partiel'] = n['sur_page'] < n['total']
+            # Le préchargement passe par ici plutôt que par `_poser_lot` : il
+            # range les lignes de tous les groupes d'un coup. Il les prend
+            # entières, donc `suite` reste nul — mais on le calcule quand même,
+            # pour que l'arbre dise la même chose par les deux chemins.
+            if n['partiel'] and n['sur_page']:
+                n['suite'] = n['sur_page']
+                n['reste'] = n['total'] - n['sur_page']
+                n['prochain'] = min(n['reste'], TAILLE_LOT_GROUPE)
             marquer(n['enfants'])
     marquer(racines)
     return racines

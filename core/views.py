@@ -1055,7 +1055,7 @@ def gynecologie_registre_naissance(request):
 
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from patients.models import Naissance
@@ -1120,7 +1120,8 @@ def gynecologie_registre_naissance(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE),
-            request.GET.get(PARAM_OUVERTS, ''))
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
@@ -1833,7 +1834,7 @@ def gynecologie_list(request):
 
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from patients.models import Patient, RendezVous
@@ -1893,7 +1894,8 @@ def gynecologie_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE),
-            request.GET.get(PARAM_OUVERTS, ''))
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))

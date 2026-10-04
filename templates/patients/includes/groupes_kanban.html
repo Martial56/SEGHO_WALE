@@ -27,5 +27,14 @@ Attend : noeuds.
   {% for objet in n.lignes %}
     {% include 'patients/includes/pk_card.html' with objet=objet parent=n.chemin ouvert=n.ouvert %}
   {% endfor %}
+  {% if n.suite %}
+  {% comment %}Le « Charger plus » de la vue tableau, en bande : un gros groupe
+  n'arrive pas d'un bloc (core.listing.TAILLE_LOT_GROUPE).{% endcomment %}
+  <div class="lst-plus" data-parent="{{ n.chemin }}" data-suite="{{ n.suite }}"
+       {% if not n.ouvert %}style="display:none;"{% endif %}
+       onclick="lstChargerPlus(this)">
+    Charger {{ n.prochain }} de plus · {{ n.reste }} restante{{ n.reste|pluralize }}
+  </div>
+  {% endif %}
 {% endif %}
 {% endfor %}

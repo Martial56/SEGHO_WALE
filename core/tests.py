@@ -928,6 +928,95 @@ class TestLesLignesArriventAuDepliage(TestCase):
 
 
 
+class TestUnGrosGroupeArriveParLots(TestCase):
+    """Déplier un groupe énorme ne doit pas tout rendre d'un coup.
+
+    Un groupe de trente mille lignes prenait plus d'une demi-minute et pesait
+    près de quarante méga-octets : le plafond de pages groupées ne protège que
+    le *nombre de groupes*, jamais la taille de l'un d'eux. Le serveur n'en rend
+    donc qu'un lot, clos par une entrée « Charger plus » qui porte le rang du
+    suivant (core.listing.TAILLE_LOT_GROUPE).
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from core.listing import TAILLE_LOT_GROUPE
+        from facturation.models import Facture
+        from patients.models import Patient
+
+        self.lot = TAILLE_LOT_GROUPE
+        self.reste = 10
+
+        User.objects.create_superuser('su_lots', password='x')
+        self.client = Client()
+        self.client.login(username='su_lots', password='x')
+
+        patient = Patient.objects.create(
+            nom='Lots', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000')
+        # Un groupe plus grand qu'un lot, et un second qui tient tout entier.
+        for statut, combien in (('emise', self.lot + self.reste), ('payee', 2)):
+            for _ in range(combien):
+                Facture.objects.create(
+                    patient=patient, type_facture='consultation', statut=statut,
+                    montant_total=1000, date_emission=timezone.now())
+        self.url = reverse('facturation:list') + '?filter=&group=statut'
+
+    def _html(self, suffixe=''):
+        reponse = self.client.get(self.url + suffixe)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    @staticmethod
+    def _nb_lignes(html):
+        return html.count('<td data-col="1" class="td-num">')
+
+    def test_un_gros_groupe_n_arrive_pas_d_un_bloc(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0')), self.lot)
+
+    def test_l_entree_charger_plus_dit_ou_reprendre(self):
+        """Le rang du lot suivant, sans quoi « Charger plus » renverrait le
+        même lot — et les mêmes lignes, en double."""
+        html = self._html('&_groupe=0')
+        self.assertIn('class="lst-plus"', html)
+        self.assertIn('data-suite="%d"' % self.lot, html)
+
+    def test_l_entree_annonce_ce_qui_reste(self):
+        self.assertIn('Charger %d de plus · %d restantes' % (self.reste, self.reste),
+                      self._html('&_groupe=0'))
+
+    def test_le_lot_suivant_part_du_decalage(self):
+        html = self._html('&_groupe=0&_decalage=%d' % self.lot)
+        self.assertEqual(self._nb_lignes(html), self.reste)
+
+    def test_le_dernier_lot_ne_propose_plus_rien(self):
+        """Sinon on cliquerait indéfiniment sur un groupe épuisé."""
+        self.assertNotIn('class="lst-plus"',
+                         self._html('&_groupe=0&_decalage=%d' % self.lot))
+
+    def test_un_groupe_entier_n_a_pas_d_entree(self):
+        """Le second groupe tient dans un lot : rien à proposer."""
+        html = self._html('&_groupe=1')
+        self.assertEqual(self._nb_lignes(html), 2)
+        self.assertNotIn('class="lst-plus"', html)
+
+    def test_un_decalage_illisible_repart_du_debut(self):
+        """Il vient de l'URL, donc de n'importe où. Mieux vaut le premier lot
+        qu'une erreur de serveur."""
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0&_decalage=zzz')),
+                         self.lot)
+
+    def test_un_decalage_negatif_aussi(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0&_decalage=-5')),
+                         self.lot)
+
+    def test_un_groupe_restaure_ouvert_revient_sur_son_premier_lot(self):
+        """On retient qu'il était ouvert, pas jusqu'où on l'avait déroulé."""
+        html = self._html('&ouverts=1:0')
+        self.assertEqual(self._nb_lignes(html), self.lot)
+        self.assertIn('data-suite="%d"' % self.lot, html)
+
+
 class TestLePrechargementSArreteALaPage(TestCase):
     """Précharger, ce n'est pas tout charger.
 

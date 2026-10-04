@@ -32,5 +32,15 @@ listing_ligne_tpl (gabarit d'une ligne de données).
   {% for objet in n.lignes %}
     {% include listing_ligne_tpl with objet=objet parent=n.chemin ouvert=n.ouvert %}
   {% endfor %}
+  {% if n.suite %}
+  {% comment %}Un gros groupe n'arrive pas d'un bloc : cette entrée clôt le lot
+  et va chercher le suivant (core.listing.TAILLE_LOT_GROUPE). Elle porte
+  `data-parent` comme une ligne de données, pour être repliée avec elles.{% endcomment %}
+  <tr class="lst-plus" data-parent="{{ n.chemin }}" data-suite="{{ n.suite }}"
+      {% if not n.ouvert %}style="display:none;"{% endif %}
+      onclick="lstChargerPlus(this)">
+    <td colspan="{{ listing_colonnes }}">Charger {{ n.prochain }} de plus · {{ n.reste }} restante{{ n.reste|pluralize }}</td>
+  </tr>
+  {% endif %}
 {% endif %}
 {% endfor %}

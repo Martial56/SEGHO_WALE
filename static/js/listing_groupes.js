@@ -66,6 +66,10 @@
    * (voir core.memoire_listing.PARAM_MEMO). */
   var PARAM_MEMO = '_memo';
 
+  /* Rang de la première ligne réclamée dans un groupe — ce que « Charger plus »
+   * fait varier (voir core.listing.PARAM_DECALAGE). */
+  var PARAM_DECALAGE = '_decalage';
+
   /* Au-delà de ce nombre de lignes, une vue n'est pas préchargée : ses groupes
    * iront les chercher au dépliage, un par un. C'est le garde-fou qui empêche
    * de retomber dans la page de plusieurs méga-octets — sur une sélection
@@ -81,9 +85,10 @@
     return racine.querySelectorAll('[data-parent^="' + chemin + '-"]');
   }
 
-  function urlDuGroupe(chemin) {
+  function urlDuGroupe(chemin, decalage) {
     var params = new URLSearchParams(location.search);
     params.set('_groupe', chemin);
+    if (decalage) params.set(PARAM_DECALAGE, decalage);
     return location.pathname + '?' + params.toString();
   }
 
@@ -139,8 +144,7 @@
 
   /* Range les lignes sous leur bande. `visible` dit si le groupe est ouvert :
    * le préchargement, lui, les pose repliées. */
-  function poser(entete, lignes, visible) {
-    var ancre = entete;
+  function inserer(ancre, lignes, visible) {
     lignes.forEach(function (el) {
       // importNode : le nœud vient d'un autre document.
       var copie = document.importNode(el, true);
@@ -148,11 +152,15 @@
       ancre.insertAdjacentElement('afterend', copie);
       ancre = copie;
     });
+  }
+
+  function poser(entete, lignes, visible) {
+    inserer(entete, lignes, visible);
     entete.dataset.charge = '1';
   }
 
-  function demander(chemin) {
-    return fetch(urlDuGroupe(chemin), {
+  function demander(chemin, decalage) {
+    return fetch(urlDuGroupe(chemin, decalage), {
       credentials: 'same-origin',
       headers: { 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) {
@@ -177,6 +185,43 @@
         }
       })
       .finally(function () { entete.classList.remove('lst-chargement'); });
+  }
+
+  /* ── Les gros groupes arrivent par lots ──
+   *
+   * Un groupe de trente mille lignes ne sort pas d'un bloc : le serveur n'en
+   * rend qu'un lot (core.listing.TAILLE_LOT_GROUPE), clos par une entrée
+   * « Charger plus » qui porte le rang du suivant. La redemander remplace cette
+   * entrée par le lot d'après — et par la suivante, s'il en reste encore.
+   *
+   * L'entrée porte `data-parent` comme une ligne de données : replier le groupe
+   * la cache avec elles, sans qu'il y ait rien de particulier à prévoir.
+   */
+  function chargerPlus(plus) {
+    if (plus.classList.contains('lst-chargement')) return;   // déjà en vol
+    var chemin = plus.dataset.parent;
+    var racine = plus.parentElement;
+    // L'en-tête du groupe sert de repère pour retrouver la bonne vue dans la
+    // réponse — tableau ou kanban, voir `conteneurJumeau`.
+    var entete = racine.querySelector('.lst-groupe[data-chemin="' + chemin + '"]');
+    if (!entete) return;
+
+    plus.classList.add('lst-chargement');
+    demander(chemin, plus.dataset.suite)
+      .then(function (html) {
+        var lignes = lignesDu(analyseur(html), chemin, entete);
+        if (!lignes.length) return;
+        // Le lot suivant vient avec sa propre entrée « Charger plus », s'il en
+        // reste : elle est dans `lignes`, puisqu'elle porte le même `data-parent`.
+        inserer(plus, lignes, true);
+        plus.remove();
+      })
+      .catch(function () {
+        if (window.showToast) {
+          showToast("Impossible de charger la suite de ce groupe.", 'error');
+        }
+      })
+      .finally(function () { plus.classList.remove('lst-chargement'); });
   }
 
   /* Les bandes feuilles qui n'ont pas encore leurs lignes, par conteneur. */
@@ -350,6 +395,7 @@
   }
 
   window.lstBasculerGroupe = basculer;
+  window.lstChargerPlus = chargerPlus;
   window.lstPrecharger = prechargerQuandLibre;
 
   if (document.readyState === 'loading') {

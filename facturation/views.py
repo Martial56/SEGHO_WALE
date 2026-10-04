@@ -37,7 +37,7 @@ def facturation_list(request):
     s'imbriquent, et les comptes des en-têtes sont calculés en base sur toute la
     sélection.
     """
-    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from .facture_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
@@ -104,7 +104,8 @@ def facturation_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE),
-            request.GET.get(PARAM_OUVERTS, ''))
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
         # La pagination porte alors sur les groupes : le compteur du titre doit
         # rester celui des factures.
         total = qs.count()

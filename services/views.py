@@ -36,7 +36,7 @@ def services_list(request):
     demander « Services » puis « Favoris » effaçait le premier critère, et
     « Archivé » faisait doublon avec « Inactif ».
     """
-    from core.listing import (PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from .article_listing import (CHAMPS_RECHERCHE, CODES_PERIODE, FILTRES_DEFAUT,
@@ -107,7 +107,8 @@ def services_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE),
-            request.GET.get(PARAM_OUVERTS, ''))
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des prestations.
         total = qs.count()
