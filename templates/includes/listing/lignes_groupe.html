@@ -1,0 +1,35 @@
+{% comment %}
+Réponse au dépliage d'un groupe (core.listing.reponse_du_groupe) : un lot de ses
+lignes, que listing_groupes.js insère sous l'en-tête cliqué.
+
+Les lignes de tableau sont dans un <table> : hors de lui, l'analyseur HTML jette
+les <tr>. Les fiches kanban, quand la liste en a, suivent dans un <div>.
+
+Tant qu'il reste des lignes, chaque vue reçoit une entrée « Charger plus »
+(`lst-plus`) qui porte le rang du lot suivant. Son `colspan` est recopié de
+l'en-tête par le script, la vue seule connaissant son nombre de colonnes.
+{% endcomment %}
+<table><tbody>
+{% for objet in lignes %}
+  {% include ligne_tpl with objet=objet parent=chemin %}
+{% endfor %}
+{% if suite %}
+<tr class="lst-plus" data-parent="{{ chemin }}" data-suite="{{ suite }}"
+    onclick="lstChargerPlus(this)">
+  <td>Charger {{ prochain }} de plus · {{ reste }} restant{{ reste|pluralize }}</td>
+</tr>
+{% endif %}
+</tbody></table>
+{% if carte_tpl %}
+<div>
+{% for objet in lignes %}
+  {% include carte_tpl with objet=objet parent=chemin %}
+{% endfor %}
+{% if suite %}
+<div class="lst-plus" data-parent="{{ chemin }}" data-suite="{{ suite }}"
+     onclick="lstChargerPlus(this)">
+  Charger {{ prochain }} de plus · {{ reste }} restant{{ reste|pluralize }}
+</div>
+{% endif %}
+</div>
+{% endif %}

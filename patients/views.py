@@ -64,7 +64,7 @@ def patient_list(request):
     """
     from datetime import date as _date
 
-    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from .patient_listing import (CHAMPS_RECHERCHE, champs_patients,
@@ -122,6 +122,12 @@ def patient_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'patients/includes/lv_row.html',
+            'patients/includes/pk_card.html')
+        if reponse:
+            return reponse
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
@@ -511,15 +517,6 @@ def patient_edit(request, pk):
     })
 
 
-def _feuilles(noeuds):
-    """Parcourt l'arbre de groupes et renvoie les nœuds qui portent des lignes."""
-    for n in noeuds:
-        if n['enfants']:
-            yield from _feuilles(n['enfants'])
-        else:
-            yield n
-
-
 def _rdv_listing(request, base_qs, template_page, rdv_url_name,
                  create_url=None, empty_sub=None, contexte_gyneco=False):
     """Filtrage, regroupement et pagination communs aux deux listes de rendez-vous.
@@ -583,7 +580,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     # Avec un regroupement actif, on pagine les **groupes** et non les lignes :
     # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
     # la page porterait, repliées, toutes les lignes de tous les groupes.
-    from core.listing import PARAM_GROUPE, paginer_groupes
+    from core.listing import PARAM_GROUPE, reponse_du_groupe, paginer_groupes
     declarees = dict(construire_dimensions(today))
     declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
@@ -592,7 +589,15 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
-        annoter_diagnostics([o for n in _feuilles(arbre) for o in n['lignes']])
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page. Les
+        # diagnostics ne sont annotés que sur le lot renvoyé ; la page groupée,
+        # elle, ne porte aucune ligne.
+        reponse = reponse_du_groupe(
+            request, arbre, 'includes/rdv_row.html',
+            contexte={'rdv_url_name': rdv_url_name},
+            preparer=annoter_diagnostics)
+        if reponse:
+            return reponse
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))

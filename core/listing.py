@@ -29,6 +29,12 @@ from django.db.models import Count, Q
 #: qu'il vient de déplier. Préfixé d'un tiret bas : ce n'est pas un filtre,
 #: et la mémoire des listes doit l'ignorer (voir core.memoire_listing).
 PARAM_GROUPE = '_groupe'
+#: Rang de la première ligne voulue dans ce groupe : les lignes d'un gros groupe
+#: arrivent par lots, le lot suivant sur « Charger plus ».
+PARAM_DECALAGE = '_decalage'
+#: Lignes par lot. Au-delà, le rendu devient perceptible ; et personne ne lit
+#: d'un trait des milliers de lignes repliées sous un en-tête.
+TAILLE_LOT_GROUPE = 80
 
 
 # ── Déclarations ────────────────────────────────────────────────────────────
@@ -450,10 +456,10 @@ def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
     regroupement à gros groupes produisait une page de plusieurs dizaines de
     méga-octets.
 
-    Le navigateur redemande donc la page avec `_groupe=<chemin>` et n'y prend
-    que les lignes du groupe (static/js/listing_groupes.js), exactement comme
-    `rafraichir()` ne prend que les zones qui l'intéressent. Un dépliage déjà
-    chargé ne rappelle plus le serveur.
+    Le navigateur redemande donc la page avec `_groupe=<chemin>`, et la vue
+    répond par `reponse_du_groupe` : un lot de lignes de ce groupe, rien d'autre
+    (static/js/listing_groupes.js). Un dépliage déjà chargé ne rappelle plus le
+    serveur. `noeud['lignes']` reste un queryset paresseux, découpé par lot.
 
     Retourne (arbre, page_de_groupes, nombre_total_de_groupes).
     """
@@ -500,6 +506,57 @@ def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
     return arbre, page, len(racines_libelles), totaux_page, brutes_chemin
 
 
+def reponse_du_groupe(request, arbre, ligne_tpl, carte_tpl=None, contexte=None,
+                      preparer=None):
+    """La réponse au dépliage d'un groupe : un lot de ses lignes, et rien d'autre.
+
+    À appeler juste après `paginer_groupes`. Retourne None hors d'un dépliage
+    (pas de `_groupe` dans l'URL, ou pas de regroupement) : la vue poursuit alors
+    normalement.
+
+    Rendre la page entière pour n'en garder que quelques lignes coûtait cher : le
+    catalogue des champs du filtre personnalisé, les menus, les statistiques et
+    tout le gabarit étaient recalculés à chaque dépliage, pour rien. Les lignes
+    sont posées dans un `<table>`, sans quoi l'analyseur HTML du navigateur jette
+    les `<tr>` orphelins ; les fiches kanban (`carte_tpl`), dans un `<div>`.
+
+    Un groupe ne sort pas d'un bloc : `TAILLE_LOT_GROUPE` lignes à partir de
+    `_decalage`, suivies d'une entrée « Charger plus » tant qu'il en reste. Un
+    groupe de trente mille patients prenait plus d'une demi-minute et pesait
+    près de 40 Mo.
+
+    `contexte` complète le contexte des gabarits de ligne, pour ceux qui ont
+    besoin d'autre chose que de `objet`, `parent`, `request` et `perms`.
+    `preparer` reçoit la liste des objets du lot avant le rendu (annotations
+    coûteuses qu'on ne veut faire que sur ce qui s'affiche).
+    """
+    from django.http import HttpResponse
+    from django.template.loader import render_to_string
+
+    chemin = request.GET.get(PARAM_GROUPE)
+    if not chemin or not arbre:
+        return None
+    try:
+        decalage = max(0, int(request.GET.get(PARAM_DECALAGE) or 0))
+    except ValueError:
+        decalage = 0
+    noeud = _noeud_par_chemin(arbre, chemin)
+    lignes, reste = [], 0
+    if noeud is not None:
+        lignes = list(noeud['lignes'][decalage:decalage + TAILLE_LOT_GROUPE])
+        reste = max(0, noeud['total'] - decalage - len(lignes))
+    if preparer and lignes:
+        preparer(lignes)
+    return HttpResponse(render_to_string('includes/listing/lignes_groupe.html', {
+        **(contexte or {}),
+        'lignes': lignes, 'chemin': chemin,
+        'ligne_tpl': ligne_tpl, 'carte_tpl': carte_tpl,
+        # Rang du lot suivant, et ce qu'il en restera à charger.
+        'suite': decalage + len(lignes) if reste and lignes else None,
+        'reste': reste, 'prochain': min(reste, TAILLE_LOT_GROUPE),
+    }, request=request))
+
+
 def _noeud_par_chemin(noeuds, chemin):
     """Le nœud dont le chemin positionnel est donné ('0', '2-1'…), ou None."""
     for n in noeuds:
@@ -537,7 +594,9 @@ def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
 
     condition = _condition_du_chemin(dims, brutes_chemin, cle)
     if condition is not None:
-        return list(base.filter(condition))
+        # Laissé paresseux : `reponse_du_groupe` n'en lit qu'un lot, et un
+        # groupe de trente mille patients ne doit pas sortir en entier de la base.
+        return base.filter(condition)
     # Repli : la dimension ne s'exprime pas en base, on trie en Python.
     return [o for o in qs_filtre if cle in _chemins(o, dims)]
 

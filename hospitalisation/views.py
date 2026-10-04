@@ -34,7 +34,7 @@ def hospitalisation_list(request):
     from django.core.paginator import Paginator
     from django.utils import timezone as tz
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, menu_filtres,
                               menu_groupes, paginer_groupes)
     from .hospitalisation_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                           construire_dimensions,
@@ -100,6 +100,11 @@ def hospitalisation_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'hospitalisation/includes/_row.html')
+        if reponse:
+            return reponse
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des dossiers.
         total = qs.count()
@@ -1748,7 +1753,7 @@ def chambres_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, menu_filtres,
                               menu_groupes, paginer_groupes)
     from .chambre_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                   construire_dimensions, familles_chambres)
@@ -1783,6 +1788,11 @@ def chambres_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'hospitalisation/chambres/_row.html')
+        if reponse:
+            return reponse
         total = qs.count()
     else:
         nb_groupes = 0
@@ -1955,7 +1965,7 @@ def registre_deces(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, menu_filtres,
                               menu_groupes, paginer_groupes)
     from .deces_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                 construire_dimensions, familles_deces, libelle_periode)
@@ -2000,6 +2010,11 @@ def registre_deces(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'hospitalisation/deces/_row.html')
+        if reponse:
+            return reponse
         total = qs.count()
     else:
         nb_groupes = 0

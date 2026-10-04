@@ -655,7 +655,7 @@ class TestLaPaginationDesGroupes(TestCase):
         racine = pathlib.Path(__file__).resolve().parent.parent
         appels = 0
         for fichier in racine.glob('*/views.py'):
-            texte = fichier.read_text()
+            texte = fichier.read_text(encoding='utf-8')
             appels += texte.count('paginer_groupes(')
             self.assertNotIn("paginer_groupes(qs, dims, request.GET.get('page'))",
                              texte, f'{fichier.name} n\'envoie pas sa taille')
@@ -737,6 +737,26 @@ class TestLesLignesArriventAuDepliage(TestCase):
         """Le chargement différé ne concerne que le mode groupé."""
         reponse = self.client.get(reverse('facturation:list') + '?filter=')
         self.assertEqual(self._nb_lignes(reponse.content.decode()), 5)
+
+    def test_deplier_ne_renvoie_que_les_lignes(self):
+        """Rendre toute la page pour n'en garder que quelques lignes coûtait
+        l'essentiel du temps d'un dépliage."""
+        html = self._html('&_groupe=0')
+        self.assertNotIn('<html', html)
+        self.assertNotIn('lst-groupe', html)
+
+    def test_un_gros_groupe_arrive_par_lots(self):
+        from unittest import mock
+        with mock.patch('core.listing.TAILLE_LOT_GROUPE', 2):
+            premier = self._html('&_groupe=0')
+            self.assertEqual(self._nb_lignes(premier), 2)
+            self.assertIn('data-suite="2"', premier)
+            suivant = self._html('&_groupe=0&_decalage=2')
+        self.assertEqual(self._nb_lignes(suivant), 1)
+        self.assertNotIn('lst-plus', suivant)
+
+    def test_un_decalage_illisible_repart_du_debut(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0&_decalage=abc')), 3)
 
     def test_deplier_ne_fait_pas_oublier_la_selection_retenue(self):
         """`_groupe` n'est ni une sélection ni un effacement : la mémoire des

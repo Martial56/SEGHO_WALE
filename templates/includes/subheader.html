@@ -254,7 +254,7 @@
 
 </div>
 
-<script src="{% static 'js/listing_groupes.js' %}"></script>
+<script src="{% static 'js/listing_groupes.js' %}?v=4"></script>
 <script>
   // Colonnes redimensionnables
   function initResizableCols(table) {
@@ -285,14 +285,16 @@
     // chaque échange : ses lignes sont donc à reconstruire depuis l'URL.
     if (window.lstfInit) window.lstfInit();
     document.querySelectorAll('.o-list').forEach(initResizableCols);
-    document.querySelectorAll('.rdv-row').forEach(function(row) {
-      row.addEventListener('click', function(e) {
-        if (e.target.type === 'checkbox') return;
-        if (e.target.closest('.o-group-header')) return;
-        window.location = row.dataset.url;
-      });
-    });
   }
+  // Clic sur une ligne de rendez-vous : délégué au document, car les lignes d'un
+  // groupe n'arrivent qu'à son dépliage (listing_groupes.js), bien après ce
+  // script — un écouteur posé ligne par ligne ne les atteindrait jamais.
+  document.addEventListener('click', function(e) {
+    var row = e.target.closest('.rdv-row');
+    if (!row || e.target.type === 'checkbox') return;
+    if (e.target.closest('.o-group-header')) return;
+    window.location = row.dataset.url;
+  });
   if (document.readyState !== 'loading') initListeInteractions();
   else document.addEventListener('DOMContentLoaded', initListeInteractions);
 

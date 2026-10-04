@@ -218,7 +218,7 @@ def soins_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, menu_filtres,
                               menu_groupes, paginer_groupes)
     from .soin_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
                                construire_dimensions, familles_soins, libelle_periode)
@@ -291,6 +291,11 @@ def soins_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'soins/includes/soin_row.html')
+        if reponse:
+            return reponse
         # Avec un regroupement, la pagination porte sur les groupes : le compteur
         # du titre doit rester celui des soins, pas celui des bandes.
         total = qs.count()
@@ -774,7 +779,7 @@ def procedure_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
+    from core.listing import (PARAM_GROUPE, reponse_du_groupe, Listing, menu_filtres,
                               menu_groupes, paginer_groupes)
     from .procedure_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
                                     TRIS as TRIS_PROCEDURE,
@@ -828,6 +833,11 @@ def procedure_list(request):
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
             request.GET.get(PARAM_GROUPE))
+        # Dépliage d'un groupe : ses lignes seules, sans recalculer la page.
+        reponse = reponse_du_groupe(
+            request, arbre, 'soins/procedure/_row.html')
+        if reponse:
+            return reponse
         # La pagination porte sur les groupes : le compteur du titre doit rester
         # celui des procédures.
         total = qs.count()

@@ -190,3 +190,110 @@ class TestNomDuMois(TestCase):
                        calculer_rapport_med_generale, calculer_rapport_soins):
             with self.subTest(rapport=calcul.__name__):
                 self.assertEqual(calcul(2026, 8)['mois_nom'], 'Août')
+
+
+# ─── Disposition de la fiche de médecine générale ──────────────────────────────
+
+class TestDispositionMedGenerale(TestCase):
+    """La fiche reprend la disposition papier ; une pathologie ajoutée au
+    catalogue vient après la dernière ligne de sa catégorie."""
+
+    def setUp(self):
+        from medecins.models import Departement
+        from patients.models import Pathologie
+        self.Pathologie = Pathologie
+        self.dept, _ = Departement.objects.get_or_create(code='medg', defaults={'nom': 'Médecine Générale'})
+
+    def _patho(self, nom, categorie):
+        return self.Pathologie.objects.create(nom=nom, categorie=categorie, departement=self.dept)
+
+    def _rapport(self):
+        from .med_generale import calculer_rapport_med_generale
+        return calculer_rapport_med_generale(2026, 8)
+
+    def test_les_lignes_de_la_fiche_restent_dans_leur_ordre(self):
+        self._patho('Zona', 'infectieuse')
+        self._patho('Angine (IRA haute)', 'infectieuse')
+        labels = [l['label'] for l in self._rapport()['a_page2']]
+        self.assertLess(labels.index('Angine (IRA haute)'), labels.index('Zona'))
+        self.assertEqual(labels[0], 'Broncho-pneumonie (IRA basse)')
+
+    def test_une_nouvelle_pathologie_suit_la_derniere_ligne_de_sa_categorie(self):
+        self._patho('Mpox', 'infectieuse')
+        self._patho('Lupus', 'non_infectieuse')
+        self._patho('Syphilis', 'ist')
+        rapport = self._rapport()
+        self.assertEqual([l['label'] for l in rapport['a_page3'][-2:]],
+                         ["Nombre d'enfants de moins de 5 ans atteints de la diarrhée et ayant reçu une prescription de SRO + Zinc",
+                          'Mpox'])
+        self.assertEqual([l['label'] for l in rapport['b_page4'][-2:]],
+                         ['Autres Maladies non infectieuses', 'Lupus'])
+        self.assertEqual(rapport['ist'][-1]['label'], 'Syphilis')
+
+    def test_les_doublons_du_catalogue_alimentent_la_meme_ligne(self):
+        p1 = self._patho('Cas de Paludisme simple', 'infectieuse')
+        p2 = self._patho('Cas dePaludisme simple', 'infectieuse')
+        patient = _patient(naissance='1990-01-01', sexe='M')
+        for p in (p1, p2):
+            rdv = _rdv(None, patient=patient)
+            rdv.departement = self.dept
+            rdv.save()
+            _curatif(rdv, cur_diagnostic=[str(p.pk)])
+        rapport = self._rapport()
+        ligne = next(l for l in rapport['a_page1'] if l['label'] == 'Cas de paludisme simple')
+        # Cellules : (0-11 mois, F), (0-11 mois, M), (1-4 ans, F)… ; 25-49 ans M = 14e.
+        self.assertEqual(ligne['cellules'][13]['val'], 2)
+        # Puis Total F/M (cellules 17 et 18), avant les Cas référés.
+        self.assertEqual([c['val'] for c in ligne['cellules'][16:18]], [0, 2])
+        self.assertNotIn('Cas dePaludisme simple', [l['label'] for l in rapport['a_page3']])
+
+
+# ─── Disposition de la fiche de gynécologie ────────────────────────────────────
+
+class TestDispositionGynecologie(TestCase):
+    """La fiche reprend la disposition papier ; une pathologie ajoutée au
+    catalogue vient après la dernière ligne de sa catégorie."""
+
+    def setUp(self):
+        from patients.models import Pathologie
+        self.Pathologie = Pathologie
+        self.dept = _departement_gyneco()
+
+    def _patho(self, nom, categorie):
+        return self.Pathologie.objects.create(nom=nom, categorie=categorie, departement=self.dept)
+
+    def test_les_lignes_de_la_fiche_restent_dans_leur_ordre(self):
+        self._patho('Violence sexuelle', 'autre_gyneco')
+        self._patho('Prolapsus génitaux', 'autre_gyneco')
+        rapport = calculer_rapport_gynecologie(2026, 8)
+        labels = [l['label'] for l in rapport['autre_page3']]
+        self.assertEqual(labels[0], "Tumeurs bénignes de l'utérus")
+        self.assertLess(labels.index('Prolapsus génitaux'), labels.index('Violence sexuelle'))
+        self.assertEqual([l['label'] for l in rapport['grossesse_page2']],
+                         ['Grossesse gemellaire', "Complication de l'allaitement", 'Autres maladies infectieuses'])
+        self.assertTrue(rapport['grossesse_ligne_vierge'])
+
+    def test_une_nouvelle_pathologie_suit_la_derniere_ligne_de_sa_categorie(self):
+        self._patho('Métrorragies', 'grossesse')
+        self._patho('Vaginose', 'infectieuse')
+        self._patho("Désir d'IVG", 'autre_gyneco')
+        rapport = calculer_rapport_gynecologie(2026, 8)
+        # « Autres maladies infectieuses » reste la dernière ligne du tableau A.
+        self.assertEqual([l['label'] for l in rapport['grossesse_page2'][-3:]],
+                         ["Complication de l'allaitement", 'Métrorragies', 'Autres maladies infectieuses'])
+        self.assertFalse(rapport['grossesse_ligne_vierge'])
+        self.assertEqual([l['label'] for l in rapport['infectieuse'][-2:]], ['Condylomes', 'Vaginose'])
+        self.assertEqual([l['label'] for l in rapport['autre_page3'][-2:]], ['Violence sexuelle', "Désir d'IVG"])
+
+    def test_une_variante_de_nom_alimente_la_ligne_de_la_fiche(self):
+        patho = self._patho('Fibrome utérien', 'autre_gyneco')
+        rdv = _rdv(_article('CS_CSGS'), patient=_patient(naissance='1990-01-01'))
+        rdv.departement = self.dept
+        rdv.save()
+        _curatif(rdv, cur_diagnostic=[str(patho.pk)])
+        rapport = calculer_rapport_gynecologie(2026, 8)
+        ligne = next(l for l in rapport['autre_page3'] if l['label'] == 'Fibrome utérin')
+        # 25-49 ans F = 13e cellule, puis Total F/M (17e et 18e).
+        self.assertEqual(ligne['cellules'][12]['val'], 1)
+        self.assertEqual([c['val'] for c in ligne['cellules'][16:18]], [1, 0])
+        self.assertNotIn('Fibrome utérien', [l['label'] for l in rapport['autre_page3']])

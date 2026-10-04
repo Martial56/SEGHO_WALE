@@ -615,3 +615,33 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         gabarit la rendrait muette sur les listes qui n'ont pas cette feuille."""
         self._rdv('annule')
         self.assertNotIn('rdv-row-annule', self._html('patients:rdv_global'))
+
+
+class TestUnePermissionDEtapePrimeSurLAccesComplet(TestCase):
+    """« Peut modifier : rendez-vous » ne rouvre pas les autres étapes.
+
+    Un infirmier qui tenait aussi `change_rendezvous` (par un second groupe,
+    par exemple) voyait le bouton « En consultation » une fois le RDV mis en
+    attente : l'accès complet l'emportait sur sa permission d'étape.
+    """
+
+    def setUp(self):
+        self.rdv = RendezVous.objects.create(
+            patient=_patient(), date_heure=timezone.now(), statut='en_attente')
+        self.url = reverse('patients:rdv_edit', args=[self.rdv.pk])
+        _avec('u_inf_complet', 'patients.view_rendezvous', 'patients.change_rendezvous',
+              'patients.mettre_en_attente_rendezvous')
+
+    def test_l_infirmier_ne_voit_pas_en_consultation(self):
+        self.assertNotIn('value="en_consultation"', _page('u_inf_complet', self.url))
+
+    def test_ni_ne_peut_le_poster(self):
+        client = Client()
+        client.login(username='u_inf_complet', password='x')
+        self.assertEqual(client.post(self.url, {'_action': 'en_consultation'}).status_code, 403)
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'en_attente')
+
+    def test_sans_permission_d_etape_l_acces_complet_demeure(self):
+        _avec('u_seul_complet', 'patients.view_rendezvous', 'patients.change_rendezvous')
+        self.assertIn('value="en_consultation"', _page('u_seul_complet', self.url))
