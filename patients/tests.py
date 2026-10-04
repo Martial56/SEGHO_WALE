@@ -660,3 +660,76 @@ class TestLAgeEstDetailleSurLaListeDesRdv(TestCase):
         cohabitaient."""
         for nom in self.LISTES:
             self.assertNotIn(f'{self.patient.age} ans', self._html(nom))
+
+
+class TestLeDepliageNeMelangePasLesDeuxVues(TestCase):
+    """La liste des patients rend deux fois le même regroupement : des fiches
+    dans `#kanban-view`, des lignes dans `#list-view`. Les deux portent les
+    mêmes `data-chemin` et les mêmes `data-parent`, puisque c'est le même arbre.
+    La gynécologie fait pareil.
+
+    listing_groupes.js cherchait ces attributs dans tout le document. Déplier
+    une bande du kanban y versait donc les fiches **et** les lignes du tableau :
+    mesuré dans Chrome sur 199 patients, les colonnes de la grille passaient de
+    254 px à 600 px et la page débordait à 3029 px de large, d'où le défilement
+    horizontal et les fiches étirées. Le tableau recevait symétriquement les
+    fiches, et se cassait de la même façon.
+
+    Il n'y a pas de lanceur JS dans ce dépôt. Ce qui est vérifiable depuis
+    Python l'est : que l'ambiguïté existe bel et bien dans la page — sans elle
+    la correction n'aurait pas lieu d'être —, que les deux bandes restent
+    distinguables à leur balise, puisque c'est ce dont le script se sert pour
+    choisir sa vue, et qu'il ne cherche plus rien dans `document`.
+    """
+
+    def setUp(self):
+        _patient()
+        User.objects.create_superuser('su_deux_vues', password='x')
+        self.client = Client()
+        self.client.login(username='su_deux_vues', password='x')
+
+    def _fragment(self):
+        """La réponse à un dépliage : c'est elle que le script découpe."""
+        reponse = self.client.get(
+            reverse('patients:list') + '?group=sexe&_groupe=0',
+            headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_les_deux_vues_portent_le_meme_chemin_de_groupe(self):
+        """L'ambiguïté que le script doit lever."""
+        html = self._fragment()
+        self.assertRegex(
+            html, r'<div[^>]*class="lst-groupe lst-groupe-bande[^"]*"[^>]*data-chemin="0"',
+            'la bande du kanban a disparu')
+        self.assertRegex(
+            html, r'<tr class="lst-groupe[^"]*"[^>]*data-chemin="0"',
+            'la ligne de groupe du tableau a disparu')
+
+    def test_les_lignes_du_groupe_existent_dans_les_deux_vues(self):
+        """Même chemin de parent des deux côtés : chercher `data-parent="0"`
+        dans tout le document ramène forcément les deux sortes."""
+        html = self._fragment()
+        self.assertRegex(html, r'<a [^>]*class="pk-card"[^>]*data-parent="0"',
+                         'la fiche kanban du groupe a disparu')
+        self.assertRegex(html, r'<tr data-parent="0"',
+                         'la ligne tableau du groupe a disparu')
+
+    def test_le_script_ne_cherche_plus_les_lignes_dans_tout_le_document(self):
+        """Le seul garde-fou possible ici : la portée de la recherche.
+
+        Les deux bandes étant indiscernables à l'échelle du document, une
+        recherche sur `document` reverse l'autre vue dans celle qu'on déplie.
+        Tout doit partir du conteneur de l'en-tête cliqué.
+        """
+        from django.contrib.staticfiles import finders
+        source = open(finders.find('js/listing_groupes.js')).read()
+        self.assertNotIn(
+            "document.querySelectorAll('[data-parent=", source,
+            'les lignes sont de nouveau cherchées dans tout le document')
+        self.assertNotIn(
+            "document.querySelectorAll('.lst-groupe", source,
+            'les sous-groupes sont de nouveau cherchés dans tout le document')
+        self.assertIn(
+            'racine.querySelectorAll', source,
+            'la recherche ne part plus du conteneur de l’en-tête')

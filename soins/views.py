@@ -218,10 +218,13 @@ def soins_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
-                              menu_groupes, paginer_groupes)
+    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from .soin_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
-                               construire_dimensions, familles_soins, libelle_periode)
+                               champs_soins, construire_dimensions,
+                               dimensions_personnalisees, familles_soins,
+                               libelle_periode)
 
     today = timezone.now().date()
     q = request.GET.get('q', '').strip()
@@ -257,11 +260,17 @@ def soins_list(request):
     elif patient_id:
         base_qs = base_qs.filter(patient_id=patient_id)
 
+    # Dimensions déclarées, complétées par celles générées depuis les champs du
+    # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
+    # liste des champs est établie une fois et sert aussi au constructeur de
+    # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
+    champs = champs_soins()
+    dims_perso = dimensions_personnalisees(champs)
     declarees = construire_dimensions()
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
         familles=familles_soins(),
-        dimensions=list(declarees.values()),
+        dimensions=list(declarees.values()) + dims_perso,
         par_page=25,
         filtres_defaut=() if cible else FILTRES_DEFAUT,
         tri_defaut=('-date_creation',),
@@ -279,12 +288,18 @@ def soins_list(request):
     qs = listing.appliquer_filtres(qs, filtres, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
+    # liste des champs découverts : une condition portant sur autre chose est
+    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
     tri, tri_sens = listing.tri_demande(request)
     qs = listing.trier(qs, groupes, tri, tri_sens)
 
-    # Avec un regroupement on pagine les **groupes** : toutes les lignes des
-    # groupes affichés sont chargées, si bien que déplier n'appelle jamais le
-    # serveur.
+    # Avec un regroupement on pagine les **groupes** ; les lignes d'un groupe
+    # n'arrivent qu'à son dépliage.
+    declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
@@ -336,11 +351,18 @@ def soins_list(request):
         'date_from': date_from,
         'date_to': date_to,
         'filtre_pose': bool(filtres),
-        'selection_active': bool(q or groupes or not listing.est_selection_par_defaut(filtres)),
+        'selection_active': bool(q or groupes or conditions
+                                 or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
         # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'conditions': conditions,
+        'mode_conditions': mode_conditions,
+        # L'entrée de menu doit rester présente après un rafraîchissement AJAX :
+        # elle est donc conditionnée à ce drapeau, et non aux données JSON.
+        'listing_filtre_perso': True,
+        'listing_champs_json': champs_pour_navigateur(champs),
         'today': today,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,
@@ -774,12 +796,14 @@ def procedure_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_GROUPE, Listing, menu_filtres,
-                              menu_groupes, paginer_groupes)
+    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+                              champs_pour_navigateur, conditions_demandees,
+                              menu_filtres, menu_groupes, paginer_groupes)
     from .procedure_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
-                                    TRIS as TRIS_PROCEDURE,
-                                    construire_dimensions, familles_procedures,
-                                    libelle_periode)
+                                    TRIS as TRIS_PROCEDURE, champs_procedures,
+                                    construire_dimensions,
+                                    dimensions_personnalisees,
+                                    familles_procedures, libelle_periode)
 
     today = timezone.now().date()
     q = request.GET.get('q', '').strip()
@@ -797,11 +821,15 @@ def procedure_list(request):
     if patient_id:
         base_qs = base_qs.filter(patient_id=patient_id)
 
+    # Déclarées plus celles générées depuis les champs du modèle : la liste des
+    # champs sert aussi de liste blanche au constructeur de conditions.
+    champs = champs_procedures()
+    dims_perso = dimensions_personnalisees(champs)
     declarees = construire_dimensions()
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
         familles=familles_procedures(),
-        dimensions=list(declarees.values()),
+        dimensions=list(declarees.values()) + dims_perso,
         par_page=25,
         filtres_defaut=FILTRES_DEFAUT,
         tri_defaut=('-date',),
@@ -819,9 +847,15 @@ def procedure_list(request):
     qs = listing.appliquer_filtres(qs, filtres, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    # Conditions personnalisées, validées contre les champs découverts : une
+    # condition portant sur autre chose est ignorée.
+    conditions = conditions_demandees(request, champs)
+    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+    qs = appliquer_conditions(qs, conditions, mode_conditions)
     tri, tri_sens = listing.tri_demande(request)
     qs = listing.trier(qs, groupes, tri, tri_sens)
 
+    declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
@@ -864,10 +898,14 @@ def procedure_list(request):
         'date_from': date_from,
         'date_to': date_to,
         'filtre_pose': bool(filtres),
-        'selection_active': bool(q or groupes or filtres),
+        'selection_active': bool(q or groupes or filtres or conditions),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
+        'conditions': conditions,
+        'mode_conditions': mode_conditions,
+        'listing_filtre_perso': True,
+        'listing_champs_json': champs_pour_navigateur(champs),
         'today': today,
         'patient_id': patient_id,
         'patient_filtre': patient_filtre,

@@ -232,20 +232,20 @@ def construire_dimensions():
         }),
         ('statut', 'État du dossier', None, {
             'values': ('statut',),
-            'label':  lambda r: lib_statut.get(r['statut']) or 'Non précisé',
-            'valeur': lambda o: lib_statut.get(o.statut) or 'Non précisé',
+            'label':  lambda r: lib_statut.get(r['statut']) or 'Indéfini',
+            'valeur': lambda o: lib_statut.get(o.statut) or 'Indéfini',
             'order':  ('statut',),
         }),
         ('genre', 'Genre du patient', None, {
             'values': ('patient__sexe',),
-            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Non précisé'),
-            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Non précisé'),
+            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Indéfini'),
+            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Indéfini'),
             'order':  ('patient__sexe',),
         }),
         ('maladie', 'Maladie', None, {
             'values': ('maladie__nom',),
-            'label':  lambda r: _vide(r['maladie__nom'], 'Non précisée'),
-            'valeur': lambda o: _vide(o.maladie.nom if o.maladie_id else '', 'Non précisée'),
+            'label':  lambda r: _vide(r['maladie__nom'], 'Indéfinie'),
+            'valeur': lambda o: _vide(o.maladie.nom if o.maladie_id else '', 'Indéfinie'),
             'order':  ('maladie__nom',),
         }),
     ]

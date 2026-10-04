@@ -124,6 +124,14 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+
+# Les adresses des fichiers statiques portent la date du fichier (voir
+# core/staticfiles.py) : un script corrigé est réellement rechargé, au lieu de
+# rester celui que le navigateur avait gardé.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'core.staticfiles.StockageStatiqueDate'},
+}
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1025,11 +1025,11 @@ def _attribut(objet, chemin):
 
 
 def _valeur_choix(chemin, libelles):
-    return lambda o: libelles.get(str(_attribut(o, chemin)), 'Non précisé') if _attribut(o, chemin) not in (None, '') else 'Non précisé'
+    return lambda o: libelles.get(str(_attribut(o, chemin)), 'Indéfini') if _attribut(o, chemin) not in (None, '') else 'Indéfini'
 
 
 def _label_choix(chemin, libelles):
-    return lambda r: libelles.get(str(r[chemin]), 'Non précisé') if r[chemin] not in (None, '') else 'Non précisé'
+    return lambda r: libelles.get(str(r[chemin]), 'Indéfini') if r[chemin] not in (None, '') else 'Indéfini'
 
 
 def _valeur_booleen(chemin):
@@ -1101,9 +1101,21 @@ def champs_pour_navigateur(champs):
             # Un enregistrement de plus que la limite suffit à savoir si la table
             # est trop grande : un COUNT séparé doublerait le nombre de requêtes,
             # et il y a autant de tables à interroger que de champs de lien.
-            objets = list(modele.objects.all()[:MAX_CHOIX_LIEN + 1])
+            #
+            # `order_by()` efface le tri par défaut du modèle, et ce n'est pas
+            # un détail : toutes ces tables en ont un, si bien que prendre 201
+            # lignes obligeait la base à trier la table entière d'abord. Sur un
+            # millier de factures c'est invisible, sur cent mille beaucoup
+            # moins — et ce tri ne servait à rien, puisqu'on ne cherche ici
+            # qu'à savoir si la table est petite et, si oui, ce qu'elle
+            # contient.
+            objets = list(modele.objects.all().order_by()[:MAX_CHOIX_LIEN + 1])
             if len(objets) <= MAX_CHOIX_LIEN:
-                choix = [(str(o.pk), str(o)) for o in objets]
+                # Rangés par libellé : on vient y choisir une valeur, et une
+                # liste alphabétique se parcourt mieux que l'ordre où la base
+                # les a rendus.
+                choix = sorted(((str(o.pk), str(o)) for o in objets),
+                               key=lambda c: _sans_accent(c[1]))
             else:
                 categorie = 'nombre'      # repli : saisie de l'identifiant
         groupe = champ.get('groupe', '')

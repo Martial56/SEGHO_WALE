@@ -671,7 +671,7 @@ def presence_rapport(request):
     motifs_count = {}
     for s in stats:
         for ab in s['absences_motif']:
-            m = ab['motif'].strip() or 'Non précisé'
+            m = ab['motif'].strip() or 'Indéfini'
             motifs_count[m] = motifs_count.get(m, 0) + 1
     total_motifs = sum(motifs_count.values())
     motifs_list = [

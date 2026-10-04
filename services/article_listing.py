@@ -136,7 +136,7 @@ def familles_articles():
         Famille('type_produit', 'Type de produit', valeurs=(
             [(f'tp_{code}', libelle, Q(type_produit_hospitalier=code))
              for code, libelle in Articleservice.TYPE_PRODUIT_CHOICES]
-            + [('tp_vide', 'Non précisé', Q(type_produit_hospitalier=''))]
+            + [('tp_vide', 'Indéfini', Q(type_produit_hospitalier=''))]
         )),
         Famille('type_article', "Type d'article", valeurs=[
             (f'ta_{code}', libelle, Q(type_article=code))
@@ -213,14 +213,14 @@ def construire_dimensions():
         }),
         ('type_produit', 'Type de produit', None, {
             'values': ('type_produit_hospitalier',),
-            'label':  lambda r: lib_type_produit.get(r['type_produit_hospitalier']) or 'Non précisé',
-            'valeur': lambda o: lib_type_produit.get(o.type_produit_hospitalier) or 'Non précisé',
+            'label':  lambda r: lib_type_produit.get(r['type_produit_hospitalier']) or 'Indéfini',
+            'valeur': lambda o: lib_type_produit.get(o.type_produit_hospitalier) or 'Indéfini',
             'order':  ('type_produit_hospitalier',),
         }),
         ('type_article', "Type d'article", None, {
             'values': ('type_article',),
-            'label':  lambda r: lib_type_article.get(r['type_article']) or 'Non précisé',
-            'valeur': lambda o: lib_type_article.get(o.type_article) or 'Non précisé',
+            'label':  lambda r: lib_type_article.get(r['type_article']) or 'Indéfini',
+            'valeur': lambda o: lib_type_article.get(o.type_article) or 'Indéfini',
             'order':  ('type_article',),
         }),
         ('etat', 'État', None, booleen('actif', 'Actif', 'Archivé')),

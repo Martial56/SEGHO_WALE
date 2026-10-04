@@ -1,0 +1,644 @@
+{% extends 'rapports/base.html' %}
+{% comment %}
+Composition de la fiche d'activité de soins.
+
+La fiche est renvoyée **d'un bloc**, en JSON, dans un champ caché : la structure
+est imbriquée et réordonnable, et l'ordre d'une ligne est sa place dans la
+liste. Un formset aurait obligé à transporter des numéros d'ordre que le
+navigateur vient de recalculer — et à les croire.
+
+L'écran se construit donc depuis `composition`, pas depuis du balisage rendu par
+Django : une ligne ajoutée et une ligne existante doivent se ressembler en tout
+point, et elles ne le feraient pas si l'une venait du gabarit et l'autre du JS.
+{% endcomment %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+:root { --rap-surface:#fff; --rap-border:#e8edf2; --rap-text:var(--teal-900); --rap-muted:rgba(0,0,0,.5); }
+html[data-theme="dark"] { --rap-surface:var(--border); --rap-border:var(--border); --rap-text:var(--teal-100); --rap-muted:rgba(255,255,255,.45); }
+
+.cfg-wrap { padding: 24px 32px 80px; max-width: 1100px; }
+
+.cfg-intro { font-size: 12.5px; color: var(--rap-muted); margin-bottom: 18px; line-height: 1.6; }
+
+.cfg-bandeau {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 11px 14px; border-radius: 8px; font-size: 12.5px;
+  margin-bottom: 18px; border: 1px solid transparent;
+}
+.cfg-bandeau i { font-size: 15px; flex-shrink: 0; }
+.cfg-bandeau-officiel { background: #fff8e1; border-color: #f0d79a; color: #7a5a00; }
+.cfg-bandeau-copie { background: var(--teal-50); border-color: var(--rap-border); color: var(--accent-text); }
+html[data-theme="dark"] .cfg-bandeau-officiel { background: rgba(176,125,0,.18); border-color: rgba(176,125,0,.4); color: #e2c16a; }
+html[data-theme="dark"] .cfg-bandeau-copie { background: rgba(var(--teal-500-rgb),.12); border-color: var(--rap-border); color: var(--teal-100); }
+
+.cfg-bloc {
+  border: 1px solid var(--rap-border); border-radius: 8px;
+  background: var(--rap-surface); margin-bottom: 16px; overflow: hidden;
+}
+.cfg-bloc-tete {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-bottom: 1px solid var(--rap-border);
+  background: #f6f8fa;
+}
+html[data-theme="dark"] .cfg-bloc-tete { background: var(--surface); }
+.cfg-bloc-titre {
+  font-size: 13px; font-weight: 700; color: var(--rap-text);
+  border: 1px solid transparent; border-radius: 5px; padding: 4px 7px;
+  background: transparent; flex: 1; min-width: 0; font-family: inherit;
+}
+.cfg-bloc-titre:hover { border-color: var(--rap-border); }
+.cfg-bloc-titre:focus { border-color: var(--teal-500); outline: none; background: var(--rap-surface); }
+
+.cfg-colonne-titre {
+  font-size: 11.5px; color: var(--rap-muted); width: 110px; text-align: center;
+  border: 1px solid transparent; border-radius: 5px; padding: 4px 6px;
+  background: transparent; font-family: inherit;
+}
+.cfg-colonne-titre:hover { border-color: var(--rap-border); }
+.cfg-colonne-titre:focus { border-color: var(--teal-500); outline: none; background: var(--rap-surface); }
+
+.cfg-lignes { display: flex; flex-direction: column; }
+
+.cfg-ligne {
+  display: grid; grid-template-columns: 34px 1fr 180px 150px 1fr 30px;
+  gap: 8px; align-items: center;
+  padding: 8px 12px; border-bottom: 1px solid var(--rap-border);
+}
+.cfg-ligne:last-child { border-bottom: none; }
+@media (max-width: 1000px) { .cfg-ligne { grid-template-columns: 34px 1fr; } }
+
+.cfg-rang { display: flex; flex-direction: column; gap: 1px; }
+.cfg-rang button {
+  border: none; background: transparent; cursor: pointer; padding: 0;
+  color: var(--rap-muted); font-size: 11px; line-height: 1;
+}
+.cfg-rang button:hover { color: var(--accent-text); }
+.cfg-rang button:disabled { opacity: .25; cursor: default; }
+
+.cfg-ligne input[type="text"], .cfg-ligne select {
+  width: 100%; font-size: 12.5px; font-family: inherit;
+  border: 1px solid var(--rap-border); border-radius: 5px;
+  padding: 6px 8px; background: var(--rap-surface); color: var(--rap-text);
+}
+.cfg-ligne select:disabled { opacity: .45; }
+
+.cfg-prestations {
+  display: flex; align-items: center; gap: 7px; font-size: 12px;
+  border: 1px dashed var(--rap-border); border-radius: 5px;
+  padding: 6px 9px; cursor: pointer; background: transparent;
+  color: var(--accent-text); font-family: inherit; text-align: left; width: 100%;
+}
+.cfg-prestations:hover { border-color: var(--teal-500); }
+.cfg-prestations:disabled { opacity: .4; cursor: default; border-style: solid; }
+.cfg-prestations .cfg-compte { font-weight: 700; }
+.cfg-prestations .cfg-apercu {
+  color: var(--rap-muted); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; min-width: 0; font-size: 11px;
+}
+
+.cfg-suppr {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--rap-muted); font-size: 14px; padding: 2px;
+}
+.cfg-suppr:hover { color: var(--rose-text); }
+
+.cfg-bloc-pied {
+  padding: 8px 12px; border-top: 1px solid var(--rap-border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+
+.cfg-btn {
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  border-radius: 6px; padding: 7px 13px; border: 1px solid var(--rap-border);
+  background: var(--rap-surface); color: var(--accent-text);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.cfg-btn:hover { border-color: var(--teal-500); }
+.cfg-btn-fort { background: var(--teal-700); border-color: var(--teal-700); color: #fff; }
+.cfg-btn-fort:hover { background: var(--teal-600); border-color: var(--teal-600); }
+.cfg-btn-discret { color: var(--rap-muted); }
+.cfg-btn-danger:hover { border-color: var(--rose-text); color: var(--rose-text); }
+
+.cfg-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--rap-border);
+}
+.cfg-actions .cfg-espace { margin-left: auto; }
+
+.cfg-aide {
+  font-size: 11px; color: var(--rap-muted); font-style: italic;
+  grid-column: 2 / -1; padding-top: 2px;
+}
+
+.cfg-sous {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 16px; padding: 12px 14px; border-radius: 8px;
+  border: 1px dashed var(--rap-border); font-size: 12.5px; color: var(--rap-muted);
+}
+.cfg-sous input[type="text"] {
+  font-family: inherit; font-size: 12.5px; color: var(--rap-text);
+  border: 1px solid var(--rap-border); border-radius: 6px; padding: 7px 10px;
+  background: var(--rap-surface); min-width: 220px;
+}
+
+.cfg-panneau {
+  border: 1px solid var(--rap-border); border-radius: 8px;
+  background: var(--rap-surface); margin-top: 20px; overflow: hidden;
+}
+.cfg-panneau-tete {
+  padding: 10px 14px; border-bottom: 1px solid var(--rap-border);
+  font-size: 13px; font-weight: 700; color: var(--rap-text); background: #f6f8fa;
+}
+html[data-theme="dark"] .cfg-panneau-tete { background: var(--surface); }
+.cfg-panneau-tete small { display: block; font-weight: 400; font-size: 11.5px; color: var(--rap-muted); margin-top: 3px; }
+.cfg-fiche {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 14px; border-bottom: 1px solid var(--rap-border); font-size: 12.5px;
+}
+.cfg-fiche:last-child { border-bottom: none; }
+.cfg-fiche-nom { font-weight: 600; color: var(--rap-text); }
+.cfg-fiche-meta { color: var(--rap-muted); font-size: 11.5px; margin-right: auto; }
+.cfg-fiche form { display: inline; }
+.cfg-vide { padding: 18px 14px; font-size: 12.5px; color: var(--rap-muted); text-align: center; }
+
+/* ── Sélecteur de prestations ── */
+.cfg-voile {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 900;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.cfg-voile.ouvert { display: flex; }
+.cfg-boite {
+  background: var(--rap-surface); border-radius: 10px; width: 520px;
+  max-width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+  overflow: hidden; border: 1px solid var(--rap-border);
+}
+.cfg-boite-tete {
+  padding: 13px 16px; border-bottom: 1px solid var(--rap-border);
+  font-size: 13px; font-weight: 700; color: var(--rap-text);
+}
+.cfg-boite-tete small { display: block; font-weight: 400; font-size: 11.5px; color: var(--rap-muted); margin-top: 3px; }
+.cfg-boite-recherche { padding: 10px 16px; border-bottom: 1px solid var(--rap-border); }
+.cfg-boite-recherche input {
+  width: 100%; font-size: 12.5px; font-family: inherit; color: var(--rap-text);
+  border: 1px solid var(--rap-border); border-radius: 6px; padding: 7px 10px;
+  background: var(--rap-surface);
+}
+.cfg-boite-liste { overflow-y: auto; flex: 1; padding: 6px 0; }
+.cfg-choix {
+  display: flex; align-items: center; gap: 9px; padding: 6px 16px;
+  font-size: 12.5px; color: var(--rap-text); cursor: pointer;
+}
+.cfg-choix:hover { background: rgba(var(--teal-500-rgb),.1); }
+.cfg-choix input { margin: 0; }
+.cfg-boite-vide { padding: 22px 16px; text-align: center; font-size: 12.5px; color: var(--rap-muted); }
+.cfg-boite-pied {
+  padding: 11px 16px; border-top: 1px solid var(--rap-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.cfg-boite-pied .cfg-compte-choisi { font-size: 12px; color: var(--rap-muted); margin-right: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cfg-wrap">
+
+  <p class="cfg-intro">
+    La partie « Activités de soins infirmiers » de la fiche se compose ici.
+    Chaque ligne porte un libellé, dit ce qu'elle compte, et où le chercher.
+    Le tableau des mises en observation, en haut de la fiche, n'est pas concerné.
+  </p>
+
+  {% if modifie_le_defaut %}
+  <div class="cfg-bandeau cfg-bandeau-officiel">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <span>Vous modifiez le <strong>format par défaut</strong>. C'est celui que voit
+    tout le monde, et celui auquel renvoie « Revenir au format par défaut ».</span>
+  </div>
+  {% elif partira_en_copie %}
+  <div class="cfg-bandeau cfg-bandeau-copie">
+    <i class="bi bi-info-circle-fill"></i>
+    <span>Vous partez du format par défaut. En enregistrant, vous en recevrez
+    <strong>votre propre copie</strong> : le format par défaut ne bouge pas, et vous
+    pourrez y revenir à tout moment.</span>
+  </div>
+  {% else %}
+  <div class="cfg-bandeau cfg-bandeau-copie">
+    <i class="bi bi-person-fill"></i>
+    <span>Votre fiche — <strong>{{ configuration.nom }}</strong>, modifiée le
+    {{ configuration.date_modification|date:"d/m/Y à H:i" }}.</span>
+  </div>
+  {% endif %}
+
+  <form method="post" id="cfg-form">
+    {% csrf_token %}
+    <input type="hidden" name="composition" id="cfg-composition">
+
+    <div id="cfg-blocs"></div>
+
+    <button type="button" class="cfg-btn" id="cfg-ajouter-bloc">
+      <i class="bi bi-plus-lg"></i> Ajouter un bloc
+    </button>
+
+    {% comment %}Le champ vit dans le formulaire principal : « mettre de côté »
+    enregistre la composition **telle qu'elle est à l'écran**, y compris les
+    changements non encore enregistrés. C'est ce qu'on attend d'un « enregistrer
+    sous » — sinon il figerait la version d'avant.{% endcomment %}
+    <div class="cfg-sous">
+      <i class="bi bi-bookmark"></i>
+      <span>Garder cette composition sous un nom, pour y revenir ou la proposer :</span>
+      <input type="text" name="nom" id="cfg-nom" maxlength="120"
+             placeholder="Par exemple : Fiche de juin 2026" autocomplete="off">
+      <button type="submit" name="action" value="enregistrer_sous"
+              class="cfg-btn" id="cfg-enregistrer-sous">Mettre de côté</button>
+    </div>
+
+    <div class="cfg-actions">
+      <button type="submit" class="cfg-btn cfg-btn-fort">
+        <i class="bi bi-check-lg"></i> Enregistrer
+      </button>
+      <a class="cfg-btn cfg-btn-discret" href="{% url 'rapports:soins' %}">Voir la fiche</a>
+      <span class="cfg-espace"></span>
+      {% if not configuration.est_defaut %}
+      <button type="submit" name="action" value="defaut" id="cfg-revenir-defaut"
+              class="cfg-btn cfg-btn-danger"
+              onclick="return confirm('Abandonner votre fiche et revenir au format par défaut ?');">
+        <i class="bi bi-arrow-counterclockwise"></i> Revenir au format par défaut
+      </button>
+      {% endif %}
+    </div>
+  </form>
+
+  {% comment %}Hors du formulaire principal : un formulaire ne s'imbrique pas,
+  et ces boutons n'ont rien à envoyer de la composition à l'écran.{% endcomment %}
+  <div class="cfg-panneau" id="cfg-mes-fiches">
+    <div class="cfg-panneau-tete">
+      Mes fiches mises de côté
+      <small>Reprendre l'une d'elles remplace votre fiche de travail. La proposer
+      la rend reprenable par les autres, qui en recevront une copie.</small>
+    </div>
+    {% for fiche in mes_fiches %}
+    <div class="cfg-fiche">
+      <span class="cfg-fiche-nom">{{ fiche.nom }}</span>
+      <span class="cfg-fiche-meta">
+        modifiée le {{ fiche.date_modification|date:"d/m/Y à H:i" }}{% if fiche.partagee %} — proposée aux autres{% endif %}
+      </span>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="config" value="{{ fiche.pk }}">
+        <button type="submit" name="action" value="reprendre" class="cfg-btn">Reprendre</button>
+      </form>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="config" value="{{ fiche.pk }}">
+        {% if fiche.partagee %}
+        <button type="submit" name="action" value="ne_plus_partager" class="cfg-btn cfg-btn-discret">Ne plus proposer</button>
+        {% else %}
+        <button type="submit" name="action" value="partager" class="cfg-btn cfg-btn-discret">Proposer aux autres</button>
+        {% endif %}
+      </form>
+      <form method="post" onsubmit="return confirm('Supprimer « {{ fiche.nom|escapejs }} » ?');">{% csrf_token %}
+        <input type="hidden" name="config" value="{{ fiche.pk }}">
+        <button type="submit" name="action" value="supprimer" class="cfg-btn cfg-btn-danger">Supprimer</button>
+      </form>
+    </div>
+    {% empty %}
+    <div class="cfg-vide">Aucune fiche mise de côté pour l'instant.</div>
+    {% endfor %}
+  </div>
+
+  <div class="cfg-panneau" id="cfg-fiches-partagees">
+    <div class="cfg-panneau-tete">
+      Fiches proposées par d'autres
+      <small>Appliquer une fiche en fait une copie à vous : si son auteur la
+      modifie ensuite, la vôtre ne bougera pas.</small>
+    </div>
+    {% for fiche in fiches_partagees %}
+    <div class="cfg-fiche">
+      <span class="cfg-fiche-nom">{{ fiche.nom }}</span>
+      <span class="cfg-fiche-meta">
+        par {{ fiche.auteur }} — modifiée le {{ fiche.date_modification|date:"d/m/Y" }}
+      </span>
+      <a class="cfg-btn cfg-btn-discret" href="{% url 'rapports:soins' %}?config={{ fiche.pk }}">Voir la fiche</a>
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="config" value="{{ fiche.pk }}">
+        <button type="submit" name="action" value="reprendre" class="cfg-btn">Appliquer</button>
+      </form>
+    </div>
+    {% empty %}
+    <div class="cfg-vide">Personne ne propose de fiche pour l'instant.</div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Sélecteur de prestations -->
+<div class="cfg-voile" id="cfg-voile">
+  <div class="cfg-boite">
+    <div class="cfg-boite-tete">
+      Prestations comptées
+      <small id="cfg-boite-ligne"></small>
+    </div>
+    <div class="cfg-boite-recherche">
+      <input type="text" id="cfg-recherche" placeholder="Rechercher parmi {{ nombre_prestations }} prestations…" autocomplete="off">
+    </div>
+    <div class="cfg-boite-liste" id="cfg-boite-liste"></div>
+    <div class="cfg-boite-pied">
+      <span class="cfg-compte-choisi" id="cfg-compte-choisi"></span>
+      <button type="button" class="cfg-btn" id="cfg-annuler-choix">Annuler</button>
+      <button type="button" class="cfg-btn cfg-btn-fort" id="cfg-valider-choix">Valider</button>
+    </div>
+  </div>
+</div>
+
+{% comment %}`json_script` et non `|safe` : les titres de blocs et les
+libellés sont libres, et « </script> » dans l'un d'eux refermerait la balise.
+Le filtre échappe `<`, `>` et `&`, et pose lui-même l'élément et son id.{% endcomment %}
+{{ composition|json_script:"cfg-donnees" }}
+{{ prestations|json_script:"cfg-prestations" }}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  'use strict';
+
+  var composition = JSON.parse(document.getElementById('cfg-donnees').textContent);
+  var prestations = JSON.parse(document.getElementById('cfg-prestations').textContent);
+  var parNom = {};
+  prestations.forEach(function (p) { parNom[p.id] = p.nom; });
+
+  var SOURCES = [
+    {% for code, libelle in sources %}{ code: '{{ code }}', libelle: '{{ libelle|escapejs }}' }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+  var ORIGINES = [
+    {% for code, libelle in origines %}{ code: '{{ code }}', libelle: '{{ libelle|escapejs }}' }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  var conteneur = document.getElementById('cfg-blocs');
+
+  function option(valeur, texte, choisi) {
+    var o = document.createElement('option');
+    o.value = valeur; o.textContent = texte;
+    if (choisi) { o.selected = true; }
+    return o;
+  }
+
+  function bouton(classe, icone, titre) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = classe; b.title = titre || '';
+    b.innerHTML = '<i class="bi ' + icone + '"></i>';
+    return b;
+  }
+
+  // ── Une ligne ────────────────────────────────────────────────────────────
+  function creerLigne(donnees) {
+    var ligne = document.createElement('div');
+    ligne.className = 'cfg-ligne';
+    ligne.dataset.articles = JSON.stringify(donnees.articles || []);
+
+    var rang = document.createElement('div');
+    rang.className = 'cfg-rang';
+    var haut = bouton('', 'bi-chevron-up', 'Monter');
+    var bas = bouton('', 'bi-chevron-down', 'Descendre');
+    haut.addEventListener('click', function () { deplacer(ligne, -1); });
+    bas.addEventListener('click', function () { deplacer(ligne, 1); });
+    rang.appendChild(haut); rang.appendChild(bas);
+
+    var libelle = document.createElement('input');
+    libelle.type = 'text'; libelle.className = 'cfg-libelle';
+    libelle.value = donnees.libelle || '';
+    libelle.placeholder = 'Libellé imprimé sur la fiche';
+
+    var source = document.createElement('select');
+    source.className = 'cfg-source';
+    SOURCES.forEach(function (s) {
+      source.appendChild(option(s.code, s.libelle, s.code === donnees.source));
+    });
+
+    var origines = document.createElement('select');
+    origines.className = 'cfg-origines';
+    ORIGINES.forEach(function (o) {
+      origines.appendChild(option(o.code, o.libelle, o.code === donnees.origines));
+    });
+
+    var choisir = document.createElement('button');
+    choisir.type = 'button'; choisir.className = 'cfg-prestations';
+    choisir.addEventListener('click', function () { ouvrirChoix(ligne); });
+
+    var suppr = bouton('cfg-suppr', 'bi-trash3', 'Supprimer cette ligne');
+    suppr.addEventListener('click', function () { ligne.remove(); rafraichirRangs(); });
+
+    ligne.appendChild(rang);
+    ligne.appendChild(libelle);
+    ligne.appendChild(source);
+    ligne.appendChild(origines);
+    ligne.appendChild(choisir);
+    ligne.appendChild(suppr);
+
+    source.addEventListener('change', function () { majLigne(ligne); });
+    majLigne(ligne);
+    return ligne;
+  }
+
+  // Une ligne qui compte des mises en observation ne compte aucune prestation :
+  // ses deux derniers réglages n'ont alors plus de sens et sont fermés, plutôt
+  // que de laisser croire qu'ils entrent dans le chiffre.
+  function majLigne(ligne) {
+    var source = ligne.querySelector('.cfg-source').value;
+    var surArticles = source === 'articles';
+    var origines = ligne.querySelector('.cfg-origines');
+    var choisir = ligne.querySelector('.cfg-prestations');
+    origines.disabled = !surArticles;
+    choisir.disabled = !surArticles;
+
+    var ids = JSON.parse(ligne.dataset.articles || '[]');
+    if (!surArticles) {
+      choisir.innerHTML = '<span class="cfg-apercu">—</span>';
+      return;
+    }
+    var noms = ids.map(function (i) { return parNom[i]; }).filter(Boolean);
+    choisir.innerHTML =
+      '<span class="cfg-compte">' + ids.length + '</span>' +
+      '<span class="cfg-apercu">' +
+      (noms.length ? noms.join(', ') : 'aucune prestation — cliquer pour en choisir') +
+      '</span>';
+  }
+
+  function deplacer(ligne, sens) {
+    var voisin = sens < 0 ? ligne.previousElementSibling : ligne.nextElementSibling;
+    if (!voisin) { return; }
+    if (sens < 0) { ligne.parentNode.insertBefore(ligne, voisin); }
+    else { ligne.parentNode.insertBefore(voisin, ligne); }
+    rafraichirRangs();
+  }
+
+  function rafraichirRangs() {
+    conteneur.querySelectorAll('.cfg-lignes').forEach(function (liste) {
+      var lignes = liste.querySelectorAll('.cfg-ligne');
+      lignes.forEach(function (l, i) {
+        l.querySelectorAll('.cfg-rang button')[0].disabled = (i === 0);
+        l.querySelectorAll('.cfg-rang button')[1].disabled = (i === lignes.length - 1);
+      });
+    });
+  }
+
+  // ── Un bloc ──────────────────────────────────────────────────────────────
+  function creerBloc(donnees) {
+    var bloc = document.createElement('div');
+    bloc.className = 'cfg-bloc';
+
+    var tete = document.createElement('div');
+    tete.className = 'cfg-bloc-tete';
+    var titre = document.createElement('input');
+    titre.type = 'text'; titre.className = 'cfg-bloc-titre';
+    titre.value = donnees.titre || '';
+    titre.placeholder = 'Titre du bloc';
+    var colonne = document.createElement('input');
+    colonne.type = 'text'; colonne.className = 'cfg-colonne-titre';
+    colonne.value = donnees.colonne || 'Nombre';
+    colonne.title = "Titre de la colonne de valeurs";
+    var supprBloc = bouton('cfg-suppr', 'bi-trash3', 'Supprimer ce bloc');
+    supprBloc.addEventListener('click', function () {
+      if (conteneur.querySelectorAll('.cfg-bloc').length === 1) {
+        alert('La fiche doit garder au moins un bloc.');
+        return;
+      }
+      if (confirm('Supprimer le bloc « ' + titre.value +' » et ses lignes ?')) {
+        bloc.remove();
+      }
+    });
+    tete.appendChild(titre); tete.appendChild(colonne); tete.appendChild(supprBloc);
+
+    var liste = document.createElement('div');
+    liste.className = 'cfg-lignes';
+    (donnees.lignes || []).forEach(function (l) { liste.appendChild(creerLigne(l)); });
+
+    var pied = document.createElement('div');
+    pied.className = 'cfg-bloc-pied';
+    var ajouter = document.createElement('button');
+    ajouter.type = 'button'; ajouter.className = 'cfg-btn';
+    ajouter.innerHTML = '<i class="bi bi-plus-lg"></i> Ajouter une ligne';
+    ajouter.addEventListener('click', function () {
+      liste.appendChild(creerLigne({
+        libelle: '', source: 'articles', origines: 'procedure', articles: []
+      }));
+      rafraichirRangs();
+      liste.lastElementChild.querySelector('.cfg-libelle').focus();
+    });
+    pied.appendChild(ajouter);
+
+    bloc.appendChild(tete); bloc.appendChild(liste); bloc.appendChild(pied);
+    return bloc;
+  }
+
+  // ── Sélecteur de prestations ─────────────────────────────────────────────
+  var voile = document.getElementById('cfg-voile');
+  var liste = document.getElementById('cfg-boite-liste');
+  var recherche = document.getElementById('cfg-recherche');
+  var compteChoisi = document.getElementById('cfg-compte-choisi');
+  var ligneEnCours = null;
+  var choix = [];
+
+  function dessinerChoix() {
+    var filtre = recherche.value.trim().toLowerCase();
+    var vus = prestations.filter(function (p) {
+      return !filtre || p.nom.toLowerCase().indexOf(filtre) !== -1;
+    });
+    liste.innerHTML = '';
+    if (!vus.length) {
+      var vide = document.createElement('div');
+      vide.className = 'cfg-boite-vide';
+      vide.textContent = 'Aucune prestation ne correspond.';
+      liste.appendChild(vide);
+    }
+    vus.forEach(function (p) {
+      var l = document.createElement('label');
+      l.className = 'cfg-choix';
+      var c = document.createElement('input');
+      c.type = 'checkbox'; c.value = p.id;
+      c.checked = choix.indexOf(p.id) !== -1;
+      c.addEventListener('change', function () {
+        var i = choix.indexOf(p.id);
+        if (c.checked && i === -1) { choix.push(p.id); }
+        if (!c.checked && i !== -1) { choix.splice(i, 1); }
+        majCompteChoisi();
+      });
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(p.nom));
+      liste.appendChild(l);
+    });
+  }
+
+  function majCompteChoisi() {
+    compteChoisi.textContent = choix.length
+      ? choix.length + ' prestation' + (choix.length > 1 ? 's' : '') + ' cochée' + (choix.length > 1 ? 's' : '')
+      : 'aucune prestation cochée';
+  }
+
+  function ouvrirChoix(ligne) {
+    ligneEnCours = ligne;
+    choix = JSON.parse(ligne.dataset.articles || '[]');
+    document.getElementById('cfg-boite-ligne').textContent =
+      ligne.querySelector('.cfg-libelle').value || 'ligne sans libellé';
+    recherche.value = '';
+    dessinerChoix();
+    majCompteChoisi();
+    voile.classList.add('ouvert');
+    recherche.focus();
+  }
+
+  function fermerChoix() { voile.classList.remove('ouvert'); ligneEnCours = null; }
+
+  recherche.addEventListener('input', dessinerChoix);
+  document.getElementById('cfg-annuler-choix').addEventListener('click', fermerChoix);
+  document.getElementById('cfg-valider-choix').addEventListener('click', function () {
+    if (ligneEnCours) {
+      ligneEnCours.dataset.articles = JSON.stringify(choix);
+      majLigne(ligneEnCours);
+    }
+    fermerChoix();
+  });
+  voile.addEventListener('click', function (e) { if (e.target === voile) { fermerChoix(); } });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && voile.classList.contains('ouvert')) { fermerChoix(); }
+  });
+
+  // ── Montage et envoi ─────────────────────────────────────────────────────
+  (composition.blocs || []).forEach(function (b) { conteneur.appendChild(creerBloc(b)); });
+  rafraichirRangs();
+
+  document.getElementById('cfg-ajouter-bloc').addEventListener('click', function () {
+    conteneur.appendChild(creerBloc({ titre: '', colonne: 'Nombre', lignes: [] }));
+    rafraichirRangs();
+    conteneur.lastElementChild.querySelector('.cfg-bloc-titre').focus();
+  });
+
+  document.getElementById('cfg-form').addEventListener('submit', function (e) {
+    // « Revenir au format par défaut » est un autre envoi : il n'a rien à
+    // composer, et sérialiser l'écran l'empêcherait seulement de partir si un
+    // libellé était resté vide.
+    if (e.submitter && e.submitter.value === 'defaut') { return; }
+    var blocs = [];
+    conteneur.querySelectorAll('.cfg-bloc').forEach(function (bloc) {
+      var lignes = [];
+      bloc.querySelectorAll('.cfg-ligne').forEach(function (l) {
+        lignes.push({
+          libelle: l.querySelector('.cfg-libelle').value,
+          source: l.querySelector('.cfg-source').value,
+          origines: l.querySelector('.cfg-origines').value,
+          articles: JSON.parse(l.dataset.articles || '[]')
+        });
+      });
+      blocs.push({
+        titre: bloc.querySelector('.cfg-bloc-titre').value,
+        colonne: bloc.querySelector('.cfg-colonne-titre').value,
+        lignes: lignes
+      });
+    });
+    document.getElementById('cfg-composition').value = JSON.stringify({ blocs: blocs });
+  });
+})();
+</script>
+{% endblock %}

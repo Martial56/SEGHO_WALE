@@ -713,6 +713,26 @@ class TestLesLignesArriventAuDepliage(TestCase):
         html = self._html('&_groupe=0')
         self.assertEqual(self._nb_lignes(html), 3)
 
+    def test_le_depliage_rend_les_lignes_en_ajax(self):
+        """C'est le chemin réel : le script demande la page en AJAX.
+
+        Il ne le faisait pas au départ, par crainte qu'une liste réponde par un
+        fragment de `<tr>` nus — que l'analyseur HTML jette hors d'un tableau.
+        Aucune n'est dans ce cas, et la page entière coûtait quatre fois plus
+        cher : 554 ms et 256 Ko pour trois lignes, contre 146 ms et 44 Ko.
+
+        Si une liste se mettait à répondre sans tableau, c'est ici que ça se
+        verrait.
+        """
+        reponse = self.client.get(
+            self.url + '&_groupe=0',
+            headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(reponse.status_code, 200)
+        corps = reponse.content.decode()
+        self.assertEqual(self._nb_lignes(corps), 3)
+        self.assertIn('<table', corps,
+                      'des lignes hors tableau seraient jetées par le navigateur')
+
     def test_chaque_groupe_rend_les_siennes_et_pas_celles_du_voisin(self):
         self.assertEqual(self._nb_lignes(self._html('&_groupe=1')), 2)
 
@@ -787,3 +807,185 @@ class TestLesLignesArriventAuDepliage(TestCase):
                         headers={'x-requested-with': 'XMLHttpRequest'})
         self.assertIn(cle, self.client.session,
                       'le dépliage a été pris pour un « Effacer »')
+
+
+class TestLesAdressesStatiquesPortentLaDateDuFichier(TestCase):
+    """Un script corrigé doit être réellement rechargé par le navigateur.
+
+    `{% static %}` rendait toujours la même adresse quel que soit le contenu du
+    fichier. Une copie gardée par le navigateur servait donc indéfiniment, et
+    une correction livrée restait invisible chez qui avait déjà ouvert la page.
+
+    Ce n'est pas théorique : le chargement différé des groupes a été livré avec
+    un script qui va chercher les lignes au serveur, là où l'ancien se
+    contentait de démasquer des lignes déjà présentes. Les deux se ressemblent
+    assez pour que rien ne signale l'erreur — le groupe s'ouvrait et restait
+    vide.
+    """
+
+    def _url(self, nom):
+        from django.contrib.staticfiles.storage import staticfiles_storage
+        return staticfiles_storage.url(nom)
+
+    def test_une_adresse_porte_une_version(self):
+        import re
+        adresse = self._url('js/listing_groupes.js')
+        self.assertRegex(adresse, r'^/static/js/listing_groupes\.js\?v=\d+$')
+
+    def test_deux_fichiers_differents_ont_des_versions_differentes(self):
+        """Une version constante ne vaudrait pas mieux que pas de version."""
+        import os
+        from django.contrib.staticfiles import finders
+        a = self._url('js/listing_groupes.js')
+        b = self._url('css/global.css')
+        self.assertNotEqual(a.split('?v=')[1], b.split('?v=')[1],
+                            'les deux fichiers ont la même date, le test ne '
+                            'prouve rien — touchez-en un et relancez')
+        # La version est bien celle du fichier, pas un nombre quelconque.
+        attendue = str(int(os.path.getmtime(finders.find('css/global.css'))))
+        self.assertEqual(b.split('?v=')[1], attendue)
+
+    def test_un_fichier_introuvable_rend_une_adresse_nue(self):
+        """Mieux vaut une adresse sans version qu'une page qui ne s'affiche
+        pas : le cache n'est pas une raison de casser le rendu."""
+        self.assertEqual(self._url('js/ce-fichier-n-existe-pas.js'),
+                         '/static/js/ce-fichier-n-existe-pas.js')
+
+    def test_les_pages_servent_des_adresses_versionnees(self):
+        import re
+        User.objects.create_superuser('su_statique', password='x')
+        client = Client()
+        client.login(username='su_statique', password='x')
+        html = client.get(reverse('soins:list') + '?filter=').content.decode()
+        adresses = re.findall(r'/static/[^"\' >]+', html)
+        self.assertTrue(adresses)
+        self.assertEqual([a for a in adresses if '?v=' not in a], [])
+
+
+class TestLeCatalogueDesChampsNeTriePasLesTables(TestCase):
+    """Savoir si une table est petite ne demande pas de la trier.
+
+    Le constructeur de conditions propose les valeurs d'un champ de lien quand
+    la table visée reste petite. Il en demandait 201 lignes — une de plus que
+    la limite, pour savoir sans compter — mais à travers le tri par défaut du
+    modèle. Or ces modèles en ont tous un : patients, factures, rendez-vous,
+    hospitalisations. La base devait donc trier la table **entière** avant d'en
+    rendre 201, à chaque affichage d'une liste, pour chacun des neuf à onze
+    champs de lien.
+
+    Invisible sur un millier de lignes, beaucoup moins sur cent mille. Et ce
+    tri ne servait à rien : on ne cherche ici qu'à savoir si la table est
+    petite et, si oui, ce qu'elle contient.
+    """
+
+    def test_aucun_sondage_ne_trie(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from core.listing import champs_filtrables, champs_pour_navigateur
+        from soins.models import Soin
+
+        with CaptureQueriesContext(connection) as requetes:
+            champs_pour_navigateur(champs_filtrables(Soin))
+
+        triees = [r['sql'] for r in requetes.captured_queries
+                  if 'ORDER BY' in r['sql'].upper()]
+        self.assertEqual(
+            triees, [],
+            'un sondage trie de nouveau la table avant de la plafonner')
+        self.assertTrue(requetes.captured_queries,
+                        'aucune requête : le test ne prouve rien')
+
+    def test_les_valeurs_proposees_sont_rangees_par_libelle(self):
+        """On vient y choisir une valeur : une liste alphabétique se parcourt
+        mieux que l'ordre où la base les a rendues — qui, le tri retiré, n'est
+        plus garanti du tout."""
+        from medecins.models import Departement
+
+        from core.listing import champs_filtrables, champs_pour_navigateur
+        from soins.models import Soin
+
+        for code, nom in (('ZZZ', 'Zone de test'), ('AAA', 'Ambulatoire'),
+                          ('MMM', 'Médecine interne')):
+            Departement.objects.get_or_create(code=code, defaults={'nom': nom})
+
+        catalogue = champs_pour_navigateur(champs_filtrables(Soin))
+        departement = next(c for c in catalogue['champs']
+                           if c['chemin'] == 'departement')
+        libelles = [libelle for _, libelle in departement['choix']]
+        self.assertEqual(libelles, sorted(libelles))
+        self.assertIn('Ambulatoire', libelles)
+
+    def test_une_table_trop_grande_bascule_en_saisie_d_identifiant(self):
+        """Le plafond est ce qui empêche le catalogue d'enfler : au-delà, on
+        saisit l'identifiant au lieu de recevoir toute la table."""
+        from medecins.models import Departement
+
+        from core.listing import (MAX_CHOIX_LIEN, champs_filtrables,
+                                  champs_pour_navigateur)
+        from soins.models import Soin
+
+        Departement.objects.bulk_create([
+            Departement(code=f'D{i:04d}', nom=f'Service {i:04d}')
+            for i in range(MAX_CHOIX_LIEN + 1)])
+
+        catalogue = champs_pour_navigateur(champs_filtrables(Soin))
+        departement = next(c for c in catalogue['champs']
+                           if c['chemin'] == 'departement')
+        self.assertEqual(departement['type'], 'nombre')
+        self.assertEqual(departement['choix'], [])
+
+
+class TestLaMemoireRetientLesFiltresPersonnalises(TestCase):
+    """Revenir d'une fiche doit rendre la sélection **entière**.
+
+    La mémoire des listes retenait `cond_…` et `mode_cond`, deux noms que rien
+    n'a jamais écrits : le constructeur de conditions envoie `cf`, `co`, `cv`
+    et `cm`. Les deux moitiés ne se sont donc jamais rencontrées. On posait un
+    filtre personnalisé, on ouvrait une fiche, on revenait — et il avait
+    disparu, sur les six listes qui offrent la fonction.
+    """
+
+    def setUp(self):
+        User.objects.create_superuser('su_memo_perso', password='x')
+        self.client = Client()
+        self.client.login(username='su_memo_perso', password='x')
+        self.url = reverse('soins:list')
+
+    SELECTION = '?filter=&cf=motif&co=contient&cv=pansement'
+
+    def test_la_condition_revient_avec_la_selection(self):
+        self.client.get(self.url + self.SELECTION)
+        retour = self.client.get(self.url)          # retour d'une fiche
+        self.assertEqual(retour.status_code, 302)
+        for morceau in ('cf=motif', 'co=contient', 'cv=pansement'):
+            self.assertIn(morceau, retour['Location'])
+
+    def test_le_mode_de_combinaison_revient_aussi(self):
+        """Sans lui, deux conditions retrouvées en ET au lieu de OU ne rendent
+        pas la même liste — et rien ne le dit."""
+        self.client.get(self.url + self.SELECTION + '&cm=ou')
+        retour = self.client.get(self.url)
+        self.assertIn('cm=ou', retour['Location'])
+
+    def test_plusieurs_conditions_reviennent_toutes(self):
+        """Elles voyagent en listes parallèles : n'en retenir qu'une changerait
+        le résultat sans prévenir."""
+        self.client.get(
+            self.url + '?filter='
+            '&cf=motif&co=contient&cv=pansement'
+            '&cf=nom&co=contient&cv=pied')
+        cible = self.client.get(self.url)['Location']
+        self.assertEqual(cible.count('cf='), 2)
+        self.assertIn('cv=pied', cible)
+
+    def test_effacer_oublie_bien_la_condition(self):
+        """« Effacer » rafraîchit la liste en AJAX sans aucun paramètre : c'est
+        ce qui le distingue d'un retour de fiche. Il doit tout oublier."""
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(self.url + self.SELECTION)
+        self.assertIn(PREFIXE_CLE + self.url, self.client.session)
+
+        self.client.get(self.url,
+                        headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertNotIn(PREFIXE_CLE + self.url, self.client.session)

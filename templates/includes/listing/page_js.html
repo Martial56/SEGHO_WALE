@@ -86,6 +86,11 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
           if (neuf && actuel) actuel.innerHTML = neuf.innerHTML;
         });
         if (pousserHistorique) history.pushState({}, '', url);
+        // Le constructeur de conditions vit dans `subheader-controls`, qu'on
+        // vient de remplacer : son entrée de menu est neuve et n'a plus
+        // d'écouteur. Sans ce rappel, « Ajouter un filtre personnalisé » ne
+        // répond plus après le premier changement de filtre.
+        if (window.lstfInit) window.lstfInit();
         if (window.initListe) window.initListe();
       })
       .catch(function (err) {
@@ -190,7 +195,12 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
 
   function resetAll() {
     var params = new URLSearchParams(window.location.search);
-    ['filter', 'group', 'q', 'date_from', 'date_to', 'page', 'tri', 'sens']
+    // `cf`/`co`/`cv`/`cm` sont les conditions personnalisées. Les oublier ici
+    // laissait « Effacer » en effacer la moitié : les filtres déclarés
+    // partaient, les conditions restaient, et la liste ne redevenait pas celle
+    // qu'on croyait avoir retrouvée.
+    ['filter', 'group', 'q', 'date_from', 'date_to', 'page', 'tri', 'sens',
+     'cf', 'co', 'cv', 'cm']
       .forEach(function (c) { params.delete(c); });
     var champ = document.getElementById('search-input');
     if (champ) champ.value = '';

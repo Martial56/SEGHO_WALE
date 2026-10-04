@@ -31,18 +31,21 @@ from core.listing import PARAM_GROUPE
 #: Paramètres qui composent une sélection. `page` en est volontairement absent :
 #: revenir sur une fiche puis retrouver sa liste à la page 7 surprendrait plus
 #: que de repartir du début.
+#:
+#: `cf`, `co`, `cv` et `cm` sont les conditions personnalisées — champ,
+#: opérateur, valeur, et le mode qui les combine. Elles manquaient : la liste
+#: retenait `cond_…` et `mode_cond`, deux noms que rien n'a jamais écrits.
+#: Poser un filtre personnalisé, ouvrir une fiche et revenir le faisait donc
+#: disparaître sans un mot, sur les six listes qui offrent la fonction.
 PARAMETRES = ('filter', 'group', 'q', 'date_from', 'date_to',
-              'tri', 'sens', 'mode_cond')
-
-#: Les conditions personnalisées sont nommées dynamiquement (`cond_champ_0`…).
-PREFIXE_CONDITION = 'cond_'
+              'tri', 'sens', 'cf', 'co', 'cv', 'cm')
 
 #: Préfixe des clés de session, pour pouvoir toutes les retirer d'un coup.
 PREFIXE_CLE = 'listing:'
 
 
 def _est_parametre(cle):
-    return cle in PARAMETRES or cle.startswith(PREFIXE_CONDITION)
+    return cle in PARAMETRES
 
 
 def _selection(request):
