@@ -34,6 +34,12 @@
 .lot-ok      { background:rgba(var(--teal-600-rgb), .08); color:var(--accent-text); border-color:rgba(var(--teal-600-rgb), .2); }
 .lot-bientot { background:rgba(var(--amber-rgb),.1); color:var(--amber-text); border-color:rgba(var(--amber-rgb),.3); }
 .lot-perime  { background:rgba(220,53,69,.1); color:var(--rose-text); border-color:rgba(220,53,69,.3); }
+/* Lots éditables : un lot par ligne, n° et date alignés d'une colonne à l'autre */
+.lot-stack { display:flex; flex-direction:column; gap:4px; }
+.lot-edit { height:24px; box-sizing:border-box; font-size:11px; }
+.lot-edit-num { width:120px; }
+.lot-edit:focus { outline:none; border-color:var(--ph-500); box-shadow:0 0 0 2px rgba(var(--teal-600-rgb), .15); }
+.lot-edit.lot-modifie { border-style:dashed; border-color:var(--ph-500); font-style:italic; }
 </style>{% endblock %}
 
 {% block content %}
@@ -57,6 +63,7 @@
     <i class="bi bi-info-circle-fill" style="color:var(--ph-500);font-size:18px;flex-shrink:0;margin-top:1px;"></i>
     <div style="font-size:12.5px;color:var(--ph-muted);line-height:1.5;">
       Saisissez les quantités physiquement comptées. Le stock théorique est pré-rempli.
+      Le numéro de lot et la date de péremption peuvent être corrigés directement ; chaque correction est tracée dans les notes du lot.
     </div>
   </div>
 
@@ -127,28 +134,30 @@
                   <span style="font-size:10.5px;color:var(--ph-muted);"> ({{ sp.produit.unite }})</span>
                   {% endif %}
                 </td>
-                <td style="max-width:150px;">
+                <td>
+                  <div class="lot-stack">
                   {% for lot in sp.lots_disponibles %}
-                  <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}">
-                    {{ lot.numero_lot }}
-                  </span>
+                  <input type="text" name="lot_num_{{ lot.pk }}" value="{{ lot.numero_lot }}" maxlength="50"
+                    class="lot-badge lot-edit lot-edit-num {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                    data-initial="{{ lot.numero_lot }}"
+                    aria-label="Numéro de lot — {{ sp.produit.nom }}">
                   {% empty %}
                   <span style="font-size:11px;color:var(--ph-muted);">—</span>
                   {% endfor %}
+                  </div>
                 </td>
-                <td style="max-width:150px;">
+                <td>
+                  <div class="lot-stack">
                   {% for lot in sp.lots_disponibles %}
-                    {% if lot.date_peremption %}
-                    <span class="lot-badge {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
-                      title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% endif %}">
-                      {{ lot.date_peremption|date:"d/m/Y" }}
-                    </span>
-                    {% else %}
-                    <span style="font-size:11px;color:var(--ph-muted);">—</span>
-                    {% endif %}
+                  <input type="date" name="lot_per_{{ lot.pk }}" value="{{ lot.date_peremption|date:'Y-m-d' }}"
+                    class="lot-badge lot-edit {% if lot.est_perime %}lot-perime{% elif lot.jours_restants is not None and lot.jours_restants <= 90 %}lot-bientot{% else %}lot-ok{% endif %}"
+                    data-initial="{{ lot.date_peremption|date:'Y-m-d' }}"
+                    title="{% if lot.est_perime %}Périmé depuis {{ lot.date_peremption|date:'d/m/Y' }}{% elif lot.jours_restants is not None %}Expire dans {{ lot.jours_restants }} j{% else %}Date de péremption non renseignée{% endif %}"
+                    aria-label="Date de péremption du lot {{ lot.numero_lot }} — {{ sp.produit.nom }}">
                   {% empty %}
                   <span style="font-size:11px;color:var(--ph-muted);">—</span>
                   {% endfor %}
+                  </div>
                 </td>
                 <td style="text-align:center;">
                   <span class="ph-qte-static" aria-label="Stock théorique — lecture seule" title="Lecture seule">
@@ -238,6 +247,13 @@
   document.querySelectorAll(".ecart-input").forEach(function (input) {
     majEcart(input);
     input.addEventListener("input", function () { majEcart(this); });
+  });
+
+  // Signale visuellement les lots dont le n° ou la péremption a été corrigé
+  document.querySelectorAll(".lot-edit").forEach(function (input) {
+    input.addEventListener("input", function () {
+      this.classList.toggle("lot-modifie", this.value.trim() !== this.dataset.initial);
+    });
   });
 }());
 </script>

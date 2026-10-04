@@ -327,6 +327,11 @@ class LigneInventaire(models.Model):
     stock_theorique   = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     stock_reel        = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     ecart             = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    # Lot corrigé par cet inventaire (lot principal du produit au moment de la
+    # saisie) ; vide si le produit n'avait aucun lot — un lot est alors créé à
+    # la validation si un n° a été saisi.
+    lot               = models.ForeignKey(LotProduit, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    numero_lot        = models.CharField("N° de lot", max_length=50, blank=True)
     date_peremption   = models.DateField(null=True, blank=True)
     notes             = models.CharField(max_length=200, blank=True)
 

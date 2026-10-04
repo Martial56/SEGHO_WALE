@@ -22,6 +22,13 @@ présent, là où l'onglet Curatif est renseigné plus tard — quand il l'est. 
 sur le registre curatif, le consultant manquait tous les rendez-vous dont
 l'onglet n'avait pas été ouvert, et la fiche sortait vide.
 
+Disposition : le rapport reproduit à l'identique la fiche papier « Fiche de
+rapport mensuel de consultations gynécologiques » (3 pages, voir FICHE_GROSSESSE /
+FICHE_INFECTIEUSE / FICHE_AUTRE ci-dessous) — mêmes lignes, même ordre, mêmes
+coupures de page. Les lignes sont rapprochées du catalogue par nom normalisé ou
+alias (voir fiche.py) ; une pathologie de la catégorie absente de la fiche est
+ajoutée juste après la dernière ligne de sa catégorie, dans l'ordre de création.
+
 Périmètre : uniquement les rendez-vous du module gynécologie (département
 'GYN' ou médecin de spécialité gynécologie), comme pour le listing des RDV
 gynécologie dans core/views.py.
@@ -29,6 +36,7 @@ gynécologie dans core/views.py.
 import calendar
 from datetime import date
 
+from .fiche import ranger_selon_fiche
 from .periode import nom_du_mois
 
 #: Références internes des types de consultation qui font un « consultant » de
@@ -46,6 +54,75 @@ AGE_BRACKETS = [
     ('a20_24', '20-24 ans'),
     ('a25_49', '25-49 ans'),
     ('a50p', '50 et plus'),
+]
+
+
+# Lignes de la fiche papier, dans l'ordre et par page :
+# (libellé imprimé, alias du catalogue, options).
+# Ne pas réordonner : l'ordre et les coupures de page sont ceux de la fiche.
+FICHE_GROSSESSE = [
+    [  # page 1
+        ('paludisme simple sur grossesse', ['paludisme sur grossesse'], {}),
+        ("Menace d'accouchement Prématuré", [], {}),
+        ('Rupture prématurée des membranes (24 – 34 SA)', [], {}),
+        ('Rupture prématurée des membranes à terme', [], {}),
+        ('Hépatite B', [], {}),
+        ('Hépatite C', [], {}),
+        ('Infection urinaire', [], {}),
+        ('HTA et complications', ['HTA et complication'], {}),
+        ('Mort in utéro', [], {}),
+        ('Diabète gestationnel', [], {}),
+        ('Diabète antérieur à la grossesse', [], {}),
+        ('Utérus cicatriciel', [], {}),
+        ('Grossesse prolongée', [], {}),
+    ],
+    [  # page 2
+        ('Grossesse gemellaire', [], {}),
+        ("Complication de l'allaitement", [], {}),
+        # Remplace la ligne « Autres » de la fiche ; reste la dernière ligne
+        # du tableau A, les pathologies hors fiche s'insèrent avant elle.
+        ('Autres maladies infectieuses', [], {'en_dernier': True}),
+    ],
+]
+
+FICHE_INFECTIEUSE = [
+    [  # page 2
+        ('Écoulement vaginal et /ou brûlure ou prurit et/ou malodeur vaginale', [], {}),
+        ('Ulcération génitale et/ou bubon', [], {}),
+        ('Douleurs abdominale basse (pelviennes) chez la femme', [], {}),
+        ('Infection génitale haute', [], {}),
+        ('Bartholinite', [], {}),
+        ('Condylomes', [], {}),
+    ],
+]
+
+FICHE_AUTRE = [
+    [  # page 2
+        ('Grossesse molaire', [], {}),
+        ('G .E .V', [], {}),
+        ('Avortement spontané', ['Avortement spontatné'], {}),
+        ('Trouble du cycle', ['Troubles du cycle'], {}),
+        ('Hémorragie génitale', [], {}),
+        ('Aménorrhée', ['Aménorrhé'], {}),
+        ('Désir de maternité', [], {}),
+    ],
+    [  # page 3
+        ("Tumeurs bénignes de l'utérus", [], {}),
+        ('Prolapsus génitaux', [], {}),
+        ("Tumeurs et Kystes de l'ovaire", [], {}),
+        ('Tumeurs bénignes et malignes du sein', [], {}),
+        ('Mastopathie', [], {}),
+        ('Incontinence urinaire', [], {}),
+        ('Tumeurs malignes du col et état précancéreux', [], {}),
+        ('Endométriose', [], {}),
+        ('Adénomyose', [], {}),
+        ('Synéchies', [], {}),
+        ('Régulation des naissances', [], {}),
+        ('GEU', [], {}),
+        ('Complication obstétricales', [], {}),
+        ('Fibrome utérin', ['Fibrome utérien'], {}),
+        ('Violence sexuelle', [], {}),
+    ],
 ]
 
 
@@ -146,9 +223,11 @@ def calculer_rapport_gynecologie(annee, mois):
     activite_consultations = {cle: dict(cases) for cle, cases in activite_consultant.items()}
     activite_referes = _grille_vide()
 
-    pathos_grossesse = list(Pathologie.objects.filter(departement__code='GYN', categorie='grossesse').order_by('nom'))
-    pathos_infectieuse = list(Pathologie.objects.filter(departement__code='GYN', categorie='infectieuse').order_by('nom'))
-    pathos_autre = list(Pathologie.objects.filter(departement__code='GYN', categorie='autre_gyneco').order_by('nom'))
+    # Tri par pk = ordre de création : les pathologies hors fiche s'ajoutent
+    # dans l'ordre où elles ont été créées.
+    pathos_grossesse = list(Pathologie.objects.filter(departement__code='GYN', categorie='grossesse').order_by('pk'))
+    pathos_infectieuse = list(Pathologie.objects.filter(departement__code='GYN', categorie='infectieuse').order_by('pk'))
+    pathos_autre = list(Pathologie.objects.filter(departement__code='GYN', categorie='autre_gyneco').order_by('pk'))
 
     patho_grilles = {
         p.pk: {'grille': _grille_vide(), 'referes': {'F': 0, 'M': 0}}
@@ -189,16 +268,26 @@ def calculer_rapport_gynecologie(annee, mois):
             if est_refere:
                 entry['referes'][sexe] += 1
 
-    def _lignes(pathos):
-        return [
-            {
-                'nom': p.nom,
-                'cells': _cellules(patho_grilles[p.pk]['grille']),
-                'total': _totaux(patho_grilles[p.pk]['grille']),
-                'referes': patho_grilles[p.pk]['referes'],
-            }
-            for p in pathos
-        ]
+    def _ligne(label, pks, opts):
+        """Ligne prête à rendre (même format que la médecine générale, voir
+        templates/rapports/_rmg_lignes.html) : une cellule par (tranche, sexe),
+        Total F/M puis Cas référés F/M, en sommant toutes les pathologies `pks`."""
+        cellules = []
+        totaux = {'F': 0, 'M': 0}
+        for cle, _ in AGE_BRACKETS:
+            for sexe in ('F', 'M'):
+                val = sum(patho_grilles[pk]['grille'][cle][sexe] for pk in pks)
+                totaux[sexe] += val
+                cellules.append({'val': val})
+        for sexe in ('F', 'M'):
+            cellules.append({'val': totaux[sexe], 'total': True})
+        for sexe in ('F', 'M'):
+            cellules.append({'val': sum(patho_grilles[pk]['referes'][sexe] for pk in pks), 'refere': True})
+        return {'label': label, 'cellules': cellules, 'hors_fiche': opts.get('hors_fiche', False)}
+
+    grossesse = ranger_selon_fiche(FICHE_GROSSESSE, pathos_grossesse, _ligne)
+    (infectieuse,) = ranger_selon_fiche(FICHE_INFECTIEUSE, pathos_infectieuse, _ligne)
+    autre = ranger_selon_fiche(FICHE_AUTRE, pathos_autre, _ligne)
 
     return {
         'annee': annee,
@@ -210,7 +299,13 @@ def calculer_rapport_gynecologie(annee, mois):
             'consultations': {'cells': _cellules(activite_consultations), 'total': _totaux(activite_consultations)},
             'referes': {'cells': _cellules(activite_referes), 'total': _totaux(activite_referes)},
         },
-        'lignes_grossesse': _lignes(pathos_grossesse),
-        'lignes_infectieuse': _lignes(pathos_infectieuse),
-        'lignes_autre': _lignes(pathos_autre),
+        'brackets': AGE_BRACKETS,
+        'grossesse_page1': grossesse[0],
+        'grossesse_page2': grossesse[1],
+        # La fiche laisse une ligne vierge en fin de tableau A, tant
+        # qu'aucune pathologie hors fiche n'y a été ajoutée.
+        'grossesse_ligne_vierge': not any(l['hors_fiche'] for l in grossesse[1]),
+        'infectieuse': infectieuse,
+        'autre_page2': autre[0],
+        'autre_page3': autre[1],
     }

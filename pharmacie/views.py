@@ -1413,6 +1413,56 @@ def pharmacie_inventaire_list(request, pharmacie):
     })
 
 
+def _maj_lots_inventaire(request, stock_items, inv):
+    """Applique les corrections de n° de lot / date de péremption saisies
+    dans le formulaire d'inventaire (champs lot_num_<pk> / lot_per_<pk>).
+    Seuls les lots affichés (lots_disponibles) sont modifiables. Chaque
+    correction est tracée dans les notes du lot. Retourne (nb_modifiés,
+    [motifs de refus])."""
+    from datetime import datetime as _dt
+    modifies, refuses = 0, []
+    for sp in stock_items:
+        tous_lots = list(sp.produit.lots.all())
+        for lot in sp.lots_disponibles:
+            num_key, per_key = f'lot_num_{lot.pk}', f'lot_per_{lot.pk}'
+            if num_key not in request.POST and per_key not in request.POST:
+                continue
+            nouveau_num = request.POST.get(num_key, lot.numero_lot).strip() or lot.numero_lot
+            per_str = request.POST.get(per_key, '').strip()
+            if per_str:
+                try:
+                    nouvelle_per = _dt.strptime(per_str, '%Y-%m-%d').date()
+                except ValueError:
+                    refuses.append(f'{sp.produit.nom} — date invalide « {per_str} »')
+                    continue
+            else:
+                nouvelle_per = None
+
+            if nouveau_num == lot.numero_lot and nouvelle_per == lot.date_peremption:
+                continue
+            if nouveau_num != lot.numero_lot and any(
+                l.pk != lot.pk and l.numero_lot.lower() == nouveau_num.lower() for l in tous_lots
+            ):
+                refuses.append(f'{sp.produit.nom} — le lot « {nouveau_num} » existe déjà')
+                continue
+
+            changements = []
+            if nouveau_num != lot.numero_lot:
+                changements.append(f'n° {lot.numero_lot} → {nouveau_num}')
+            if nouvelle_per != lot.date_peremption:
+                avant = lot.date_peremption.strftime('%d/%m/%Y') if lot.date_peremption else '—'
+                apres = nouvelle_per.strftime('%d/%m/%Y') if nouvelle_per else '—'
+                changements.append(f'péremption {avant} → {apres}')
+            trace = (f"[{timezone.localdate():%d/%m/%Y}] Correction inventaire {inv.numero} "
+                     f"par {request.user.get_username()} : {', '.join(changements)}")
+            lot.numero_lot = nouveau_num
+            lot.date_peremption = nouvelle_per
+            lot.notes = f'{lot.notes}\n{trace}'.strip()
+            lot.save(update_fields=['numero_lot', 'date_peremption', 'notes'])
+            modifies += 1
+    return modifies, refuses
+
+
 @login_required(login_url='login')
 def pharmacie_inventaire_nouveau(request, pharmacie):
     from decimal import Decimal
@@ -1424,6 +1474,10 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
     stock_items = StockPharmacie.objects.filter(
         pharmacie=pharmacie
     ).select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom')
+
+    stock_items = list(stock_items)
+    for sp in stock_items:
+        sp.lots_disponibles = [l for l in sp.produit.lots.all() if l.quantite_actuelle > 0]
 
     if request.method == 'POST':
         date_str = request.POST.get('date_inventaire', str(timezone.now().date()))
@@ -1453,12 +1507,13 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
                     notes=commentaire,
                 ))
             LigneInventairePharmacie.objects.bulk_create(lignes_inv)
+            lots_modifies, lots_refuses = _maj_lots_inventaire(request, stock_items, inv)
         messages.success(request, f'Inventaire {inv.numero} créé.')
+        if lots_modifies:
+            messages.info(request, f'{lots_modifies} lot(s) corrigé(s) (n° de lot / date de péremption).')
+        if lots_refuses:
+            messages.warning(request, 'Lot(s) non modifié(s) : ' + ' ; '.join(lots_refuses))
         return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
-
-    stock_items = list(stock_items)
-    for sp in stock_items:
-        sp.lots_disponibles = [l for l in sp.produit.lots.all() if l.quantite_actuelle > 0]
 
     return render(request, 'pharmacie/inventaire_form.html', {
         'pharmacie': pharmacie, 'label': label,

@@ -1,5 +1,13 @@
 {% load static %}
 {% load rapports_tags %}
+{% comment %}
+Reproduit à l'identique la « Fiche de rapport mensuel de consultations » papier
+(6 pages A4 paysage) : mêmes lignes, même ordre, mêmes coupures de page, mêmes
+cases grisées. L'ordre des lignes est défini dans rapports/med_generale.py
+(FICHE_A / FICHE_B / FICHE_C) ; une pathologie ajoutée plus tard au catalogue
+apparaît après la dernière ligne de sa catégorie (A → page 3, B → page 4,
+C → page 5). Les notes d'explication (.rm-note-ecran) ne s'impriment pas.
+{% endcomment %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -7,9 +15,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rapport mensuel médecine générale — {{ mois_nom }} {{ annee }}</title>
 <style>
-:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; --brand: #1a5c4a; }
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --brand: #1a5c4a; --logo-vert: #4a8a3a; --gris: #a6a6a6; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
+body { font-family: var(--font-print); background: #e5e7eb; color: #111; font-size: 12px; }
 
 /* ── Contrôles écran ── */
 .print-toolbar {
@@ -32,70 +40,77 @@ body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font
 .btn-back { background: rgba(255,255,255,.15); color: #fff; }
 .btn-back:hover { background: rgba(255,255,255,.25); }
 
-/* ── Page A4 paysage (tableaux âge × sexe très larges) ── */
+/* ── Page A4 paysage, comme la fiche papier ── */
 .rm-page {
-  max-width: 1250px; margin: 24px auto; background: #fff;
+  position: relative; max-width: 1250px; margin: 24px auto; background: #fff;
   border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
-  padding: 26px 30px 34px; overflow-x: auto;
+  padding: 22px 30px 44px; overflow-x: auto;
 }
-.rm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.rm-logo { display: flex; align-items: center; gap: 10px; }
-.rm-logo-circle {
-  width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--brand);
-  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; flex-shrink: 0;
+.rm-header {
+  display: flex; align-items: flex-end; justify-content: center; gap: 8px;
+  width: 75%; margin: 0 auto 18px; padding-bottom: 3px; border-bottom: 1.5px solid var(--logo-vert);
 }
-.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
-.rm-logo-name { font-size: 14px; font-weight: 800; color: var(--brand); letter-spacing: .3px; }
-.rm-page-num { font-size: 11px; color: #9ca3af; }
-.rm-title { text-align: center; font-size: 16px; font-weight: 800; color: var(--brand); margin: 10px 0 4px; text-transform: uppercase; }
-.rm-subtitle { text-align: center; font-size: 12.5px; color: #374151; margin-bottom: 16px; }
-.rm-subtitle strong { color: var(--brand); }
+.rm-logo-circle { width: 40px; height: 40px; flex-shrink: 0; }
+.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; }
+.rm-logo-name { font-size: 22px; color: var(--brand); letter-spacing: .3px; line-height: 1.1; }
+.rm-page-num {
+  position: absolute; right: 30px; bottom: 14px; font-size: 9px;
+  border: 1px solid #555; padding: 3px 8px 6px; border-radius: 0 0 6px 0;
+}
+.rm-title { text-align: center; font-size: 13px; font-weight: 800; text-decoration: underline; margin: 4px 0 10px; }
+.rm-ligne-info { font-size: 12px; font-weight: 700; margin: 0 0 12px 30px; }
+.rm-ligne-info strong { color: var(--brand); }
 
-.rm-section-title {
-  font-size: 12.5px; font-weight: 800; text-transform: uppercase; color: var(--brand);
-  margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1.5px solid var(--brand);
-}
-.rm-sub-title { font-size: 11.5px; font-weight: 700; color: #374151; margin: 12px 0 6px; text-decoration: underline; }
+.rm-section-title { font-size: 12px; font-weight: 800; margin: 14px 0 4px 40px; }
+.rm-section-title.souligne { text-decoration: underline; }
+.rm-nb { font-size: 11px; font-weight: 800; margin: 10px 0 10px 40px; }
+.rm-legende-fiche { display: flex; justify-content: space-between; gap: 16px; font-size: 10px; font-weight: 800; margin: 2px 40px 10px; }
 
-table.rm-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-table.rm-table th, table.rm-table td {
-  border: 1px solid #9ca3af; padding: 5px 8px; font-size: 11px; text-align: left; vertical-align: middle;
-}
-table.rm-table th { background: #f0fdf4; font-weight: 700; color: #1f2937; text-align: center; }
-table.rm-table td.num { text-align: center; width: 90px; }
-table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 800; background: #f9fafb; }
-.rm-val { font-weight: 700; color: var(--brand); }
-.rm-blank { display: inline-block; min-width: 24px; border-bottom: 1px solid #9ca3af; height: 13px; }
-
-/* ── Tableau âge × sexe (grille) ── */
-table.rmg-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 9.5px; }
+/* ── Tableaux âge × sexe ── */
+table.rmg-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 10px; }
 table.rmg-table th, table.rmg-table td {
-  border: 1px solid #9ca3af; padding: 3px 4px; text-align: center; vertical-align: middle; white-space: nowrap;
+  border: 1px solid #333; padding: 2px 3px; text-align: center; vertical-align: middle; white-space: nowrap; min-width: 26px;
 }
 table.rmg-table th.rmg-label-col, table.rmg-table td.rmg-label-col {
-  text-align: left; white-space: normal; min-width: 200px; max-width: 260px; font-size: 10px;
+  text-align: left; white-space: normal; width: 24%; min-width: 220px; font-weight: 700;
 }
-table.rmg-table thead th { background: #f0fdf4; font-weight: 700; color: #1f2937; }
-table.rmg-table thead tr.rmg-bracket-row th { font-size: 9px; }
-table.rmg-table tbody tr:nth-child(even) { background: #fafafa; }
-table.rmg-table td.rmg-val { font-weight: 700; color: var(--brand); }
-table.rmg-table td.rmg-refere { background: #f3f4f6; }
-.rmg-empty-row td { padding: 10px; font-size: 10.5px; font-style: italic; color: #6b7280; text-align: center; }
+table.rmg-table thead th { font-weight: 700; }
+table.rmg-table td.rmg-val { color: var(--brand); font-weight: 700; }
+table.rmg-table td.rmg-total, table.rmg-table th.rmg-total { background: #f3f4f6; }
+table.rmg-table td.rmg-grise { background: var(--gris); color: #111; font-weight: 700; }
+table.rmg-table td.rmg-noir { background: #000; }
+table.rmg-table tr.rmg-separateur td { border-top: 6px solid #000; }
+table.rmg-table.ist td.rmg-label-col { font-weight: 400; }
+.rm-blank { display: inline-block; min-width: 20px; height: 12px; }
 
-.rm-legende {
+/* ── Petits tableaux de la page 6 ── */
+.rm-encadres { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-top: 14px; }
+.rm-encadre { flex: 1; }
+.rm-encadre h3 { font-size: 13px; font-weight: 800; margin-bottom: 6px; text-align: center; }
+table.rm-petit { width: 100%; border-collapse: collapse; font-size: 9px; }
+table.rm-petit th, table.rm-petit td { border: 1px solid #333; padding: 3px 4px; text-align: center; vertical-align: middle; }
+table.rm-petit th { font-weight: 700; }
+table.rm-petit td.lib { text-align: left; font-weight: 700; }
+table.rm-petit td.val { color: var(--brand); font-weight: 700; min-width: 34px; }
+
+.rm-signatures { display: flex; justify-content: space-between; margin-top: 40px; gap: 16px; }
+.rm-signature-box { width: 36%; border: 1px solid #333; border-radius: 12px; padding: 8px 10px 46px; font-size: 10px; }
+
+.rm-note-ecran {
   margin-top: 10px; font-size: 10px; color: #6b7280; font-style: italic; line-height: 1.6;
   border-top: 1px dashed #d1d5db; padding-top: 8px;
 }
-.rm-signatures { display: flex; justify-content: space-between; margin-top: 34px; gap: 16px; }
-.rm-signature-box { flex: 1; text-align: center; border: 1px solid #9ca3af; border-radius: 4px; padding: 14px 8px 40px; font-size: 10.5px; font-weight: 700; }
-
-.rm-page-break { page-break-after: always; }
+.rm-page-break { page-break-after: always; break-after: page; }
 
 @media print {
   body { background: #fff; }
-  .print-toolbar { display: none !important; }
+  .print-toolbar, .rm-note-ecran { display: none !important; }
   .rm-page {
-    margin: 0; padding: 10mm 8mm 12mm; box-shadow: none; border-radius: 0; max-width: 100%; overflow-x: visible;
+    margin: 0; padding: 8mm 8mm 12mm; box-shadow: none; border-radius: 0; max-width: 100%; overflow-x: visible;
+  }
+  .rm-page-num { right: 8mm; bottom: 4mm; }
+  table.rmg-table td.rmg-grise, table.rmg-table td.rmg-noir, table.rmg-table tr.rmg-separateur td {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
 @page { size: A4 landscape; margin: 0; }
@@ -128,31 +143,15 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
   <a class="toolbar-btn btn-back" href="{% url 'rapports:hub' %}">← Fermer</a>
 </div>
 
-<!-- ══════════════════════ PAGE 1 : Activités ══════════════════════ -->
+<!-- ══════════════════════ PAGE 1 : Activités + A (début) ══════════════════════ -->
 <div class="rm-page rm-page-break">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
-    </div>
-    <div class="rm-page-num">1</div>
-  </div>
-  <div class="rm-title">Rapport mensuel d'activité : Médecine Générale</div>
-  <div class="rm-subtitle">ANNÉE : <strong>{{ annee }}</strong> &nbsp;—&nbsp; MOIS : <strong>{{ mois_nom }}</strong></div>
+  {% include "rapports/_rmg_entete.html" %}
+  <div class="rm-title">FICHE DE RAPPORT MENSUEL DE CONSULTATIONS</div>
+  <div class="rm-ligne-info">DATE (mois/ année) : <strong>{{ mois_nom }}</strong> / <strong>{{ annee }}</strong></div>
+  <div class="rm-ligne-info">MEDECIN : Dr ………………………. Ou Infirmier (ière) : M./ Mme/Mlle ……………………………………………</div>
 
-  <div class="rm-section-title">Activités</div>
   <table class="rmg-table">
-    <thead>
-      <tr>
-        <th class="rmg-label-col" rowspan="2">Activités</th>
-        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
-        <th colspan="2">Total</th>
-      </tr>
-      <tr class="rmg-bracket-row">
-        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
-        <th>F</th><th>M</th>
-      </tr>
-    </thead>
+    {% include "rapports/_rmg_thead.html" with titre="ACTIVITES" derniere="total" %}
     <tbody>
       {% for ligne in activites_lignes %}
       <tr>
@@ -177,263 +176,175 @@ table.rmg-table td.rmg-refere { background: #f3f4f6; }
       {% endfor %}
     </tbody>
   </table>
-  <div class="rm-legende">
+
+  <div class="rm-section-title">A- Maladies infectieuses</div>
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="" total=True derniere="Cas référés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=a_page1 %}</tbody>
+  </table>
+
+  <div class="rm-note-ecran">
     Source : registre de consultation curative (RendezVous du département « Médecine Générale »).
     « Nombre de Nouveaux clients » = patients dont la date de création du dossier est comprise dans le mois de rapportage.
-    « Nombre de consultants » = visites dont le type de consultation curative (« cur_type_visite ») est « Consultant ».
+    « Nombre de consultant » = visites dont le type de consultation curative est « Consultant ».
     « Nombre de consultations » = visites de type « Consultant » + « Contrôle ».
-    « Nombre de cas référés » = visites dont l'issue de consultation (« cur_issue_consultation ») est « Référé(e) en externe ».
-    « Nombre de cas contre référés » ne dispose pas encore de champ dédié dans le registre curatif et doit être complété manuellement.
+    « Nombre de cas référés » = visites dont l'issue de consultation est « Référé(e) en externe ».
+    « Nombre de cas contre référés » n'a pas encore de champ dédié et se complète à la main.
     « Assurés » = patients disposant d'une assurance enregistrée, parmi les consultations de la période.
+    Maladies : diagnostics retenus cochés dans le registre curatif, selon l'âge et le sexe du patient à la date de la visite ;
+    « Cas référés » compte, parmi ces diagnostics, les visites dont l'issue est « Référé(e) en externe ».
   </div>
+  <div class="rm-page-num">1</div>
 </div>
 
-<!-- ══════════════════════ PAGE 2 : A — Maladies infectieuses ══════════════════════ -->
+<!-- ══════════════════════ PAGE 2 : A (suite) ══════════════════════ -->
 <div class="rm-page rm-page-break">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
-    </div>
-    <div class="rm-page-num">2</div>
+  {% include "rapports/_rmg_entete.html" %}
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="" total=True derniere="cas referés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=a_page2 %}</tbody>
+  </table>
+  <div class="rm-page-num">2</div>
+</div>
+
+<!-- ══════════════════════ PAGE 3 : A (fin) + B (début) ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  {% include "rapports/_rmg_entete.html" %}
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="" total=True derniere="cas referés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=a_page3 %}</tbody>
+  </table>
+  <div class="rm-legende-fiche">
+    <span>FE= femme enceinte &nbsp;&nbsp; CS= cas suspect &nbsp;&nbsp; IRA= infection respiratoire aigue</span>
+    <span>CTA : combinaison thérapeutique à base d'artemisinine &nbsp;&nbsp; SRO = sel de réhydratation orale</span>
   </div>
 
-  <div class="rm-section-title">A — Maladies infectieuses</div>
+  <div class="rm-section-title">B : Autres maladies non infectieuses et facteurs de risque cardiovasculaire</div>
   <table class="rmg-table">
-    <thead>
-      <tr>
-        <th class="rmg-label-col" rowspan="2">Maladies</th>
-        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
-        <th colspan="2">Total</th>
-        <th colspan="2">Cas référés</th>
-      </tr>
-      <tr class="rmg-bracket-row">
-        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
-        <th>F</th><th>M</th>
-        <th>F</th><th>M</th>
-      </tr>
-    </thead>
+    {% include "rapports/_rmg_thead.html" with titre="Maladies" total=True derniere="Cas référés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=b_page3 %}</tbody>
+  </table>
+  <div class="rm-page-num">3</div>
+</div>
+
+<!-- ══════════════════════ PAGE 4 : B (suite) ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  {% include "rapports/_rmg_entete.html" %}
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="" total=True derniere="référés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=b_page4 %}</tbody>
+  </table>
+  <div class="rm-page-num">4</div>
+</div>
+
+<!-- ══════════════════════ PAGE 5 : C — IST + D — Dépistage VIH ══════════════════════ -->
+<div class="rm-page rm-page-break">
+  {% include "rapports/_rmg_entete.html" %}
+  <div class="rm-section-title">C : Infections sexuellement transmissibles</div>
+  <table class="rmg-table ist">
+    {% include "rapports/_rmg_thead.html" with titre="Syndromes / Infections" brackets=brackets_ist total=True derniere="Cas referé" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=ist %}</tbody>
+  </table>
+
+  <div class="rm-section-title">D : DEPISTAGE DU VIH CHEZ LES PATIENTS PRESENTANT UNE INFECTION SEXUELLEMENT TRANSMISSIBLES</div>
+  <div class="rm-nb">NB : Le nombre total de personne ayant une IST doit être égale au nombre total de personnes dépistées atteinte de IST ( C = D )</div>
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="" brackets=brackets_ist derniere="Total" %}
     <tbody>
-      {% for ligne in maladies_infectieuses %}
+      {% for label in vih_lignes %}
       <tr>
-        <td class="rmg-label-col">{{ ligne.label }}</td>
-        {% for cle, label in brackets %}
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
-        {% endfor %}
-        <td class="rmg-val">{{ ligne.total.F }}</td>
-        <td class="rmg-val">{{ ligne.total.M }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
+        <td class="rmg-label-col">{{ label }}</td>
+        {% for cle, l in brackets_ist %}<td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td>{% endfor %}
+        <td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td>
       </tr>
-      {% empty %}
-      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Maladie infectieuse » dans le catalogue des pathologies.</td></tr>
       {% endfor %}
     </tbody>
   </table>
-  <div class="rm-legende">
-    FE = femme enceinte · CS = cas suspect · IRA = infection respiratoire aiguë · CTA = combinaison thérapeutique à base d'artémisinine.
-    Effectifs comptés à partir des diagnostics retenus / autres pathologies associées cochés dans le registre de consultation curative (« Diagnostic retenu »),
-    rattachés à l'âge et au sexe du patient au moment de la visite. La colonne « Cas référés » compte, parmi ces mêmes diagnostics, les visites dont l'issue de consultation (« cur_issue_consultation ») est « Référé(e) en externe ».
-    Les pathologies affichées sont celles du catalogue taguées catégorie « Maladie infectieuse » pour le département Médecine Générale — pour ajouter/retirer une ligne, retaguer le catalogue (écran de gestion des pathologies).
+  <div class="rm-note-ecran">
+    Section C : âge du patient à la date de la visite ; les patients de 29 jours à 9 ans n'ont pas de colonne sur la fiche
+    (ils restent comptés dans « Cas referé »). Section D : pas encore de champ de dépistage VIH spécifique aux IST — à compléter à la main.
   </div>
+  <div class="rm-page-num">5</div>
 </div>
 
-<!-- ══════════════════════ PAGE 3 : B — Autres maladies non infectieuses ══════════════════════ -->
-<div class="rm-page rm-page-break">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
-    </div>
-    <div class="rm-page-num">3</div>
-  </div>
-
-  <div class="rm-section-title">B — Autres maladies non infectieuses et facteurs de risque cardiovasculaire</div>
+<!-- ══════════════════════ PAGE 6 : E — VBG, tétanos néonatal, MILDA, ver de Guinée, signatures ══════════════════════ -->
+<div class="rm-page{% if epidemiologie %} rm-page-break{% endif %}">
+  {% include "rapports/_rmg_entete.html" %}
+  <div class="rm-section-title souligne">E : Violences basées sur le genre</div>
   <table class="rmg-table">
-    <thead>
-      <tr>
-        <th class="rmg-label-col" rowspan="2">Maladies</th>
-        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
-        <th colspan="2">Total</th>
-        <th colspan="2">Cas référés</th>
-      </tr>
-      <tr class="rmg-bracket-row">
-        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
-        <th>F</th><th>M</th>
-        <th>F</th><th>M</th>
-      </tr>
-    </thead>
+    {% include "rapports/_rmg_thead.html" with titre="Maladies" derniere="" %}
     <tbody>
-      {% for ligne in maladies_non_infectieuses %}
+      {% for label in vbg_lignes %}
       <tr>
-        <td class="rmg-label-col">{{ ligne.label }}</td>
-        {% for cle, label in brackets %}
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
-        {% endfor %}
-        <td class="rmg-val">{{ ligne.total.F }}</td>
-        <td class="rmg-val">{{ ligne.total.M }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
+        <td class="rmg-label-col">{{ label }}</td>
+        {% for cle, l in brackets %}<td><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td>{% endfor %}
       </tr>
-      {% empty %}
-      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Autre maladie non infectieuse » dans le catalogue des pathologies.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="rm-legende">
-    Les pathologies affichées sont celles du catalogue taguées catégorie « Autre maladie non infectieuse » pour le département Médecine Générale —
-    pour ajouter/retirer une ligne (ex. « Evaluation nutritionnelle »), retaguer le catalogue (écran de gestion des pathologies).
-  </div>
-</div>
-
-<!-- ══════════════════════ PAGE 4 : C — IST, dépistage VIH, violences, MILDA ══════════════════════ -->
-<div class="rm-page rm-page-break">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
-    </div>
-    <div class="rm-page-num">4</div>
-  </div>
-
-  <div class="rm-section-title">C — Infections sexuellement transmissibles</div>
-  <table class="rmg-table">
-    <thead>
-      <tr>
-        <th class="rmg-label-col" rowspan="2">Syndromes / Infections</th>
-        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
-        <th colspan="2">Total</th>
-        <th colspan="2">Cas référés</th>
-      </tr>
-      <tr class="rmg-bracket-row">
-        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
-        <th>F</th><th>M</th>
-        <th>F</th><th>M</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for ligne in ist %}
-      <tr>
-        <td class="rmg-label-col">{{ ligne.label }}</td>
-        {% for cle, label in brackets %}
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
-        {% endfor %}
-        <td class="rmg-val">{{ ligne.total.F }}</td>
-        <td class="rmg-val">{{ ligne.total.M }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
-      </tr>
-      {% empty %}
-      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « IST / MST » dans le catalogue des pathologies.</td></tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <div class="rm-sub-title">D — Dépistage du VIH chez les patients présentant une IST</div>
-  <table class="rm-table">
-    <thead><tr><th style="text-align:left;">Indicateur</th><th>F</th><th>M</th></tr></thead>
-    <tbody>
-      <tr><td>Nombre de personnes atteintes d'une IST dépistées au VIH</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Nombre de personnes atteintes d'une IST dépistées positives au VIH</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-    </tbody>
-  </table>
-  <div class="rm-legende">Le registre de consultation curative ne comporte pas encore de champ de dépistage VIH spécifique aux patients IST — section à compléter manuellement.</div>
-
-  <div class="rm-sub-title">Distribution de MILDA aux enfants 12-59 mois (approximé par la tranche 1-4 ans)</div>
-  <table class="rm-table">
-    <thead><tr><th style="text-align:left;">Indicateur</th><th>F</th><th>M</th></tr></thead>
-    <tbody>
-      <tr><td>Nombre d'enfants éligibles à la MILDA vus en consultations et soins curatifs</td><td class="num rm-val">{{ milda.eligibles.F }}</td><td class="num rm-val">{{ milda.eligibles.M }}</td></tr>
-      <tr><td>Nombre d'enfants ayant reçu une MILDA vus en consultations et soins curatifs</td><td class="num rm-val">{{ milda.recus.F }}</td><td class="num rm-val">{{ milda.recus.M }}</td></tr>
-    </tbody>
-  </table>
-
-  <div class="rm-sub-title">E — Violences basées sur le genre / Tétanos néonatal / Ver de Guinée</div>
-  <table class="rm-table">
-    <thead><tr><th style="text-align:left;">Indicateur</th><th>F</th><th>M</th></tr></thead>
-    <tbody>
-      <tr><td>Nombre de survivants aux violences sexuelles ayant consulté dans les 72 heures</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Nombre de survivants aux violences sexuelles pris en charge dans l'établissement</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Nombre de survivants aux violences sexuelles référés vers une autre structure</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Cas de tétanos néonatal</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Décès liés au tétanos néonatal</td><td class="num"><span class="rm-blank"></span></td><td class="num"><span class="rm-blank"></span></td></tr>
-      <tr><td>Rumeurs de cas de ver de Guinée signalés</td><td class="num" colspan="2"><span class="rm-blank"></span></td></tr>
-      <tr><td>Rumeurs de cas de ver de Guinée investigués</td><td class="num" colspan="2"><span class="rm-blank"></span></td></tr>
-      <tr><td>Rumeurs de ver de Guinée investigués dans les 24 heures</td><td class="num" colspan="2"><span class="rm-blank"></span></td></tr>
-    </tbody>
-  </table>
-  <div class="rm-legende">Aucun de ces indicateurs ne dispose de champ dédié dans le registre de consultation curative actuel — sections à compléter manuellement, comme sur la fiche papier d'origine.</div>
-</div>
-
-<!-- ══════════════════════ PAGE 5 : Maladies à déclaration obligatoire ══════════════════════ -->
-<div class="rm-page rm-page-break">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+  <div class="rm-encadres">
+    <div class="rm-encadre">
+      <h3>Tétanos Néonatal</h3>
+      <table class="rm-petit">
+        <thead><tr><th></th><th>Enfant né de mère correctement vaccinée</th><th>Enfant né de mère incomplètement vaccinée</th><th>Enfant né mère non vaccinée</th></tr></thead>
+        <tbody>
+          <tr><td class="lib">Cas de tétanos néonatal</td><td></td><td></td><td></td></tr>
+          <tr><td class="lib">Décès liés au tétanos néonatal</td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="rm-page-num">5</div>
-  </div>
-
-  <div class="rm-section-title">Maladies à déclaration obligatoire (surveillance épidémiologique)</div>
-  <table class="rmg-table">
-    <thead>
-      <tr>
-        <th class="rmg-label-col" rowspan="2">Maladies</th>
-        {% for cle, label in brackets %}<th colspan="2">{{ label }}</th>{% endfor %}
-        <th colspan="2">Total</th>
-        <th colspan="2">Cas référés</th>
-      </tr>
-      <tr class="rmg-bracket-row">
-        {% for cle, label in brackets %}<th>F</th><th>M</th>{% endfor %}
-        <th>F</th><th>M</th>
-        <th>F</th><th>M</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for ligne in epidemiologie %}
-      <tr>
-        <td class="rmg-label-col">{{ ligne.label }}</td>
-        {% for cle, label in brackets %}
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'F'|default:0 }}</td>
-        <td class="rmg-val">{{ ligne.data|get_item:cle|get_item:'M'|default:0 }}</td>
-        {% endfor %}
-        <td class="rmg-val">{{ ligne.total.F }}</td>
-        <td class="rmg-val">{{ ligne.total.M }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.F }}</td>
-        <td class="rmg-refere rmg-val">{{ ligne.refere.M }}</td>
-      </tr>
-      {% empty %}
-      <tr class="rmg-empty-row"><td colspan="21">Aucune pathologie classée « Épidémiologie » dans le catalogue des pathologies.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <div class="rm-legende">
-    PFA = paralysie flasque aiguë (suspicion de poliomyélite).
-    Les pathologies affichées sont celles du catalogue taguées catégorie « Épidémiologie » pour le département Médecine Générale —
-    pour ajouter/retirer une ligne, retaguer le catalogue (écran de gestion des pathologies).
-  </div>
-</div>
-
-<!-- ══════════════════════ PAGE 6 : Signatures ══════════════════════ -->
-<div class="rm-page">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
+    <div class="rm-encadre">
+      <h3>DISTRIBUTION DE MILDA AUX ENFANTS<br>12-59 MOIS</h3>
+      <table class="rm-petit">
+        <thead>
+          <tr><th rowspan="2"></th><th colspan="2">Nombre</th></tr>
+          <tr><th>F</th><th>M</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="lib">Nombre d'enfants éligible à la MILDA vus en consultations et soins curatifs</td><td class="val">{{ milda.eligibles.F }}</td><td class="val">{{ milda.eligibles.M }}</td></tr>
+          <tr><td class="lib">Nombre d'enfants ayant reçu une MILDA vus en consultations et soins curatifs</td><td class="val">{{ milda.recus.F }}</td><td class="val">{{ milda.recus.M }}</td></tr>
+        </tbody>
+      </table>
     </div>
-    <div class="rm-page-num">6</div>
+    <div class="rm-encadre">
+      <h3>Ver de Guinée (Dracunculose)</h3>
+      <table class="rm-petit">
+        <thead><tr><th></th><th>Nombre</th></tr></thead>
+        <tbody>
+          <tr><td class="lib">Rumeurs de cas de ver de guinée signalés</td><td></td></tr>
+          <tr><td class="lib">Rumeurs de cas de ver de guinée investigués</td><td></td></tr>
+          <tr><td class="lib">Rumeurs de ver de guinée investigués dans 24 hrs</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="rm-signatures">
-    <div class="rm-signature-box">Le Médecin<br>(Nom, Signature et cachet)</div>
-    <div class="rm-signature-box">Le Gestionnaire de données<br>(Nom, Signature et cachet)</div>
-    <div class="rm-signature-box">Le Directeur Médical<br>(Nom, Signature et cachet)</div>
+    <div class="rm-signature-box">Nom et signature du Médecin</div>
+    <div class="rm-signature-box">Nom et signature du gestionnaire de données</div>
+  </div>
+  <div class="rm-note-ecran">
+    MILDA : approximé par la tranche 1-4 ans du registre curatif. Violences basées sur le genre, tétanos néonatal et ver de Guinée
+    n'ont pas de champ dédié dans le registre curatif — à compléter à la main, comme sur la fiche papier.
+  </div>
+  <div class="rm-page-num">6</div>
+</div>
+
+{% if epidemiologie %}
+<!-- ══════════════════════ ANNEXE : Maladies à déclaration obligatoire (hors fiche papier) ══════════════════════ -->
+<div class="rm-page">
+  {% include "rapports/_rmg_entete.html" %}
+  <div class="rm-section-title">Annexe : Maladies à déclaration obligatoire (surveillance épidémiologique)</div>
+  <table class="rmg-table">
+    {% include "rapports/_rmg_thead.html" with titre="Maladies" total=True derniere="Cas référés" %}
+    <tbody>{% include "rapports/_rmg_lignes.html" with lignes=epidemiologie %}</tbody>
+  </table>
+  <div class="rm-note-ecran">
+    Hors fiche papier : pathologies du catalogue taguées « Épidémiologie » pour le département Médecine Générale, dans leur ordre de création.
   </div>
 </div>
+{% endif %}
 
 <script>
   if (window.location.search.indexOf('auto=1') !== -1) {
