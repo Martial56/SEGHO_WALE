@@ -1867,6 +1867,20 @@ def _parse_date_cell(value):
         return None
 
 
+def _dec_cell(value, default):
+    """Montant/quantité arrondi à 2 décimales. Excel livre des flottants
+    (833.33 → 833.3300000000000409…) que DecimalField(decimal_places=2)
+    refuserait à la validation ; accepte aussi « 1 500,50 » en texte."""
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+    if value is None or value == '':
+        return Decimal(default)
+    try:
+        d = Decimal(str(value).replace(' ', '').replace(' ', '').replace(',', '.'))
+    except InvalidOperation:
+        return Decimal(default)
+    return d.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 # ── Export des produits (JSON/CSV/XLSX, comme les unités de mesure) ──
 
 _PRD_HDR = [
@@ -1948,12 +1962,18 @@ def import_produits(request):
                     nom=cat_nom, defaults={'type': type_produit}
                 )
 
+            # L'export écrit le nom de l'unité (« Boîtes ») et le modèle propose
+            # l'abréviation (« Bts ») : on accepte les deux, sans tenir compte de la casse.
             um_code = _s(item.get('unite_mesure', ''))
             unite = None
             if um_code:
-                unite = UniteMesure.objects.filter(code=um_code).first()
+                unite = (UniteMesure.objects.filter(code__iexact=um_code).first()
+                         or UniteMesure.objects.filter(nom__iexact=um_code).first())
                 if not unite:
                     unites_manquantes.add(um_code)
+                    # Ne pas effacer l'unité d'un produit existant faute de correspondance
+                    if existing:
+                        unite = existing.unite_mesure
 
             with transaction.atomic():
                 obj = existing or Produit()
@@ -1967,11 +1987,11 @@ def import_produits(request):
                 obj.dosage = _s(item.get('dosage', ''))
                 obj.forme  = forme
                 obj.prescription_obligatoire = _b(item.get('prescription_obligatoire', False))
-                obj.stock_actuel  = item.get('stock_actuel') or 0
-                obj.stock_alerte  = item.get('stock_alerte') or 10
-                obj.stock_minimum = item.get('stock_minimum') or 5
-                obj.prix_achat = item.get('prix_achat') or 0
-                obj.prix_vente = item.get('prix_vente') or 0
+                obj.stock_actuel  = _dec_cell(item.get('stock_actuel'), 0)
+                obj.stock_alerte  = _dec_cell(item.get('stock_alerte'), 10)
+                obj.stock_minimum = _dec_cell(item.get('stock_minimum'), 5)
+                obj.prix_achat = _dec_cell(item.get('prix_achat'), 0)
+                obj.prix_vente = _dec_cell(item.get('prix_vente'), 0)
                 obj.actif = _b(item.get('actif', True))
                 obj.modifie_par = request.user
                 obj.modifie_le  = timezone.now()
