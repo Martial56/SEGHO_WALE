@@ -983,3 +983,44 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         _soin(statut='en_cours')
         self.assertEqual(self._html(reverse('soins:list')).count(
             'class="ligne-annulee"'), 1)
+
+
+class TestLAgeEstDetailleSurLaListe(TestCase):
+    """La colonne Âge donne les mois et les jours, pas seulement les années.
+
+    Elle affichait « {{ patient.age }} ans » : pour un nourrisson, toute la
+    liste se lisait « 0 ans », et « 1 ans » ne dit pas si l'enfant a treize
+    mois ou vingt-trois. C'est pourtant sur cette distinction que reposent les
+    tranches d'âge du rapport d'activité de soins. `Patient.age_detail`
+    existait déjà et sert la liste des patients ; cette liste-ci l'ignorait.
+    """
+
+    def setUp(self):
+        self.user = _soins_user('u_age', perms=('view_soin',))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _soin_relu(self):
+        """`_patient` pose la date de naissance sous forme de chaîne : tant
+        qu'on n'a pas relu la ligne, `age_detail` travaille sur un `str`."""
+        soin = _soin()
+        soin.patient.refresh_from_db()
+        return soin
+
+    def _html(self):
+        reponse = self.client.get(reverse('soins:list') + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_colonne_porte_les_annees_les_mois_et_les_jours(self):
+        soin = self._soin_relu()
+        # Calculé depuis le modèle plutôt qu'écrit en dur : l'âge d'un patient
+        # fixe grandit à chaque jour qui passe, et la valeur du jour ferait
+        # rougir le test demain matin.
+        self.assertIn(soin.patient.age_detail, self._html())
+
+    def test_l_ancien_format_en_annees_seules_a_disparu(self):
+        """Sans cette moitié, le test précédent passerait si les deux
+        cohabitaient — le détail ajouté à côté du vieux « X ans »."""
+        soin = self._soin_relu()
+        self.assertNotIn(f'{soin.patient.age} ans', self._html())

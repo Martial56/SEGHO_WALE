@@ -729,6 +729,23 @@ class TestLesLignesArriventAuDepliage(TestCase):
         html = self._html('&group=type&_groupe=0')
         self.assertEqual(self._nb_lignes(html), 0)
 
+    def test_deplier_un_groupe_parent_ne_balaie_pas_toute_la_selection(self):
+        """Le garde-fou `not noeud['enfants']` protège le temps, pas le résultat.
+
+        Sans lui, on demande les lignes d'un chemin partiel : aucune condition
+        SQL ne sait l'exprimer, et on retombe sur le tri en Python — qui
+        parcourt **toute** la sélection pour ne rien trouver, le chemin d'un
+        parent ne pouvant jamais égaler celui d'une feuille. Le résultat reste
+        juste, la page reste vide, et rien ne se voit : seul le compte de
+        requêtes trahit le balayage.
+
+        Si ce nombre change pour une raison étrangère, relancez la mesure
+        plutôt que de l'ajuster à l'aveugle — c'est l'écart d'une requête qui
+        compte, pas sa valeur absolue.
+        """
+        with self.assertNumQueries(15):
+            self.client.get(self.url + '&group=type&_groupe=0')
+
     def test_un_sous_groupe_rend_bien_les_siennes(self):
         html = self._html('&group=type&_groupe=0-0')
         self.assertEqual(self._nb_lignes(html), 3)
@@ -766,5 +783,27 @@ class TestLesLignesArriventAuDepliage(TestCase):
         cle = PREFIXE_CLE + reverse('facturation:list')
         retenue = self.client.session[cle]
 
-        self.client.get(reverse('facturation:list') + '?_groupe=0')
+        reponse = self.client.get(self.url + '&_groupe=0')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(self._nb_lignes(reponse.content.decode()), 3)
         self.assertEqual(self.client.session[cle], retenue)
+
+    def test_un_depliage_en_ajax_n_efface_pas_la_selection_retenue(self):
+        """Une requête AJAX sans paramètre est le signal d'« Effacer » : la
+        mémoire oublie la sélection. Un dépliage n'est pas un effacement, et
+        `core.memoire_listing` l'écarte sur la seule présence de `_groupe`.
+
+        Le navigateur ne pose pas cet en-tête aujourd'hui — un `<tr>` hors d'un
+        `<table>` serait jeté par l'analyseur HTML, voir listing_groupes.js. Le
+        garde-fou tient pour le jour où ce choix changera : sans lui, ouvrir un
+        groupe effacerait le filtre de la liste.
+        """
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(self.url)
+        cle = PREFIXE_CLE + reverse('facturation:list')
+        self.assertIn(cle, self.client.session)
+
+        self.client.get(reverse('facturation:list') + '?_groupe=0',
+                        headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertIn(cle, self.client.session,
+                      'le dépliage a été pris pour un « Effacer »')

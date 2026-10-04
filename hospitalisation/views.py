@@ -441,15 +441,112 @@ def _transition_installer(hosp, user):
         now = tz.now()
         hosp.statut = 'hospitalise'
         hosp.heure_entree = now
+        # Gravé en même temps, et plus jamais réécrit : c'est le témoin de ce
+        # que le système a vu, face à l'heure corrigée à la main ensuite.
+        hosp.heure_entree_systeme = now
         hosp.modifie_par = user
         hosp.date_modification = now
-        hosp.save(update_fields=['statut', 'heure_entree', 'modifie_par', 'date_modification'])
+        hosp.save(update_fields=['statut', 'heure_entree', 'heure_entree_systeme',
+                                 'modifie_par', 'date_modification'])
     log_event(hosp, user, "Statut changé : Hospitalisé — heure d'entrée figée à %s." % hosp.heure_entree.strftime('%H:%M'), type='statut')
     return True, None
 
 
-def _transition_decharger(hosp, user):
-    """hospitalise → decharge : exige résumé de décharge, fige heure_sortie."""
+def _save_heures_observation(hosp, POST, user):
+    """Corrige les heures d'entrée et de sortie, quand l'écran les a envoyées.
+
+    Hors du `ModelForm` à dessein : plusieurs modes d'édition n'affichent
+    qu'une partie de la fiche, et un champ absent du POST vaudrait « vide » —
+    on effacerait l'heure au lieu de la laisser tranquille. Ici, une clé
+    absente ne fait rien.
+
+    Les noms sont préfixés `obs_` pour ne pas se confondre avec le champ
+    `heure_sortie` que poste la modale de décharge, qui est un autre geste.
+
+    Ces deux heures nourrissent `duree_observation`, donc le tableau MO de la
+    fiche d'activité de soins : toute correction part au journal, avec l'avant
+    et l'après.
+
+    Rend (ok, erreur).
+    """
+    from django.utils import timezone as tz
+    from django.utils.dateparse import parse_datetime
+
+    def lire(cle):
+        if cle not in POST:
+            return False, None
+        brut = (POST.get(cle) or '').strip()
+        if not brut:
+            return True, None
+        valeur = parse_datetime(brut)
+        if valeur is None:
+            return False, None
+        return True, (valeur if tz.is_aware(valeur) else tz.make_aware(valeur))
+
+    presente_e, entree = lire('obs_heure_entree')
+    presente_s, sortie = lire('obs_heure_sortie')
+    if not (presente_e or presente_s):
+        return True, None
+
+    nouvelle_entree = entree if presente_e else hosp.heure_entree
+    nouvelle_sortie = sortie if presente_s else hosp.heure_sortie
+    if nouvelle_entree and nouvelle_sortie and nouvelle_sortie < nouvelle_entree:
+        return False, "L'heure de sortie ne peut pas précéder l'heure d'entrée."
+
+    def mot(valeur):
+        return valeur.strftime('%d/%m/%Y à %H:%M') if valeur else '—'
+
+    changements = []
+    for libelle, champ, avant, apres in (
+        ("Heure d'entrée", 'heure_entree', hosp.heure_entree, nouvelle_entree),
+        ('Heure de sortie', 'heure_sortie', hosp.heure_sortie, nouvelle_sortie),
+    ):
+        if avant != apres:
+            setattr(hosp, champ, apres)
+            changements.append(f'{libelle} : {mot(avant)} → {mot(apres)}')
+
+    if changements:
+        hosp.save(update_fields=['heure_entree', 'heure_sortie'])
+        log_event(hosp, user, 'Horaires corrigés — ' + ' ; '.join(changements),
+                  type='modif')
+    return True, None
+
+
+def _heure_sortie_postee(POST):
+    """L'heure de sortie choisie dans la modale de décharge, ou None.
+
+    Le navigateur envoie un `datetime-local` sans fuseau ; on le rend conscient
+    de celui du projet, sinon Django avertit et la comparaison avec l'heure
+    d'entrée, elle, consciente, lève une erreur.
+
+    Une valeur illisible rend None plutôt que de lever : on retombe alors sur
+    l'heure courante, l'ancien comportement, au lieu de refuser une décharge
+    pour une chaîne mal formée.
+    """
+    from django.utils import timezone as tz
+    from django.utils.dateparse import parse_datetime
+
+    brut = (POST.get('heure_sortie') or '').strip()
+    if not brut:
+        return None
+    valeur = parse_datetime(brut)
+    if valeur is None:
+        return None
+    return valeur if tz.is_aware(valeur) else tz.make_aware(valeur)
+
+
+def _transition_decharger(hosp, user, heure_sortie=None):
+    """hospitalise → decharge : exige résumé de décharge, pose heure_sortie.
+
+    `heure_sortie` vient de la modale de décharge, qui la propose à l'instant
+    présent et laisse la corriger : on décharge rarement à la seconde où le
+    patient sort, et `duree_observation` part dans le tableau MO de la fiche
+    d'activité de soins. Sans valeur, on retombe sur l'heure courante.
+
+    Une modale portant ce champ a déjà existé ici, et le serveur ne la lisait
+    pas — il écrasait avec `now()`. D'où le test qui poste une heure choisie et
+    vérifie que c'est bien elle qu'on retrouve en base.
+    """
     from .services import check_action
     ok, err = check_action(hosp, user, 'decharger')
     if not ok:
@@ -464,15 +561,25 @@ def _transition_decharger(hosp, user):
         pass
     from django.utils import timezone as tz
     now = tz.now()
+    sortie = heure_sortie or now
+    # Une sortie antérieure à l'entrée ne veut rien dire et fausserait la durée
+    # par un nombre négatif.
+    if hosp.heure_entree and sortie < hosp.heure_entree:
+        return False, "L'heure de sortie ne peut pas précéder l'heure d'entrée."
     hosp.statut = 'decharge'
-    hosp.heure_sortie = now
+    hosp.heure_sortie = sortie
+    hosp.heure_sortie_systeme = now
     hosp.modifie_par = user
     hosp.date_modification = now
     if hosp.chambre_id and hosp.chambre.nombre_lits == 1:
         hosp.chambre.statut = True
         hosp.chambre.save(update_fields=['statut'])
-    hosp.save(update_fields=['statut', 'heure_sortie', 'modifie_par', 'date_modification'])
-    log_event(hosp, user, 'Statut changé : Déchargé — sortie médicale à %s.' % now.strftime('%H:%M'), type='statut')
+    hosp.save(update_fields=['statut', 'heure_sortie', 'heure_sortie_systeme',
+                             'modifie_par', 'date_modification'])
+    message = 'Statut changé : Déchargé — sortie médicale à %s.' % sortie.strftime('%d/%m à %H:%M')
+    if sortie != now:
+        message += ' Heure saisie à la main (le système était à %s).' % now.strftime('%d/%m à %H:%M')
+    log_event(hosp, user, message, type='statut')
     _sync_statut_soin_dossier(hosp, user)
     return True, None
 
@@ -514,6 +621,7 @@ def _transition_annuler(hosp, user, motif=''):
             hosp.chambre.statut = True
             hosp.chambre.save(update_fields=['statut'])
         hosp.heure_sortie = now
+        hosp.heure_sortie_systeme = now
     # Annuler les factures impayées (les factures payées sont conservées)
     Facture.objects.filter(hospitalisation=hosp).exclude(
         statut__in=['payee', 'annulee']
@@ -523,7 +631,7 @@ def _transition_annuler(hosp, user, motif=''):
     hosp.date_modification = now
     fields = ['statut', 'modifie_par', 'date_modification']
     if statut_avant == 'hospitalise':
-        fields.append('heure_sortie')
+        fields += ['heure_sortie', 'heure_sortie_systeme']
     hosp.save(update_fields=fields)
     msg = 'Hospitalisation annulée.'
     if motif:
@@ -1172,7 +1280,11 @@ def hospitalisation_edit(request, pk):
             messages.error(request, "Vous n'avez pas l'autorisation de modifier ce dossier.")
             return redirect('hospitalisation:detail', pk=pk)
 
-    if hosp.statut in ('termine', 'annule') and not is_admin:
+    # Un dossier déchargé ou annulé reste ouvrable : les heures d'observation
+    # s'y corrigent, et c'est souvent une fois le patient sorti qu'on s'aperçoit
+    # de l'erreur. « Terminé », en revanche, clôt pour de bon — sauf pour
+    # l'admin, qui dans ce module passe partout.
+    if hosp.statut == 'termine' and not is_admin:
         messages.warning(request, "Ce dossier est clôturé et ne peut plus être modifié.")
         return redirect('hospitalisation:detail', pk=pk)
 
@@ -1181,7 +1293,8 @@ def hospitalisation_edit(request, pk):
         # ── DÉCHARGER via modale (decharge-form : champs principaux absents) ───
         if 'action_decharger' in request.POST:
             _save_resume_decharge(hosp, request.POST)
-            ok, err = _transition_decharger(hosp, request.user)
+            ok, err = _transition_decharger(
+                hosp, request.user, _heure_sortie_postee(request.POST))
             if err:
                 messages.error(request, err)
             else:
@@ -1195,7 +1308,8 @@ def hospitalisation_edit(request, pk):
             _save_services_a_facturer(hosp, request.POST)
             _sync_soins_services(hosp)
             _save_resume_decharge(hosp, request.POST)
-            ok, err = _transition_decharger(hosp, request.user)
+            ok, err = _transition_decharger(
+                hosp, request.user, _heure_sortie_postee(request.POST))
             if err:
                 messages.error(request, err)
             else:
@@ -1245,6 +1359,12 @@ def hospitalisation_edit(request, pk):
             updated.save()
             form.save_m2m()
             _sync_soins_services(hosp)
+            # Après la sauvegarde du formulaire : `updated` et `hosp` désignent
+            # la même ligne, et on corrige sur l'instance fraîchement écrite.
+            heures_ok, heures_err = _save_heures_observation(
+                updated, request.POST, request.user)
+            if not heures_ok:
+                messages.error(request, heures_err)
 
         # ── Transitions workflow (CONFIRMER, HOSPITALISER, TERMINER) ────────────
         wf_action = next(
@@ -1443,15 +1563,21 @@ def _boutons_extra(hosp, user):
     is_admin = user.is_superuser
     facture_payee = Facture.objects.filter(hospitalisation=hosp, statut='payee').exists()
 
-    # Bouton Modifier : visible pour les utilisateurs change_hospitalisation dès le statut
-    # confirmé, mais grisé/incliquable tant que la facture n'est pas payée. L'admin reste
-    # inchangé (toujours actif), comme partout ailleurs dans ce module.
+    # Bouton Modifier : de « Confirmé » jusqu'à « Déchargé », plus l'annulé.
+    # On ne ferme plus la porte à la décharge — les heures d'entrée et de sortie
+    # se corrigent après coup, et c'est précisément une fois le patient sorti
+    # qu'on s'aperçoit d'avoir déchargé en retard. Mais « Terminé » clôt
+    # vraiment : le dossier est réglé administrativement, on n'y touche plus.
     _peut_modifier_base = (
         user.has_perm('hospitalisation.change_hospitalisation')
-        and hosp.statut == 'confirme'
+        and hosp.statut in ('confirme', 'hospitalise', 'decharge', 'annule')
     )
     peut_modifier = is_admin or _peut_modifier_base
-    modifier_enabled = is_admin or (_peut_modifier_base and facture_payee)
+    # La facture ne conditionne que l'étape « confirmé » — on n'édite pas un
+    # dossier qu'on n'a pas encore encaissé. Plus loin dans le parcours elle est
+    # forcément réglée, et au statut annulé la question ne se pose plus.
+    modifier_enabled = is_admin or (
+        _peut_modifier_base and (hosp.statut != 'confirme' or facture_payee))
     modifier_raison = '' if modifier_enabled else "La facture doit être payée avant de modifier le dossier"
     # Bouton Attribuer une chambre : utilisateurs can_installer_patient ou admin (confirme + facture payée)
     peut_attribuer_chambre = (
@@ -1498,6 +1624,7 @@ def _etat_payload(hosp, user):
         'has_chambre':        bool(hosp.chambre_id),
         'has_soins':          hosp.soins_apportes.exists(),
         'url_facture':        reverse('hospitalisation:creer_facture', kwargs={'pk': hosp.pk}),
+        'heure_entree':       hosp.heure_entree.isoformat() if hosp.heure_entree else None,
         'heure_entree':       hosp.heure_entree.isoformat() if hosp.heure_entree else None,
         'heure_sortie':       hosp.heure_sortie.isoformat() if hosp.heure_sortie else None,
         'date_termine':       hosp.date_termine.isoformat() if hosp.date_termine else None,
@@ -1616,7 +1743,8 @@ def hospitalisation_decharger(request, pk):
         return redirect('hospitalisation:detail', pk=pk)
     hosp = get_object_or_404(Hospitalisation, pk=pk)
     _save_resume_decharge(hosp, request.POST)
-    ok, err = _transition_decharger(hosp, request.user)
+    ok, err = _transition_decharger(
+        hosp, request.user, _heure_sortie_postee(request.POST))
     if _is_ajax(request):
         if err:
             return JsonResponse({'ok': False, 'error': err}, status=400)
