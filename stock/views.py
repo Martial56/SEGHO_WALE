@@ -1023,7 +1023,13 @@ def inventaire_list(request):
 def inventaire_create(request):
     if not can_manage_stock(request.user):
         raise PermissionDenied
-    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    produits = list(
+        Produit.objects.filter(actif=True).select_related('unite_mesure')
+        .prefetch_related('lots').order_by('type', 'nom')
+    )
+    for p in produits:
+        p.lot_principal = _lot_principal(p)
+
     if request.method == 'POST':
         from decimal import Decimal
         inv = Inventaire.objects.create(
@@ -1032,25 +1038,40 @@ def inventaire_create(request):
         )
         nouvelles_lignes = []
         for p in produits:
-            val = request.POST.get(f'reel_{p.pk}', '')
-            if val != '':
-                try:
-                    stock_reel = float(val)
-                except ValueError:
-                    stock_reel = float(p.stock_actuel)
-                peremption = request.POST.get(f'peremption_{p.pk}', '').strip() or None
-                commentaire = request.POST.get(f'commentaire_{p.pk}', '').strip()
-                # LigneInventaire.save() calcule normalement l'écart — bulk_create
-                # n'appelle pas save(), donc on le calcule ici explicitement.
-                ecart = Decimal(str(stock_reel)) - Decimal(str(p.stock_actuel))
-                nouvelles_lignes.append(LigneInventaire(
-                    inventaire=inv, produit=p,
-                    stock_theorique=p.stock_actuel,
-                    stock_reel=stock_reel,
-                    ecart=ecart,
-                    date_peremption=peremption,
-                    notes=commentaire,
-                ))
+            lot = p.lot_principal
+            val = request.POST.get(f'reel_{p.pk}', '').strip()
+            # Champ absent de la requête = inchangé (valeur du lot en cours)
+            numero_lot = request.POST.get(f'lot_{p.pk}', lot.numero_lot if lot else '').strip()
+            per_key = f'peremption_{p.pk}'
+            peremption = (_parse_date_cell(request.POST.get(per_key, '')) if per_key in request.POST
+                          else (lot.date_peremption if lot else None))
+            # Un n° de lot ou une péremption corrigés suffisent à retenir le
+            # produit, même sans recomptage (stock réel = stock système).
+            lot_modifie = (
+                numero_lot != (lot.numero_lot if lot else '')
+                or peremption != (lot.date_peremption if lot else None)
+            )
+            if val == '' and not lot_modifie:
+                continue
+            try:
+                stock_reel = float(val) if val != '' else float(p.stock_actuel)
+            except ValueError:
+                stock_reel = float(p.stock_actuel)
+            commentaire = request.POST.get(f'commentaire_{p.pk}', '').strip()
+            # LigneInventaire.save() calcule normalement l'écart — bulk_create
+            # n'appelle pas save(), donc on le calcule ici explicitement.
+            ecart = Decimal(str(stock_reel)) - Decimal(str(p.stock_actuel))
+            nouvelles_lignes.append(LigneInventaire(
+                inventaire=inv, produit=p,
+                stock_theorique=p.stock_actuel,
+                stock_reel=stock_reel,
+                ecart=ecart,
+                lot=lot,
+                # n° vidé → on conserve celui du lot existant
+                numero_lot=numero_lot or (lot.numero_lot if lot else ''),
+                date_peremption=peremption,
+                notes=commentaire,
+            ))
         if nouvelles_lignes:
             LigneInventaire.objects.bulk_create(nouvelles_lignes)
         messages.success(request, f'Inventaire {inv.numero} créé.')
@@ -1058,10 +1079,51 @@ def inventaire_create(request):
     return render(request, 'stock/inventaire/form.html', {'produits': produits})
 
 
+def _lot_principal(produit):
+    """Lot présenté (et corrigé) dans l'inventaire : le plus récemment reçu
+    parmi ceux encore en stock, à défaut le plus récent tout court.
+    Utilise les lots préchargés (prefetch_related('lots'))."""
+    lots = sorted(produit.lots.all(), key=lambda l: (l.date_reception, l.pk), reverse=True)
+    return next((l for l in lots if l.quantite_actuelle > 0), lots[0] if lots else None)
+
+
+def _appliquer_lot_inventaire(ligne, inv, user):
+    """À la validation : reporte le n° de lot / la péremption de la ligne sur
+    le lot concerné (trace dans ses notes), ou crée le lot si le produit n'en
+    avait pas et qu'un n° a été saisi."""
+    lot = ligne.lot
+    if lot is None:
+        if not ligne.numero_lot:
+            return
+        LotProduit.objects.create(
+            produit=ligne.produit, numero_lot=ligne.numero_lot,
+            date_peremption=ligne.date_peremption,
+            date_reception=timezone.now().date(),
+            quantite_initiale=ligne.stock_reel, quantite_actuelle=ligne.stock_reel,
+            prix_achat_lot=ligne.produit.prix_achat,
+            notes=f'Créé par l\'inventaire {inv.numero}',
+        )
+        return
+    changements = []
+    if ligne.numero_lot and ligne.numero_lot != lot.numero_lot:
+        changements.append(f'n° {lot.numero_lot} → {ligne.numero_lot}')
+        lot.numero_lot = ligne.numero_lot
+    if ligne.date_peremption != lot.date_peremption:
+        avant = lot.date_peremption.strftime('%d/%m/%Y') if lot.date_peremption else '—'
+        apres = ligne.date_peremption.strftime('%d/%m/%Y') if ligne.date_peremption else '—'
+        changements.append(f'péremption {avant} → {apres}')
+        lot.date_peremption = ligne.date_peremption
+    if changements:
+        trace = (f"[{timezone.localdate():%d/%m/%Y}] Correction inventaire {inv.numero} "
+                 f"par {user.get_username()} : {', '.join(changements)}")
+        lot.notes = f'{lot.notes}\n{trace}'.strip()
+        lot.save(update_fields=['numero_lot', 'date_peremption', 'notes'])
+
+
 @login_required(login_url='login')
 def inventaire_detail(request, pk):
     inv = get_object_or_404(Inventaire, pk=pk)
-    lignes = inv.lignes.select_related('produit', 'produit__unite_mesure').all()
+    lignes = inv.lignes.select_related('produit', 'produit__unite_mesure', 'lot').all()
 
     if request.method == 'POST' and request.POST.get('action') == 'valider' and inv.statut == 'brouillon':
         if not can_manage_stock(request.user):
@@ -1082,8 +1144,10 @@ def inventaire_detail(request, pk):
                     produit.stock_actuel = stock_apres
                     produit.save(update_fields=['stock_actuel'])
 
-                # Mettre à jour la date de péremption sur le lot principal si renseignée
-                if ligne.date_peremption:
+                if ligne.lot_id or ligne.numero_lot:
+                    _appliquer_lot_inventaire(ligne, inv, request.user)
+                elif ligne.date_peremption:
+                    # Lignes antérieures au suivi du lot : ancien comportement
                     lot = ligne.produit.lots.order_by('-date_reception').first()
                     if lot:
                         lot.date_peremption = ligne.date_peremption

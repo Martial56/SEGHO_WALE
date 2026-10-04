@@ -10,6 +10,13 @@
 .stock-sys { font-family: var(--font-mono); font-size:13px; font-weight:700; color:var(--accent-text-soft); }
 .inv-commentaire { width:100%; border:none; border-bottom:1.5px solid rgba(0,0,0,.15); background:transparent; padding:5px 4px; font-size:12px; font-family:inherit; color:var(--st-text); outline:none; transition:border-color .15s; }
 .inv-commentaire:focus { border-bottom-color:var(--st-500); }
+.inv-lot, .inv-date { border:none; border-bottom:1.5px solid rgba(0,0,0,.15); background:transparent; font-size:12px; font-family:inherit; outline:none; color:var(--st-text); padding:4px 2px; transition:border-color .15s; }
+.inv-lot { width:120px; font-family:var(--font-mono); }
+.inv-date { width:130px; }
+.inv-lot:focus, .inv-date:focus { border-bottom-color:var(--st-500); }
+.inv-date.lot-bientot { color:var(--amber-text); font-weight:600; }
+.inv-date.lot-perime  { color:var(--rose-text); font-weight:600; }
+.lot-edit.lot-modifie { border-bottom-style:dashed; border-bottom-color:var(--st-500); font-style:italic; }
 .badge-ph-ok      { background:rgba(var(--st-600-rgb),.1); color:var(--accent-text-soft); border:1px solid rgba(var(--st-600-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
 .badge-ph-rupture { background:rgba(var(--rose-rgb),.1); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
 </style>{% endblock %}
@@ -33,7 +40,8 @@
 <!-- Notice -->
 <div style="background:var(--st-50);border:1px solid var(--st-200);border-radius:8px;padding:13px 16px;font-size:12.5px;color:var(--accent-text);line-height:1.7;margin-top:20px;">
   <i class="bi bi-info-circle" style="color:var(--st-500);margin-right:6px;"></i>
-  Saisissez uniquement les quantités <strong>réellement comptées</strong>. Laissez un champ vide pour exclure le produit de cet inventaire. Les écarts seront calculés et le stock mis à jour lors de la validation.
+  Saisissez uniquement les quantités <strong>réellement comptées</strong>. Laissez un champ vide pour exclure le produit de cet inventaire. Les écarts seront calculés et le stock mis à jour lors de la validation.<br>
+  Le <strong>n° de lot</strong> et la <strong>date de péremption</strong> sont pré-remplis depuis le lot en cours et peuvent être corrigés ; la correction est appliquée au lot à la validation (même sans recomptage du produit).
 </div>
 
 <!-- Tableau produits -->
@@ -51,6 +59,7 @@
         <th style="text-align:right;">Stock système</th>
         <th style="text-align:right;">Stock réel compté</th>
         <th style="text-align:center;">Écart inventaire</th>
+        <th>N° de lot</th>
         <th style="text-align:center;">Date de péremption</th>
         <th>Commentaire</th>
       </tr>
@@ -58,7 +67,7 @@
     <tbody>
     {% regroup produits by type as produits_par_type %}
     {% for groupe in produits_par_type %}
-    <tr><td colspan="8" style="padding:0;">
+    <tr><td colspan="9" style="padding:0;">
       <div class="inv-section">
         {% if groupe.grouper == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
         {% elif groupe.grouper == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
@@ -90,11 +99,20 @@
       <td style="text-align:center;" id="ecart-{{ p.pk }}">
         <span style="color:var(--st-muted);font-size:11px;">—</span>
       </td>
+      <td>
+        <input type="text" name="lot_{{ p.pk }}" class="inv-lot lot-edit" maxlength="50"
+          value="{{ p.lot_principal.numero_lot|default:'' }}" data-initial="{{ p.lot_principal.numero_lot|default:'' }}"
+          placeholder="{% if p.lot_principal %}{{ p.lot_principal.numero_lot }}{% else %}Nouveau lot…{% endif %}"
+          title="{% if p.lot_principal %}Lot {{ p.lot_principal.numero_lot }} — reçu le {{ p.lot_principal.date_reception|date:'d/m/Y' }}{% else %}Aucun lot : un n° saisi créera le lot à la validation{% endif %}">
+      </td>
       <td style="text-align:center;">
         {% if p.type == 'medicament' or p.type == 'consommable' %}
-        <input type="date" name="peremption_{{ p.pk }}"
-          style="border:none;border-bottom:1.5px solid rgba(0,0,0,.15);background:transparent;font-size:12px;font-family:inherit;outline:none;color:var(--st-text);padding:4px 2px;width:130px;">
+        <input type="date" name="peremption_{{ p.pk }}" class="inv-date lot-edit
+          {% if p.lot_principal.est_perime %}lot-perime{% elif p.lot_principal.jours_restants is not None and p.lot_principal.jours_restants <= 90 %}lot-bientot{% endif %}"
+          value="{{ p.lot_principal.date_peremption|date:'Y-m-d' }}" data-initial="{{ p.lot_principal.date_peremption|date:'Y-m-d' }}">
         {% else %}
+        {# Équipement : péremption non saisie, mais conservée telle quelle #}
+        <input type="hidden" name="peremption_{{ p.pk }}" value="{{ p.lot_principal.date_peremption|date:'Y-m-d' }}">
         <span style="color:var(--st-muted);font-size:11px;">—</span>
         {% endif %}
       </td>
@@ -105,7 +123,7 @@
     {% endfor %}
     {% endfor %}
     {% if not produits %}
-    <tr><td colspan="8" style="text-align:center;padding:48px;color:var(--st-muted);">
+    <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--st-muted);">
       <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:10px;opacity:.4;"></i>
       Aucun produit actif dans le stock central.
     </td></tr>
@@ -158,6 +176,13 @@
 
   document.querySelectorAll(".ecart-input").forEach(function (input) {
     input.addEventListener("input", function () { majEcart(this); });
+  });
+
+  // Signale visuellement un n° de lot / une péremption corrigés
+  document.querySelectorAll(".lot-edit").forEach(function (input) {
+    input.addEventListener("input", function () {
+      this.classList.toggle("lot-modifie", this.value.trim() !== this.dataset.initial);
+    });
   });
 }());
 </script>

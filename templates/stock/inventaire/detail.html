@@ -122,6 +122,7 @@
           <th style="text-align:right;">Stock système</th>
           <th style="text-align:right;">Stock réel compté</th>
           <th style="text-align:right;">Écart</th>
+          <th>N° de lot</th>
           <th style="text-align:center;">Péremption</th>
           <th>Notes</th>
         </tr>
@@ -147,6 +148,16 @@
           {% else %}
             <span class="ecart-zero"><i class="bi bi-dash"></i> 0</span>
           {% endif %}
+        </td>
+        <td style="font-size:12px;font-family:var(--font-mono);">
+          {% if ligne.numero_lot %}
+            {{ ligne.numero_lot }}
+            {% if ligne.lot and ligne.lot.numero_lot != ligne.numero_lot and inv.statut == 'brouillon' %}
+            <div style="font-size:10px;color:var(--st-muted);font-family:inherit;" title="N° actuel du lot, remplacé à la validation">au lieu de {{ ligne.lot.numero_lot }}</div>
+            {% elif not ligne.lot and inv.statut == 'brouillon' %}
+            <div style="font-size:10px;color:var(--st-muted);font-family:inherit;">nouveau lot</div>
+            {% endif %}
+          {% else %}<span style="color:var(--st-muted);">—</span>{% endif %}
         </td>
         <td style="text-align:center;font-size:12px;">
           {% if ligne.date_peremption %}
