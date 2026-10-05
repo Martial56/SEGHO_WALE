@@ -983,3 +983,204 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         _soin(statut='en_cours')
         self.assertEqual(self._html(reverse('soins:list')).count(
             'class="ligne-annulee"'), 1)
+
+
+class TestLAgeEstDetailleSurLaListe(TestCase):
+    """La colonne Âge donne les mois et les jours, pas seulement les années.
+
+    Elle affichait « {{ patient.age }} ans » : pour un nourrisson, toute la
+    liste se lisait « 0 ans », et « 1 ans » ne dit pas si l'enfant a treize
+    mois ou vingt-trois. C'est pourtant sur cette distinction que reposent les
+    tranches d'âge du rapport d'activité de soins. `Patient.age_detail`
+    existait déjà et sert la liste des patients ; cette liste-ci l'ignorait.
+    """
+
+    def setUp(self):
+        self.user = _soins_user('u_age', perms=('view_soin',))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _soin_relu(self):
+        """`_patient` pose la date de naissance sous forme de chaîne : tant
+        qu'on n'a pas relu la ligne, `age_detail` travaille sur un `str`."""
+        soin = _soin()
+        soin.patient.refresh_from_db()
+        return soin
+
+    def _html(self):
+        reponse = self.client.get(reverse('soins:list') + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_colonne_porte_les_annees_les_mois_et_les_jours(self):
+        soin = self._soin_relu()
+        # Calculé depuis le modèle plutôt qu'écrit en dur : l'âge d'un patient
+        # fixe grandit à chaque jour qui passe, et la valeur du jour ferait
+        # rougir le test demain matin.
+        self.assertIn(soin.patient.age_detail, self._html())
+
+    def test_l_ancien_format_en_annees_seules_a_disparu(self):
+        """Sans cette moitié, le test précédent passerait si les deux
+        cohabitaient — le détail ajouté à côté du vieux « X ans »."""
+        soin = self._soin_relu()
+        self.assertNotIn(f'{soin.patient.age} ans', self._html())
+
+
+class TestFiltreEtRegroupementPersonnalises(TestCase):
+    """Le module Soins rejoint les listes qui savent filtrer sur n'importe quel champ.
+
+    Les familles déclarées couvrent ce qu'on cherche tous les jours ; elles ne
+    couvriront jamais « les soins dont le motif contient tel mot ». Le
+    constructeur de conditions de `core.listing` répond à ces questions-là sans
+    qu'on les ait prévues, et les champs découverts sur le modèle lui servent de
+    liste blanche — une condition portant sur autre chose est ignorée, et une
+    URL forgée ne peut donc pas atteindre une relation arbitraire.
+    """
+
+    def setUp(self):
+        self.user = _soins_user(
+            'u_perso', perms=('view_soin', 'view_proceduresoin'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    # ── outillage ───────────────────────────────────────────────────────────
+
+    def _soin_motif(self, motif, suffix=''):
+        soin = _soin(patient=_patient(suffix))
+        soin.motif = motif
+        soin.save(update_fields=['motif'])
+        return soin
+
+    def _html(self, nom, suffixe=''):
+        reponse = self.client.get(reverse(nom) + '?filter=' + suffixe)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    @staticmethod
+    def _nb_lignes(html):
+        """Les lignes de données, repérées par le balisage de leur cellule
+        d'âge — jamais par un nom de classe nu, qui vit aussi dans le CSS."""
+        return html.count('<td data-col="8"')
+
+    @staticmethod
+    def _tableau(html):
+        """Le corps du tableau seul.
+
+        Chercher un nom dans la page entière se trompe de cible : le catalogue
+        des champs embarque les libellés de tous les objets liés — donc tous
+        les patients — et un nom filtré s'y trouve quand même.
+        """
+        debut = html.index('<tbody')
+        return html[debut:html.index('</tbody>', debut)]
+
+    # ── l'écran ─────────────────────────────────────────────────────────────
+
+    def test_l_entree_de_menu_parait_sur_les_deux_listes(self):
+        for nom in ('soins:list', 'soins:procedure_list'):
+            self.assertIn('id="lstf-entree"', self._html(nom))
+
+    def test_le_catalogue_des_champs_accompagne_la_page(self):
+        """Le constructeur se peuple depuis ce JSON : sans lui, l'entrée de
+        menu s'ouvre sur une liste de champs vide."""
+        import json
+        import re
+        for nom in ('soins:list', 'soins:procedure_list'):
+            trouve = re.search(
+                r'<script id="lstf-champs" type="application/json">(.*?)</script>',
+                self._html(nom), re.S)
+            self.assertIsNotNone(trouve, nom)
+            self.assertTrue(json.loads(trouve.group(1))['champs'], nom)
+
+    # ── filtrer ─────────────────────────────────────────────────────────────
+
+    def test_une_condition_sur_le_motif_restreint_la_liste(self):
+        self._soin_motif('Pansement du pied', 'A')
+        self._soin_motif('Injection', 'B')
+        html = self._html('soins:list', '&cf=motif&co=contient&cv=pansement')
+        self.assertEqual(self._nb_lignes(html), 1)
+
+    def test_la_negation_rend_bien_le_complement(self):
+        """Sans cette moitié, le test précédent passerait aussi si la condition
+        n'était jamais appliquée — il resterait deux lignes, pas une."""
+        self._soin_motif('Pansement du pied', 'A')
+        self._soin_motif('Injection', 'B')
+        html = self._html('soins:list', '&cf=motif&co=ne_contient&cv=pansement')
+        self.assertEqual(self._nb_lignes(html), 1)
+        # Le motif n'est pas une colonne de cette liste : c'est le nom du
+        # patient qui dit laquelle des deux lignes a été retenue.
+        tableau = self._tableau(html)
+        self.assertIn('TestB', tableau)
+        self.assertNotIn('TestA', tableau)
+
+    def test_deux_conditions_se_cumulent_en_et(self):
+        self._soin_motif('Pansement du pied', 'A')
+        self._soin_motif('Pansement de la main', 'B')
+        html = self._html(
+            'soins:list',
+            '&cf=motif&co=contient&cv=pansement&cf=motif&co=contient&cv=pied')
+        self.assertEqual(self._nb_lignes(html), 1)
+
+    def test_deux_conditions_en_ou_additionnent(self):
+        self._soin_motif('Pansement', 'A')
+        self._soin_motif('Injection', 'B')
+        self._soin_motif('Perfusion', 'C')
+        html = self._html(
+            'soins:list',
+            '&cf=motif&co=contient&cv=pansement'
+            '&cf=motif&co=contient&cv=injection&cm=ou')
+        self.assertEqual(self._nb_lignes(html), 2)
+
+    def test_une_condition_sur_un_champ_inconnu_est_ignoree(self):
+        """La liste blanche est le garde-fou : un chemin absent ne filtre rien
+        plutôt que d'atteindre une relation qu'on n'a pas voulu exposer."""
+        self._soin_motif('Pansement', 'A')
+        self._soin_motif('Injection', 'B')
+        html = self._html(
+            'soins:list', '&cf=patient__user__password&co=contient&cv=x')
+        self.assertEqual(self._nb_lignes(html), 2)
+
+    def test_la_liste_des_procedures_filtre_aussi(self):
+        _procedure(prix=Decimal('500'))
+        _procedure(prix=Decimal('9000'))
+        reponse = self.client.get(
+            reverse('soins:procedure_list') + '?filter=&cf=prix&co=sup&cv=1000')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.context['total'], 1)
+
+    # ── le bouton « Effacer » ───────────────────────────────────────────────
+
+    def test_une_condition_seule_allume_le_bouton_effacer(self):
+        """Sinon on filtre sans aucun moyen visible de revenir en arrière.
+
+        Sans `filter=` dans l'adresse : la liste applique alors sa sélection
+        par défaut, qui n'allume rien. La condition est donc la seule chose
+        qui puisse allumer le bouton — avec `filter=` vide, le test passait
+        sans elle.
+        """
+        self._soin_motif('Pansement', 'A')
+        temoin = self.client.get(reverse('soins:list'))
+        self.assertFalse(temoin.context['selection_active'],
+                         "la sélection par défaut ne doit rien allumer")
+
+        reponse = self.client.get(
+            reverse('soins:list') + '?cf=motif&co=contient&cv=pansement')
+        self.assertTrue(reponse.context['selection_active'])
+
+    # ── regrouper ───────────────────────────────────────────────────────────
+
+    def test_on_regroupe_sur_un_champ_non_declare(self):
+        from .soin_listing import dimensions_personnalisees
+        self._soin_motif('Pansement', 'A')
+        self._soin_motif('Injection', 'B')
+        cles = {d.cle for d in dimensions_personnalisees()}
+        self.assertIn('auto_motif', cles)
+
+        html = self._html('soins:list', '&group=auto_motif')
+        self.assertEqual(html.count('data-feuille="1"'), 2)
+
+    def test_un_champ_deja_declare_n_est_pas_propose_deux_fois(self):
+        """« État du soin » est déjà une dimension déclarée : la proposer une
+        seconde fois n'offrirait qu'un doublon, et le moins parlant des deux."""
+        from .soin_listing import dimensions_personnalisees
+        cles = {d.cle for d in dimensions_personnalisees()}
+        self.assertNotIn('auto_statut', cles)

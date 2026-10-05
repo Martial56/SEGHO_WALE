@@ -9,10 +9,13 @@ le moindre message.
 Ces tests vérifient les deux moitiés de la correction : la permission ouvre la
 porte, et le nom du groupe qui la porte n'a aucune importance.
 """
+import re
+
 from django.contrib.auth.models import Group, Permission, User
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from core.listing import TOUS_LES_GROUPES
 from core.permissions import utilisateurs_avec
 
 
@@ -554,6 +557,42 @@ class TestMemoireDesListes(TestCase):
         self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.get(reverse('patients:list')).status_code, 200)
 
+    # ── L'état déplié, qui ne recharge rien ────────────────────────────────
+
+    def test_la_note_de_depliage_est_retenue(self):
+        """Déplier un groupe ne recharge pas la page : l'état déplié n'arrivait
+        donc jamais jusqu'ici, et revenir par le bouton « Retour » d'une fiche
+        ramenait le filtre et le regroupement, mais la liste repliée. Le
+        navigateur envoie désormais cette note de fond à chaque dépliage."""
+        self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('ouverts=1%3A0', reponse.url)
+
+    def test_la_note_de_depliage_ne_rend_aucune_page(self):
+        """Tout son intérêt : elle ne coûte que ce qu'il faut pour retenir."""
+        reponse = self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        self.assertEqual(reponse.status_code, 204)
+        self.assertFalse(reponse.content)
+
+    def test_replier_le_dernier_groupe_oublie_l_etat(self):
+        """La note suivante ne porte plus `ouverts` : elle doit l'emporter,
+        sinon la liste rouvrirait un groupe qu'on vient de fermer."""
+        self._ajax(self.url + '?group=statut&ouverts=1:0&_memo=1')
+        self._ajax(self.url + '?group=statut&_memo=1')
+        self.assertNotIn('ouverts', self.client.get(self.url).url)
+
+    def test_une_note_sans_selection_n_efface_rien(self):
+        """Elle voyage en AJAX, comme « Effacer ». Sans le retour anticipé de
+        `selection_memorisee`, une note dépourvue de critères passerait pour un
+        effacement que personne n'a demandé."""
+        self.client.get(self.url + '?filter=aujourdhui')
+        self._ajax(self.url + '?_memo=1')
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302,
+                         'la note a effacé la sélection retenue')
+        self.assertIn('filter=aujourdhui', reponse.url)
+
     # ── Chaque liste a sa propre mémoire ───────────────────────────────────
 
     def test_deux_listes_ne_se_melangent_pas(self):
@@ -670,8 +709,12 @@ class TestLesLignesArriventAuDepliage(TestCase):
     Toutes les lignes des groupes affichés partaient dans le HTML, repliées et
     souvent jamais lues. Une ligne pèse plus d'un kilo-octet : un regroupement
     à gros groupes produisait une page de plusieurs dizaines de méga-octets
-    pour un écran qui ne montrait que des en-têtes. Elles n'arrivent désormais
-    qu'au dépliage, groupe par groupe.
+    pour un écran qui ne montrait que des en-têtes.
+
+    La page part donc avec ses seuls en-têtes. Un groupe sait rendre ses lignes
+    à lui (`_groupe=<chemin>`), et la page sait les rendre toutes d'un coup
+    (`_groupe=*`) : c'est ce que le navigateur demande en tâche de fond une fois
+    la page affichée, pour que déplier ne fasse plus attendre.
     """
 
     def setUp(self):
@@ -713,6 +756,26 @@ class TestLesLignesArriventAuDepliage(TestCase):
         html = self._html('&_groupe=0')
         self.assertEqual(self._nb_lignes(html), 3)
 
+    def test_le_depliage_rend_les_lignes_en_ajax(self):
+        """C'est le chemin réel : le script demande la page en AJAX.
+
+        Il ne le faisait pas au départ, par crainte qu'une liste réponde par un
+        fragment de `<tr>` nus — que l'analyseur HTML jette hors d'un tableau.
+        Aucune n'est dans ce cas, et la page entière coûtait quatre fois plus
+        cher : 554 ms et 256 Ko pour trois lignes, contre 146 ms et 44 Ko.
+
+        Si une liste se mettait à répondre sans tableau, c'est ici que ça se
+        verrait.
+        """
+        reponse = self.client.get(
+            self.url + '&_groupe=0',
+            headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(reponse.status_code, 200)
+        corps = reponse.content.decode()
+        self.assertEqual(self._nb_lignes(corps), 3)
+        self.assertIn('<table', corps,
+                      'des lignes hors tableau seraient jetées par le navigateur')
+
     def test_chaque_groupe_rend_les_siennes_et_pas_celles_du_voisin(self):
         self.assertEqual(self._nb_lignes(self._html('&_groupe=1')), 2)
 
@@ -729,22 +792,497 @@ class TestLesLignesArriventAuDepliage(TestCase):
         html = self._html('&group=type&_groupe=0')
         self.assertEqual(self._nb_lignes(html), 0)
 
+    def test_deplier_un_groupe_parent_ne_balaie_pas_toute_la_selection(self):
+        """Le garde-fou `not noeud['enfants']` protège le temps, pas le résultat.
+
+        Sans lui, on demande les lignes d'un chemin partiel : aucune condition
+        SQL ne sait l'exprimer, et on retombe sur le tri en Python — qui
+        parcourt **toute** la sélection pour ne rien trouver, le chemin d'un
+        parent ne pouvant jamais égaler celui d'une feuille. Le résultat reste
+        juste, la page reste vide, et rien ne se voit : seul le compte de
+        requêtes trahit le balayage.
+
+        Si ce nombre change pour une raison étrangère, relancez la mesure
+        plutôt que de l'ajuster à l'aveugle — c'est l'écart d'une requête qui
+        compte, pas sa valeur absolue.
+
+        Il est passé de 18 à 25 le jour où la liste des factures a reçu le
+        filtre personnalisé : `champs_pour_navigateur` interroge chaque champ
+        lié pour en proposer les valeurs. Ces requêtes-là sont les mêmes qu'on
+        déplie un parent ou une feuille, elles ne disent donc rien du balayage
+        que ce test surveille — seul l'écart compte, et il reste nul.
+        """
+        with self.assertNumQueries(25):
+            self.client.get(self.url + '&group=type&_groupe=0')
+
     def test_un_sous_groupe_rend_bien_les_siennes(self):
         html = self._html('&group=type&_groupe=0-0')
         self.assertEqual(self._nb_lignes(html), 3)
+
+    def test_tout_precharger_rend_les_lignes_de_tous_les_groupes(self):
+        """`_groupe=*` : une seule requête pour les deux groupes.
+
+        C'est ce qui rend le dépliage instantané. Demander groupe par groupe
+        donnait 3 lignes puis 2 ; ici les 5 arrivent ensemble.
+        """
+        html = self._html('&_groupe=' + TOUS_LES_GROUPES)
+        self.assertEqual(self._nb_lignes(html), 5)
+        self.assertIn('data-parent="0"', html)
+        self.assertIn('data-parent="1"', html,
+                      'le second groupe est resté sans lignes')
+
+    def test_un_groupe_reclame_ouvert_arrive_deja_deplie(self):
+        """La page rendue est la bonne du premier coup.
+
+        Rouvrir les groupes après l'affichage marchait, mais se voyait : la
+        liste arrivait fermée puis sautait. Les filtres n'ont jamais ce défaut
+        parce qu'ils sont appliqués au rendu — l'état déplié suit désormais le
+        même chemin.
+        """
+        html = self._html('&ouverts=1:0')
+        self.assertRegex(html, r'<tr class="lst-groupe[^"]*open"[^>]*data-chemin="0"',
+                         "la bande n'est pas marquée ouverte")
+        self.assertEqual(self._nb_lignes(html), 3,
+                         'les lignes du groupe ouvert devraient être rendues')
+
+    def test_les_lignes_d_un_groupe_ouvert_ne_sont_pas_masquees(self):
+        """Rendre la bande ouverte sans montrer ses lignes donnerait un groupe
+        béant : c'est le `display:none` des gabarits de ligne qui devait suivre."""
+        html = self._html('&ouverts=1:0')
+        lignes = re.findall(r'<tr data-parent="0"[^>]*>', html)
+        self.assertEqual(len(lignes), 3)
+        for ligne in lignes:
+            self.assertNotIn('display:none', ligne)
+
+    def test_la_bande_ouverte_se_declare_deja_chargee(self):
+        """Sinon le préchargement y reverserait les mêmes lignes, en double."""
+        self.assertRegex(self._html('&ouverts=1:0'),
+                         r'data-chemin="0"[^>]*data-charge="1"|data-charge="1"[^>]*data-chemin="0"')
+
+    def test_un_etat_pris_sur_une_autre_page_est_ignore(self):
+        """Un chemin est positionnel : « 0 » est le premier groupe *de la page
+        affichée*. Les liens de pagination recopiant les paramètres courants,
+        sans le numéro en tête de la valeur, changer de page aurait déplié un
+        groupe sans rapport — en silence."""
+        html = self._html('&ouverts=2:0')
+        self.assertNotRegex(html, r'<tr class="lst-groupe[^"]*open"')
+        self.assertEqual(self._nb_lignes(html), 0)
+
+    def test_un_chemin_ouvert_inconnu_ne_casse_rien(self):
+        """Une sélection qui a changé depuis que l'état a été noté."""
+        self.assertEqual(self._nb_lignes(self._html('&ouverts=1:99')), 0)
+
+    def test_l_etat_deplie_est_retenu_comme_les_filtres(self):
+        """C'est ce qui le ramène au retour d'une fiche : la vue redirige vers
+        l'URL portant la sélection retenue, et `ouverts` en fait partie."""
+        self.client.get(self.url + '&ouverts=1:0')
+        reponse = self.client.get(reverse('facturation:list'))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('ouverts=1%3A0', reponse['Location'])
+
+    def test_les_bandes_annoncent_leur_taille(self):
+        """Le navigateur s'en sert pour renoncer au préchargement quand la page
+        est énorme (MAX_LIGNES_PRECHARGEES). Sans cet attribut il précharge
+        tout, et on retombe sur la page de plusieurs méga-octets."""
+        html = self._html()
+        self.assertIn('data-total="3"', html)
+        self.assertIn('data-total="2"', html)
 
     def test_sans_regroupement_les_lignes_sont_toujours_la(self):
         """Le chargement différé ne concerne que le mode groupé."""
         reponse = self.client.get(reverse('facturation:list') + '?filter=')
         self.assertEqual(self._nb_lignes(reponse.content.decode()), 5)
 
-    def test_deplier_ne_fait_pas_oublier_la_selection_retenue(self):
-        """`_groupe` n'est ni une sélection ni un effacement : la mémoire des
-        listes doit le laisser passer sans y toucher."""
+    def test_deplier_ne_derange_pas_la_selection_retenue(self):
+        """Le dépliage emporte la sélection courante : la mémoire la retient
+        comme d'habitude et rend bien les lignes du groupe."""
         from core.memoire_listing import PREFIXE_CLE
         self.client.get(self.url)                      # mémorise le regroupement
         cle = PREFIXE_CLE + reverse('facturation:list')
         retenue = self.client.session[cle]
 
-        self.client.get(reverse('facturation:list') + '?_groupe=0')
+        reponse = self.client.get(self.url + '&_groupe=0')
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(self._nb_lignes(reponse.content.decode()), 3)
         self.assertEqual(self.client.session[cle], retenue)
+
+    def test_un_depliage_en_ajax_n_efface_pas_la_selection_retenue(self):
+        """Une requête AJAX sans paramètre est le signal d'« Effacer » : la
+        mémoire oublie la sélection. Un dépliage n'est pas un effacement, et
+        `core.memoire_listing` l'écarte sur la seule présence de `_groupe`.
+
+        Le navigateur ne pose pas cet en-tête aujourd'hui — un `<tr>` hors d'un
+        `<table>` serait jeté par l'analyseur HTML, voir listing_groupes.js. Le
+        garde-fou tient pour le jour où ce choix changera : sans lui, ouvrir un
+        groupe effacerait le filtre de la liste.
+        """
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(self.url)
+        cle = PREFIXE_CLE + reverse('facturation:list')
+        self.assertIn(cle, self.client.session)
+
+        self.client.get(reverse('facturation:list') + '?_groupe=0',
+                        headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertIn(cle, self.client.session,
+                      'le dépliage a été pris pour un « Effacer »')
+
+
+
+class TestUnGrosGroupeArriveParLots(TestCase):
+    """Déplier un groupe énorme ne doit pas tout rendre d'un coup.
+
+    Un groupe de trente mille lignes prenait plus d'une demi-minute et pesait
+    près de quarante méga-octets : le plafond de pages groupées ne protège que
+    le *nombre de groupes*, jamais la taille de l'un d'eux. Le serveur n'en rend
+    donc qu'un lot, clos par une entrée « Charger plus » qui porte le rang du
+    suivant (core.listing.TAILLE_LOT_GROUPE).
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from core.listing import TAILLE_LOT_GROUPE
+        from facturation.models import Facture
+        from patients.models import Patient
+
+        self.lot = TAILLE_LOT_GROUPE
+        self.reste = 10
+
+        User.objects.create_superuser('su_lots', password='x')
+        self.client = Client()
+        self.client.login(username='su_lots', password='x')
+
+        patient = Patient.objects.create(
+            nom='Lots', prenoms='Patient', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000')
+        # Un groupe plus grand qu'un lot, et un second qui tient tout entier.
+        for statut, combien in (('emise', self.lot + self.reste), ('payee', 2)):
+            for _ in range(combien):
+                Facture.objects.create(
+                    patient=patient, type_facture='consultation', statut=statut,
+                    montant_total=1000, date_emission=timezone.now())
+        self.url = reverse('facturation:list') + '?filter=&group=statut'
+
+    def _html(self, suffixe=''):
+        reponse = self.client.get(self.url + suffixe)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    @staticmethod
+    def _nb_lignes(html):
+        return html.count('<td data-col="1" class="td-num">')
+
+    def test_un_gros_groupe_n_arrive_pas_d_un_bloc(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0')), self.lot)
+
+    def test_l_entree_charger_plus_dit_ou_reprendre(self):
+        """Le rang du lot suivant, sans quoi « Charger plus » renverrait le
+        même lot — et les mêmes lignes, en double."""
+        html = self._html('&_groupe=0')
+        self.assertIn('class="lst-plus"', html)
+        self.assertIn('data-suite="%d"' % self.lot, html)
+
+    def test_l_entree_annonce_ce_qui_reste(self):
+        self.assertIn('Charger %d de plus · %d restantes' % (self.reste, self.reste),
+                      self._html('&_groupe=0'))
+
+    def test_le_lot_suivant_part_du_decalage(self):
+        html = self._html('&_groupe=0&_decalage=%d' % self.lot)
+        self.assertEqual(self._nb_lignes(html), self.reste)
+
+    def test_le_dernier_lot_ne_propose_plus_rien(self):
+        """Sinon on cliquerait indéfiniment sur un groupe épuisé."""
+        self.assertNotIn('class="lst-plus"',
+                         self._html('&_groupe=0&_decalage=%d' % self.lot))
+
+    def test_un_groupe_entier_n_a_pas_d_entree(self):
+        """Le second groupe tient dans un lot : rien à proposer."""
+        html = self._html('&_groupe=1')
+        self.assertEqual(self._nb_lignes(html), 2)
+        self.assertNotIn('class="lst-plus"', html)
+
+    def test_un_decalage_illisible_repart_du_debut(self):
+        """Il vient de l'URL, donc de n'importe où. Mieux vaut le premier lot
+        qu'une erreur de serveur."""
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0&_decalage=zzz')),
+                         self.lot)
+
+    def test_un_decalage_negatif_aussi(self):
+        self.assertEqual(self._nb_lignes(self._html('&_groupe=0&_decalage=-5')),
+                         self.lot)
+
+    def test_un_groupe_restaure_ouvert_revient_sur_son_premier_lot(self):
+        """On retient qu'il était ouvert, pas jusqu'où on l'avait déroulé."""
+        html = self._html('&ouverts=1:0')
+        self.assertEqual(self._nb_lignes(html), self.lot)
+        self.assertIn('data-suite="%d"' % self.lot, html)
+
+
+class TestLePrechargementSArreteALaPage(TestCase):
+    """Précharger, ce n'est pas tout charger.
+
+    `_groupe=*` rend les lignes de tous les groupes **de la page affichée**, et
+    d'eux seuls. Sans cette borne, un regroupement à mille groupes ramènerait
+    toute la sélection à chaque affichage : exactement la page de plusieurs
+    méga-octets que le chargement différé avait supprimée.
+    """
+
+    def setUp(self):
+        from django.utils import timezone
+        from facturation.models import Facture
+        from patients.models import Patient
+
+        patient = Patient.objects.create(
+            nom='Borne', prenoms='Page', date_naissance='1990-06-01',
+            sexe='F', telephone='0700000000')
+        # Un montant distinct par facture : trente groupes d'une ligne.
+        for i in range(30):
+            Facture.objects.create(
+                patient=patient, type_facture='consultation', statut='emise',
+                montant_total=1000 + i, date_emission=timezone.now())
+
+    def _page(self, numero, chemin_demande):
+        from facturation.models import Facture
+        from core.listing import Dimension, paginer_groupes
+        dimension = Dimension(
+            cle='montant', libelle='Montant',
+            valeur=lambda o: str(o.montant_total),
+            values=('montant_total',),
+            label=lambda ligne: str(ligne['montant_total']))
+        return paginer_groupes(Facture.all_objects.all(), [dimension], numero,
+                               groupes_par_page=25,
+                               chemin_demande=chemin_demande)
+
+    @staticmethod
+    def _nb_lignes(arbre):
+        return sum(len(n['lignes']) + sum(len(e['lignes']) for e in n['enfants'])
+                   for n in arbre)
+
+    def test_la_page_un_ne_precharge_que_ses_vingt_cinq_groupes(self):
+        arbre, page, nombre = self._page(1, TOUS_LES_GROUPES)
+        self.assertEqual(nombre, 30, 'les trente groupes doivent exister')
+        self.assertEqual(len(arbre), 25)
+        self.assertEqual(self._nb_lignes(arbre), 25,
+                         'le préchargement a débordé sur la page suivante')
+
+    def test_la_derniere_page_ne_precharge_que_son_reste(self):
+        arbre, page, nombre = self._page(2, TOUS_LES_GROUPES)
+        self.assertEqual(len(arbre), 5)
+        self.assertEqual(self._nb_lignes(arbre), 5)
+
+    def test_sans_demande_aucune_ligne_n_est_chargee(self):
+        """Le témoin : c'est bien `_groupe=*` qui les amène, pas la page."""
+        arbre, page, nombre = self._page(1, None)
+        self.assertEqual(len(arbre), 25)
+        self.assertEqual(self._nb_lignes(arbre), 0)
+
+
+class TestLaListeRafraichieReprechargeSesGroupes(TestCase):
+    """Un changement de filtre remplace la liste : ses groupes repartent sans
+    lignes, et le préchargement doit repartir avec eux.
+
+    Sans ce rappel, la première liste de la session serait instantanée et toutes
+    les suivantes feraient attendre à chaque dépliage — le genre de différence
+    qu'on met longtemps à relier à sa cause.
+    """
+
+    #: Les cinq endroits qui remplacent une liste par AJAX. Chacun rappelle
+    #: `lstfInit` pour les filtres ; il doit rappeler le préchargement aussi.
+    GABARITS = (
+        'templates/includes/listing/page_js.html',
+        'templates/includes/subheader.html',
+        'templates/gynecologie/list.html',
+        'templates/gynecologie/registre_naissance.html',
+        'templates/patients/list.html',
+    )
+
+    def test_chaque_rafraichissement_relance_le_prechargement(self):
+        from pathlib import Path
+        from django.conf import settings
+        for nom in self.GABARITS:
+            texte = Path(settings.BASE_DIR, nom).read_text()
+            self.assertIn('window.lstfInit()', texte,
+                          f'{nom} ne rafraîchit plus les filtres')
+            self.assertIn('window.lstPrecharger()', texte,
+                          f'{nom} ne reprécharge pas ses groupes')
+
+
+class TestLesAdressesStatiquesPortentLaDateDuFichier(TestCase):
+    """Un script corrigé doit être réellement rechargé par le navigateur.
+
+    `{% static %}` rendait toujours la même adresse quel que soit le contenu du
+    fichier. Une copie gardée par le navigateur servait donc indéfiniment, et
+    une correction livrée restait invisible chez qui avait déjà ouvert la page.
+
+    Ce n'est pas théorique : le chargement différé des groupes a été livré avec
+    un script qui va chercher les lignes au serveur, là où l'ancien se
+    contentait de démasquer des lignes déjà présentes. Les deux se ressemblent
+    assez pour que rien ne signale l'erreur — le groupe s'ouvrait et restait
+    vide.
+    """
+
+    def _url(self, nom):
+        from django.contrib.staticfiles.storage import staticfiles_storage
+        return staticfiles_storage.url(nom)
+
+    def test_une_adresse_porte_une_version(self):
+        import re
+        adresse = self._url('js/listing_groupes.js')
+        self.assertRegex(adresse, r'^/static/js/listing_groupes\.js\?v=\d+$')
+
+    def test_deux_fichiers_differents_ont_des_versions_differentes(self):
+        """Une version constante ne vaudrait pas mieux que pas de version."""
+        import os
+        from django.contrib.staticfiles import finders
+        a = self._url('js/listing_groupes.js')
+        b = self._url('css/global.css')
+        self.assertNotEqual(a.split('?v=')[1], b.split('?v=')[1],
+                            'les deux fichiers ont la même date, le test ne '
+                            'prouve rien — touchez-en un et relancez')
+        # La version est bien celle du fichier, pas un nombre quelconque.
+        attendue = str(int(os.path.getmtime(finders.find('css/global.css'))))
+        self.assertEqual(b.split('?v=')[1], attendue)
+
+    def test_un_fichier_introuvable_rend_une_adresse_nue(self):
+        """Mieux vaut une adresse sans version qu'une page qui ne s'affiche
+        pas : le cache n'est pas une raison de casser le rendu."""
+        self.assertEqual(self._url('js/ce-fichier-n-existe-pas.js'),
+                         '/static/js/ce-fichier-n-existe-pas.js')
+
+    def test_les_pages_servent_des_adresses_versionnees(self):
+        import re
+        User.objects.create_superuser('su_statique', password='x')
+        client = Client()
+        client.login(username='su_statique', password='x')
+        html = client.get(reverse('soins:list') + '?filter=').content.decode()
+        adresses = re.findall(r'/static/[^"\' >]+', html)
+        self.assertTrue(adresses)
+        self.assertEqual([a for a in adresses if '?v=' not in a], [])
+
+
+class TestLeCatalogueDesChampsNeTriePasLesTables(TestCase):
+    """Savoir si une table est petite ne demande pas de la trier.
+
+    Le constructeur de conditions propose les valeurs d'un champ de lien quand
+    la table visée reste petite. Il en demandait 201 lignes — une de plus que
+    la limite, pour savoir sans compter — mais à travers le tri par défaut du
+    modèle. Or ces modèles en ont tous un : patients, factures, rendez-vous,
+    hospitalisations. La base devait donc trier la table **entière** avant d'en
+    rendre 201, à chaque affichage d'une liste, pour chacun des neuf à onze
+    champs de lien.
+
+    Invisible sur un millier de lignes, beaucoup moins sur cent mille. Et ce
+    tri ne servait à rien : on ne cherche ici qu'à savoir si la table est
+    petite et, si oui, ce qu'elle contient.
+    """
+
+    def test_aucun_sondage_ne_trie(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        from core.listing import champs_filtrables, champs_pour_navigateur
+        from soins.models import Soin
+
+        with CaptureQueriesContext(connection) as requetes:
+            champs_pour_navigateur(champs_filtrables(Soin))
+
+        triees = [r['sql'] for r in requetes.captured_queries
+                  if 'ORDER BY' in r['sql'].upper()]
+        self.assertEqual(
+            triees, [],
+            'un sondage trie de nouveau la table avant de la plafonner')
+        self.assertTrue(requetes.captured_queries,
+                        'aucune requête : le test ne prouve rien')
+
+    def test_les_valeurs_proposees_sont_rangees_par_libelle(self):
+        """On vient y choisir une valeur : une liste alphabétique se parcourt
+        mieux que l'ordre où la base les a rendues — qui, le tri retiré, n'est
+        plus garanti du tout."""
+        from medecins.models import Departement
+
+        from core.listing import champs_filtrables, champs_pour_navigateur
+        from soins.models import Soin
+
+        for code, nom in (('ZZZ', 'Zone de test'), ('AAA', 'Ambulatoire'),
+                          ('MMM', 'Médecine interne')):
+            Departement.objects.get_or_create(code=code, defaults={'nom': nom})
+
+        catalogue = champs_pour_navigateur(champs_filtrables(Soin))
+        departement = next(c for c in catalogue['champs']
+                           if c['chemin'] == 'departement')
+        libelles = [libelle for _, libelle in departement['choix']]
+        self.assertEqual(libelles, sorted(libelles))
+        self.assertIn('Ambulatoire', libelles)
+
+    def test_une_table_trop_grande_bascule_en_saisie_d_identifiant(self):
+        """Le plafond est ce qui empêche le catalogue d'enfler : au-delà, on
+        saisit l'identifiant au lieu de recevoir toute la table."""
+        from medecins.models import Departement
+
+        from core.listing import (MAX_CHOIX_LIEN, champs_filtrables,
+                                  champs_pour_navigateur)
+        from soins.models import Soin
+
+        Departement.objects.bulk_create([
+            Departement(code=f'D{i:04d}', nom=f'Service {i:04d}')
+            for i in range(MAX_CHOIX_LIEN + 1)])
+
+        catalogue = champs_pour_navigateur(champs_filtrables(Soin))
+        departement = next(c for c in catalogue['champs']
+                           if c['chemin'] == 'departement')
+        self.assertEqual(departement['type'], 'nombre')
+        self.assertEqual(departement['choix'], [])
+
+
+class TestLaMemoireRetientLesFiltresPersonnalises(TestCase):
+    """Revenir d'une fiche doit rendre la sélection **entière**.
+
+    La mémoire des listes retenait `cond_…` et `mode_cond`, deux noms que rien
+    n'a jamais écrits : le constructeur de conditions envoie `cf`, `co`, `cv`
+    et `cm`. Les deux moitiés ne se sont donc jamais rencontrées. On posait un
+    filtre personnalisé, on ouvrait une fiche, on revenait — et il avait
+    disparu, sur les six listes qui offrent la fonction.
+    """
+
+    def setUp(self):
+        User.objects.create_superuser('su_memo_perso', password='x')
+        self.client = Client()
+        self.client.login(username='su_memo_perso', password='x')
+        self.url = reverse('soins:list')
+
+    SELECTION = '?filter=&cf=motif&co=contient&cv=pansement'
+
+    def test_la_condition_revient_avec_la_selection(self):
+        self.client.get(self.url + self.SELECTION)
+        retour = self.client.get(self.url)          # retour d'une fiche
+        self.assertEqual(retour.status_code, 302)
+        for morceau in ('cf=motif', 'co=contient', 'cv=pansement'):
+            self.assertIn(morceau, retour['Location'])
+
+    def test_le_mode_de_combinaison_revient_aussi(self):
+        """Sans lui, deux conditions retrouvées en ET au lieu de OU ne rendent
+        pas la même liste — et rien ne le dit."""
+        self.client.get(self.url + self.SELECTION + '&cm=ou')
+        retour = self.client.get(self.url)
+        self.assertIn('cm=ou', retour['Location'])
+
+    def test_plusieurs_conditions_reviennent_toutes(self):
+        """Elles voyagent en listes parallèles : n'en retenir qu'une changerait
+        le résultat sans prévenir."""
+        self.client.get(
+            self.url + '?filter='
+            '&cf=motif&co=contient&cv=pansement'
+            '&cf=nom&co=contient&cv=pied')
+        cible = self.client.get(self.url)['Location']
+        self.assertEqual(cible.count('cf='), 2)
+        self.assertIn('cv=pied', cible)
+
+    def test_effacer_oublie_bien_la_condition(self):
+        """« Effacer » rafraîchit la liste en AJAX sans aucun paramètre : c'est
+        ce qui le distingue d'un retour de fiche. Il doit tout oublier."""
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(self.url + self.SELECTION)
+        self.assertIn(PREFIXE_CLE + self.url, self.client.session)
+
+        self.client.get(self.url,
+                        headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertNotIn(PREFIXE_CLE + self.url, self.client.session)

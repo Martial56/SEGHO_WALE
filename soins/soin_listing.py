@@ -179,11 +179,11 @@ def construire_dimensions():
 
     lib_statut = dict(Soin.STATUT)
     # Le choix vide porte le libellé « — » : écarté, pour que le groupe des
-    # valeurs absentes s'annonce « Non précisé » comme ailleurs.
+    # valeurs absentes s'annonce « Indéfini » comme ailleurs.
     lib_severite = {code: libelle for code, libelle in Soin.SEVERITE if code}
     lib_maladie = {code: libelle for code, libelle in Soin.STATUT_MALADIE if code}
 
-    def choix(champ, libelles, defaut='Non précisé'):
+    def choix(champ, libelles, defaut='Indéfini'):
         """Dimension d'un champ à choix : le code est traduit des deux côtés."""
         return {
             'values': (champ,),
@@ -256,8 +256,8 @@ def construire_dimensions():
         ('maladie', 'Statut de la maladie', None, choix('statut_maladie', lib_maladie)),
         ('genre', 'Genre du patient', None, {
             'values': ('patient__sexe',),
-            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Non précisé'),
-            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Non précisé'),
+            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Indéfini'),
+            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Indéfini'),
             'order':  ('patient__sexe',),
         }),
     ]
@@ -278,3 +278,54 @@ TRIS = {
     'statut':   ('statut',),
     'severite': ('severite',),
 }
+
+
+# ── Filtres et regroupements personnalisés ──────────────────────────────────
+# Les familles et les dimensions ci-dessus couvrent ce qu'on cherche tous les
+# jours. Elles ne couvriront jamais tout : « les soins d'un patient de telle
+# commune », « ceux dont le motif contient tel mot ». Le constructeur de
+# conditions de `core.listing` répond à ces questions-là sans qu'on ait à les
+# prévoir, et les champs découverts lui servent de liste blanche.
+
+#: Chemins traversant une relation : utiles au filtrage, mais non découvrables
+#: sans exposer tout le schéma. Le second élément range le champ sous un titre.
+CHAMPS_EXTRA = (
+    ('patient__nom', 'Patient'),
+    ('patient__prenoms', 'Patient'),
+    ('patient__code_patient', 'Patient'),
+    ('patient__sexe', 'Patient'),
+    ('patient__telephone', 'Patient'),
+    ('patient__date_naissance', 'Patient'),
+    ('facture__numero', 'Facturation'),
+    ('facture__statut', 'Facturation'),
+    ('facture__montant_total', 'Facturation'),
+    ('hospitalisation__numero', 'Hospitalisation'),
+    ('hospitalisation__statut', 'Hospitalisation'),
+)
+
+#: Champs déjà couverts par une dimension déclarée : les proposer une seconde
+#: fois dans « Ajouter un groupement personnalisé » n'offrirait qu'un doublon,
+#: et le doublon serait le moins parlant des deux.
+CHAMPS_DEJA_GROUPABLES = (
+    'statut', 'severite', 'statut_maladie', 'patient', 'infirmier',
+    'departement', 'patient__sexe',
+)
+
+
+def champs_soins():
+    """Champs proposés au filtrage et au regroupement personnalisés."""
+    from core.listing import champs_filtrables
+
+    from .models import Soin
+    return champs_filtrables(Soin, extra=CHAMPS_EXTRA, groupe='Soin')
+
+
+def dimensions_personnalisees(champs=None):
+    """Dimensions générées pour « Ajouter un groupement personnalisé ».
+
+    L'appelant qui tient déjà la liste des champs la passe : la construire
+    interroge la base, autant ne pas le faire deux fois par requête.
+    """
+    from core.listing import dimensions_auto
+    return dimensions_auto(champs or champs_soins(),
+                           exclure=CHAMPS_DEJA_GROUPABLES)

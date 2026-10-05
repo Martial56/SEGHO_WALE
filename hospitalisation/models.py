@@ -181,11 +181,24 @@ class Hospitalisation(ModeleCentre):
     motif_admission      = models.TextField(blank=True, verbose_name="Motif d'admission")
     notes                = models.TextField(blank=True)
 
-    # Horodatages figés à la transition de statut
-    heure_entree = models.DateTimeField(null=True, blank=True, editable=False,
+    # Horodatages de l'observation. Posés par la transition de statut, puis
+    # corrigeables à la main : on décharge rarement à la seconde près, et
+    # `duree_observation` part dans le tableau MO de la fiche d'activité de
+    # soins. Mieux vaut une heure corrigée qu'un rapport faux.
+    heure_entree = models.DateTimeField(null=True, blank=True,
                                         verbose_name="Heure d'entrée")
-    heure_sortie = models.DateTimeField(null=True, blank=True, editable=False,
+    heure_sortie = models.DateTimeField(null=True, blank=True,
                                         verbose_name="Heure de sortie")
+    # Ce que le système a lui-même enregistré, à la seconde de la transition.
+    # Jamais réécrit — pas même par un superadmin — et seuls les superadmins le
+    # voient sur la fiche : c'est l'écart entre ces heures et celles du dessus
+    # qui dit qu'une décharge a été faite en retard, et permet d'y revenir.
+    heure_entree_systeme = models.DateTimeField(
+        null=True, blank=True, editable=False,
+        verbose_name="Heure d'entrée enregistrée par le système")
+    heure_sortie_systeme = models.DateTimeField(
+        null=True, blank=True, editable=False,
+        verbose_name="Heure de sortie enregistrée par le système")
 
     # Champs transfert (renseignés lors d'une décharge avec transfert=True sur ResumeDecharge)
     etablissement_destination = models.CharField(max_length=200, blank=True,
@@ -228,6 +241,18 @@ class Hospitalisation(ModeleCentre):
                     continue
             raise IntegrityError("Impossible de générer un numéro d'hospitalisation unique après 3 tentatives.")
         super().save(*args, **kwargs)
+
+    @property
+    def heures_corrigees(self):
+        """Les heures affichées s'écartent-elles de celles du système ?
+
+        Vrai dès qu'une des deux a été reprise à la main. Un champ système vide
+        ne compte pas : ce sont les dossiers antérieurs à ces champs, ou une
+        étape jamais franchie.
+        """
+        paires = ((self.heure_entree, self.heure_entree_systeme),
+                  (self.heure_sortie, self.heure_sortie_systeme))
+        return any(sys is not None and val != sys for val, sys in paires)
 
     @property
     def duree_observation(self):

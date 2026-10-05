@@ -30,6 +30,40 @@ from django.db.models import Count, Q
 #: et la mémoire des listes doit l'ignorer (voir core.memoire_listing).
 PARAM_GROUPE = '_groupe'
 
+#: Paramètre d'URL portant les groupes à rendre déjà dépliés, sous la forme
+#: `<page>:<chemin>,<chemin>`. Il voyage avec les filtres et le regroupement, et
+#: la mémoire des listes le retient comme eux (voir core.memoire_listing) : la
+#: page revient donc dépliée comme on l'avait laissée, sans rien à rattraper
+#: après l'affichage.
+#:
+#: Le numéro de page fait partie de la valeur parce qu'un chemin est positionnel
+#: — « 0 » désigne le premier groupe *de la page affichée*. Sans lui, passer à la
+#: page suivante aurait déplié un groupe sans rapport, en silence.
+PARAM_OUVERTS = 'ouverts'
+
+#: Valeur de `PARAM_GROUPE` réclamant les lignes de **tous** les groupes de la
+#: page, en une seule requête. C'est ce que le navigateur demande en tâche de
+#: fond une fois la page affichée, pour que déplier ne fasse plus attendre.
+TOUS_LES_GROUPES = '*'
+
+#: Paramètre d'URL portant le rang de la première ligne réclamée dans un groupe.
+#: Un gros groupe ne sort pas d'un bloc : « Charger plus » redemande le même
+#: groupe à partir de là où le lot précédent s'est arrêté.
+PARAM_DECALAGE = '_decalage'
+
+#: Nombre de lignes rendues d'un coup pour un groupe déplié.
+#:
+#: Sans ce plafond, déplier un groupe de trente mille lignes les rendait toutes :
+#: la réponse pesait des dizaines de méga-octets et la page se figeait le temps
+#: de les poser. On n'en montre donc qu'un lot, suivi d'une entrée « Charger
+#: plus » tant qu'il en reste — c'est la pagination des groupes, à l'intérieur
+#: d'un groupe.
+#:
+#: Le préchargement, lui, ne passe pas par ici : il a son propre garde-fou
+#: côté navigateur (MAX_LIGNES_PRECHARGEES dans listing_groupes.js), qui renonce
+#: à précharger une page trop lourde plutôt que de la tronquer.
+TAILLE_LOT_GROUPE = 80
+
 
 # ── Déclarations ────────────────────────────────────────────────────────────
 
@@ -430,7 +464,7 @@ class _PaginateurDeGroupes(Paginator):
 
 
 def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
-                    chemin_demande=None):
+                    chemin_demande=None, ouverts='', decalage=0):
     """Pagine les **groupes** plutôt que les lignes, à la manière d'Odoo.
 
     Avec un regroupement actif, paginer les lignes conduit à afficher des groupes
@@ -455,18 +489,94 @@ def paginer_groupes(qs_filtre, dims, numero_page, groupes_par_page=25,
     `rafraichir()` ne prend que les zones qui l'intéressent. Un dépliage déjà
     chargé ne rappelle plus le serveur.
 
+    `chemin_demande = TOUS_LES_GROUPES` réclame d'un coup les lignes de tous les
+    groupes de la page. C'est ce que le navigateur demande en tâche de fond
+    aussitôt la page affichée : l'affichage reste aussi rapide qu'avec les
+    en-têtes seuls, et quand on déplie, les lignes sont déjà là. On retrouve
+    ainsi le dépliage instantané d'avant le chargement différé, sans retrouver
+    sa page de plusieurs méga-octets — c'est le même volume, mais après coup et
+    sans bloquer.
+
+    `decalage` dit à partir de quelle ligne servir le groupe demandé : c'est le
+    « Charger plus » d'un gros groupe (voir TAILLE_LOT_GROUPE). Il vient de
+    l'URL, donc de n'importe où : tout ce qui n'est pas un rang positif vaut
+    zéro, et on repart du début plutôt que de refuser la page.
+
     Retourne (arbre, page_de_groupes, nombre_total_de_groupes).
     """
-    arbre, page, nombre, _, brutes_chemin = _page_de_groupes(
+    try:
+        decalage = max(0, int(decalage or 0))
+    except (TypeError, ValueError):
+        decalage = 0
+    arbre, page, nombre, totaux_page, brutes_chemin, brutes = _page_de_groupes(
         qs_filtre, dims, numero_page, groupes_par_page)
-    if chemin_demande:
+    if chemin_demande == TOUS_LES_GROUPES:
+        retenus = set(page.object_list)
+        arbre = _arbre(totaux_page,
+                       _lignes_des_groupes(qs_filtre, dims, brutes, retenus),
+                       dims, retenus)
+    elif chemin_demande:
         noeud = _noeud_par_chemin(arbre, chemin_demande)
         # Un nœud qui a des enfants n'a pas de lignes à lui : ses sous-groupes
         # sont déjà dans la page, et ce sont eux qui en demanderont.
         if noeud is not None and not noeud['enfants']:
-            noeud['lignes'] = _lignes_du_groupe(
-                qs_filtre, dims, brutes_chemin, noeud['cle'])
+            _poser_lot(noeud, _lignes_du_groupe(
+                qs_filtre, dims, brutes_chemin, noeud['cle'], decalage), decalage)
+
+    # En dernier : l'arbre a pu être rebâti juste au-dessus par le
+    # préchargement, et les marques posées avant auraient été perdues.
+    _ouvrir(arbre, chemins_ouverts(ouverts, numero_page),
+            lambda n: _poser_lot(n, _lignes_du_groupe(
+                qs_filtre, dims, brutes_chemin, n['cle'])))
     return arbre, page, nombre
+
+
+def chemins_ouverts(valeur, numero_page):
+    """Les chemins à déplier, s'ils concernent bien la page affichée.
+
+    `valeur` est ce que porte `PARAM_OUVERTS` : « 2:0,1-3 ». Le numéro en tête
+    dit de quelle page ces chemins parlent. Il ne s'agit pas de prudence
+    gratuite : un chemin est positionnel, « 0 » désigne le premier groupe de la
+    page affichée. Les liens de pagination recopient les paramètres courants,
+    donc sans cette vérification, passer à la page suivante aurait déplié un
+    groupe sans rapport — et rien ne l'aurait signalé.
+    """
+    if not valeur:
+        return ()
+    page, _, chemins = str(valeur).partition(':')
+    if not chemins:
+        return ()
+    if (page or '1') != (str(numero_page) if numero_page else '1'):
+        return ()
+    return tuple(c for c in chemins.split(',') if c)
+
+
+def _ouvrir(arbre, chemins, charger_lignes):
+    """Marque les groupes dépliés et leur donne leur premier lot de lignes.
+
+    `charger_lignes` reçoit le nœud et s'occupe d'y ranger ce qu'il faut — le
+    lot comme ce qu'il en reste (voir `_poser_lot`). Un groupe restauré ouvert
+    revient donc sur son premier lot, avec son « Charger plus » s'il est gros :
+    on ne retient pas jusqu'où on avait déroulé, seulement qu'il était ouvert.
+
+    Les ancêtres s'ouvrent avec eux : la bande d'un sous-groupe est masquée tant
+    que son parent est fermé, un chemin « 0-1 » déplié seul ne se verrait donc
+    pas. Le navigateur les note déjà tous, mais le serveur ne doit pas dépendre
+    de cette politesse.
+    """
+    for chemin in chemins:
+        morceaux = chemin.split('-')
+        for profondeur in range(1, len(morceaux) + 1):
+            noeud = _noeud_par_chemin(arbre, '-'.join(morceaux[:profondeur]))
+            if noeud is None:
+                break
+            noeud['ouvert'] = True
+            for enfant in noeud['enfants']:
+                enfant['visible'] = True
+            # Un nœud à enfants n'a pas de lignes à lui, et celles d'un groupe
+            # déjà servi par `_groupe` ou par le préchargement sont là.
+            if not noeud['enfants'] and not noeud['lignes']:
+                charger_lignes(noeud)
 
 
 def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
@@ -476,9 +586,10 @@ def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
     ne dépend que de l'agrégation, cela d'un chemin réclamé par le navigateur.
     La séparation rend aussi les en-têtes testables sans toucher aux lignes.
 
-    Retourne (arbre, page, nombre_de_groupes, totaux, valeurs_brutes_par_chemin).
+    Retourne (arbre, page, nombre_de_groupes, totaux,
+    valeurs_brutes_par_chemin, valeurs_brutes_par_racine).
     """
-    totaux, _, brutes_chemin = (
+    totaux, brutes, brutes_chemin = (
         _totaux_feuilles_sql(qs_filtre, dims)
         if all(d.agregeable for d in dims)
         else _totaux_feuilles_python(qs_filtre, dims))
@@ -497,7 +608,8 @@ def _page_de_groupes(qs_filtre, dims, numero_page, groupes_par_page):
 
     totaux_page = {c: n for c, n in totaux.items() if c[0] in retenus}
     arbre = _arbre(totaux_page, [], dims, retenus)
-    return arbre, page, len(racines_libelles), totaux_page, brutes_chemin
+    return (arbre, page, len(racines_libelles), totaux_page, brutes_chemin,
+            brutes)
 
 
 def _noeud_par_chemin(noeuds, chemin):
@@ -528,8 +640,46 @@ def _condition_du_chemin(dims, brutes_chemin, cle):
     return condition
 
 
-def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
-    """Les lignes d'un groupe feuille, désigné par son chemin en libellés."""
+def _lignes_des_groupes(qs_filtre, dims, brutes, retenus):
+    """Les lignes de tous les groupes racines affichés, en une seule requête.
+
+    Le dépliage groupe par groupe fait attendre à chaque ouverture, et refait
+    l'agrégation complète pour n'en tirer que quelques lignes. Le navigateur
+    demande donc tout d'un coup une fois la page à l'écran : il paie un
+    aller-retour pendant qu'on lit les en-têtes, et chaque dépliage devient
+    instantané ensuite.
+
+    Une seule condition suffit : la page retient des groupes **racines
+    entiers**, jamais une partie d'un groupe. Filtrer sur la première dimension
+    ramène donc exactement les lignes de la page, et `_arbre` les range ensuite
+    dans leurs feuilles.
+    """
+    racine = dims[0]
+    annotations = {}
+    for dim in dims:
+        annotations.update(dim.annotate)
+    base = qs_filtre.annotate(**annotations) if annotations else qs_filtre
+    if not racine.filtrable:
+        # La dimension ne s'exprime pas en base : `_arbre` fera le tri lui-même.
+        return list(base)
+    valeurs = set()
+    for libelle in retenus:
+        valeurs |= brutes.get(libelle, set())
+    if not valeurs:
+        return []
+    return list(base.filter(racine.filtre(valeurs)))
+
+
+def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle, decalage=0,
+                      limite=TAILLE_LOT_GROUPE):
+    """Un lot des lignes d'un groupe feuille, désigné par son chemin en libellés.
+
+    Le lot va de `decalage` à `decalage + limite` : voir TAILLE_LOT_GROUPE pour
+    la raison de ce découpage. La tranche est posée sur le queryset, donc la base
+    ne renvoie que ces lignes-là — sauf pour le repli en Python, où une dimension
+    qui ne s'exprime pas en filtre oblige de toute façon à tout parcourir ; le
+    plafond n'y protège que le rendu.
+    """
     annotations = {}
     for dim in dims:
         annotations.update(dim.annotate)
@@ -537,9 +687,24 @@ def _lignes_du_groupe(qs_filtre, dims, brutes_chemin, cle):
 
     condition = _condition_du_chemin(dims, brutes_chemin, cle)
     if condition is not None:
-        return list(base.filter(condition))
+        return list(base.filter(condition)[decalage:decalage + limite])
     # Repli : la dimension ne s'exprime pas en base, on trie en Python.
-    return [o for o in qs_filtre if cle in _chemins(o, dims)]
+    retenues = [o for o in qs_filtre if cle in _chemins(o, dims)]
+    return retenues[decalage:decalage + limite]
+
+
+def _poser_lot(noeud, lignes, decalage=0):
+    """Range un lot dans son nœud et calcule ce qu'il reste à charger.
+
+    Le compte ne vient pas des lignes mais de `total`, qui sort de l'agrégation :
+    on sait donc ce qui manque sans l'avoir lu, et « Charger plus » peut annoncer
+    combien de lignes il reste avant qu'on ait touché à la base.
+    """
+    noeud['lignes'] = lignes
+    reste = max(0, noeud['total'] - decalage - len(lignes))
+    noeud['suite'] = decalage + len(lignes) if reste and lignes else None
+    noeud['reste'] = reste
+    noeud['prochain'] = min(reste, TAILLE_LOT_GROUPE)
 
 
 def _arbre(totaux, lignes, dims, retenus=None):
@@ -579,6 +744,18 @@ def _arbre(totaux, lignes, dims, retenus=None):
             'total':    sommes.get(cle_complete, 0),
             'sur_page': 0,
             'partiel':  False,
+            # Rang du lot suivant, et ce qu'il restera après celui-ci : de quoi
+            # écrire l'entrée « Charger plus ». `suite` est None quand le groupe
+            # est entier — il n'y a alors rien à proposer.
+            'suite':    None,
+            'reste':    0,
+            'prochain': 0,
+            # Déplié dès le rendu : la page arrive ouverte, sans que rien n'ait
+            # à la rouvrir après coup (voir `chemins_ouverts`).
+            'ouvert':   False,
+            # Une bande de sous-groupe ne se montre que si son parent est
+            # déplié — c'est l'état du parent qui décide, jamais le sien.
+            'visible':  niveau == 0,
             'enfants':  [],
             'lignes':   [],
         }
@@ -605,6 +782,14 @@ def _arbre(totaux, lignes, dims, retenus=None):
     def marquer(noeuds):
         for n in noeuds:
             n['partiel'] = n['sur_page'] < n['total']
+            # Le préchargement passe par ici plutôt que par `_poser_lot` : il
+            # range les lignes de tous les groupes d'un coup. Il les prend
+            # entières, donc `suite` reste nul — mais on le calcule quand même,
+            # pour que l'arbre dise la même chose par les deux chemins.
+            if n['partiel'] and n['sur_page']:
+                n['suite'] = n['sur_page']
+                n['reste'] = n['total'] - n['sur_page']
+                n['prochain'] = min(n['reste'], TAILLE_LOT_GROUPE)
             marquer(n['enfants'])
     marquer(racines)
     return racines
@@ -1025,11 +1210,11 @@ def _attribut(objet, chemin):
 
 
 def _valeur_choix(chemin, libelles):
-    return lambda o: libelles.get(str(_attribut(o, chemin)), 'Non précisé') if _attribut(o, chemin) not in (None, '') else 'Non précisé'
+    return lambda o: libelles.get(str(_attribut(o, chemin)), 'Indéfini') if _attribut(o, chemin) not in (None, '') else 'Indéfini'
 
 
 def _label_choix(chemin, libelles):
-    return lambda r: libelles.get(str(r[chemin]), 'Non précisé') if r[chemin] not in (None, '') else 'Non précisé'
+    return lambda r: libelles.get(str(r[chemin]), 'Indéfini') if r[chemin] not in (None, '') else 'Indéfini'
 
 
 def _valeur_booleen(chemin):
@@ -1101,9 +1286,21 @@ def champs_pour_navigateur(champs):
             # Un enregistrement de plus que la limite suffit à savoir si la table
             # est trop grande : un COUNT séparé doublerait le nombre de requêtes,
             # et il y a autant de tables à interroger que de champs de lien.
-            objets = list(modele.objects.all()[:MAX_CHOIX_LIEN + 1])
+            #
+            # `order_by()` efface le tri par défaut du modèle, et ce n'est pas
+            # un détail : toutes ces tables en ont un, si bien que prendre 201
+            # lignes obligeait la base à trier la table entière d'abord. Sur un
+            # millier de factures c'est invisible, sur cent mille beaucoup
+            # moins — et ce tri ne servait à rien, puisqu'on ne cherche ici
+            # qu'à savoir si la table est petite et, si oui, ce qu'elle
+            # contient.
+            objets = list(modele.objects.all().order_by()[:MAX_CHOIX_LIEN + 1])
             if len(objets) <= MAX_CHOIX_LIEN:
-                choix = [(str(o.pk), str(o)) for o in objets]
+                # Rangés par libellé : on vient y choisir une valeur, et une
+                # liste alphabétique se parcourt mieux que l'ordre où la base
+                # les a rendus.
+                choix = sorted(((str(o.pk), str(o)) for o in objets),
+                               key=lambda c: _sans_accent(c[1]))
             else:
                 categorie = 'nombre'      # repli : saisie de l'identifiant
         groupe = champ.get('groupe', '')

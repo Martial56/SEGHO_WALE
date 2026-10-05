@@ -64,7 +64,7 @@ def patient_list(request):
     """
     from datetime import date as _date
 
-    from core.listing import (PARAM_GROUPE, Listing, appliquer_conditions,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
                               menu_filtres, menu_groupes, paginer_groupes)
     from .patient_listing import (CHAMPS_RECHERCHE, champs_patients,
@@ -121,7 +121,9 @@ def patient_list(request):
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
-            request.GET.get(PARAM_GROUPE))
+            request.GET.get(PARAM_GROUPE),
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
     else:
         nb_groupes = 0
         page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
@@ -562,7 +564,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
         familles=familles_rdv(contexte_gyneco),
         dimensions=list(construire_dimensions(today).values()) + dims_perso,
-        par_page=25,
+        par_page=100,
         filtres_defaut=FILTRES_PAR_DEFAUT,
         tri_defaut=('-date_heure',),
     )
@@ -583,7 +585,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     # Avec un regroupement actif, on pagine les **groupes** et non les lignes :
     # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
     # la page porterait, repliées, toutes les lignes de tous les groupes.
-    from core.listing import PARAM_GROUPE, paginer_groupes
+    from core.listing import PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, paginer_groupes
     declarees = dict(construire_dimensions(today))
     declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
@@ -591,11 +593,13 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
             qs, dims, request.GET.get('page'), listing.par_page,
-            request.GET.get(PARAM_GROUPE))
+            request.GET.get(PARAM_GROUPE),
+            request.GET.get(PARAM_OUVERTS, ''),
+            request.GET.get(PARAM_DECALAGE))
         annoter_diagnostics([o for n in _feuilles(arbre) for o in n['lignes']])
     else:
         nb_groupes = 0
-        page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
         annoter_diagnostics(list(page_obj))
 
     # En AJAX on ne renvoie que les zones rafraîchies, pas la page entière.

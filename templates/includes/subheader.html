@@ -254,7 +254,7 @@
 
 </div>
 
-<script src="{% static 'js/listing_groupes.js' %}"></script>
+<script src="{% static 'js/listing_groupes.js' %}?v=4"></script>
 <script>
   // Colonnes redimensionnables
   function initResizableCols(table) {
@@ -278,20 +278,34 @@
   }
   // Appelé après le rendu DOM complet (la table est après cet include)
 
-  // Rebranché après chaque échange AJAX : les lignes du tableau sont remplacées,
-  // leurs écouteurs d'origine disparaissent avec elles.
+  // Ouvrir un rendez-vous : **un seul** écouteur, posé sur le document.
+  //
+  // Il était posé ligne par ligne, sur celles présentes au moment du
+  // branchement. Les lignes d'un groupe arrivent désormais à son dépliage,
+  // bien après : elles n'avaient aucun écouteur, et le tableau se dépliait
+  // sur des lignes qu'on ne pouvait pas ouvrir. Rebrancher après chaque
+  // insertion aurait marché, mais il aurait fallu y penser à chaque nouvelle
+  // façon d'ajouter une ligne — la délégation, elle, n'a rien à savoir de
+  // quand la ligne est née.
+  document.addEventListener('click', function (e) {
+    var ligne = e.target.closest('.rdv-row');
+    if (!ligne || !ligne.dataset.url) return;
+    if (e.target.type === 'checkbox') return;
+    if (e.target.closest('.o-group-header')) return;
+    if (e.target.closest('a, button, input, select, label')) return;
+    window.location = ligne.dataset.url;
+  });
+
+  // Rebranché après chaque échange AJAX : le redimensionnement des colonnes et
+  // le constructeur de conditions vivent dans des zones remplacées.
   function initListeInteractions() {
     // Le constructeur de conditions vit dans la barre de contrôles, remplacée à
     // chaque échange : ses lignes sont donc à reconstruire depuis l'URL.
     if (window.lstfInit) window.lstfInit();
+    // La liste a été remplacée : ses groupes repartent sans lignes, on les
+    // reprécharge pour que déplier reste instantané.
+    if (window.lstPrecharger) window.lstPrecharger();
     document.querySelectorAll('.o-list').forEach(initResizableCols);
-    document.querySelectorAll('.rdv-row').forEach(function(row) {
-      row.addEventListener('click', function(e) {
-        if (e.target.type === 'checkbox') return;
-        if (e.target.closest('.o-group-header')) return;
-        window.location = row.dataset.url;
-      });
-    });
   }
   if (document.readyState !== 'loading') initListeInteractions();
   else document.addEventListener('DOMContentLoaded', initListeInteractions);
@@ -369,6 +383,9 @@
     autres.forEach(function(v) { params.append('filter', v); });
     params.append('filter', value);
     params.delete('page');
+    // Les chemins dépliés sont positionnels : ceux d'une sélection ne
+    // désignent rien sur une autre. Changer de critère les abandonne.
+    params.delete('ouverts');
     refreshList(window.location.pathname + '?' + params.toString(), true);
   }
   window.setPeriode = setPeriode;
@@ -389,7 +406,7 @@
     if (key === 'filter' && params.getAll('filter').length === 0) {
       params.append('filter', 'tous');
     }
-    params.delete('page');
+    params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + '?' + params.toString(), true);
   }
   window.toggleParam = toggleParam;
@@ -400,7 +417,7 @@
     if (input) input.value = '';
     if (btn) btn.style.display = 'none';
     var params = new URLSearchParams(window.location.search);
-    params.delete('q'); params.delete('page');
+    params.delete('q'); params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
   }
   window.clearSearch = clearSearch;
@@ -420,7 +437,7 @@
     var params = new URLSearchParams(window.location.search);
     if (from && from.value) params.set('date_from', from.value); else params.delete('date_from');
     if (to && to.value) params.set('date_to', to.value); else params.delete('date_to');
-    params.delete('page');
+    params.delete('page'); params.delete('ouverts');
     refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
   }
   window.applyDateFilter = applyDateFilter;
@@ -577,7 +594,7 @@
       timer = setTimeout(function() {
         var params = new URLSearchParams(window.location.search);
         if (val) params.set('q', val); else params.delete('q');
-        params.delete('page');
+        params.delete('page'); params.delete('ouverts');
         refreshList(window.location.pathname + (params.toString() ? '?' + params.toString() : ''), true);
       }, 300);
     });

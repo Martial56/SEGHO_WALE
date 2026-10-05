@@ -184,14 +184,14 @@ def construire_dimensions():
         }),
         ('statut', 'État de la fiche', None, {
             'values': ('statut',),
-            'label':  lambda r: lib_statut.get(r['statut']) or 'Non précisé',
-            'valeur': lambda o: lib_statut.get(o.statut) or 'Non précisé',
+            'label':  lambda r: lib_statut.get(r['statut']) or 'Indéfini',
+            'valeur': lambda o: lib_statut.get(o.statut) or 'Indéfini',
             'order':  ('statut',),
         }),
         ('genre', 'Genre du patient', None, {
             'values': ('patient__sexe',),
-            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Non précisé'),
-            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Non précisé'),
+            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Indéfini'),
+            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Indéfini'),
             'order':  ('patient__sexe',),
         }),
     ]

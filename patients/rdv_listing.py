@@ -217,14 +217,14 @@ def construire_dimensions(aujourdhui):
         }),
         ('sexe', {
             'values': ('patient__sexe',),
-            'label':  lambda r: {'F': 'Féminin', 'M': 'Masculin'}.get(r['patient__sexe'], 'Non précisé'),
-            'cle':    lambda o: {'F': 'Féminin', 'M': 'Masculin'}.get(o.patient.sexe if o.patient else None, 'Non précisé'),
+            'label':  lambda r: {'F': 'Féminin', 'M': 'Masculin'}.get(r['patient__sexe'], 'Indéfini'),
+            'cle':    lambda o: {'F': 'Féminin', 'M': 'Masculin'}.get(o.patient.sexe if o.patient else None, 'Indéfini'),
             'order':  ('patient__sexe',),
         }),
         ('type_rdv', {
             'values': ('type_rdv',),
-            'label':  lambda r: _LIB_TYPE.get(r['type_rdv'], _vide(r['type_rdv'], 'Non précisé')),
-            'cle':    lambda o: o.get_type_rdv_display() if o.type_rdv else 'Non précisé',
+            'label':  lambda r: _LIB_TYPE.get(r['type_rdv'], _vide(r['type_rdv'], 'Indéfini')),
+            'cle':    lambda o: o.get_type_rdv_display() if o.type_rdv else 'Indéfini',
             'order':  ('type_rdv',),
         }),
         ('type_consultation', {
@@ -267,8 +267,8 @@ def construire_dimensions(aujourdhui):
         }),
         ('statut', {
             'values': ('statut',),
-            'label':  lambda r: _LIB_STATUT.get(r['statut'], _vide(r['statut'], 'Non précisé')),
-            'cle':    lambda o: o.get_statut_display() if o.statut else 'Non précisé',
+            'label':  lambda r: _LIB_STATUT.get(r['statut'], _vide(r['statut'], 'Indéfini')),
+            'cle':    lambda o: o.get_statut_display() if o.statut else 'Indéfini',
             'order':  ('statut',),
         }),
         ('departement', {

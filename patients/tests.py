@@ -615,3 +615,164 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         gabarit la rendrait muette sur les listes qui n'ont pas cette feuille."""
         self._rdv('annule')
         self.assertNotIn('rdv-row-annule', self._html('patients:rdv_global'))
+
+
+class TestUnePermissionDEtapePrimeSurLAccesComplet(TestCase):
+    """« Peut modifier : rendez-vous » ne rouvre pas les autres étapes.
+
+    Un infirmier qui tenait aussi `change_rendezvous` (par un second groupe,
+    par exemple) voyait le bouton « En consultation » une fois le RDV mis en
+    attente : l'accès complet l'emportait sur sa permission d'étape.
+    """
+
+    def setUp(self):
+        self.rdv = RendezVous.objects.create(
+            patient=_patient(), date_heure=timezone.now(), statut='en_attente')
+        self.url = reverse('patients:rdv_edit', args=[self.rdv.pk])
+        _avec('u_inf_complet', 'patients.view_rendezvous', 'patients.change_rendezvous',
+              'patients.mettre_en_attente_rendezvous')
+
+    def test_l_infirmier_ne_voit_pas_en_consultation(self):
+        self.assertNotIn('value="en_consultation"', _page('u_inf_complet', self.url))
+
+    def test_ni_ne_peut_le_poster(self):
+        client = Client()
+        client.login(username='u_inf_complet', password='x')
+        self.assertEqual(client.post(self.url, {'_action': 'en_consultation'}).status_code, 403)
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'en_attente')
+
+    def test_sans_permission_d_etape_l_acces_complet_demeure(self):
+        _avec('u_seul_complet', 'patients.view_rendezvous', 'patients.change_rendezvous')
+        self.assertIn('value="en_consultation"', _page('u_seul_complet', self.url))
+
+
+class TestLAgeEstDetailleSurLaListeDesRdv(TestCase):
+    """Même correction que sur la liste des soins, sur le gabarit de ligne
+    partagé par les rendez-vous des patients et ceux de gynécologie.
+
+    `templates/includes/rdv_row.html` écrivait « {{ patient.age }} ans ». La
+    liste des patients, elle, affiche `age_detail` depuis toujours : deux
+    listes du même dossier ne donnaient pas le même âge.
+    """
+
+    def setUp(self):
+        self.patient = _patient()
+        # `_patient` pose la date de naissance sous forme de chaîne : tant
+        # qu'on n'a pas relu la ligne, `age_detail` travaille sur un `str`.
+        self.patient.refresh_from_db()
+        User.objects.create_superuser('su_age_rdv', password='x')
+        self.client = Client()
+        self.client.login(username='su_age_rdv', password='x')
+        from medecins.models import Departement
+        departement, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(),
+            motif='Controle', statut='confirme', departement=departement,
+        )
+
+    #: Les deux listes partagent `includes/rdv_row.html` : la correction doit
+    #: se voir sur les deux, sinon elle n'est écrite qu'à moitié.
+    LISTES = ('patients:rdv_global', 'gynecologie_rdv')
+
+    def _html(self, nom):
+        reponse = self.client.get(reverse(nom) + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_les_deux_listes_portent_l_age_detaille(self):
+        for nom in self.LISTES:
+            self.assertIn(self.patient.age_detail, self._html(nom))
+
+    def test_l_ancien_format_en_annees_seules_a_disparu(self):
+        """Sans cette moitié, le test précédent passerait si les deux
+        cohabitaient."""
+        for nom in self.LISTES:
+            self.assertNotIn(f'{self.patient.age} ans', self._html(nom))
+
+
+class TestLeDepliageNeMelangePasLesDeuxVues(TestCase):
+    """La liste des patients rend deux fois le même regroupement : des fiches
+    dans `#kanban-view`, des lignes dans `#list-view`. Les deux portent les
+    mêmes `data-chemin` et les mêmes `data-parent`, puisque c'est le même arbre.
+    La gynécologie fait pareil.
+
+    listing_groupes.js cherchait ces attributs dans tout le document. Déplier
+    une bande du kanban y versait donc les fiches **et** les lignes du tableau :
+    mesuré dans Chrome sur 199 patients, les colonnes de la grille passaient de
+    254 px à 600 px et la page débordait à 3029 px de large, d'où le défilement
+    horizontal et les fiches étirées. Le tableau recevait symétriquement les
+    fiches, et se cassait de la même façon.
+
+    Il n'y a pas de lanceur JS dans ce dépôt. Ce qui est vérifiable depuis
+    Python l'est : que l'ambiguïté existe bel et bien dans la page — sans elle
+    la correction n'aurait pas lieu d'être —, que les deux bandes restent
+    distinguables à leur balise, puisque c'est ce dont le script se sert pour
+    choisir sa vue, et qu'il ne cherche plus rien dans `document`.
+    """
+
+    def setUp(self):
+        _patient()
+        User.objects.create_superuser('su_deux_vues', password='x')
+        self.client = Client()
+        self.client.login(username='su_deux_vues', password='x')
+
+    def _fragment(self):
+        """La réponse à un dépliage : c'est elle que le script découpe."""
+        reponse = self.client.get(
+            reverse('patients:list') + '?group=sexe&_groupe=0',
+            headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_les_deux_vues_portent_le_meme_chemin_de_groupe(self):
+        """L'ambiguïté que le script doit lever."""
+        html = self._fragment()
+        self.assertRegex(
+            html, r'<div[^>]*class="lst-groupe lst-groupe-bande[^"]*"[^>]*data-chemin="0"',
+            'la bande du kanban a disparu')
+        self.assertRegex(
+            html, r'<tr class="lst-groupe[^"]*"[^>]*data-chemin="0"',
+            'la ligne de groupe du tableau a disparu')
+
+    def test_les_lignes_du_groupe_existent_dans_les_deux_vues(self):
+        """Même chemin de parent des deux côtés : chercher `data-parent="0"`
+        dans tout le document ramène forcément les deux sortes."""
+        html = self._fragment()
+        self.assertRegex(html, r'<a [^>]*class="pk-card"[^>]*data-parent="0"',
+                         'la fiche kanban du groupe a disparu')
+        self.assertRegex(html, r'<tr data-parent="0"',
+                         'la ligne tableau du groupe a disparu')
+
+    def test_le_script_ne_cherche_plus_les_lignes_dans_tout_le_document(self):
+        """Le seul garde-fou possible ici : la portée de la recherche.
+
+        Les deux bandes étant indiscernables à l'échelle du document, chercher
+        des **lignes** sur `document` reverse l'autre vue dans celle qu'on
+        déplie. Lignes et sous-groupes doivent donc partir du conteneur de
+        l'en-tête visé.
+
+        Chercher des **bandes** sur le document reste permis, et deux
+        mécanismes le font à bon droit : le préchargement, qui a besoin de
+        toutes les bandes de la page pour les ranger par conteneur, et la
+        restauration des groupes ouverts, qui doit justement rouvrir le groupe
+        dans les deux vues à la fois. Ce que le premier en tire repasse par
+        `lignesDu`, qui cloisonne ; le second ne fait que basculer une classe.
+
+        On vise donc précisément `[data-chemin^=`, le repli en cascade des
+        sous-groupes — le seul de ces trois usages qui doive rester dans son
+        conteneur, puisqu'il referme des bandes. Viser `.lst-groupe` tout court,
+        ou même `[data-chemin`, condamnerait les deux autres.
+        """
+        from django.contrib.staticfiles import finders
+        source = open(finders.find('js/listing_groupes.js')).read()
+        self.assertNotIn(
+            "document.querySelectorAll('[data-parent=", source,
+            'les lignes sont de nouveau cherchées dans tout le document')
+        self.assertNotIn(
+            "document.querySelectorAll('.lst-groupe[data-chemin^=", source,
+            'les sous-groupes sont de nouveau cherchés dans tout le document')
+        self.assertIn(
+            'racine.querySelectorAll', source,
+            'la recherche ne part plus du conteneur de l’en-tête')

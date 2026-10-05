@@ -91,14 +91,14 @@ def construire_dimensions():
         ('statut', 'Disponibilité', None, booleen('statut', 'Disponible', 'Occupée')),
         ('type', 'Type de chambre', None, {
             'values': ('type_chambre',),
-            'label':  lambda r: lib_type.get(r['type_chambre']) or 'Non précisé',
-            'valeur': lambda o: lib_type.get(o.type_chambre) or 'Non précisé',
+            'label':  lambda r: lib_type.get(r['type_chambre']) or 'Indéfini',
+            'valeur': lambda o: lib_type.get(o.type_chambre) or 'Indéfini',
             'order':  ('type_chambre',),
         }),
         ('genre', 'Genre admis', None, {
             'values': ('genre',),
-            'label':  lambda r: lib_genre.get(r['genre']) or 'Non précisé',
-            'valeur': lambda o: lib_genre.get(o.genre) or 'Non précisé',
+            'label':  lambda r: lib_genre.get(r['genre']) or 'Indéfini',
+            'valeur': lambda o: lib_genre.get(o.genre) or 'Indéfini',
             'order':  ('genre',),
         }),
         ('prive', 'Standing', None, booleen('prive', 'Chambre privée', 'Chambre commune')),

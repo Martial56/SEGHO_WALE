@@ -212,8 +212,8 @@ def construire_dimensions():
         }),
         ('soin_type', 'Type de soin', None, {
             'values': ('soin_type__nom',),
-            'label':  lambda r: _vide(r['soin_type__nom'], 'Non précisé'),
-            'valeur': lambda o: _vide(o.soin_type.nom if o.soin_type_id else '', 'Non précisé'),
+            'label':  lambda r: _vide(r['soin_type__nom'], 'Indéfini'),
+            'valeur': lambda o: _vide(o.soin_type.nom if o.soin_type_id else '', 'Indéfini'),
             'order':  ('soin_type__nom',),
         }),
         ('departement', 'Département', None, {
@@ -224,20 +224,20 @@ def construire_dimensions():
         }),
         ('maladie', 'Maladie', None, {
             'values': ('maladie__nom',),
-            'label':  lambda r: _vide(r['maladie__nom'], 'Non précisée'),
-            'valeur': lambda o: _vide(o.maladie.nom if o.maladie_id else '', 'Non précisée'),
+            'label':  lambda r: _vide(r['maladie__nom'], 'Indéfinie'),
+            'valeur': lambda o: _vide(o.maladie.nom if o.maladie_id else '', 'Indéfinie'),
             'order':  ('maladie__nom',),
         }),
         ('statut', 'État', None, {
             'values': ('statut',),
-            'label':  lambda r: lib_statut.get(r['statut']) or 'Non précisé',
-            'valeur': lambda o: lib_statut.get(o.statut) or 'Non précisé',
+            'label':  lambda r: lib_statut.get(r['statut']) or 'Indéfini',
+            'valeur': lambda o: lib_statut.get(o.statut) or 'Indéfini',
             'order':  ('statut',),
         }),
         ('genre', 'Genre du patient', None, {
             'values': ('patient__sexe',),
-            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Non précisé'),
-            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Non précisé'),
+            'label':  lambda r: {'M': 'Masculin', 'F': 'Féminin'}.get(r['patient__sexe'], 'Indéfini'),
+            'valeur': lambda o: {'M': 'Masculin', 'F': 'Féminin'}.get(o.patient.sexe, 'Indéfini'),
             'order':  ('patient__sexe',),
         }),
     ]
@@ -257,3 +257,45 @@ TRIS = {
     'prix':        ('prix',),
     'statut':      ('statut',),
 }
+
+
+# ── Filtres et regroupements personnalisés ──────────────────────────────────
+# Même brique que la liste des soins. Elle sert sans doute davantage ici : une
+# procédure porte un prix, une prestation et une date, et c'est la liste où l'on
+# vient chercher un cas précis plutôt qu'une vue d'ensemble.
+
+CHAMPS_EXTRA = (
+    ('patient__nom', 'Patient'),
+    ('patient__prenoms', 'Patient'),
+    ('patient__code_patient', 'Patient'),
+    ('patient__sexe', 'Patient'),
+    ('patient__date_naissance', 'Patient'),
+    ('soin__numero', 'Soin'),
+    ('soin__motif', 'Soin'),
+    ('soin__statut', 'Soin'),
+    ('soin_type__nom', 'Prestation'),
+    ('soin_type__prix_vente', 'Prestation'),
+    ('facture__numero', 'Facturation'),
+    ('facture__statut', 'Facturation'),
+)
+
+CHAMPS_DEJA_GROUPABLES = (
+    'statut', 'patient', 'infirmier', 'soin_type', 'departement', 'maladie',
+    'patient__sexe',
+)
+
+
+def champs_procedures():
+    """Champs proposés au filtrage et au regroupement personnalisés."""
+    from core.listing import champs_filtrables
+
+    from .models import ProcedureSoin
+    return champs_filtrables(ProcedureSoin, extra=CHAMPS_EXTRA,
+                             groupe='Procédure')
+
+
+def dimensions_personnalisees(champs=None):
+    """Dimensions générées pour « Ajouter un groupement personnalisé »."""
+    from core.listing import dimensions_auto
+    return dimensions_auto(champs or champs_procedures(),
+                           exclure=CHAMPS_DEJA_GROUPABLES)

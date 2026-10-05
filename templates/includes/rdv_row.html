@@ -4,7 +4,7 @@ Une ligne de rendez-vous, au contrat de la brique commune : elle reçoit `objet`
 et `parent`, le chemin de son groupe. `parent` n'est renseigné qu'en mode groupé :
 la ligne est alors masquée au départ et pilotée par lstBasculerGroupe.
 {% endcomment %}
-<tr class="rdv-row rdv-etat-{{ objet.statut }}{% if objet.statut == 'annule' %} ligne-annulee{% endif %}"{% if parent %} data-parent="{{ parent }}" style="display:none;"{% endif %}
+<tr class="rdv-row rdv-etat-{{ objet.statut }}{% if objet.statut == 'annule' %} ligne-annulee{% endif %}"{% if parent %} data-parent="{{ parent }}"{% if not ouvert %} style="display:none;"{% endif %}{% endif %}
     data-url="{% url rdv_url_name objet.pk %}">
   <td class="td-code">{{ objet.code_rdv|default:objet.patient.code_patient }}</td>
   <td class="td-name">{{ objet.patient.nom|upper }} {{ objet.patient.prenoms }}</td>
@@ -12,7 +12,7 @@ la ligne est alors masquée au départ et pilotée par lstBasculerGroupe.
   <td class="td-doctor"{% if objet.medecin %} title="{{ objet.medecin }}"{% endif %}>{% if objet.medecin %}{{ objet.medecin|nom_court_planning }}{% else %}<span style="color:var(--text-faint)">—</span>{% endif %}</td>
   <td class="td-type">{{ objet.type_consultation.nom|default:"—" }}</td>
   <td class="td-diagnostic">{{ objet.diagnostic_libelle|default:objet.maladies|truncatechars:45|default:"—" }}</td>
-  <td>{% if objet.patient.date_naissance %}{{ objet.patient.age }} ans{% else %}<span style="color:var(--text-faint)">—</span>{% endif %}</td>
+  <td style="white-space:nowrap;">{% if objet.patient.date_naissance %}{{ objet.patient.age_detail }}{% else %}<span style="color:var(--text-faint)">—</span>{% endif %}</td>
   <td>{% if objet.patient.sexe == 'F' %}Femme{% elif objet.patient.sexe == 'M' %}Homme{% else %}<span style="color:var(--text-faint)">—</span>{% endif %}</td>
   <td><span class="o-badge badge-{{ objet.statut }}">{{ objet.get_statut_display }}</span></td>
 </tr>

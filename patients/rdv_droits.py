@@ -11,10 +11,12 @@ mener la consultation. Chaque étape a désormais sa permission :
   → Terminé ..................... `consulter_rendezvous`   (médecin)
 * Annuler ....................... `annuler_rendezvous`
 
-`change_rendezvous` reste l'accès complet : qui l'avait garde tout, rien ne
-change pour les comptes existants. Pour restreindre un compte à une étape, il
-faut donc lui retirer `change_rendezvous` et lui donner la permission de
-l'étape.
+`change_rendezvous` reste l'accès complet, mais seulement pour un compte qui
+n'a **aucune** permission d'étape : les comptes existants gardent tout. Dès
+qu'un compte reçoit une permission d'étape (par l'un de ses groupes ou en
+direct), seules ses permissions d'étape comptent. Sans cela, un infirmier
+qui tenait aussi `change_rendezvous` par un autre groupe voyait le bouton
+« En consultation » malgré sa seule permission « mettre en attente ».
 
 Les mêmes fonctions servent aux deux fiches (patients et gynécologie) et
 gardent à la fois l'affichage des boutons et le POST : un bouton masqué ne
@@ -50,8 +52,17 @@ PERMISSION_DE_L_ACTION = {
 }
 
 
+PERMISSIONS_D_ETAPE = (CONFIRMER, METTRE_EN_ATTENTE, CONSULTER, ANNULER)
+
+
+def _acces_complet(user):
+    """`change_rendezvous` ouvre tout, sauf à qui a des permissions d'étape."""
+    return (user.has_perm(PERMISSION_COMPLETE)
+            and not any(user.has_perm(p) for p in PERMISSIONS_D_ETAPE))
+
+
 def _a(user, permission):
-    return user.has_perm(PERMISSION_COMPLETE) or user.has_perm(permission)
+    return user.has_perm(permission) or _acces_complet(user)
 
 
 def peut_modifier(user, rdv):

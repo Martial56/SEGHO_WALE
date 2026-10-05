@@ -104,8 +104,19 @@ table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 80
       <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
     </select>
     <input type="number" name="annee" value="{{ annee }}" min="2000" max="2100" style="width:80px;">
+    {% comment %}Rouvrir un mois passé tel qu'on l'avait rendu, c'est y repasser
+    la composition de l'époque. Le choix ne vaut que pour cet affichage : il
+    voyage dans l'URL, et la fiche de travail de chacun n'en est pas touchée.{% endcomment %}
+    {% if configurations|length > 1 %}
+    <select name="config" id="choix-config" title="Composition de la fiche">
+      {% for c in configurations %}
+      <option value="{{ c.pk }}" {% if c == configuration %}selected{% endif %}>{{ c.nom }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
     <button type="submit" class="toolbar-btn btn-appliquer">Appliquer</button>
   </form>
+  <a class="toolbar-btn btn-appliquer" id="btn-configurer" href="{% url 'rapports:soins_configuration' %}">Configurer la fiche</a>
   <button class="toolbar-btn btn-print" onclick="window.print()">Imprimer / Télécharger PDF</button>
   <a class="toolbar-btn btn-back" href="{% url 'rapports:hub' %}">← Fermer</a>
 </div>
@@ -154,29 +165,51 @@ table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 80
   </div>
 
   <div class="rm-section-title" style="margin-top:22px;">Activités de soins infirmiers</div>
-  <table class="rm-table">
-    <thead><tr><th style="text-align:left;">Soins</th><th>Nombre</th><th style="text-align:left;">Autres soins à préciser</th><th>Nombre</th></tr></thead>
-    <tbody>
-      {% for soin, autre in lignes_soins %}
+  {% comment %}
+  Les blocs, leurs colonnes et leurs lignes viennent de la configuration de la
+  fiche — plus rien n'est écrit ici. `tableaux` les a déjà mis deux par rangée
+  et aplati chaque cellule : le gabarit ne fait que dérouler, parce que c'est
+  le calcul qui sait distinguer une case absente d'une case à remplir.
+  {% endcomment %}
+  {% for tableau in tableaux %}
+  <table class="rm-table"{% if not forloop.first %} style="margin-top:14px;"{% endif %}>
+    <thead>
       <tr>
+        {% for entete in tableau.entetes %}
+        <th{% if entete.est_libelle %} style="text-align:left;"{% endif %}>{{ entete.texte }}</th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for rangee in tableau.rangees %}
+      <tr>
+        {% for cellule in rangee %}
+          {% if cellule.est_libelle %}
         <td>
-          {{ soin.label|default:"" }}
-          {% if soin.detail %}<div style="font-size:9.5px;color:#6b7280;font-style:italic;font-weight:400;">({{ soin.detail }})</div>{% endif %}
+          {{ cellule.libelle }}
+          {% if cellule.detail %}<div style="font-size:9.5px;color:#6b7280;font-style:italic;font-weight:400;">({{ cellule.detail }})</div>{% endif %}
         </td>
-        <td class="num">{% if soin and soin.nombre is not None %}<span class="rm-val">{{ soin.nombre }}</span>{% elif soin %}<span class="rm-blank"></span>{% endif %}</td>
-        <td>
-          {{ autre.label|default:"" }}
-          {% if autre.detail %}<div style="font-size:9.5px;color:#6b7280;font-style:italic;font-weight:400;">({{ autre.detail }})</div>{% endif %}
-        </td>
-        <td class="num">{% if autre and autre.nombre is not None %}<span class="rm-val">{{ autre.nombre }}</span>{% elif autre %}<span class="rm-blank"></span>{% endif %}</td>
+          {% else %}
+        <td class="num">{% if cellule.presente %}{% if cellule.valeur is not None %}<span class="rm-val">{{ cellule.valeur }}</span>{% else %}<span class="rm-blank"></span>{% endif %}{% endif %}</td>
+          {% endif %}
+        {% endfor %}
       </tr>
       {% endfor %}
     </tbody>
   </table>
+  {% endfor %}
+  {% comment %}La légende nommait PERFUSION et sa règle en dur. La composition
+  de la fiche se règle désormais, et chaque ligne affiche la sienne entre
+  parenthèses : répéter ici la règle d'une ligne qui peut avoir été renommée ou
+  retirée ne pouvait que mentir tôt ou tard.{% endcomment %}
+  {% comment %}La feuille dit de quelle composition elle sort. Deux personnes
+  qui impriment le même mois peuvent en sortir deux différentes : sans cette
+  mention, les deux papiers seraient indiscernables sur un bureau.{% endcomment %}
   <div class="rm-legende">
-    Ne sont comptés que les soins facturés et payés sur le mois sélectionné, pour les types de soin ayant un article correspondant dans le catalogue.
-    PERFUSION : pas d'article dédié — compté comme le nombre de mises en observation ayant reçu au moins un soin apporté et facturé/payé.
-    Les cases vides n'ont pas d'article correspondant dans le catalogue et doivent être complétées manuellement.
+    Ne sont comptés que les actes facturés et payés sur le mois sélectionné.
+    Le détail entre parenthèses sous un libellé dit ce que la ligne regroupe.
+    Les cases vides sont à compléter manuellement.
+    {% if configuration %}<br>Composition : <strong>{{ configuration.nom }}</strong> ({{ configuration.auteur }}).{% endif %}
   </div>
 </div>
 

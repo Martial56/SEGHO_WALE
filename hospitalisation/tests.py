@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission, User
@@ -786,8 +787,11 @@ class TestParcoursDecharge(TestCase):
         ).content.decode()
         self.assertIn('%s?tab=resume' % self._url_edit(), fiche)
 
-    def test_plus_aucune_modale_de_decharge(self):
-        """Elle réapparaîtrait avec le bug qu'elle portait : le résumé vidé."""
+    def test_l_ancienne_modale_de_decharge_ne_revient_pas(self):
+        """Celle d'avant portait un formulaire concurrent sans les champs du
+        résumé : elle le vidait à chaque décharge. Celle d'aujourd'hui ne
+        demande que l'heure de sortie et la fait partir avec le formulaire
+        principal — c'est une autre bête, et ce test surveille l'ancienne."""
         self._utilisateur('u_modale', 'view_hospitalisation',
                           'change_hospitalisation', 'can_decharger_patient')
         fiche = self.client.get(
@@ -798,8 +802,6 @@ class TestParcoursDecharge(TestCase):
 
         formulaire = self.client.get(self._url_edit()).content.decode()
         self.assertNotIn('openDechargeModal', formulaire)
-        # La modale imposait une date de sortie que le serveur n'a jamais lue :
-        # heure_sortie vient de timezone.now() dans _transition_decharger.
         self.assertNotIn('date_sortie_decharge', formulaire)
 
     def test_tab_resume_ouvre_le_mode_decharge_pour_les_deux_profils(self):
@@ -1183,13 +1185,15 @@ class TestLeDocteurEstObligatoireSurLaDemande(TestCase):
 
 # ─── « Nouvelle évaluation » depuis le formulaire ──────────────────────────────
 
-class TestLeBoutonNouvelleEvaluationDansLeFormulaire(TestCase):
-    """Le bouton n'existait que sur la fiche.
+class TestUnSeulBoutonNouvelleEvaluation(TestCase):
+    """Le geste vit sur la fiche, et là seulement.
 
-    Depuis le formulaire, il fallait en ressortir pour ajouter un relevé —
-    alors que l'onglet « Évaluation clinique » est juste là. Il mène au même
-    endroit : la page se recharge avec `nouvelle=1`, et les constantes déjà
-    enregistrées sont conservées au lieu d'être corrigées.
+    Il y en a eu un aussi dans le formulaire : un lien de navigation posé au
+    milieu d'une saisie. Cliquer dessus rechargeait la page et emportait tout ce
+    qui n'avait pas été enregistré — un résumé de décharge en cours, un service
+    ajouté, une heure d'entrée corrigée — sans un mot. La fiche, elle, ne se
+    saisit pas : il n'y a rien à y perdre, et le bouton y est juste au-dessus de
+    la liste des relevés.
     """
 
     def setUp(self):
@@ -1198,40 +1202,38 @@ class TestLeBoutonNouvelleEvaluationDansLeFormulaire(TestCase):
         self.hosp = _hosp(self.patient, self.medecin, statut='hospitalise')
         self.user = _compte('u_btn', 'view_hospitalisation', 'change_hospitalisation')
 
-    def _html(self, nouvelle=False):
+    def _html(self, vue, suffixe=''):
         from django.test import Client
-
-        url = reverse('hospitalisation:edit', args=[self.hosp.pk])
-        if nouvelle:
-            url += '?nouvelle=1'
         client = Client()
         client.force_login(self.user)
-        reponse = client.get(url)
+        reponse = client.get(
+            reverse('hospitalisation:%s' % vue, args=[self.hosp.pk]) + suffixe)
         self.assertEqual(reponse.status_code, 200)
         return reponse.content.decode()
 
-    #: L'adresse exacte vers laquelle il mène.
+    #: L'adresse exacte vers laquelle le bouton mène.
     def _lien(self):
         return (reverse('hospitalisation:edit', args=[self.hosp.pk])
                 + '?tab=evaluation&amp;nouvelle=1')
 
-    def test_le_bouton_est_present_en_modification(self):
-        html = self._html()
+    def test_le_bouton_est_sur_la_fiche(self):
+        html = self._html('detail')
         self.assertIn(self._lien(), html)
         self.assertIn('Nouvelle évaluation', html)
 
-    def test_il_disparait_quand_on_y_est_deja(self):
-        """Inutile de proposer un nouveau relevé pendant qu'on en saisit un."""
-        self.assertNotIn(self._lien(), self._html(nouvelle=True))
+    def test_il_n_est_plus_dans_le_formulaire(self):
+        """Celui-là faisait perdre la saisie en cours."""
+        self.assertNotIn(self._lien(), self._html('edit'))
 
-    def test_le_message_ne_renvoie_plus_a_la_fiche(self):
-        html = self._html()
-        self.assertIn('le bouton « Nouvelle évaluation » ci-dessus', html)
-        self.assertNotIn('« Nouvelle évaluation » depuis la fiche', html)
+    def test_le_message_du_formulaire_renvoie_a_la_fiche(self):
+        """Il disait « le bouton ci-dessus » — celui qui vient de partir."""
+        html = ' '.join(self._html('edit').split())
+        self.assertIn('« Nouvelle évaluation » sur la fiche du dossier', html)
+        self.assertNotIn('« Nouvelle évaluation » ci-dessus', html)
 
     def test_le_lien_mene_bien_a_un_nouveau_releve(self):
         """Suivre le bouton doit ouvrir le mode « ajout », pas « correction »."""
-        html = self._html(nouvelle=True)
+        html = self._html('edit', '?nouvelle=1')
         self.assertIn('name="eval_nouvelle" value="1"', html)
         self.assertIn('les constantes précédentes sont conservées', html)
 
@@ -1273,3 +1275,348 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         _hosp(statut='annule')
         _hosp(statut='hospitalise')
         self.assertEqual(self._html().count('class="ligne-annulee"'), 1)
+
+
+# ─── Heures d'observation corrigeables ────────────────────────────────────────
+
+class TestLesHeuresDObservationSeCorrigent(TestCase):
+    """On décharge rarement à la seconde où le patient sort.
+
+    `duree_observation` part dans le tableau MO de la fiche d'activité de
+    soins ; quatre dossiers sur huit portaient une durée invraisemblable — dont
+    un à 922 heures — parce qu'ils avaient été déchargés en lot des semaines
+    après la sortie réelle. Les deux heures se corrigent donc à la main, et ce
+    que le système avait enregistré reste à part.
+    """
+
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user('u_heures', password='x')
+        self.user.user_permissions.add(Permission.objects.get(
+            codename='change_hospitalisation',
+            content_type__app_label='hospitalisation'))
+        self.client = Client()
+        self.client.force_login(self.user)
+        self.hosp = _hosp(statut='decharge')
+        self.entree = timezone.make_aware(datetime(2026, 10, 1, 8, 0))
+        self.sortie = timezone.make_aware(datetime(2026, 10, 3, 9, 24))
+        Hospitalisation.objects.filter(pk=self.hosp.pk).update(
+            heure_entree=self.entree, heure_sortie=self.sortie,
+            heure_entree_systeme=self.entree, heure_sortie_systeme=self.sortie)
+        self.hosp.refresh_from_db()
+
+    def _corriger(self, **champs):
+        from hospitalisation.views import _save_heures_observation
+        ok, err = _save_heures_observation(self.hosp, champs, self.user)
+        self.hosp.refresh_from_db()
+        return ok, err
+
+    def test_corriger_l_heure_de_sortie_change_la_duree(self):
+        avant = self.hosp.duree_observation / 3600
+        self.assertGreater(avant, 48)
+        ok, err = self._corriger(obs_heure_sortie='2026-10-01T14:00')
+        self.assertTrue(ok, err)
+        self.assertEqual(round(self.hosp.duree_observation / 3600), 6)
+
+    def test_corriger_l_heure_d_entree_aussi(self):
+        ok, _ = self._corriger(obs_heure_entree='2026-10-03T07:24')
+        self.assertTrue(ok)
+        self.assertEqual(round(self.hosp.duree_observation / 3600), 2)
+
+    def test_une_sortie_avant_l_entree_est_refusee(self):
+        ok, err = self._corriger(obs_heure_sortie='2026-09-30T08:00')
+        self.assertFalse(ok)
+        self.assertIn('ne peut pas précéder', err)
+        # Rien n'a bougé en base.
+        self.assertEqual(self.hosp.heure_sortie, self.sortie)
+
+    def test_une_cle_absente_ne_touche_a_rien(self):
+        """Les modes d'édition restreints n'envoient pas ces champs : un champ
+        absent doit laisser l'heure tranquille, pas l'effacer."""
+        ok, _ = self._corriger(autre_chose='1')
+        self.assertTrue(ok)
+        self.assertEqual(self.hosp.heure_entree, self.entree)
+        self.assertEqual(self.hosp.heure_sortie, self.sortie)
+
+    def test_les_heures_du_systeme_ne_bougent_jamais(self):
+        self._corriger(obs_heure_sortie='2026-10-01T14:00',
+                       obs_heure_entree='2026-10-01T09:00')
+        self.assertEqual(self.hosp.heure_entree_systeme, self.entree)
+        self.assertEqual(self.hosp.heure_sortie_systeme, self.sortie)
+        self.assertTrue(self.hosp.heures_corrigees)
+
+    def test_une_fiche_jamais_corrigee_ne_signale_rien(self):
+        self.assertFalse(self.hosp.heures_corrigees)
+
+    def test_la_correction_part_au_journal(self):
+        from core.views import get_logs
+        self._corriger(obs_heure_sortie='2026-10-01T14:00')
+        messages = [e.message for e in get_logs(self.hosp)]
+        trace = [m for m in messages if 'Horaires corrigés' in m]
+        self.assertTrue(trace, messages)
+        self.assertIn('03/10/2026 à 09:24', trace[0])   # l'avant
+        self.assertIn('01/10/2026 à 14:00', trace[0])   # l'après
+
+    def test_corriger_deux_fois_la_meme_valeur_n_ecrit_rien(self):
+        from core.views import get_logs
+        avant = len(get_logs(self.hosp))
+        self._corriger(obs_heure_sortie='2026-10-03T09:24')
+        self.assertEqual(len(get_logs(self.hosp)), avant)
+
+
+class TestLaModaleDeDechargeChoisitLHeure(TestCase):
+    """L'heure proposée est celle du moment, mais elle se corrige — et surtout
+    le serveur la lit.
+
+    Une modale portant ce champ a déjà existé ici : elle l'affichait, la
+    personne le remplissait, et `_transition_decharger` écrasait avec `now()`.
+    Le champ était décoratif et personne ne s'en apercevait. Ces tests postent
+    une heure choisie et vérifient que c'est bien elle qu'on retrouve en base.
+    """
+
+    def setUp(self):
+        from django.test import Client
+        self.hosp = _hosp(_patient('Mod'), _medecin('Mod'), statut='hospitalise',
+                          chambre=_chambre())
+        self.entree = timezone.make_aware(datetime(2026, 10, 1, 8, 0))
+        Hospitalisation.objects.filter(pk=self.hosp.pk).update(
+            heure_entree=self.entree, heure_entree_systeme=self.entree)
+        self.hosp.refresh_from_db()
+        self.user = User.objects.create_superuser('su_modale', password='x')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _decharger(self, heure=None):
+        from hospitalisation.views import _transition_decharger
+        ok, err = _transition_decharger(self.hosp, self.user, heure)
+        self.hosp.refresh_from_db()
+        return ok, err
+
+    def test_l_heure_choisie_est_celle_qui_est_enregistree(self):
+        choisie = timezone.make_aware(datetime(2026, 10, 1, 14, 30))
+        ok, err = self._decharger(choisie)
+        self.assertTrue(ok, err)
+        self.assertEqual(self.hosp.heure_sortie, choisie)
+
+    def test_sans_heure_choisie_on_retombe_sur_maintenant(self):
+        ok, _ = self._decharger()
+        self.assertTrue(ok)
+        ecart = abs((timezone.now() - self.hosp.heure_sortie).total_seconds())
+        self.assertLess(ecart, 60)
+
+    def test_le_systeme_garde_l_heure_reelle_de_la_decharge(self):
+        """Le témoin, lui, ne suit pas la saisie : c'est tout son intérêt."""
+        choisie = timezone.make_aware(datetime(2026, 10, 1, 14, 30))
+        self._decharger(choisie)
+        self.assertEqual(self.hosp.heure_sortie, choisie)
+        self.assertNotEqual(self.hosp.heure_sortie_systeme, choisie)
+        ecart = abs((timezone.now() - self.hosp.heure_sortie_systeme).total_seconds())
+        self.assertLess(ecart, 60)
+        self.assertTrue(self.hosp.heures_corrigees)
+
+    def test_une_sortie_avant_l_entree_est_refusee(self):
+        avant = timezone.make_aware(datetime(2026, 9, 30, 8, 0))
+        ok, err = self._decharger(avant)
+        self.assertFalse(ok)
+        self.assertIn('ne peut pas précéder', err)
+        self.assertEqual(self.hosp.statut, 'hospitalise')
+        self.assertIsNone(self.hosp.heure_sortie)
+
+    def test_la_saisie_a_la_main_est_dite_dans_le_journal(self):
+        from core.views import get_logs
+        self._decharger(timezone.make_aware(datetime(2026, 10, 1, 14, 30)))
+        messages = [e.message for e in get_logs(self.hosp)]
+        trace = [m for m in messages if 'sortie médicale' in m]
+        self.assertTrue(trace, messages)
+        self.assertIn('01/10 à 14:30', trace[0])
+        self.assertIn('à la main', trace[0])
+
+    def test_la_modale_est_rendue_avec_l_heure_du_moment(self):
+        html = self.client.get(
+            reverse('hospitalisation:edit', kwargs={'pk': self.hosp.pk})
+            + '?tab=resume').content.decode()
+        self.assertIn('id="modal-decharge"', html)
+        # Le champ voyage dans le formulaire principal, pas dans un second
+        # formulaire : c'est ce qui perdait le résumé dans l'ancienne version.
+        self.assertIn('name="heure_sortie" id="dc-heure-sortie" form="hosp-form"', html)
+        # Et il est borné par l'heure d'entrée côté navigateur.
+        self.assertIn('min="2026-10-01T08:00"', html)
+
+
+class TestLeBoutonModifierVaJusquALaDecharge(TestCase):
+    """De « Confirmé » à « Déchargé », et pas au-delà.
+
+    Le bouton n'apparaissait qu'au statut « Confirmé » pour les non-admins, et
+    la page d'édition refusait les dossiers clos. Or c'est précisément une fois
+    le patient sorti qu'on s'aperçoit d'avoir déchargé en retard, et ce sont ces
+    heures-là qu'il faut pouvoir reprendre. « Terminé » reste fermé : le dossier
+    est réglé administrativement, on n'y revient plus.
+    """
+
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user('u_modif', password='x')
+        for code in ('view_hospitalisation', 'change_hospitalisation'):
+            self.user.user_permissions.add(Permission.objects.get(
+                codename=code, content_type__app_label='hospitalisation'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    #: `detail.html` reconstruit ce bouton en JavaScript : la chaîne
+    #: `id="btn-modifier-link"` est dans la page même quand le bouton n'y est
+    #: pas. On vise donc le drapeau du contexte, et le balisage réel — avec son
+    #: URL — quand il s'agit de prouver que le lien est bien là.
+    def _fiche(self, statut):
+        hosp = _hosp(statut=statut)
+        return hosp, self.client.get(
+            reverse('hospitalisation:detail', kwargs={'pk': hosp.pk}))
+
+    def test_le_bouton_parait_de_confirme_jusqu_a_decharge(self):
+        for statut in ('confirme', 'hospitalise', 'decharge', 'annule'):
+            with self.subTest(statut=statut):
+                _, reponse = self._fiche(statut)
+                self.assertTrue(reponse.context['peut_modifier'])
+
+    def test_un_dossier_termine_ne_se_modifie_plus(self):
+        """La clôture administrative ferme le dossier pour de bon."""
+        _, reponse = self._fiche('termine')
+        self.assertFalse(reponse.context['peut_modifier'])
+
+    def test_le_lien_d_edition_est_reellement_rendu_apres_la_decharge(self):
+        hosp, reponse = self._fiche('decharge')
+        lien = reverse('hospitalisation:edit', kwargs={'pk': hosp.pk})
+        self.assertIn('href="%s" class="abtn abtn-primary" id="btn-modifier-link"' % lien,
+                      reponse.content.decode())
+
+    def test_le_bouton_ne_parait_pas_sur_un_brouillon(self):
+        _, reponse = self._fiche('brouillon')
+        self.assertFalse(reponse.context['peut_modifier'])
+
+    def test_la_page_d_edition_s_ouvre_apres_la_decharge(self):
+        """Elle renvoyait vers la fiche avec « Ce dossier est clôturé »."""
+        for statut in ('decharge', 'annule'):
+            with self.subTest(statut=statut):
+                hosp = _hosp(statut=statut)
+                reponse = self.client.get(
+                    reverse('hospitalisation:edit', kwargs={'pk': hosp.pk}))
+                self.assertEqual(reponse.status_code, 200)
+
+    def test_sans_la_permission_la_page_d_edition_reste_fermee(self):
+        """Ouvrir les dossiers clos n'ouvre pas la porte à tout le monde : la
+        vue refuse d'entrée de jeu qui n'a pas `change_hospitalisation`."""
+        from django.test import Client
+        curieux = User.objects.create_user('u_curieux', password='x')
+        curieux.user_permissions.add(Permission.objects.get(
+            codename='view_hospitalisation', content_type__app_label='hospitalisation'))
+        client = Client()
+        client.force_login(curieux)
+        for statut in ('termine', 'decharge'):
+            with self.subTest(statut=statut):
+                hosp = _hosp(statut=statut)
+                reponse = client.get(
+                    reverse('hospitalisation:edit', kwargs={'pk': hosp.pk}))
+                self.assertEqual(reponse.status_code, 403)
+
+    def test_un_dossier_termine_renvoie_vers_la_fiche(self):
+        """Avec la permission mais au statut clos : la page se ferme."""
+        hosp = _hosp(statut='termine')
+        reponse = self.client.get(
+            reverse('hospitalisation:edit', kwargs={'pk': hosp.pk}))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn(str(hosp.pk), reponse['Location'])
+
+
+class TestLaListeMontreLaDateDeSortie(TestCase):
+    """Pour repérer d'un coup d'œil les décharges faites en retard."""
+
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user('u_liste_sortie', password='x')
+        self.user.user_permissions.add(Permission.objects.get(
+            codename='view_hospitalisation', content_type__app_label='hospitalisation'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def _html(self):
+        reponse = self.client.get(reverse('hospitalisation:list') + '?filter=')
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_colonne_existe(self):
+        self.assertIn('<th style="width:130px;">Sortie</th>', self._html())
+
+    def test_une_sortie_enregistree_s_affiche(self):
+        hosp = _hosp(statut='decharge')
+        Hospitalisation.objects.filter(pk=hosp.pk).update(
+            heure_sortie=timezone.make_aware(datetime(2026, 10, 3, 9, 24)))
+        self.assertIn('03/10/2026', self._html())
+
+    def test_un_dossier_sans_sortie_affiche_un_tiret(self):
+        _hosp(statut='hospitalise')
+        self.assertIn('—', self._html())
+
+
+class TestLaFicheCompteCommeLeRapport(TestCase):
+    """L'écran et le rapport annonçaient deux durées pour le même dossier.
+
+    La carte « Date d'entrée » montrait en réalité la date de la **demande**,
+    et la durée affichée se comptait depuis elle. Le rapport, lui, compte
+    depuis l'entrée en chambre. Sur un dossier où le lit s'est fait attendre
+    cinq jours, l'écran annonçait 155 h et le rapport 34 : plus de quatre fois
+    d'écart, sans que rien ne le signale — les deux dates n'étaient jamais
+    montrées côte à côte.
+    """
+
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user('u_duree', password='x')
+        self.user.user_permissions.add(Permission.objects.get(
+            codename='view_hospitalisation',
+            content_type__app_label='hospitalisation'))
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        self.demande = timezone.make_aware(datetime(2026, 9, 26, 22, 16))
+        self.entree = timezone.make_aware(datetime(2026, 10, 1, 23, 46))
+        self.sortie = timezone.make_aware(datetime(2026, 10, 3, 9, 24))
+        self.hosp = _hosp(statut='decharge')
+        Hospitalisation.objects.filter(pk=self.hosp.pk).update(
+            date_admission=self.demande,
+            heure_entree=self.entree, heure_entree_systeme=self.entree,
+            heure_sortie=self.sortie, heure_sortie_systeme=self.sortie)
+        self.hosp.refresh_from_db()
+
+    def _html(self):
+        return self.client.get(
+            reverse('hospitalisation:detail', kwargs={'pk': self.hosp.pk})
+        ).content.decode()
+
+    def test_les_quatre_reperes_sont_dans_l_ordre_du_parcours(self):
+        html = self._html()
+        rangs = [html.index(lbl) for lbl in (
+            'Date de la demande', "Date d'entrée en chambre",
+            "Durée d'hospitalisation", 'Date de sortie')]
+        self.assertEqual(rangs, sorted(rangs))
+
+    def test_la_duree_part_de_l_entree_en_chambre_et_non_de_la_demande(self):
+        """C'est l'attribut que lit le chronomètre de la page."""
+        html = self._html()
+        self.assertIn('data-heure-entree="%s"' % self.entree.isoformat(), html)
+        self.assertNotIn('data-heure-entree="%s"' % self.demande.isoformat(), html)
+
+    def test_l_ecran_et_le_rapport_tombent_sur_le_meme_nombre(self):
+        ecran = (self.sortie - self.entree).total_seconds()
+        self.assertEqual(self.hosp.duree_observation, int(ecran))
+        # Et la demande, elle, donnerait tout autre chose.
+        depuis_demande = (self.sortie - self.demande).total_seconds()
+        self.assertGreater(depuis_demande, ecran * 4)
+
+    def test_la_date_de_la_demande_reste_affichee(self):
+        """On ne la perd pas : elle dit depuis quand le patient attendait."""
+        self.assertIn('26/09/2026', self._html())
+
+    def test_un_dossier_jamais_installe_affiche_un_tiret(self):
+        Hospitalisation.objects.filter(pk=self.hosp.pk).update(heure_entree=None)
+        html = self._html()
+        self.assertIn('id="dur-entree"', html)
+        self.assertIn('data-heure-entree=""', html)

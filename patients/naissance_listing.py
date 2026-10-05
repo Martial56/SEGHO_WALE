@@ -146,11 +146,11 @@ def construire_dimensions():
     lib_statut = dict(Naissance.STATUT)
     lib_sexe = dict(Naissance.SEXE)
     # Le choix vide de la liste d'éducation porte le libellé « — » : écarté, pour
-    # que le groupe des valeurs absentes s'annonce « Non précisé » comme ailleurs.
+    # que le groupe des valeurs absentes s'annonce « Indéfini » comme ailleurs.
     lib_education = {code: libelle for code, libelle in Naissance.EDUCATION if code}
     lib_dossier = dict(Naissance.STATUT_DOSSIER)
 
-    def choix(champ, libelles, defaut='Non précisé'):
+    def choix(champ, libelles, defaut='Indéfini'):
         """Dimension d'un champ à choix : le code est traduit des deux côtés."""
         return {
             'values': (champ,),
@@ -225,20 +225,20 @@ def construire_dimensions():
         ('genre', "Sexe de l'enfant", None, choix('sexe_enfant', lib_sexe)),
         ('groupe_sanguin', 'Groupe sanguin', None, {
             'values': ('groupe_sanguin_enfant',),
-            'label':  lambda r: _vide(r['groupe_sanguin_enfant'], 'Non précisé'),
-            'valeur': lambda o: _vide(o.groupe_sanguin_enfant, 'Non précisé'),
+            'label':  lambda r: _vide(r['groupe_sanguin_enfant'], 'Indéfini'),
+            'valeur': lambda o: _vide(o.groupe_sanguin_enfant, 'Indéfini'),
             'order':  ('groupe_sanguin_enfant',),
         }),
         ('lieu', 'Lieu de naissance', None, {
             'values': ('lieu_naissance',),
-            'label':  lambda r: _vide(r['lieu_naissance'], 'Non précisé'),
-            'valeur': lambda o: _vide(o.lieu_naissance, 'Non précisé'),
+            'label':  lambda r: _vide(r['lieu_naissance'], 'Indéfini'),
+            'valeur': lambda o: _vide(o.lieu_naissance, 'Indéfini'),
             'order':  ('lieu_naissance',),
         }),
         ('parite', 'Parité', None, {
             'values': ('parite',),
-            'label':  lambda r: f"Parité {r['parite']}" if r['parite'] is not None else 'Non précisée',
-            'valeur': lambda o: f'Parité {o.parite}' if o.parite is not None else 'Non précisée',
+            'label':  lambda r: f"Parité {r['parite']}" if r['parite'] is not None else 'Indéfini',
+            'valeur': lambda o: f'Parité {o.parite}' if o.parite is not None else 'Indéfini',
             'order':  ('parite',),
         }),
         ('education', 'Éducation de la mère', None, choix('education_mere', lib_education)),

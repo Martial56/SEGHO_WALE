@@ -10,12 +10,14 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from .configuration_soins import CompositionInvalide, appliquer, composition
 from .export import csv_response, xlsx_response
 from .maternite import calculer_rapport_maternite
 from .soins import calculer_rapport_soins
 from .gynecologie import calculer_rapport_gynecologie
 from .med_generale import calculer_rapport_med_generale
-from .models import HistoriqueRapport
+from .models import (ConfigurationFicheSoins, HistoriqueRapport,
+                     LigneFicheSoins)
 from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
 
 
@@ -178,8 +180,202 @@ def rapports_soins(request):
         mois = today.month
     mois = min(max(mois, 1), 12)
 
-    rapport = calculer_rapport_soins(annee, mois)
+    # La fiche se compose depuis la base : celle de l'utilisateur s'il s'en est
+    # fait une, le format officiel sinon. Tant que personne n'a rien réglé,
+    # tout le monde voit la même, et c'est celle d'avant.
+    #
+    # `?config=` permet d'en demander une autre, le temps d'un affichage : c'est
+    # ainsi qu'on rouvre un mois passé tel qu'on l'avait rendu, en repassant la
+    # composition de l'époque. Rien n'est changé pour autant — la sienne reste
+    # la sienne au prochain chargement.
+    visibles = ConfigurationFicheSoins.visibles_par(request.user)
+    demandee = request.GET.get('config')
+    if demandee:
+        try:
+            configuration = visibles.get(pk=int(demandee))
+        except (ValueError, ConfigurationFicheSoins.DoesNotExist):
+            raise Http404("Cette composition de fiche n'existe pas ou ne vous "
+                          "est pas accessible.")
+    else:
+        configuration = ConfigurationFicheSoins.pour(request.user)
+
+    rapport = calculer_rapport_soins(annee, mois, configuration=configuration)
+    rapport['configurations'] = list(visibles.order_by('-est_defaut', 'nom'))
     return render(request, 'rapports/rapport_soins.html', rapport)
+
+
+def _configuration_a_modifier(configuration, utilisateur):
+    """Celle qu'on va réellement écrire, qui n'est pas toujours celle qu'on lit.
+
+    Un utilisateur ordinaire qui part du format officiel ne le modifie pas : il
+    en reçoit une copie, qui devient la sienne. C'est ce qui fait tenir tout le
+    reste — sans cette copie, le premier réglage de n'importe qui changerait la
+    fiche de tout le monde, et « revenir au format par défaut » ne voudrait
+    plus rien dire.
+
+    Un superutilisateur, lui, modifie bien le format officiel : c'est le seul à
+    pouvoir le faire, et c'est voulu.
+    """
+    if configuration.est_defaut and not utilisateur.is_superuser:
+        return configuration.dupliquer(
+            utilisateur, nom="Ma fiche d'activité de soins", est_active=True)
+    return configuration
+
+
+def _fiche_designee(request, action):
+    """La configuration visée par un bouton de la liste, ou None si refus.
+
+    Le numéro vient d'un champ de formulaire : il ne décide de rien tant qu'on
+    ne l'a pas confronté aux droits. Deux règles, et elles diffèrent —
+    **reprendre** une fiche demande seulement de pouvoir la lire, donc la
+    sienne, le format par défaut ou une fiche proposée ; la **partager**, la
+    retirer du partage ou la **supprimer** demande d'en être le propriétaire.
+
+    Le format par défaut ne se supprime ni ne se partage par ce chemin : il
+    n'appartient à personne, et la règle du propriétaire l'écarte d'elle-même.
+    """
+    try:
+        numero = int(request.POST.get('config', ''))
+    except (TypeError, ValueError):
+        messages.error(request, "Fiche introuvable.")
+        return None
+
+    if action == 'reprendre':
+        candidates = ConfigurationFicheSoins.visibles_par(request.user)
+    else:
+        candidates = ConfigurationFicheSoins.objects.filter(
+            utilisateur=request.user)
+
+    fiche = candidates.filter(pk=numero).first()
+    if fiche is None:
+        messages.error(
+            request, "Cette fiche n'existe pas ou ne vous appartient pas.")
+    return fiche
+
+
+def _ma_fiche(utilisateur):
+    """Ma configuration de travail, créée au besoin.
+
+    Reprendre une fiche mise de côté ou appliquer celle d'un collègue atterrit
+    **toujours** ici, jamais dans le format par défaut — même pour un
+    superutilisateur. Sans cette règle, appliquer la fiche d'un collègue
+    changerait celle de tout le centre, ce que personne n'attend d'un bouton
+    « Appliquer ».
+    """
+    sienne = ConfigurationFicheSoins.objects.filter(
+        utilisateur=utilisateur, est_active=True).first()
+    if sienne is not None:
+        return sienne
+    return ConfigurationFicheSoins.officielle().dupliquer(
+        utilisateur, nom="Ma fiche d'activité de soins", est_active=True)
+
+
+def _recopier_composition(source, cible):
+    """Pose sur `cible` la composition de `source`, sans les relier.
+
+    On passe par la forme sérialisée plutôt que de dupliquer : `cible` existe
+    déjà, elle a son nom, son propriétaire et son historique, et seule sa
+    composition doit changer.
+    """
+    import json as _json
+    appliquer(cible, _json.dumps(composition(source)))
+
+
+@login_required(login_url='login')
+def rapports_soins_configuration(request):
+    """L'écran de composition de la fiche d'activité de soins."""
+    from services.models import Articleservice
+
+    configuration = ConfigurationFicheSoins.pour(request.user)
+    if configuration is None:
+        raise Http404("Aucune configuration de fiche de soins n'est en place.")
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        retour = redirect('rapports:soins_configuration')
+
+        if action == 'defaut':
+            # Revenir au format officiel, c'est abandonner la sienne : celui
+            # que les superutilisateurs ajustent reprend alors le dessus, tel
+            # qu'ils l'ont laissé.
+            ConfigurationFicheSoins.objects.filter(
+                utilisateur=request.user).delete()
+            messages.success(
+                request, "La fiche est revenue au format par défaut.")
+            return retour
+
+        if action in ('reprendre', 'partager', 'ne_plus_partager', 'supprimer'):
+            source = _fiche_designee(request, action)
+            if source is None:
+                return retour
+            if action == 'reprendre':
+                _recopier_composition(source, _ma_fiche(request.user))
+                messages.success(
+                    request, f"« {source.nom} » est devenue votre fiche.")
+            elif action == 'supprimer':
+                nom = source.nom
+                source.delete()
+                messages.success(request, f"« {nom} » a été supprimée.")
+            else:
+                source.partagee = (action == 'partager')
+                source.save(update_fields=['partagee'])
+                messages.success(request, (
+                    f"« {source.nom} » est proposée aux autres utilisateurs."
+                    if source.partagee else
+                    f"« {source.nom} » n'est plus proposée."))
+            return retour
+
+        if action == 'enregistrer_sous':
+            nom = (request.POST.get('nom') or '').strip()
+            if not nom:
+                messages.error(request, "Donnez un nom à cette fiche.")
+            else:
+                mise_de_cote = ConfigurationFicheSoins.objects.create(
+                    nom=nom[:120], utilisateur=request.user, est_active=False)
+                try:
+                    appliquer(mise_de_cote, request.POST.get('composition'))
+                except CompositionInvalide as erreur:
+                    mise_de_cote.delete()
+                    messages.error(request, str(erreur))
+                else:
+                    messages.success(
+                        request, f"« {nom} » a été mise de côté.")
+                    return retour
+            configuration = ConfigurationFicheSoins.pour(request.user)
+        else:
+            cible = _configuration_a_modifier(configuration, request.user)
+            try:
+                appliquer(cible, request.POST.get('composition'))
+            except CompositionInvalide as erreur:
+                messages.error(request, str(erreur))
+                configuration = cible
+            else:
+                messages.success(request, "La fiche a été enregistrée.")
+                return retour
+
+    prestations = list(Articleservice.objects.filter(actif=True)
+                       .order_by('nom').values('pk', 'nom'))
+    return render(request, 'rapports/configuration_soins.html', {
+        'configuration': configuration,
+        # Les objets eux-mêmes, pas du JSON : le gabarit les sérialise avec
+        # `json_script`, qui échappe `<`, `>` et `&`. Un titre de bloc
+        # contenant « </script> » refermerait sinon la balise et casserait la
+        # page — et ces titres sont libres.
+        'composition': composition(configuration),
+        'prestations': [{'id': p['pk'], 'nom': p['nom']} for p in prestations],
+        'nombre_prestations': len(prestations),
+        'sources': LigneFicheSoins.SOURCE,
+        'origines': LigneFicheSoins.ORIGINE,
+        'modifie_le_defaut': configuration.est_defaut and request.user.is_superuser,
+        'partira_en_copie': configuration.est_defaut and not request.user.is_superuser,
+        # Les siennes mises de côté : tout ce qui lui appartient sans être sa
+        # fiche de travail du moment.
+        'mes_fiches': ConfigurationFicheSoins.objects.filter(
+            utilisateur=request.user, est_active=False).order_by('nom'),
+        'fiches_partagees': ConfigurationFicheSoins.objects.filter(
+            partagee=True).exclude(utilisateur=request.user)
+            .select_related('utilisateur').order_by('nom'),
+    })
 
 
 @login_required(login_url='login')

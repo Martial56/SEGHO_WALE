@@ -115,8 +115,11 @@
   {# Tri, redimensionnement et sélecteur de colonnes : includes/listing/styles.html #}
 
   /* ── STATS ── */
+  /* Cinq colonnes pour cinq cartes : le compte doit suivre celui des
+     `.stat-box` ci-dessous, sinon la dernière bascule toute seule au rang
+     suivant quelle que soit la largeur de l'écran. */
   .stats-row {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
     border-bottom: 1px solid var(--border); background: var(--surface);
   }
 
@@ -150,8 +153,12 @@
 
   @media (max-width: 800px) {
     .stats-row { grid-template-columns: repeat(2, 1fr); }
-    .stat-box:nth-child(2) { border-right: none; }
-    .stat-box:nth-child(3) { border-right: 1px solid var(--border); }
+    /* Sur deux colonnes, le filet tombe pour la carte de droite de chaque
+       rangée — et pour la cinquième, restée seule en bas. Écrit par parité
+       plutôt que carte par carte : en ajouter une n'oblige plus à y revenir. */
+    .stat-box { border-right: 1px solid var(--border); }
+    .stat-box:nth-child(even),
+    .stat-box:last-child { border-right: none; }
   }
 </style>
 {% endblock %}
@@ -314,10 +321,10 @@ Les valeurs d'une même famille se cumulent, les familles se croisent.
         <th class="sortable-col" data-col="2" data-tri="numero" style="width:12%"><span class="col-label">N°</span>{% include "includes/listing/tri_icone.html" with cle="numero" %}<div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="1" data-tri="patient" style="width:26%"><span class="col-label">Patient</span>{% include "includes/listing/tri_icone.html" with cle="patient" %}<div class="col-resizer"></div></th>
 
-        <th class="sortable-col" data-col="4" data-tri="infirmier" style="width:24%"><span class="col-label">Infirmier</span>{% include "includes/listing/tri_icone.html" with cle="infirmier" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="4" data-tri="infirmier" style="width:20%"><span class="col-label">Infirmier</span>{% include "includes/listing/tri_icone.html" with cle="infirmier" %}<div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="6" data-tri="date" style="width:15%"><span class="col-label">Date</span>{% include "includes/listing/tri_icone.html" with cle="date" %}<div class="col-resizer"></div></th>
         <th class="sortable-col" data-col="7" data-tri="sexe" style="width:6%;text-align:center;"><span class="col-label">Sexe</span>{% include "includes/listing/tri_icone.html" with cle="sexe" %}<div class="col-resizer"></div></th>
-        <th class="sortable-col" data-col="8" data-tri="age" style="width:7%;text-align:center;"><span class="col-label">Âge</span>{% include "includes/listing/tri_icone.html" with cle="age" %}<div class="col-resizer"></div></th>
+        <th class="sortable-col" data-col="8" data-tri="age" style="width:11%;text-align:center;"><span class="col-label">Âge</span>{% include "includes/listing/tri_icone.html" with cle="age" %}<div class="col-resizer"></div></th>
         <!--
         <th class="col-age-group sortable-col" data-col="9" style="width:40px"><span class="col-label">0-11 Mois</span><div class="col-resizer"></div></th>
         <th class="col-age-group sortable-col" data-col="10" style="width:40px"><span class="col-label">1-4 Ans</span><div class="col-resizer"></div></th>
@@ -398,7 +405,7 @@ Les valeurs d'une même famille se cumulent, les familles se croisent.
 </div><!-- /#list-result -->
 
 {% comment %}Dépliage des groupes : commun à toutes les listes de la brique.{% endcomment %}
-<script src="{% static 'js/listing_groupes.js' %}"></script>
+<script src="{% static 'js/listing_groupes.js' %}?v=4"></script>
 {% include 'includes/listing/page_js.html' %}
 {% include 'includes/listing/colonnes_js.html' %}
 
@@ -408,6 +415,11 @@ inclus ci-dessus (includes/listing/page_js.html et
 includes/listing/colonnes_js.html). Le tri est calculé par le serveur —
 celui qui vivait ici ne réordonnait que les 25 lignes affichées.
 {% endcomment %}
+
+{% comment %}Constructeur de conditions personnalisées. Hors des zones échangées
+en AJAX : la liste des champs ne change pas d'un rafraîchissement à l'autre, il
+n'est donc chargé qu'une fois.{% endcomment %}
+{% include 'includes/listing/filtre_perso.html' %}
 
 </div><!-- /#page-wrap -->
 {% endblock %}

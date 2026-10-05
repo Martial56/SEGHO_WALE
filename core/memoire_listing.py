@@ -20,9 +20,18 @@ La distinction entre « j'efface » et « je reviens d'une fiche » tient à la
 nature de la requête. « Effacer » rafraîchit la liste **en AJAX**, sans quitter
 la page ; revenir d'une fiche est un **chargement complet**. Le premier oublie,
 le second restaure.
+
+Une sélection se pose en rechargeant la liste, et la mémoire n'a donc qu'à lire
+l'URL qu'on lui demande. L'état déplié, lui, ne recharge rien : déplier un
+groupe se fait dans la page, et l'adresse n'est réécrite que pour le navigateur
+(`history.replaceState`). Il n'arrivait jamais jusqu'ici — revenir d'une fiche
+par le bouton « Retour » ramenait bien le filtre et le regroupement, mais la
+liste repliée. D'où `PARAM_MEMO` : une requête de fond, que le navigateur envoie
+à chaque dépliage et qui ne sert qu'à faire retenir.
 """
 from urllib.parse import urlencode
 
+from django.http import HttpResponse
 from django.shortcuts import redirect
 
 # Importé plutôt que recopié : c'est la brique des listes qui définit ce nom.
@@ -31,18 +40,27 @@ from core.listing import PARAM_GROUPE
 #: Paramètres qui composent une sélection. `page` en est volontairement absent :
 #: revenir sur une fiche puis retrouver sa liste à la page 7 surprendrait plus
 #: que de repartir du début.
+#:
+#: `cf`, `co`, `cv` et `cm` sont les conditions personnalisées — champ,
+#: opérateur, valeur, et le mode qui les combine. Elles manquaient : la liste
+#: retenait `cond_…` et `mode_cond`, deux noms que rien n'a jamais écrits.
+#: Poser un filtre personnalisé, ouvrir une fiche et revenir le faisait donc
+#: disparaître sans un mot, sur les six listes qui offrent la fonction.
 PARAMETRES = ('filter', 'group', 'q', 'date_from', 'date_to',
-              'tri', 'sens', 'mode_cond')
-
-#: Les conditions personnalisées sont nommées dynamiquement (`cond_champ_0`…).
-PREFIXE_CONDITION = 'cond_'
+              'tri', 'sens', 'cf', 'co', 'cv', 'cm', 'ouverts')
 
 #: Préfixe des clés de session, pour pouvoir toutes les retirer d'un coup.
 PREFIXE_CLE = 'listing:'
 
+#: Marque une requête qui ne vient que faire retenir la sélection : elle porte
+#: l'URL de la liste telle qu'elle est à l'écran et n'attend aucune page en
+#: retour. C'est ainsi que l'état déplié rejoint la mémoire sans rien recharger
+#: (voir la docstring du module, et `noterOuverts` dans listing_groupes.js).
+PARAM_MEMO = '_memo'
+
 
 def _est_parametre(cle):
-    return cle in PARAMETRES or cle.startswith(PREFIXE_CONDITION)
+    return cle in PARAMETRES
 
 
 def _selection(request):
@@ -73,9 +91,9 @@ def _est_ajax(request):
 def selection_memorisee(request):
     """À appeler en tête d'une vue de liste.
 
-    Rend une redirection quand la sélection retenue doit être remise dans
-    l'URL — la vue n'a alors qu'à la retourner — et None dans tous les autres
-    cas, où elle poursuit normalement.
+    Rend une réponse que la vue n'a qu'à retourner — la redirection qui remet la
+    sélection retenue dans l'URL, ou le 204 d'une requête de mémorisation — et
+    None dans tous les autres cas, où la vue poursuit normalement.
     """
     # Déplier un groupe redemande la page avec `_groupe` : ce n'est ni une
     # sélection ni un effacement, et il ne doit donc ni être retenu ni effacer
@@ -86,6 +104,15 @@ def selection_memorisee(request):
 
     cle = _cle(request)
     selection = _selection(request)
+
+    # Requête de mémorisation : on retient, et c'est tout. Pas de page à rendre,
+    # et surtout rien à oublier — sans ce retour anticipé, une liste dépliée
+    # alors qu'aucun critère n'est posé passerait plus bas pour un « Effacer »,
+    # que personne n'a demandé.
+    if PARAM_MEMO in request.GET:
+        if selection:
+            request.session[cle] = selection
+        return HttpResponse(status=204)
 
     if selection:
         request.session[cle] = selection
