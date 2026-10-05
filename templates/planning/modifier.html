@@ -498,6 +498,12 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
   const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   const ALL_MEDECINS = JSON.parse(document.getElementById('medecins-data').textContent);
   const ABSENTS = JSON.parse(document.getElementById('absents-data').textContent);
+
+  // Alias d'affichage personnalisé (Medecin.nom_affichage), prioritaire sur
+  // le raccourci automatique calculé par nomCourt() — même règle que le
+  // filtre Python nom_court_planning.
+  const COURT_PAR_LABEL = {};
+  ALL_MEDECINS.forEach(function (m) { if (m.court) COURT_PAR_LABEL[m.label] = m.court; });
   let ctxTarget = null;
 
   let medTargetInput = null;
@@ -573,6 +579,7 @@ margin-top: 5px; text-transform: uppercase; letter-spacing: 0.05em;
   // l'input (utilisée pour la sauvegarde et le rapprochement des congés)
   // reste complète. Même règle que le filtre Python nom_court_planning. ──
   function nomCourt(name) {
+    if (COURT_PAR_LABEL[name]) return COURT_PAR_LABEL[name];
     var mots = name.split(/\s+/).filter(Boolean);
     if (mots.length <= 2 || (mots[0] !== 'Dr' && mots[0] !== 'SF')) return name;
     var titre = mots[0];

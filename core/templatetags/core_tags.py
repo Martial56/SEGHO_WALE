@@ -86,6 +86,24 @@ def nombre(valeur):
     return number_format(d, decimal_pos=decimales, use_l10n=True)
 
 
+def _overrides_nom_affichage():
+    """{nom complet « Titre Nom Prénoms » -> alias} pour les médecins qui ont
+    renseigné un nom d'affichage personnalisé. Mis en cache (invalidé dans
+    Medecin.save()) car ce filtre peut être appelé pour chaque cellule d'une
+    grille de planning — potentiellement des centaines de fois par page."""
+    from django.core.cache import cache
+
+    overrides = cache.get('medecins_nom_affichage_overrides')
+    if overrides is None:
+        from medecins.models import Medecin
+        overrides = {
+            f"{m.titre} {m.nom} {m.prenoms}": m.nom_affichage
+            for m in Medecin.objects.exclude(nom_affichage='').select_related('employe__fonction')
+        }
+        cache.set('medecins_nom_affichage_overrides', overrides, 300)
+    return overrides
+
+
 @register.filter
 def nom_court_planning(valeur):
     """Raccourcit chaque nom d'une cellule de planning à 2 mots au plus — ex.
@@ -93,16 +111,24 @@ def nom_court_planning(valeur):
     nom + initiale du dernier mot). Plusieurs médecins sur une même cellule
     sont séparés par « / », chacun est raccourci indépendamment.
 
+    Un médecin peut remplacer ce raccourci automatique par un alias fixe
+    (Medecin.nom_affichage) — prioritaire dès qu'il correspond exactement au
+    nom complet du segment.
+
     Purement un raccourci d'AFFICHAGE : n'altère jamais la valeur stockée en
     base (le texte brut continue de servir au rapprochement avec les congés
     et aux exports), seul le gabarit qui l'affiche applique ce filtre.
     """
     if not valeur:
         return valeur
+    overrides = _overrides_nom_affichage()
     segments = [s.strip() for s in str(valeur).split('/')]
     out = []
     for seg in segments:
         if not seg:
+            continue
+        if seg in overrides:
+            out.append(overrides[seg])
             continue
         mots = seg.split()
         if len(mots) <= 2 or mots[0] not in ('Dr', 'SF'):
