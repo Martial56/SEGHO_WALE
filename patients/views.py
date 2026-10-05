@@ -564,7 +564,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
         familles=familles_rdv(contexte_gyneco),
         dimensions=list(construire_dimensions(today).values()) + dims_perso,
-        par_page=25,
+        par_page=100,
         filtres_defaut=FILTRES_PAR_DEFAUT,
         tri_defaut=('-date_heure',),
     )
@@ -599,7 +599,7 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         annoter_diagnostics([o for n in _feuilles(arbre) for o in n['lignes']])
     else:
         nb_groupes = 0
-        page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
+        page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
         annoter_diagnostics(list(page_obj))
 
     # En AJAX on ne renvoie que les zones rafraîchies, pas la page entière.
