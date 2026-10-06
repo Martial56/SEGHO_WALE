@@ -139,6 +139,13 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
 
+# Cookie de session sans durée de vie propre : le navigateur l'efface quand il
+# ferme réellement (pas juste un onglet), ce qui force une reconnexion complète
+# au lieu de retomber sur l'écran de verrouillage (core.middleware.
+# SessionTimeoutMiddleware) le lendemain. Tant que le navigateur reste ouvert,
+# même inactif longtemps, c'est toujours ce verrouillage qui s'applique.
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'planning@cms-wale.ci'
 

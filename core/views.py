@@ -448,6 +448,7 @@ def medecin_create(request):
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
         ordre_medecin = request.POST.get('ordre_medecin', '').strip() or None
+        nom_affichage = request.POST.get('nom_affichage', '').strip()
 
         if not matricule:
             errors['matricule'] = 'Le matricule employé est obligatoire.'
@@ -474,7 +475,8 @@ def medecin_create(request):
         if not errors:
             service_obj = Service.objects.filter(pk=service_pk).first() if service_pk else employe_trouve.service
 
-            med = Medecin(employe=employe_trouve, ordre_medecin=ordre_medecin, actif=actif, service=service_obj)
+            med = Medecin(employe=employe_trouve, ordre_medecin=ordre_medecin, actif=actif,
+                          service=service_obj, nom_affichage=nom_affichage)
             try:
                 med.taux_honoraire = float(taux_honoraire)
             except ValueError:
@@ -536,6 +538,7 @@ def medecin_edit(request, pk):
         actif = request.POST.get('actif') == 'on'
         user_pk = request.POST.get('user', '')
         ordre_medecin = request.POST.get('ordre_medecin', '').strip() or None
+        nom_affichage = request.POST.get('nom_affichage', '').strip()
 
         if not specialite_pk:
             errors['specialite'] = 'La spécialité est obligatoire.'
@@ -553,6 +556,7 @@ def medecin_edit(request, pk):
         if not errors:
             med.actif = actif
             med.ordre_medecin = ordre_medecin
+            med.nom_affichage = nom_affichage
             try:
                 med.taux_honoraire = float(taux_honoraire)
             except ValueError:
