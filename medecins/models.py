@@ -29,6 +29,13 @@ class Medecin(models.Model):
     taux_honoraire = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     actif = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
+    nom_affichage = models.CharField(
+        max_length=40, blank=True,
+        verbose_name="Nom à afficher (raccourci)",
+        help_text="Remplace le raccourci automatique (ex. « Dr Konan E ») partout où le nom "
+                   "est abrégé — planning, liste des rendez-vous. Laissez vide pour garder "
+                   "le raccourci automatique.",
+    )
 
     # Identité et coordonnées désormais portées par l'Employé lié — un médecin
     # est avant tout un employé, pas une fiche d'identité séparée.
@@ -55,6 +62,12 @@ class Medecin(models.Model):
         return 'Dr'
 
     def __str__(self): return f"{self.titre} {self.nom} {self.prenoms}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        from django.core.cache import cache
+        cache.delete('medecins_nom_affichage_overrides')
+
     class Meta:
         verbose_name = "Médecin"
         ordering = ['employe__nom']

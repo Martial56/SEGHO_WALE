@@ -43,6 +43,7 @@ def _medecins_json(medecins_qs):
         {
             'label': f"{m.titre} {m.nom} {m.prenoms}",
             'spec':  m.specialite.nom if m.specialite else '',
+            'court': m.nom_affichage,
         }
         for m in medecins_qs
     ]
