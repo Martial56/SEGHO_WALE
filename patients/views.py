@@ -764,6 +764,8 @@ def rdv_create(request):
         # Types de visite curative, configurables depuis le menu Configurations
         # des rendez-vous (remplace trois valeurs autrefois écrites en dur).
         'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
+        # Types de visite CPN : même liste configurable que la fiche gynécologie.
+        'types_visite':  TypeVisite.objects.filter(actif=True).order_by('nom'),
         'medecins':        Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
     })
 
@@ -1089,6 +1091,8 @@ def rdv_edit(request, pk):
         'constante':     constante,
         'departements_medg_ids': departements_medecine_generale_ids(),
         'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
+        # Types de visite CPN : même liste configurable que la fiche gynécologie.
+        'types_visite':  TypeVisite.objects.filter(actif=True).order_by('nom'),
         'pathologies':   Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
         'registre_cpn':          _get_reg(RegistreCPN),

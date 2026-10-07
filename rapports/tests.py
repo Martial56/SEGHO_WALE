@@ -1358,3 +1358,41 @@ class TestMettreDeCoteEtPartager(TestCase):
         html = self.client.get(
             '/rapports/soins/?annee=2026&mois=10').content.decode()
         self.assertIn('Composition : <strong>Format officiel</strong>', html)
+
+
+class TestDepistageVihCpnPorteLeTypeDeVisite(TestCase):
+    """Le listing « Dépistage VIH en CPN » reprend le type de visite choisi
+    dans le registre CPN. Les deux fiches ne l'enregistrent pas pareil : la
+    gynécologie pose la clé étrangère `cpn_type_visite` (et l'identifiant dans
+    le registre), la fiche patients garde « 1ere » ou « suivi » dans le registre."""
+
+    def setUp(self):
+        from gynecologie.models import TypeVisite
+        self.cpn1 = TypeVisite.objects.create(nom='CPN 1', code='TEST_CPN1')
+
+    def _ligne(self, rdv_extra=None, **donnees):
+        from datetime import date
+        from patients.models import RegistreCPN
+        from .registry import _depistage_vih_cpn
+        rdv = _rdv(_article('CPN'))
+        for champ, valeur in (rdv_extra or {}).items():
+            setattr(rdv, champ, valeur)
+        rdv.save()
+        RegistreCPN.objects.create(rdv=rdv, donnees=donnees)
+        colonnes, lignes = _depistage_vih_cpn(None, date(2026, 12, 31))
+        self.assertEqual(len(lignes), 1)
+        return dict(zip(colonnes, lignes[0]))['Type de visite CPN']
+
+    def test_la_cle_etrangere_de_la_fiche_gynecologie(self):
+        self.assertEqual(
+            self._ligne({'cpn_type_visite': self.cpn1}, cpn_type_visite=str(self.cpn1.pk)),
+            'CPN 1')
+
+    def test_l_identifiant_seul_dans_le_registre(self):
+        self.assertEqual(self._ligne(cpn_type_visite=str(self.cpn1.pk)), 'CPN 1')
+
+    def test_la_valeur_de_la_fiche_patients(self):
+        self.assertEqual(self._ligne(cpn_type_visite='1ere'), '1ère visite')
+
+    def test_rien_de_choisi(self):
+        self.assertEqual(self._ligne(cpn_type_visite=''), 'Non renseigné')

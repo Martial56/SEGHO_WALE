@@ -920,3 +920,73 @@ class TestSauvegarderEtFacturerExigeUnTypeDeConsultation(TestCase):
                 self.assertEqual(reponse.status_code, 302)
                 self.assertIn(reverse('facturation:create'), reponse['Location'])
                 RendezVous.objects.filter(patient=self.patient).delete()
+
+
+class TestLaFichePatientsUtiliseLesTypesDeVisiteCpn(TestCase):
+    """La fiche patients proposait « 1ère visite / Visite de suivi » et ne
+    posait pas `RendezVous.cpn_type_visite` : ses CPN manquaient au rapport
+    maternité, qui compte par cette clé étrangère."""
+
+    def setUp(self):
+        from gynecologie.models import TypeVisite
+        self.cpn1, _ = TypeVisite.objects.get_or_create(
+            code='CPN01', defaults={'nom': 'CPN1 premier trimestre de la grossesse'})
+        self.cpn1_autres, _ = TypeVisite.objects.get_or_create(
+            code='CPNA01', defaults={'nom': 'CPN1 Autres trimestres de la grossesse'})
+        self.rdv = RendezVous.objects.create(
+            patient=_patient(), date_heure=timezone.now(), statut='en_consultation')
+        self.url = reverse('patients:rdv_edit', args=[self.rdv.pk])
+        User.objects.create_superuser('su_cpn', password='x')
+        self.client = Client()
+        self.client.login(username='su_cpn', password='x')
+
+    def test_la_liste_configurable_remplace_les_deux_choix_fixes(self):
+        html = self.client.get(self.url).content.decode()
+        self.assertIn(f'<option value="{self.cpn1.pk}" >{self.cpn1.nom}</option>', html)
+        self.assertNotIn('value="1ere"', html)
+
+    def test_l_enregistrement_pose_le_type_sur_le_rdv(self):
+        self.client.post(self.url, {'_action': 'autosave_registres',
+                                    'cpn_type_visite': str(self.cpn1.pk)})
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.cpn_type_visite, self.cpn1)
+
+        # Et le vider le retire : la clé suit le registre dans les deux sens.
+        self.client.post(self.url, {'_action': 'autosave_registres', 'cpn_type_visite': ''})
+        self.rdv.refresh_from_db()
+        self.assertIsNone(self.rdv.cpn_type_visite)
+
+
+class TestLaMigrationReprendLesTypesDeVisiteCpn(TestCase):
+    """patients/migrations/0041 : pose la clé étrangère d'après le registre."""
+
+    def setUp(self):
+        from gynecologie.models import TypeVisite
+        self.cpn1, _ = TypeVisite.objects.get_or_create(
+            code='CPN01', defaults={'nom': 'CPN1 premier trimestre de la grossesse'})
+        self.cpn1_autres, _ = TypeVisite.objects.get_or_create(
+            code='CPNA01', defaults={'nom': 'CPN1 Autres trimestres de la grossesse'})
+
+    def _apres_migration(self, **donnees):
+        import importlib
+        from django.apps import apps
+        from patients.models import RegistreCPN
+        rdv = RendezVous.objects.create(patient=_patient(), date_heure=timezone.now())
+        reg = RegistreCPN.objects.create(rdv=rdv, donnees=donnees)
+        importlib.import_module(
+            'patients.migrations.0041_type_visite_cpn_depuis_registre').remplir(apps, None)
+        rdv.refresh_from_db()
+        reg.refresh_from_db()
+        return rdv.cpn_type_visite, reg.donnees.get('cpn_type_visite')
+
+    def test_l_identifiant_du_registre_devient_la_cle(self):
+        self.assertEqual(self._apres_migration(cpn_type_visite=str(self.cpn1_autres.pk))[0],
+                         self.cpn1_autres)
+
+    def test_les_anciennes_valeurs_ne_donnent_pas_le_rang(self):
+        """« 1ère visite » = première venue au centre, quel que soit le rang de
+        la CPN : même avec les semaines d'aménorrhée, on ne la convertit pas."""
+        self.assertEqual(
+            self._apres_migration(cpn_type_visite='1ere', cpn_semaines_amenorrhee='10'),
+            (None, '1ere'))
+        self.assertEqual(self._apres_migration(cpn_type_visite='suivi'), (None, 'suivi'))

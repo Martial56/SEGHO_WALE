@@ -29,6 +29,27 @@ def save_registres(request, rdv, prefixes=None):
             obj.donnees = data
             obj.save()
 
+    if 'cpn_type_visite' in request.POST and (prefixes is None or 'cpn_' in prefixes):
+        _synchroniser_type_visite_cpn(rdv, request.POST.get('cpn_type_visite', ''))
+
+
+def _synchroniser_type_visite_cpn(rdv, valeur):
+    """Recopie sur le RDV le type de visite CPN choisi dans le registre.
+
+    Le rapport maternité compte les CPN par `RendezVous.cpn_type_visite`, pas
+    par le JSON du registre. Plusieurs chemins (création, enregistrement
+    automatique, fiche patients) n'écrivaient que le JSON : la visite
+    disparaissait du rapport. `save_registres` étant leur passage commun,
+    c'est ici que la clé étrangère suit.
+    """
+    from gynecologie.models import TypeVisite
+    valeur = (valeur or '').strip()
+    type_id = (TypeVisite.objects.filter(pk=int(valeur)).values_list('pk', flat=True).first()
+               if valeur.isdigit() else None)
+    if rdv.cpn_type_visite_id != type_id:
+        type(rdv).objects.filter(pk=rdv.pk).update(cpn_type_visite_id=type_id)
+        rdv.cpn_type_visite_id = type_id
+
 
 #: Codes du département « Médecine générale ». 'medg' est celui présent en base ;
 #: 'MEDGEN' est le doublon que créerait la migration medecins/0015 (voir
