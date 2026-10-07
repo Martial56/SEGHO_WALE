@@ -265,6 +265,16 @@ class RendezVousForm(forms.ModelForm):
             for pk, departement_id in type_consultation_qs.values_list('pk', 'departement_id')
         }
 
+    MESSAGE_TYPE_REQUIS = 'Choisissez un type de consultation avant de facturer.'
+
+    def exiger_type_consultation(self):
+        """« Sauvegarder et facturer » part sur la facture, dont la désignation
+        est le type de consultation : sans lui, il n'y a rien à facturer.
+        Sert aux deux créations (patients et gynécologie)."""
+        champ = self.fields['type_consultation']
+        champ.required = True
+        champ.error_messages['required'] = self.MESSAGE_TYPE_REQUIS
+
 
 class PathologieForm(forms.ModelForm):
     class Meta:

@@ -6,7 +6,8 @@ mener la consultation. Chaque étape a désormais sa permission :
 
 * Brouillon → Confirmé .......... `confirmer_rendezvous`   (accueil)
 * Confirmé → En attente ......... `mettre_en_attente_rendezvous` (évaluation,
-  choix du médecin — infirmier)
+  choix du médecin — infirmier ; l'évaluation et le médecin restent
+  modifiables tant que le RDV est « En attente »)
 * En attente → En consultation
   → Terminé ..................... `consulter_rendezvous`   (médecin)
 * Annuler ....................... `annuler_rendezvous`
@@ -75,6 +76,18 @@ def peut_modifier(user, rdv):
     return _a(user, permission)
 
 
+#: Statuts où « mettre en attente » ouvre la fenêtre d'évaluation (constantes
+#: et médecin) : l'infirmier corrige encore tant que le médecin n'a pas commencé.
+STATUTS_D_EVALUATION = ('confirme', 'en_attente')
+
+
+def peut_evaluer(user, rdv):
+    """L'utilisateur peut-il enregistrer l'évaluation clinique et le médecin ?"""
+    if peut_modifier(user, rdv):
+        return True
+    return rdv.statut in STATUTS_D_EVALUATION and _a(user, METTRE_EN_ATTENTE)
+
+
 def peut_faire(user, action):
     """L'utilisateur peut-il lancer ce changement d'état (`_action`) ?"""
     return _a(user, PERMISSION_DE_L_ACTION[action])
@@ -88,6 +101,7 @@ def droits(user, rdv):
     """Booléens pour les templates : quels boutons afficher."""
     return {
         'modifier': peut_modifier(user, rdv),
+        'evaluer': peut_evaluer(user, rdv),
         'confirmer': _a(user, CONFIRMER),
         'en_attente': _a(user, METTRE_EN_ATTENTE),
         'consulter': _a(user, CONSULTER),

@@ -119,6 +119,23 @@ def _avec(username, *codes):
     return user
 
 
+def _medecin():
+    from employer.models import Employe
+    from medecins.models import Medecin
+    return Medecin.objects.create(employe=Employe.objects.create(
+        nom='Docteur', prenoms='Test', telephone='0700000001',
+        date_embauche='2020-01-01'))
+
+
+def _evaluation_et_medecin(rdv):
+    """Ce que l'infirmier pose avant « En Attente » : évaluation et médecin."""
+    from consultations.models import Consultation
+    rdv.medecin = _medecin()
+    rdv.save(update_fields=['medecin'])
+    Consultation.objects.create(patient=rdv.patient, rendez_vous=rdv,
+                                motif='Évaluation clinique')
+
+
 def _page(username, url, attendu=200):
     client = Client()
     client.login(username=username, password='x')
@@ -467,6 +484,8 @@ class TestLesDroitsParEtapeDuRendezVous(TestCase):
         rdv.refresh_from_db()
         self.assertEqual(rdv.statut, 'confirme')
 
+        # « En Attente » exige l'évaluation et le médecin.
+        _evaluation_et_medecin(rdv)
         self.assertEqual(self._poster('u_infirmier', url, 'en_attente').status_code, 302)
         rdv.refresh_from_db()
         self.assertEqual(rdv.statut, 'en_attente')
@@ -615,6 +634,82 @@ class TestLaLigneAnnuleeEstGrisee(TestCase):
         gabarit la rendrait muette sur les listes qui n'ont pas cette feuille."""
         self._rdv('annule')
         self.assertNotIn('rdv-row-annule', self._html('patients:rdv_global'))
+
+
+class TestLInfirmierEvalueEncoreUnRdvEnAttente(TestCase):
+    """« Mettre en attente » ouvre l'évaluation clinique et le choix du
+    médecin, au stade « Confirmé » comme une fois le RDV « En attente » :
+    au second, la fiche relevait de `consulter_rendezvous` et l'infirmier ne
+    pouvait plus corriger une constante ni réorienter le patient.
+    """
+
+    def setUp(self):
+        self.medecin = _medecin()
+        self.patient = _patient()
+        _avec('u_inf_eval', 'patients.view_rendezvous',
+              'patients.mettre_en_attente_rendezvous')
+        _avec('u_acc_eval', 'patients.view_rendezvous',
+              'patients.confirmer_rendezvous')
+
+    def _rdv(self, statut):
+        # Sans consultation : l'évaluation la crée. Sur un RDV « En attente »,
+        # le signal de `consultations` le passait alors « En consultation ».
+        rdv = RendezVous.objects.create(
+            patient=self.patient, date_heure=timezone.now(), statut=statut)
+        return rdv, reverse('patients:rdv_edit', args=[rdv.pk])
+
+    def _evaluer(self, username, url):
+        client = Client()
+        client.login(username=username, password='x')
+        return client.post(url, {'_action': 'save_eval', 'eval_poids': '70',
+                                 'eval_medecin': self.medecin.pk})
+
+    def test_en_attente_l_infirmier_modifie_l_evaluation_et_le_medecin(self):
+        rdv, url = self._rdv('en_attente')
+        self.assertIn('id="btn-eval-toggle"', _page('u_inf_eval', url))
+        self.assertEqual(self._evaluer('u_inf_eval', url).status_code, 302)
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.medecin, self.medecin)
+        self.assertEqual(float(rdv.consultation.constantes.poids), 70)
+        self.assertEqual(rdv.statut, 'en_attente')
+
+    def test_en_attente_refuse_sans_evaluation_ni_medecin(self):
+        rdv, url = self._rdv('confirme')
+        client = Client()
+        client.login(username='u_inf_eval', password='x')
+        client.post(url, {'_action': 'en_attente'})
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'confirme')
+
+        # Évaluation sans médecin : toujours refusé.
+        client.post(url, {'_action': 'save_eval', 'eval_poids': '70'})
+        client.post(url, {'_action': 'en_attente'})
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'confirme')
+
+        # Avec le médecin, la mise en attente passe.
+        client.post(url, {'_action': 'en_attente', 'medecin': self.medecin.pk})
+        rdv.refresh_from_db()
+        self.assertEqual(rdv.statut, 'en_attente')
+
+    def test_une_fois_la_consultation_commencee_c_est_fini(self):
+        rdv, url = self._rdv('en_consultation')
+        self.assertNotIn('id="btn-eval-toggle"', _page('u_inf_eval', url))
+        self.assertEqual(self._evaluer('u_inf_eval', url).status_code, 403)
+        rdv.refresh_from_db()
+        self.assertIsNone(rdv.medecin)
+
+    def test_sans_la_permission_l_evaluation_reste_fermee(self):
+        rdv, url = self._rdv('en_attente')
+        self.assertNotIn('id="btn-eval-toggle"', _page('u_acc_eval', url))
+        self.assertEqual(self._evaluer('u_acc_eval', url).status_code, 403)
+
+    def test_l_evaluation_n_ouvre_pas_le_reste_de_la_fiche(self):
+        """Seul `save_eval` est ouvert : l'enregistrement de la fiche reste refusé."""
+        _, url = self._rdv('en_attente')
+        client = Client()
+        client.login(username='u_inf_eval', password='x')
+        self.assertEqual(client.post(url, {'motif': 'x'}).status_code, 403)
 
 
 class TestUnePermissionDEtapePrimeSurLAccesComplet(TestCase):
@@ -776,3 +871,52 @@ class TestLeDepliageNeMelangePasLesDeuxVues(TestCase):
         self.assertIn(
             'racine.querySelectorAll', source,
             'la recherche ne part plus du conteneur de l’en-tête')
+
+
+class TestSauvegarderEtFacturerExigeUnTypeDeConsultation(TestCase):
+    """« Sauvegarder et facturer » partait sur la facture même avec
+    « — Choisir un type de consultation — » : la facture n'avait alors rien
+    à reprendre comme désignation. Même règle pour les deux créations."""
+
+    #: Les deux pages de création partagent `RendezVousForm`.
+    CREATIONS = ('patients:rdv_create', 'gynecologie_rdv_create')
+
+    def setUp(self):
+        from medecins.models import Departement
+        from services.models import Articleservice, CategorieArticle
+        self.patient = _patient()
+        self.departement, _ = Departement.objects.get_or_create(
+            code='GYN', defaults={'nom': 'Gynécologie'})
+        categorie, _ = CategorieArticle.objects.get_or_create(
+            code='CS', defaults={'nom': 'Consultations'})
+        self.type_consultation = Articleservice.objects.create(
+            nom='CONSULTATION GYN', categorie=categorie, departement=self.departement)
+        # Superuser : la gynécologie exige aussi son module.
+        User.objects.create_superuser('su_crea_rdv', password='x')
+        self.client = Client()
+        self.client.login(username='su_crea_rdv', password='x')
+
+    def _creer(self, nom, **extra):
+        donnees = {'patient': self.patient.pk, 'departement': self.departement.pk,
+                   'date_heure': timezone.now().strftime('%Y-%m-%dT%H:%M:%S'),
+                   'motif': 'Controle'}
+        donnees.update(extra)
+        return self.client.post(reverse(nom), donnees)
+
+    def test_sans_type_aucun_rdv_ni_facture(self):
+        for nom in self.CREATIONS:
+            with self.subTest(nom):
+                reponse = self._creer(nom)
+                self.assertEqual(reponse.status_code, 200)
+                self.assertIn('Choisissez un type de consultation avant de facturer.',
+                              reponse.content.decode())
+                self.assertFalse(RendezVous.objects.filter(patient=self.patient).exists())
+
+    def test_avec_un_type_on_part_sur_la_facture(self):
+        """Sans cette moitié, le test précédent passerait si plus rien ne se créait."""
+        for nom in self.CREATIONS:
+            with self.subTest(nom):
+                reponse = self._creer(nom, type_consultation=self.type_consultation.pk)
+                self.assertEqual(reponse.status_code, 302)
+                self.assertIn(reverse('facturation:create'), reponse['Location'])
+                RendezVous.objects.filter(patient=self.patient).delete()

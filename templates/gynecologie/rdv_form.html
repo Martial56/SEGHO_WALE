@@ -767,6 +767,9 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
                 </label>
                 {{ form.type_consultation }}
             </div>
+            {% if form.type_consultation.errors %}
+            <div class="field-row"><span></span><div class="field-error">{{ form.type_consultation.errors.0 }}</div></div>
+            {% endif %}
             <div class="field-row">
                 <span></span>
                 <div class="f-hint">
@@ -877,7 +880,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             {% elif rdv %}Aucune évaluation pour ce rendez-vous.
             {% else %}Sauvegardez d'abord le rendez-vous pour créer une évaluation.{% endif %}
           </span>
-          {% if rdv and peut_modifier %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
+          {% if rdv and droits_rdv.evaluer %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
         </div>
 
         <!-- Résumé lecture seule -->
@@ -1878,6 +1881,17 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
     }
     if (typeConsult) typeConsult.addEventListener('change', majTypeVisiteRequis);
     majTypeVisiteRequis();
+    // Nouveau RDV : « Sauvegarder et facturer » exige un type de consultation
+    // (désignation de la facture). La vue refuse aussi, ceci évite l'aller-retour.
+    rdvForm.addEventListener('submit', function(e) {
+        if (!isNew || !typeConsult || typeConsult.value) return;
+        var sub = e.submitter;
+        if (sub && sub.name === '_action' && sub.value === 'annuler') return;
+        e.preventDefault();
+        typeConsult.style.borderBottomColor = 'var(--rose)';
+        typeConsult.focus();
+        alert('Choisissez un type de consultation avant de facturer.');
+    });
     rdvForm.addEventListener('submit', function(e) {
         if (!typeVisiteObligatoire()) return;
         var sub = e.submitter;
