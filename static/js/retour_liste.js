@@ -22,7 +22,13 @@
  * * les pages qui ont elles-mêmes bougé dans l'historique : la fiche patient
  *   change d'URL en changeant d'onglet (pushState), et un cran en arrière y
  *   ramènerait à l'onglet précédent, pas à la liste ;
- * * l'ouverture dans un onglet neuf, qui n'a pas d'historique derrière elle.
+ * * l'ouverture dans un onglet neuf, qui n'a pas d'historique derrière elle ;
+ * * les liens de la barre de navigation du module : y cliquer est un
+ *   déplacement voulu, pas un retour. Rouvrir une liste par son entrée de menu
+ *   reculait dans l'historique, et elle revenait avec les critères qu'on y
+ *   avait laissés — la liste des caisses rouvrait sur « mois en cours » quand
+ *   le serveur, lui, l'aurait rendue sur la journée. Le lien est nu ; le suivre
+ *   doit donc donner la liste nue.
  *
  * ── Ce que coûte un retour ──
  *
@@ -58,6 +64,9 @@
     if (!clicSimple(e) || !e.target.closest) return;
     var a = e.target.closest('a[href]');
     if (!a || a.target || a.hasAttribute('download')) return;
+    // La barre de navigation du module est écartée avant toute autre
+    // vérification : son lien est nu, et c'est la liste nue qu'il promet.
+    if (a.closest('.o-nav')) return;
 
     if (history.length <= 1 || !document.referrer) return;
     if (location.href !== urlInitiale) return;
@@ -72,6 +81,18 @@
     if (vise.pathname !== venu.pathname) return;
     // Et pas vers la page courante : ce serait un lien interne, pas un retour.
     if (vise.pathname === location.pathname) return;
+    // Reculer n'a de sens que depuis une page *fille* de la liste visée — une
+    // fiche, dont l'adresse prolonge celle de la liste. Partout ailleurs, un
+    // lien qui mène à la liste est une navigation voulue, et le suivre doit
+    // rendre la liste telle que le serveur la donne.
+    //
+    // L'égalité des chemins ne suffisait pas à distinguer les deux. Depuis
+    // l'accueil, où l'on venait de quitter une liste filtrée, la tuile du
+    // module rouvrait cette liste par un cran en arrière : le filtre revenait
+    // alors que repasser par l'accueil est précisément ce qui doit le faire
+    // oublier (core.memoire_listing). Le même travers rouvrait la liste des
+    // caisses sur la période qu'on y avait laissée.
+    if (location.pathname.indexOf(vise.pathname) !== 0) return;
     // Des critères que le référent n'avait pas : le lien demande autre chose.
     if (vise.search && vise.search !== venu.search) return;
 

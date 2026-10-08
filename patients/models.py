@@ -52,11 +52,12 @@ class Patient(ModeleCentre):
 
     def save(self, *args, **kwargs):
         if not self.code_patient:
+            from core.numerotation import prochain_code
             annee = timezone.now().year
             # all_objects : code_patient est unique tous centres confondus, la
             # numérotation ne doit donc jamais être filtrée par centre actif.
-            count = Patient.all_objects.filter(date_creation__year=annee).count() + 1
-            self.code_patient = f"PAT{annee}{count:05d}"
+            self.code_patient = prochain_code(
+                Patient.all_objects, 'code_patient', f'PAT{annee}', 5)
         super().save(*args, **kwargs)
 
     @property
@@ -351,9 +352,10 @@ class Naissance(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
+            from core.numerotation import prochain_code
             annee = timezone.now().year
-            count = Naissance.objects.filter(date_creation__year=annee).count() + 1
-            self.numero = f"NAISS{annee}{count:04d}"
+            self.numero = prochain_code(
+                Naissance.objects, 'numero', f'NAISS{annee}', 4)
         super().save(*args, **kwargs)
 
     def __str__(self): return f"{self.numero} - {self.mere}"

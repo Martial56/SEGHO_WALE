@@ -10,11 +10,19 @@ remettre dans l'URL quand on revient sans elle — et non d'inventer un état
 caché : l'adresse affichée reste celle de ce qu'on voit, la page se recharge,
 se met en favori et revient par le bouton Précédent sans surprise.
 
-Trois façons de l'oublier, et seulement trois :
+Quatre façons de l'oublier, et seulement quatre :
 
 * le bouton « Effacer », qui rafraîchit la liste sans aucun paramètre ;
 * une nouvelle sélection, qui écrase la précédente ;
-* le retour à l'accueil, qui vide toutes les listes d'un coup.
+* le retour à l'accueil, qui vide toutes les listes d'un coup ;
+* sortir du module, qui emporte les sélections des listes qu'on y laisse.
+
+La dernière est la plus large, et les deux premières restent utiles à
+l'intérieur d'un module. Retenir une sélection sert le temps d'un aller-retour —
+ouvrir une fiche, passer d'une liste sœur à l'autre — et cesse de servir dès
+qu'on travaille ailleurs : retrouver la facturation filtrée sur un mois choisi
+la veille, en venant de l'hospitalisation, ne rend service à personne. Le retour
+à l'accueil en est le cas particulier, l'accueil ne relevant d'aucun module.
 
 La distinction entre « j'efface » et « je reviens d'une fiche » tient à la
 nature de la requête. « Effacer » rafraîchit la liste **en AJAX**, sans quitter
@@ -130,9 +138,48 @@ def selection_memorisee(request):
     return redirect(f'{request.path}?{urlencode([tuple(p) for p in retenue])}')
 
 
+def _module(chemin):
+    """Module dont relève une adresse : son premier segment.
+
+    « /patients/ », « /patients/rendez-vous/ » et « /patients/252/ » relèvent du
+    même module — c'est ce qui laisse une sélection survivre à l'ouverture d'une
+    fiche et au passage d'une liste à sa voisine. « / », le tableau de bord, n'en
+    relève d'aucun.
+
+    Le premier segment et non le namespace de l'URL : les clés en mémoire sont
+    des chemins, pas des requêtes, et il faut mesurer les deux côtés avec la même
+    règle. Chaque module de ce projet préfixe ses routes par son propre nom.
+    """
+    segments = [s for s in chemin.split('/') if s]
+    return segments[0] if segments else ''
+
+
+def _cles_retenues(session):
+    """Clés de sélection présentes en session.
+
+    `.keys()` et non la session elle-même : `SessionBase` expose `__getitem__`
+    sans être itérable, et Python retomberait sur l'indexation par entiers. La
+    liste est matérialisée avant toute suppression — on ne retire pas d'un
+    dictionnaire qu'on parcourt.
+    """
+    return [c for c in session.keys() if c.startswith(PREFIXE_CLE)]
+
+
 def oublier_tout(request):
     """Vide la mémoire de toutes les listes. Appelée depuis l'accueil."""
-    # `.keys()` et non la session elle-même : `SessionBase` expose `__getitem__`
-    # sans être itérable, et Python retomberait sur l'indexation par entiers.
-    for cle in [c for c in request.session.keys() if c.startswith(PREFIXE_CLE)]:
+    for cle in _cles_retenues(request.session):
         del request.session[cle]
+
+
+def oublier_les_autres_modules(request):
+    """Oublie les listes qui ne relèvent pas du module de la page demandée.
+
+    Appelée à chaque navigation par core.middleware.MemoireListingMiddleware, et
+    non depuis les vues de liste : une sélection doit tomber quand on ouvre une
+    page d'un autre module, c'est-à-dire précisément là où aucune vue de liste ne
+    s'exécute.
+    """
+    courant = _module(request.path)
+    for cle in _cles_retenues(request.session):
+        if _module(cle[len(PREFIXE_CLE):]) != courant:
+            del request.session[cle]

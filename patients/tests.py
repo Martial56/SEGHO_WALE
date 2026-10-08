@@ -990,3 +990,58 @@ class TestLaMigrationReprendLesTypesDeVisiteCpn(TestCase):
             self._apres_migration(cpn_type_visite='1ere', cpn_semaines_amenorrhee='10'),
             (None, '1ere'))
         self.assertEqual(self._apres_migration(cpn_type_visite='suivi'), (None, 'suivi'))
+
+
+class TestLaNumerotationSurvitAUneSuppression(TestCase):
+    """Supprimer un patient ne doit pas casser la création des suivants.
+
+    Le code était le nombre de patients de l'année, plus un. Supprimer trois
+    fiches ramenait ce compte trois crans en arrière, et le code calculé était
+    déjà porté par une fiche restée en base : l'enregistrement tombait sur la
+    contrainte d'unicité de `code_patient`. Et il tombait encore à chaque
+    tentative suivante, le compte ne pouvant plus rattraper son retard — la
+    création de patients restait cassée jusqu'à une intervention sur le code.
+
+    C'est arrivé en production, après une suppression depuis /admin/.
+    """
+
+    def _creer(self, suffixe):
+        return Patient.objects.create(
+            nom=f'Num{suffixe}', prenoms='Patient',
+            date_naissance='1990-06-01', sexe='M', telephone='0700000000')
+
+    def test_creer_apres_une_suppression_ne_leve_plus(self):
+        a, b, c = (self._creer(i) for i in range(3))
+        b.delete()
+        # Sans le correctif : IntegrityError sur code_patient.
+        d = self._creer('apres')
+        self.assertTrue(d.code_patient)
+
+    def test_le_code_ne_reprend_pas_celui_d_un_supprime(self):
+        """Réattribuer le code d'une fiche effacée mêlerait deux dossiers.
+
+        Les écritures qui la citaient — journal d'activité, exports, documents
+        imprimés — se rattacheraient en silence au nouveau venu.
+        """
+        a, b, c = (self._creer(i) for i in range(3))
+        efface = b.code_patient
+        b.delete()
+        d = self._creer('apres')
+        self.assertNotEqual(d.code_patient, efface)
+        self.assertGreater(d.code_patient, c.code_patient)
+
+    def test_vider_la_table_repart_du_premier_rang(self):
+        self._creer('seul').delete()
+        annee = timezone.now().year
+        self.assertEqual(self._creer('neuf').code_patient, f'PAT{annee}00001')
+
+    def test_plusieurs_suppressions_d_affilee(self):
+        """Le cas réel : plusieurs fiches retirées d'un coup depuis /admin/."""
+        patients = [self._creer(i) for i in range(6)]
+        dernier = patients[-1].code_patient
+        Patient.all_objects.filter(
+            pk__in=[p.pk for p in patients[1:4]]).delete()
+        suivant = self._creer('apres')
+        self.assertGreater(suivant.code_patient, dernier)
+        self.assertEqual(Patient.all_objects.filter(
+            code_patient=suivant.code_patient).count(), 1)

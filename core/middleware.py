@@ -210,3 +210,52 @@ def _module_depuis_request(request):
         return app_name
     segments = [s for s in request.path.split('/') if s]
     return segments[0] if segments else 'core'
+
+
+class MemoireListingMiddleware:
+    """Oublie la sélection d'une liste dès qu'on quitte son module.
+
+    La mémoire de sélection (core.memoire_listing) sert le temps d'un
+    aller-retour : on filtre une liste, on ouvre une fiche, on revient, le tri
+    est encore là. Elle ne tombait qu'au passage par l'accueil, si bien qu'une
+    liste filtrée la veille se rouvrait filtrée, atteinte depuis n'importe où.
+
+    L'oubli ne peut pas vivre dans les vues de liste : il doit se produire quand
+    on ouvre une page d'un **autre** module, là où aucune d'elles ne s'exécute.
+    D'où ce middleware, qui regarde passer chaque navigation.
+
+    Avant la vue et non après : la liste qu'on demande doit lire une session déjà
+    nettoyée, sans quoi elle se restaurerait une dernière fois avant l'oubli.
+
+    Doit être déclarée APRÈS SessionMiddleware dans MIDDLEWARE : elle lit
+    `request.session`.
+    """
+
+    # Mêmes exclusions que le journal, pour les mêmes raisons : ni fichier, ni
+    # API interne, ni rechargement de développement ne sont une navigation.
+    CHEMINS_EXCLUS = ('/static/', '/media/', '/api/', '/__reload__/',
+                      '/admin/jsi18n/')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        try:
+            if self._est_une_navigation(request):
+                from core import memoire_listing
+                memoire_listing.oublier_les_autres_modules(request)
+        except Exception:
+            # Une mémoire mal rangée ne doit jamais empêcher d'afficher la page.
+            pass
+        return self.get_response(request)
+
+    def _est_une_navigation(self, request):
+        if request.method != 'GET':
+            return False
+        if not hasattr(request, 'session'):
+            return False
+        # Un rafraîchissement de liste en AJAX n'est pas un déplacement : il
+        # porte l'adresse de la liste qu'on regarde déjà.
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return False
+        return not any(request.path.startswith(p) for p in self.CHEMINS_EXCLUS)
