@@ -1879,7 +1879,7 @@ def gynecologie_list(request):
         recherche=CHAMPS_RECHERCHE,
         familles=familles_patients(),
         dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
+        par_page=100,
         tri_defaut=('nom', 'prenoms'),
     )
 
