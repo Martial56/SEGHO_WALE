@@ -299,3 +299,23 @@ def dimensions_personnalisees(champs=None):
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_procedures(),
                            exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_procedures():
+    """Déclaration de la liste des procédures de soin, partagée par la page et
+    son export — voir soins.soin_listing.listing_soins pour le pourquoi."""
+    from core.listing import Listing
+
+    champs = champs_procedures()
+    declarees = construire_dimensions()
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_procedures(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date',),
+        tris=TRIS,
+    )
+    return listing, champs, declarees, perso

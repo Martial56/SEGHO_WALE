@@ -315,6 +315,82 @@ class Listing:
             ajouter(champ)
         return qs.order_by(*ordre) if ordre else qs
 
+    # ── Sélection ───────────────────────────────────────────────────────────
+
+    def selection(self, request, base_qs, champs=(), contexte=None, dimensions=None,
+                  trier=None):
+        """Jeu filtré tel que la liste l'affiche, et dimensions retenues.
+
+        Rassemble les cinq gestes que chaque vue de liste répétait — recherche,
+        filtres, conditions personnalisées, tri, dimensions — pour que l'export
+        puisse emprunter le même chemin que la page.
+
+        `trier(qs, groupes)` remplace le tri par défaut pour les listes qui en
+        ont un à elles : celle des rendez-vous ordonne la journée en cours à
+        l'endroit et les jours passés à l'envers, ce que `trier` ne sait pas
+        exprimer.
+        """
+        q = (request.GET.get('q') or '').strip()
+        groupes = request.GET.getlist('group')
+        filtres = self.filtres_demandes(request)
+
+        qs = self.appliquer_recherche(base_qs, q)
+        qs = self.appliquer_filtres(qs, filtres, contexte or {})
+        conditions = conditions_demandees(request, champs) if champs else []
+        mode = 'ou' if request.GET.get('cm') == 'ou' else 'et'
+        qs = appliquer_conditions(qs, conditions, mode)
+        tri, sens = self.tri_demande(request)
+        qs = trier(qs, groupes) if trier else self.trier(qs, groupes, tri, sens)
+
+        table = self.dimensions if dimensions is None else dimensions
+        dims = [table[g] for g in groupes if g in table]
+        return Selection(qs=qs, dims=dims, filtres=filtres, groupes=groupes,
+                         q=q, conditions=conditions, mode_conditions=mode,
+                         tri=tri, sens=sens)
+
+
+#: Paramètres d'URL qui ne décrivent pas la sélection mais la façon de la
+#: parcourir à l'écran. Les emporter dans un lien d'export n'aurait aucun effet
+#: et donnerait à croire qu'on ne télécharge que la page affichée.
+_PARAMS_DE_PAGE = ('page', 'format', PARAM_GROUPE, PARAM_OUVERTS, PARAM_DECALAGE)
+
+
+def parametres_export(request):
+    """Query string à recopier dans les liens d'export : la sélection, sans la
+    pagination ni le dépliage."""
+    params = request.GET.copy()
+    for cle in _PARAMS_DE_PAGE:
+        params.pop(cle, None)
+    return params.urlencode()
+
+
+class Selection:
+    """Ce que la liste montre : le jeu filtré, et le découpage demandé.
+
+    Rendue par `Listing.selection`, elle sert la page comme son export. Les
+    deux lisent donc le même objet, ce qui est la seule façon de garantir qu'un
+    fichier téléchargé porte exactement les lignes affichées — auparavant
+    l'export refaisait sa propre requête, sans filtre, et sortait la table
+    entière.
+    """
+
+    def __init__(self, qs, dims, filtres, groupes, q, conditions,
+                 mode_conditions, tri='', sens='asc'):
+        self.qs = qs
+        self.dims = dims
+        self.filtres = filtres
+        self.groupes = groupes
+        self.q = q
+        self.conditions = conditions
+        self.mode_conditions = mode_conditions
+        self.tri = tri
+        self.sens = sens
+
+    @property
+    def active(self):
+        """Une sélection est-elle posée, ou regarde-t-on le jeu entier ?"""
+        return bool(self.filtres or self.groupes or self.q or self.conditions)
+
 
 # ── Comptage ────────────────────────────────────────────────────────────────
 

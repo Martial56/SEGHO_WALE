@@ -1349,3 +1349,131 @@ class TestLaMemoireRetientLesFiltresPersonnalises(TestCase):
         self.client.get(self.url,
                         headers={'x-requested-with': 'XMLHttpRequest'})
         self.assertNotIn(PREFIXE_CLE + self.url, self.client.session)
+
+
+class TestProchainCode(TestCase):
+    """La brique de numérotation partagée (core.numerotation).
+
+    Elle remplace le « compter les lignes, plus un » qui équipait neuf modèles :
+    une suppression ramenait le compteur en arrière, et le code calculé était
+    déjà pris. La contrainte d'unicité rejetait l'enregistrement, et le rejetait
+    encore à chaque tentative suivante.
+    """
+
+    def _creer(self, suffixe):
+        from patients.models import Patient
+        return Patient.objects.create(
+            nom=f'Code{suffixe}', prenoms='Patient',
+            date_naissance='1990-06-01', sexe='M', telephone='0700000000')
+
+    def _prochain(self):
+        from core.numerotation import prochain_code
+        from patients.models import Patient
+        from django.utils import timezone
+        return prochain_code(Patient.all_objects, 'code_patient',
+                             f'PAT{timezone.now().year}', 5)
+
+    def test_sur_une_table_vide_le_rang_part_de_un(self):
+        from django.utils import timezone
+        self.assertEqual(self._prochain(), f'PAT{timezone.now().year}00001')
+
+    def test_le_rang_suit_le_plus_haut_et_non_le_nombre_de_lignes(self):
+        """Le coeur du correctif : on lit le plus haut code, pas le compte."""
+        patients = [self._creer(i) for i in range(5)]
+        plus_haut = patients[-1].code_patient
+        patients[1].delete()
+        patients[2].delete()
+        # Le compte est tombé à 3 ; le plus haut rang posé reste 5.
+        self.assertEqual(int(self._prochain()[-5:]), int(plus_haut[-5:]) + 1)
+
+    def test_un_code_hors_format_ne_fait_pas_tomber_la_numerotation(self):
+        """Une reprise de données peut avoir posé un code que `int` refuse.
+
+        Mieux vaut repartir d'un rang approché — la boucle anti-collision
+        rattrapant le reste — que de refuser tout enregistrement.
+        """
+        from patients.models import Patient
+        from django.utils import timezone
+        annee = timezone.now().year
+        p = self._creer('legacy')
+        Patient.all_objects.filter(pk=p.pk).update(
+            code_patient=f'PAT{annee}ABCDE')
+        code = self._prochain()
+        self.assertTrue(code.startswith(f'PAT{annee}'))
+        self.assertFalse(Patient.all_objects.filter(code_patient=code).exists())
+
+    def test_un_rang_deja_pris_est_enjambe(self):
+        """Deux guichets qui enregistrent dans la même seconde.
+
+        Ils lisent le même « dernier » et calculeraient le même code : la boucle
+        évite à la contrainte d'unicité d'avoir à servir de garde-fou.
+        """
+        from patients.models import Patient
+        from django.utils import timezone
+        annee = timezone.now().year
+        self._creer('a')
+        # On pose à la main le code que la numérotation va viser.
+        vise = self._prochain()
+        p = self._creer('b')
+        Patient.all_objects.filter(pk=p.pk).update(code_patient=vise)
+        self.assertNotEqual(self._prochain(), vise)
+
+
+class TestLeTelechargementDemandeLaPermission(TestCase):
+    """Cacher le bouton ne suffit pas : l'adresse doit refuser aussi.
+
+    Les listes de gynécologie rendent leur export dans la vue de la page, et
+    cette vue n'exigeait qu'une connexion. Le fichier — toutes les patientes,
+    tout le registre des naissances — partait donc à n'importe quel compte qui
+    tapait `?format=csv`, bouton visible ou non.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Les deux vues sont aussi gardées par `module_requis('gynecologie')`,
+        # qui répond à une autre question : « cette personne travaille-t-elle
+        # ici ? ». On la met de côté en donnant le module à tout le monde, pour
+        # n'éprouver que la permission.
+        from modules_permissions.models import Module, UserModuleOverride
+
+        module, _ = Module.objects.get_or_create(
+            code='gynecologie', defaults={'name': 'Gynécologie', 'is_active': True})
+        module.is_active = True
+        module.save()
+
+        def avec_module(nom, *codes):
+            user = User.objects.create_user(nom, password='x')
+            for code in codes:
+                user.user_permissions.add(_permission(code))
+            UserModuleOverride.objects.create(
+                user=user, module=module, override_type='grant')
+            return User.objects.get(pk=user.pk)
+
+        cls.nu = avec_module('tel_nu')
+        cls.voit_patientes = avec_module('tel_pat', 'patients.view_patient')
+        cls.voit_naissances = avec_module('tel_nai', 'patients.view_naissance')
+
+    def _code(self, utilisateur, url):
+        client = Client()
+        client.force_login(User.objects.get(pk=utilisateur.pk))
+        return client.get(url).status_code
+
+    def test_les_patientes_refusent_sans_view_patient(self):
+        url = reverse('gynecologie_list') + '?format=csv'
+        self.assertEqual(self._code(self.nu, url), 403)
+        self.assertEqual(self._code(self.voit_patientes, url), 200)
+
+    def test_le_registre_des_naissances_refuse_sans_view_naissance(self):
+        url = reverse('gynecologie_naissances') + '?format=csv'
+        self.assertEqual(self._code(self.nu, url), 403)
+        self.assertEqual(self._code(self.voit_naissances, url), 200)
+
+    def test_l_ancienne_adresse_du_registre_refuse_aussi(self):
+        """`?export=excel` est le lien que portait l'ancien bouton."""
+        url = reverse('gynecologie_naissances') + '?export=excel'
+        self.assertEqual(self._code(self.nu, url), 403)
+
+    def test_la_page_elle_meme_reste_ouverte(self):
+        """Seul le téléchargement est fermé : la vue n'a pas changé de garde."""
+        self.assertEqual(self._code(self.nu, reverse('gynecologie_list')), 200)
+        self.assertEqual(self._code(self.nu, reverse('gynecologie_naissances')), 200)

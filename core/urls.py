@@ -27,6 +27,10 @@ urlpatterns = [
     path('compte/couleur-accent/', views.accent_color_set, name='accent_color_set'),
     path('compte/luminosite/', views.luminosite_set, name='luminosite_set'),
 
+    # Avancement d'un import mené en tâche de fond (core.taches) — relu par la
+    # jauge, quel que soit le module qui a lancé l'import.
+    path('taches/<uuid:pk>/statut/', views.tache_statut, name='tache_statut'),
+
     # URLs des modules
     path('centres/', include('centres.urls')),
     path('patients/', include('patients.urls')),

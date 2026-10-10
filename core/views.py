@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, permission_required
 from core import memoire_listing
+from core.export_listing import contexte as contexte_export
 
 from modules_permissions.decorateurs import module_requis
 from django.views.decorators.http import require_POST
@@ -1061,7 +1062,8 @@ def gynecologie_registre_naissance(request):
 
     from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
                               champs_pour_navigateur, conditions_demandees,
-                              menu_filtres, menu_groupes, paginer_groupes)
+                              menu_filtres, menu_groupes, paginer_groupes,
+                              parametres_export)
     from patients.models import Naissance
     from patients.naissance_listing import (CHAMPS_RECHERCHE, champs_naissances,
                                             construire_dimensions,
@@ -1108,17 +1110,26 @@ def gynecologie_registre_naissance(request):
     qs = appliquer_conditions(qs, conditions, mode_conditions)
     qs = listing.trier(qs, groupes)
 
-    # L'export part de la même requête : il reflète donc exactement ce qui est à
-    # l'écran, recherche, filtres et conditions comprises.
-    if request.GET.get('export') == 'excel':
-        return _export_naissances(qs)
-
     # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
     # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
     # la page porterait, repliées, toutes les lignes de tous les groupes.
     toutes = dict(declarees)
     toutes.update({d.cle: d for d in dims_perso})
     dims = [toutes[g] for g in groupes if g in toutes]
+
+    # L'export part de la même requête, et porte les titres de groupe quand un
+    # regroupement est posé. `export=excel` reste accepté : c'est l'adresse que
+    # portait l'ancien bouton.
+    if request.GET.get('format') or request.GET.get('export'):
+        # La vue n'exige qu'une connexion pour afficher la page ; télécharger
+        # le registre entier demande la permission de le consulter, comme le
+        # bouton qui y mène.
+        if not request.user.has_perm('patients.view_naissance'):
+            raise PermissionDenied
+        from core.export_listing import repondre
+        fmt = request.GET.get('format') or 'xlsx'
+        return repondre(fmt, 'registre-naissances', _colonnes_naissances(),
+                        qs, dims, titre_feuille='Registre des naissances')
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -1150,6 +1161,12 @@ def gynecologie_registre_naissance(request):
         'filtre_pose':      filtre_pose,
         'selection_active': filtre_pose or bool(groupes or q or conditions),
         'periode_libelle':  libelle_periode(filtres, date_from, date_to),
+        # Menu « Exporter » : télécharge la sélection affichée, pas le registre
+        # entier. Servi par cette vue même, via `?format=`.
+        'export_url':      reverse('gynecologie_naissances'),
+        'export_libelle':  'le registre',
+        'export_qs':       parametres_export(request),
+        'nb_selection':    qs.count() if dims else page_obj.paginator.count,
         # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()) + dims_perso, groupes),
@@ -1170,77 +1187,39 @@ def gynecologie_registre_naissance(request):
     })
 
 
-def _export_naissances(naissances):
-    """Classeur Excel du registre, dans la sélection et l'ordre de l'écran."""
-    import openpyxl
-    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+def _colonnes_naissances():
+    """Colonnes du registre des naissances.
 
-    from django.http import HttpResponse
-
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = 'Registre des naissances'
-
-    headers = [
-        'Numéro', 'Mère', 'Date d\'accouchement', 'Médecin',
-        'Mode d\'accouchement', 'Nom de l\'enfant', 'Prénoms de l\'enfant',
-        'Sexe', 'Poids (g)', 'Taille (cm)', 'Apgar 1\'', 'Apgar 5\'',
-        'Groupe sanguin', 'Lieu de naissance', 'Parité',
-        'Garçons', 'Filles', 'Éducation mère', 'Statut', 'Remarques',
+    Reprend à l'identique celles du classeur bâti à la main qu'elles
+    remplacent ; l'export passe désormais par core.export_listing, ce qui lui
+    apporte le CSV, le JSON et les titres de groupe.
+    """
+    from core.export_listing import Colonne
+    return [
+        Colonne('Numéro', 'numero', largeur=14),
+        Colonne('Mère', lambda n: f'{n.mere.nom.upper()} {n.mere.prenoms}'
+                if n.mere_id else '', largeur=28),
+        Colonne("Date d'accouchement", 'date_accouchement', largeur=18),
+        Colonne('Médecin', lambda n: str(n.medecin) if n.medecin_id else '', largeur=22),
+        Colonne("Mode d'accouchement", lambda n: n.get_mode_accouchement_display(), largeur=18),
+        Colonne("Nom de l'enfant", 'nom_enfant', largeur=18),
+        Colonne("Prénoms de l'enfant", 'prenoms_enfant', largeur=20),
+        Colonne('Sexe', lambda n: 'Féminin' if n.sexe_enfant == 'F' else 'Masculin', largeur=10),
+        Colonne('Poids (g)', lambda n: float(n.poids_naissance) if n.poids_naissance else '',
+                largeur=10),
+        Colonne('Taille (cm)', lambda n: float(n.taille_naissance) if n.taille_naissance else '',
+                largeur=10),
+        Colonne("Apgar 1'", lambda n: n.apgar_1min if n.apgar_1min is not None else '', largeur=9),
+        Colonne("Apgar 5'", lambda n: n.apgar_5min if n.apgar_5min is not None else '', largeur=9),
+        Colonne('Groupe sanguin', 'groupe_sanguin_enfant', largeur=12),
+        Colonne('Lieu de naissance', 'lieu_naissance', largeur=18),
+        Colonne('Parité', 'parite', largeur=8),
+        Colonne('Garçons', 'nombre_garcons', largeur=8),
+        Colonne('Filles', 'nombre_filles', largeur=8),
+        Colonne('Éducation mère', lambda n: n.get_education_mere_display(), largeur=16),
+        Colonne('Statut', lambda n: n.get_statut_display(), largeur=10),
+        Colonne('Remarques', 'remarques', largeur=30),
     ]
-    header_fill = PatternFill('solid', fgColor='714B67')
-    header_font = Font(bold=True, color='FFFFFF', size=10)
-    thin = Side(style='thin', color='DDDDDD')
-    border = Border(left=thin, right=thin, bottom=thin)
-
-    for col, h in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=h)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal='center', vertical='center')
-        cell.border = border
-    ws.row_dimensions[1].height = 18
-
-    for row_idx, n in enumerate(naissances, 2):
-        values = [
-            n.numero,
-            f"{n.mere.nom.upper()} {n.mere.prenoms}",
-            n.date_accouchement.strftime('%d/%m/%Y %H:%M'),
-            str(n.medecin) if n.medecin else '',
-            n.get_mode_accouchement_display(),
-            n.nom_enfant,
-            n.prenoms_enfant,
-            'Féminin' if n.sexe_enfant == 'F' else 'Masculin',
-            float(n.poids_naissance) if n.poids_naissance else '',
-            float(n.taille_naissance) if n.taille_naissance else '',
-            n.apgar_1min if n.apgar_1min is not None else '',
-            n.apgar_5min if n.apgar_5min is not None else '',
-            n.groupe_sanguin_enfant,
-            n.lieu_naissance,
-            n.parite,
-            n.nombre_garcons,
-            n.nombre_filles,
-            n.get_education_mere_display(),
-            n.get_statut_display(),
-            n.remarques,
-        ]
-        for col, val in enumerate(values, 1):
-            cell = ws.cell(row=row_idx, column=col, value=val)
-            cell.border = border
-            if row_idx % 2 == 0:
-                cell.fill = PatternFill('solid', fgColor='F9F4FC')
-
-    col_widths = [14, 28, 18, 22, 18, 18, 20, 10, 10, 10, 9, 9, 12, 18, 8, 8, 8, 16, 10, 30]
-    for i, w in enumerate(col_widths, 1):
-        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
-
-    filename = f"naissances_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
-    response = HttpResponse(
-        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    wb.save(response)
-    return response
 
 
 def _rdv_gyn_qs():
@@ -1744,68 +1723,19 @@ def gynecologie_rdv(request):
     if cpn_val in ('cpn1', 'cpn2', 'cpn3', 'cpn4', 'autre'):
         rdvs = rdvs.filter(type_visite_cpn=cpn_val)
 
-    # --- Export Excel (respecte les filtres actifs) ---
-    if request.GET.get('export') == 'excel':
-        # Le classeur doit refléter la même sélection que la liste : on rejoue
-        # ici la recherche et les filtres via la logique partagée.
-        # Même déclaration que la liste : sans cela, l'export et l'écran
-        # finiraient par appliquer des filtres différents.
-        from core.listing import Listing
-        from patients.rdv_listing import FILTRES_PAR_DEFAUT, familles_rdv
-        from datetime import date as _dexp
-        _listing = Listing(
-            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
-            familles=familles_rdv(contexte_gyneco=True),
-            filtres_defaut=FILTRES_PAR_DEFAUT,
-        )
-        rdvs = _listing.appliquer_recherche(rdvs, request.GET.get('q', '').strip())
-        rdvs = _listing.appliquer_filtres(rdvs, _listing.filtres_demandes(request), {
-            'user': request.user, 'aujourdhui': _dexp.today(),
-            'date_from': request.GET.get('date_from', '').strip(),
-            'date_to': request.GET.get('date_to', '').strip(),
-        })
-        import openpyxl
-        from openpyxl.styles import Font, PatternFill, Alignment
-        from django.http import HttpResponse
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = 'Rendez-vous'
-        headers = ['Code RDV', 'Patient', 'Date', 'Médecin', 'Type', 'Motif', 'Âge', 'Genre', 'État']
-        header_fill = PatternFill('solid', fgColor='00838F')
-        for ci, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=ci, value=h)
-            cell.font = Font(bold=True, color='FFFFFF')
-            cell.fill = header_fill
-            cell.alignment = Alignment(horizontal='center')
-        from datetime import date as _d2
-        for ri, rdv in enumerate(rdvs, 2):
-            age = ''
-            if rdv.patient.date_naissance:
-                t = _d2.today()
-                dob = rdv.patient.date_naissance
-                age = str(t.year - dob.year - ((t.month, t.day) < (dob.month, dob.day)))
-            ws.append([
-                rdv.code_rdv or rdv.patient.code_patient,
-                f"{rdv.patient.nom.upper()} {rdv.patient.prenoms}",
-                rdv.date_heure.strftime('%d/%m/%Y %H:%M'),
-                str(rdv.medecin) if rdv.medecin else '',
-                rdv.get_type_rdv_display(),
-                rdv.motif[:100] if rdv.motif else '',
-                age,
-                rdv.patient.get_sexe_display() if rdv.patient.sexe else '',
-                rdv.get_statut_display(),
-            ])
-        for col in ws.columns:
-            ws.column_dimensions[col[0].column_letter].width = max(len(str(col[0].value or '')), max(len(str(c.value or '')) for c in col)) + 4
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        response['Content-Disposition'] = 'attachment; filename="rendez-vous.xlsx"'
-        wb.save(response)
-        return response
+    # Export : même chemin que la page (voir patients.views._export_rdv), ce qui
+    # lui apporte au passage le CSV, le JSON et les titres de groupe. Le
+    # classeur était bâti ici à la main, avec sa propre déclaration de liste —
+    # deux sources qui finissent toujours par diverger.
+    if request.GET.get('export') or request.GET.get('format'):
+        from patients.views import _export_rdv
+        return _export_rdv(request, rdvs, True, 'rendez-vous-gynecologie')
 
     return _rdv_listing(request, rdvs, 'gynecologie/rdv.html',
                         contexte_gyneco=True,
                         rdv_url_name='gynecologie_rdv_detail',
                         create_url=reverse('gynecologie_rdv_create'),
+                        export_url_name='gynecologie_rdv',
                         empty_sub='Aucun rendez-vous gynécologique enregistré.')
 
 @login_required(login_url='login')
@@ -1870,18 +1800,10 @@ def gynecologie_list(request):
         pk__in=RendezVous.objects.filter(departement__code='GYN').values('patient')
     )
 
-    # Champs établis une fois et partagés : ils servent au regroupement
-    # personnalisé comme au constructeur de conditions.
-    champs     = champs_patients()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees  = construire_dimensions(today)
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_patients(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=100,
-        tri_defaut=('nom', 'prenoms'),
-    )
+    # Même déclaration que la liste du module Patients : seule la cohorte
+    # change (voir patients.patient_listing.listing_patients).
+    from patients.patient_listing import listing_patients
+    listing, champs, declarees, dims_perso = listing_patients(today)
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -1889,23 +1811,29 @@ def gynecologie_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {'aujourdhui': today})
+    # Export : même chemin que la page, le fichier porte donc ce qui est affiché.
+    if request.GET.get('format'):
+        # Même raison qu'au registre des naissances : la page est ouverte à
+        # tout compte connecté, le fichier non.
+        if not request.user.has_perm('patients.view_patient'):
+            raise PermissionDenied
+        from core.export_listing import repondre
+        from patients.views import _colonnes_patients
+        vue = listing.selection(request, base_qs, champs, {'aujourdhui': today})
+        return repondre(request.GET['format'], 'patientes-gynecologie',
+                        _colonnes_patients(), vue.qs, vue.dims,
+                        titre_feuille='Patientes')
 
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre les
-    # champs découverts sur le modèle : une condition inconnue est ignorée.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    qs = listing.trier(qs, groupes)
+    selection = listing.selection(request, base_qs, champs, {'aujourdhui': today})
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
 
     # Avec un regroupement, on pagine les **groupes** : toutes les lignes des
     # groupes affichés sont chargées, si bien que déplier n'appelle jamais le
     # serveur.
-    toutes = dict(declarees)
-    toutes.update({d.cle: d for d in dims_perso})
-    dims = [toutes[g] for g in groupes if g in toutes]
+    dims = selection.dims
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -1943,6 +1871,10 @@ def gynecologie_list(request):
             {'title': 'Gynécologie', 'url': '/gynecologie/'},
             {'title': 'Patients'},
         ],
+        # Menu « Exporter » : télécharge la sélection affichée, pas la cohorte.
+        **contexte_export(request, selection, reverse('gynecologie_list'),
+                          'les patientes',
+                          None if dims else page_obj.paginator.count),
     })
 
 
@@ -2501,3 +2433,29 @@ def medecins_import_departements(request):
 
 
 ### Le CRUD "Services" a été déplacé vers employer/views.py (menu Configuration du module Employé).
+
+
+@login_required
+def tache_statut(request, pk):
+    """Avancement d'un import en tâche de fond, relu par la jauge (voir
+    core.taches). Chaque utilisateur ne suit que ses propres imports — sauf un
+    superuser, qui peut constater qu'un collègue en a un en cours."""
+    from core.models import TacheImport
+
+    tache = get_object_or_404(TacheImport, pk=pk)
+    if tache.utilisateur_id != request.user.pk and not request.user.is_superuser:
+        raise PermissionDenied
+
+    return JsonResponse({
+        'etat': tache.etat,
+        'etape': tache.etape,
+        'total': tache.total,
+        'traites': tache.traites,
+        'pourcentage': tache.pourcentage,
+        'crees': tache.crees,
+        'mis_a_jour': tache.mis_a_jour,
+        'ignores': tache.ignores,
+        'erreurs': tache.erreurs,
+        'message': tache.message,
+        'termine': tache.etat != 'en_cours',
+    })

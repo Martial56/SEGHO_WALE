@@ -464,7 +464,7 @@ sombres des bandes doivent l'emporter sur le bleu figé de la brique.
     <span><i class="bi bi-upload"></i> Importer des patients</span>
     <button type="button" class="io-modal-close" onclick="closeImportModal()">×</button>
   </div>
-  <form method="post" action="{% url 'patients:import_patients' %}" enctype="multipart/form-data">
+  <form method="post" action="{% url 'patients:import_patients' %}" enctype="multipart/form-data" data-io-progression>
     {% csrf_token %}
     <div class="io-modal-body">
       <label class="io-file-label" for="io-file-input">
@@ -476,9 +476,12 @@ sombres des bandes doivent l'emporter sur le bleu figé de la brique.
       <div class="io-filename" id="io-filename" style="display:none;"></div>
       <label class="io-checkbox-label"><input type="checkbox" name="update"> Mettre à jour les enregistrements existants</label>
       <p class="io-hint">
-        Clé de rapprochement : <strong>code_identifiant</strong> si renseigné, sinon nom + âge approximatif.
-        Colonnes attendues : <strong>code_identifiant, nom, age, genre, mobile</strong>.
-        L'âge est converti en date de naissance approximative (année exacte, jour/mois non gardés).
+        Colonnes attendues : <strong>code_identifiant, nom, date_naissance, genre, mobile</strong>.
+        La date de naissance est facultative — jj/mm/aaaa, aaaa-mm-jj ou cellule datée d'Excel.
+        Une colonne <strong>age</strong> reste acceptée à sa place (convertie en date approximative),
+        pour les fichiers issus d'un autre logiciel.
+        Clé de rapprochement : <strong>code_identifiant</strong> si renseigné, sinon nom + date de
+        naissance ; sans date, seul l'identifiant rapproche.
       </p>
     </div>
     <div class="io-modal-footer">
@@ -486,6 +489,7 @@ sombres des bandes doivent l'emporter sur le bleu figé de la brique.
       <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
     </div>
   </form>
+  {% include 'includes/io_progression.html' %}
 </div>
 {% endif %}
 

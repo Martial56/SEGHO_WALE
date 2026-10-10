@@ -26,6 +26,9 @@ UNAUDITED_APPS = {
 SKIP_MODELS = {
     'logactivite', 'userprofile', 'session', 'logentry',
     'permission', 'group', 'contenttype',
+    # Une tâche d'import s'enregistre à chaque lot pour faire avancer la jauge :
+    # tracée, elle noierait le journal sous des centaines de lignes techniques.
+    'tacheimport',
 }
 
 

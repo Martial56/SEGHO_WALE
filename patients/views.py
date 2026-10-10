@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
-from core import memoire_listing
+from core import memoire_listing, taches
 from datetime import date, timedelta
 
 from . import origines as origines_patient
@@ -64,12 +64,11 @@ def patient_list(request):
     """
     from datetime import date as _date
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
-                              menu_filtres, menu_groupes, paginer_groupes)
-    from .patient_listing import (CHAMPS_RECHERCHE, champs_patients,
-                                  construire_dimensions, dimensions_personnalisees,
-                                  familles_patients)
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
+                              menu_filtres, menu_groupes, paginer_groupes,
+                              parametres_export)
+    from .patient_listing import listing_patients
 
     today   = _date.today()
     q       = request.GET.get('q', '').strip()
@@ -81,18 +80,9 @@ def patient_list(request):
     # fait pas partie, ce comptage est donc inutile.
     is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
-    # Champs établis une fois et partagés : ils servent au regroupement
-    # personnalisé comme au constructeur de conditions.
-    champs     = champs_patients()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees  = construire_dimensions(today)
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_patients(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=100,
-        tri_defaut=('nom', 'prenoms'),
-    )
+    # Déclaration partagée avec `export_patients` : une seule source pour les
+    # filtres, les regroupements et les champs du constructeur de conditions.
+    listing, champs, declarees, dims_perso = listing_patients(today)
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -100,23 +90,19 @@ def patient_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {'aujourdhui': today})
-
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre les
-    # champs découverts sur le modèle : une condition inconnue est ignorée.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    qs = listing.trier(qs, groupes)
+    # Recherche, filtres, conditions personnalisées, tri et dimensions : le même
+    # chemin que celui qu'empruntera `export_patients`, pour que le fichier
+    # téléchargé porte exactement les lignes de l'écran.
+    selection = listing.selection(request, base_qs, champs, {'aujourdhui': today})
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    dims = selection.dims
 
     # Avec un regroupement, on pagine les **groupes** et non les lignes : toutes
     # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
     # la page porterait, repliées, toutes les lignes de tous les groupes.
-    toutes = dict(declarees)
-    toutes.update({d.cle: d for d in dims_perso})
-    dims = [toutes[g] for g in groupes if g in toutes]
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -140,7 +126,11 @@ def patient_list(request):
         'filters':    filtres,
         'groups':     groupes,
         'filtre_pose':      bool(filtres),
-        'selection_active': bool(filtres or groupes or q or conditions),
+        'selection_active': selection.active,
+        # Nombre réellement sélectionné : le menu d'export l'annonce, pour qu'on
+        # sache ce qu'on télécharge avant de cliquer.
+        'nb_selection':     page_obj.paginator.count if not dims else qs.count(),
+        'export_qs':        parametres_export(request),
         # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
         'listing_filtres': menu_filtres(listing.familles, filtres),
         'listing_groupes': menu_groupes(list(declarees.values()) + dims_perso, groupes),
@@ -156,61 +146,48 @@ def patient_list(request):
 
 # ── Export / Import des patients ────────────────────────────────────────────
 
-_PATIENT_HDR = ['code_identifiant', 'nom', 'age', 'genre', 'mobile']
+_PATIENT_HDR = ['code_identifiant', 'nom', 'date_naissance', 'genre', 'mobile']
 
 
-def _patient_row(p):
-    return [p.code_patient, f'{p.nom} {p.prenoms}'.strip(), p.age_detail, p.sexe, p.telephone]
+def _colonnes_patients():
+    """Colonnes du fichier exporté — les mêmes que celles lues à l'import, pour
+    qu'un export se réimporte sans retouche."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('code_identifiant', 'code_patient', largeur=16),
+        Colonne('nom', lambda p: f'{p.nom} {p.prenoms}'.strip(), largeur=32),
+        Colonne('date_naissance', 'date_naissance', largeur=15),
+        Colonne('genre', 'sexe', largeur=8),
+        Colonne('mobile', 'telephone', largeur=16),
+    ]
 
 
 @login_required
 def export_patients(request):
+    """Télécharge ce que la liste affiche — filtres, recherche et regroupement
+    compris.
+
+    L'export sortait `Patient.objects.all()` : on filtrait, on téléchargeait, et
+    on recevait les 47 000 fiches. Il passe désormais par `Listing.selection`,
+    le chemin même qu'emprunte la page, et porte les titres de groupe quand un
+    regroupement est posé.
+    """
     if not request.user.is_superuser:
         raise PermissionDenied
-    from core.utils import csv_response
-    import json as _json
-    from django.http import HttpResponse
+    from datetime import date as _date
 
-    fmt = request.GET.get('format', 'json')
-    qs = Patient.objects.all()
-    rows = [_patient_row(p) for p in qs]
+    from core.export_listing import repondre
+    from .patient_listing import listing_patients
 
-    if fmt == 'csv':
-        return csv_response('patients', _PATIENT_HDR, rows, delimiter=',')
-    if fmt == 'xlsx':
-        from openpyxl import Workbook
-        from openpyxl.styles import Font, PatternFill, Alignment
-        import io as _io
-        wb = Workbook()
-        ws = wb.active
-        ws.title = 'Patients'
-        fill = PatternFill(start_color='1F6E8C', end_color='1F6E8C', fill_type='solid')
-        fnt = Font(color='FFFFFF', bold=True)
-        ws.append(_PATIENT_HDR)
-        for cell in ws[1]:
-            cell.fill, cell.font = fill, fnt
-            cell.alignment = Alignment(horizontal='center')
-        for row in rows:
-            ws.append(['' if v is None else v for v in row])
-        for col in ws.columns:
-            w = max((len(str(c.value or '')) for c in col), default=0)
-            ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
-        buf = _io.BytesIO()
-        wb.save(buf)
-        resp = HttpResponse(
-            buf.getvalue(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        )
-        resp['Content-Disposition'] = 'attachment; filename="patients.xlsx"'
-        return resp
-
-    data = [dict(zip(_PATIENT_HDR, r)) for r in rows]
-    resp = HttpResponse(
-        _json.dumps(data, ensure_ascii=False, indent=2, default=str),
-        content_type='application/json',
-    )
-    resp['Content-Disposition'] = 'attachment; filename="patients.json"'
-    return resp
+    today = _date.today()
+    listing, champs, _declarees, _perso = listing_patients(today)
+    selection = listing.selection(request, Patient.objects.all(), champs,
+                                  {'aujourdhui': today})
+    # Virgule : ce fichier se réimporte par le menu « Importer », et le lecteur
+    # lit en virgule (voir _parse_pathologie_upload).
+    return repondre(request.GET.get('format', 'xlsx'), 'patients',
+                    _colonnes_patients(), selection.qs, selection.dims,
+                    titre_feuille='Patients', separateur=',')
 
 
 @login_required
@@ -232,7 +209,12 @@ def patients_modele_excel(request):
     for cell in ws[1]:
         cell.fill, cell.font = fill, fnt
         cell.alignment = Alignment(horizontal='center')
-    ws.append(['', 'Koné Aminata', 34, 'F', '0708091011'])
+    from datetime import date as _date
+    ws.append(['', 'Koné Aminata', _date(1991, 5, 14), 'F', '0708091011'])
+    # Seconde ligne sans date : la colonne peut rester vide, autant le montrer.
+    ws.append(['', 'Yao Koffi', '', 'M', '0101020304'])
+    for cellule in ws['C']:
+        cellule.number_format = 'DD/MM/YYYY'
     for col in ws.columns:
         w = max((len(str(c.value or '')) for c in col), default=0)
         ws.column_dimensions[col[0].column_letter].width = min(w + 4, 55)
@@ -255,6 +237,40 @@ def _normalize_nom_patient(s):
     s = ''.join(c for c in s if not unicodedata.combining(c))
     s = re.sub(r'[^A-Za-z0-9]+', '', s)
     return s.upper()
+
+
+def _parse_date_naissance(valeur, today):
+    """Date de naissance lue sur une ligne de fichier, ou None si la colonne est
+    vide ou illisible.
+
+    Accepte une cellule datée d'Excel (openpyxl rend un `datetime`), le format
+    français jj/mm/aaaa, l'ISO aaaa-mm-jj que produisent la plupart des exports,
+    et leurs variantes à tirets ou à points.
+
+    Une date postérieure à aujourd'hui est écartée comme illisible plutôt que
+    refusée : la colonne n'est pas obligatoire, une valeur aberrante ne doit
+    donc pas coûter le patient — mieux vaut un dossier sans date qu'un dossier
+    manquant.
+    """
+    from datetime import datetime as _datetime
+
+    if valeur is None:
+        return None
+    if isinstance(valeur, _datetime):
+        valeur = valeur.date()
+    if isinstance(valeur, date):
+        return valeur if valeur <= today else None
+
+    texte = _s(valeur)
+    if not texte:
+        return None
+    for motif in ('%d/%m/%Y', '%Y-%m-%d', '%d-%m-%Y', '%d.%m.%Y', '%Y/%m/%d', '%d/%m/%y'):
+        try:
+            lue = _datetime.strptime(texte, motif).date()
+        except ValueError:
+            continue
+        return lue if lue <= today else None
+    return None
 
 
 def _parse_age_to_date(v, today):
@@ -305,6 +321,199 @@ def _parse_age_to_date(v, today):
     return base - timedelta(days=days)
 
 
+# Nombre de patients envoyés en base d'un seul coup : assez grand pour que le
+# coût fixe d'un aller-retour SQL se dilue, assez petit pour que la jauge avance
+# régulièrement et que la mémoire ne gonfle pas.
+_LOT_IMPORT = 1000
+
+# Champs réécrits sur un patient déjà connu, quand « mettre à jour » est coché.
+_CHAMPS_PATIENT = ['nom', 'prenoms', 'sexe', 'date_naissance', 'telephone']
+
+_SEXES_IMPORT = {
+    'm': 'M', 'masculin': 'M', 'homme': 'M', 'male': 'M',
+    'f': 'F', 'féminin': 'F', 'feminin': 'F', 'femme': 'F', 'female': 'F',
+}
+
+
+def _cle_identite(nom, prenoms, date_naissance):
+    """Clé de rapprochement d'un patient dépourvu d'identifiant : même date de
+    naissance et mêmes nom/prénoms une fois la casse et les accents gommés.
+
+    None quand la date de naissance manque : le nom seul ne suffit pas à dire
+    qu'il s'agit de la même personne, et deux homonymes fondus en un seul
+    dossier médical coûtent bien plus cher qu'un doublon. Ces lignes-là ne se
+    rapprochent donc que par leur identifiant.
+    """
+    if date_naissance is None:
+        return None
+    return (date_naissance, _normalize_nom_patient(nom), _normalize_nom_patient(prenoms))
+
+
+def _champs_depuis_ligne(item, today):
+    """Champs d'un patient lus sur une ligne du fichier, ou None si la ligne est
+    inexploitable (nom, âge, genre ou téléphone manquant ou illisible)."""
+    nom_complet = _s(item.get('nom', ''))
+    if not nom_complet:
+        return None
+    parts = nom_complet.split(' ', 1)
+    nom = parts[0]
+    prenoms = parts[1] if len(parts) > 1 else parts[0]
+
+    # La date de naissance prime ; `age` reste lu pour les fichiers d'avant ce
+    # changement, et pour les exports d'autres logiciels qui ne donnent que lui.
+    # Ni l'une ni l'autre n'est obligatoire : une ligne sans date s'importe.
+    date_naissance = _parse_date_naissance(item.get('date_naissance'), today)
+    if date_naissance is None:
+        date_naissance = _parse_age_to_date(item.get('age'), today)
+
+    sexe = _SEXES_IMPORT.get(_s(item.get('genre', '')).lower(), '')
+    if sexe not in ('M', 'F'):
+        return None
+
+    telephone = _s(item.get('mobile', ''))
+    if not telephone:
+        return None
+
+    return {'nom': nom, 'prenoms': prenoms, 'sexe': sexe,
+            'date_naissance': date_naissance, 'telephone': telephone}
+
+
+def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centre):
+    """Import du fichier de patients, mené en tâche de fond (voir core.taches).
+
+    Le rapprochement se faisait auparavant une ligne à la fois : une requête sur
+    la date de naissance, puis une comparaison en Python, pour chaque ligne du
+    fichier. La table grossissant à chaque insertion, le coût était quadratique,
+    et un fichier de 48 000 lignes
+    demandait des dizaines d'heures. Les clés de rapprochement tiennent en
+    mémoire : on les relève une fois, puis on n'interroge plus la base que pour
+    écrire, par lots.
+    """
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from core.numerotation import prochain_code
+
+    avancement.etape('Lecture du fichier…')
+    data, err = _parse_pathologie_upload(SimpleUploadedFile(nom_fichier, contenu))
+    if err:
+        raise ValueError(err)
+
+    today = timezone.now().date()
+    avancement.etape('Relevé des patients déjà enregistrés…', total=len(data))
+
+    # Même périmètre que le manager cloisonné `Patient.objects`, mais posé
+    # explicitement : le fil d'exécution n'hérite pas du centre actif de la
+    # requête, et un queryset qui s'en remettrait au thread-local ne verrait
+    # rien (voir core.taches).
+    deja_en_base = Patient.all_objects.all()
+    if centre is not None:
+        deja_en_base = deja_en_base.filter(centre=centre)
+
+    par_code = {}
+    par_identite = {}
+    for pk, code, nom, prenoms, naissance in deja_en_base.values_list(
+            'pk', 'code_patient', 'nom', 'prenoms', 'date_naissance').iterator(chunk_size=5000):
+        par_code[code] = pk
+        identite = _cle_identite(nom, prenoms, naissance)
+        if identite is not None:
+            par_identite[identite] = pk
+
+    # Les codes sont uniques tous centres confondus : pour en attribuer de
+    # nouveaux il faut connaître ceux de tous les centres, pas seulement ceux
+    # du centre courant.
+    codes_pris = set(Patient.all_objects.values_list('code_patient', flat=True).iterator(chunk_size=5000))
+
+    # Rang de départ calculé une seule fois. prochain_code trie l'ensemble des
+    # codes déjà posés : refaire ce tri à chaque patient — ce que faisait
+    # Patient.save() — coûtait à lui seul plus que l'insertion.
+    prefixe = f'PAT{timezone.now().year}'
+    rang = int(prochain_code(Patient.all_objects, 'code_patient', prefixe, 5)[len(prefixe):])
+
+    def code_suivant():
+        nonlocal rang
+        while True:
+            code = f'{prefixe}{rang:05d}'
+            rang += 1
+            if code not in codes_pris:
+                codes_pris.add(code)
+                return code
+
+    avancement.etape('Enregistrement…')
+    a_creer, a_modifier, a_modifier_avec_identifiant = [], [], []
+    # Un même patient figurant deux fois dans le fichier n'était rattrapé que
+    # parce que la première occurrence était déjà en base au moment de lire la
+    # seconde. Sans écriture immédiate, il faut s'en souvenir ici.
+    identites_creees = set()
+
+    def vider_les_lots():
+        if a_creer:
+            Patient.all_objects.bulk_create(a_creer, batch_size=_LOT_IMPORT)
+            a_creer.clear()
+        if a_modifier:
+            Patient.all_objects.bulk_update(
+                a_modifier, _CHAMPS_PATIENT + ['date_modification'], batch_size=_LOT_IMPORT)
+            a_modifier.clear()
+        if a_modifier_avec_identifiant:
+            Patient.all_objects.bulk_update(
+                a_modifier_avec_identifiant,
+                _CHAMPS_PATIENT + ['date_modification', 'ancien_identifiant'],
+                batch_size=_LOT_IMPORT)
+            a_modifier_avec_identifiant.clear()
+
+    for item in data:
+        try:
+            champs = _champs_depuis_ligne(item, today)
+            if champs is None:
+                avancement.ajouter(traites=1, erreurs=1)
+                continue
+
+            code_identifiant = _s(item.get('code_identifiant', ''))
+            pk = par_code.get(code_identifiant) if code_identifiant else None
+            reconnu_par_son_code = pk is not None
+            identite = _cle_identite(champs['nom'], champs['prenoms'], champs['date_naissance'])
+            if pk is None and identite is not None:
+                pk = par_identite.get(identite)
+
+            if code_identifiant and not reconnu_par_son_code:
+                # Ce n'est pas un de nos propres code_patient (ex. réimport de
+                # notre export) : c'est l'identifiant d'un système externe, on
+                # le conserve pour référence future sans l'afficher nulle part.
+                champs['ancien_identifiant'] = code_identifiant
+
+            if pk is None and identite is not None and identite in identites_creees:
+                # Doublon interne au fichier, déjà créé quelques lignes plus haut.
+                avancement.ajouter(traites=1, ignores=1)
+                continue
+
+            if pk is not None:
+                if do_update:
+                    champs['date_modification'] = timezone.now()
+                    cible = (a_modifier_avec_identifiant if 'ancien_identifiant' in champs
+                             else a_modifier)
+                    cible.append(Patient(pk=pk, **champs))
+                    avancement.ajouter(traites=1, mis_a_jour=1)
+                else:
+                    avancement.ajouter(traites=1, ignores=1)
+            else:
+                a_creer.append(Patient(code_patient=code_suivant(), centre=centre, **champs))
+                if identite is not None:
+                    identites_creees.add(identite)
+                avancement.ajouter(traites=1, crees=1)
+        except Exception:
+            avancement.ajouter(traites=1, erreurs=1)
+
+        if len(a_creer) >= _LOT_IMPORT or len(a_modifier) >= _LOT_IMPORT \
+                or len(a_modifier_avec_identifiant) >= _LOT_IMPORT:
+            vider_les_lots()
+
+    vider_les_lots()
+    avancement.enregistrer()
+
+    tache = avancement.tache
+    n = lambda valeur: f'{valeur:,}'.replace(',', '\u202f')  # noqa: E731 — séparateur de milliers français
+    return (f'{n(tache.crees)} patient(s) importé(s), {n(tache.mis_a_jour)} mis à jour, '
+            f'{n(tache.ignores)} ignoré(s), {n(tache.erreurs)} erreur(s).')
+
+
 @login_required
 def import_patients(request):
     if not request.user.is_superuser:
@@ -314,85 +523,26 @@ def import_patients(request):
         messages.error(request, 'Aucun fichier sélectionné.')
         return redirect('patients:list')
 
-    data, err = _parse_pathologie_upload(upload)
-    if err:
-        messages.error(request, err)
-        return redirect('patients:list')
-
+    # Le fichier est lu ici, pas dans le fil d'exécution : au-delà de quelques
+    # mégaoctets Django l'écrit dans un fichier temporaire qu'il efface dès la
+    # réponse rendue, et le fil ne trouverait plus rien à lire.
+    nom_fichier, contenu = upload.name, upload.read()
     do_update = 'update' in request.POST
-    created = updated = skipped = errors = 0
-    today = timezone.now().date()
+    centre = getattr(request, 'centre', None)
 
-    for item in data:
-        try:
-            nom_complet = _s(item.get('nom', ''))
-            if not nom_complet:
-                errors += 1
-                continue
-            parts = nom_complet.split(' ', 1)
-            nom = parts[0]
-            prenoms = parts[1] if len(parts) > 1 else parts[0]
+    tache = taches.lancer(
+        'Import de patients', request.user, centre,
+        lambda avancement: _executer_import_patients(
+            avancement, nom_fichier, contenu, do_update, centre),
+    )
 
-            date_naiss = _parse_age_to_date(item.get('age'), today)
-            if not date_naiss:
-                errors += 1
-                continue
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'tache': str(tache.pk),
+            'url_statut': reverse('tache_statut', args=[tache.pk]),
+        })
 
-            sexe_raw = _s(item.get('genre', '')).lower()
-            sexe = {
-                'm': 'M', 'masculin': 'M', 'homme': 'M', 'male': 'M',
-                'f': 'F', 'féminin': 'F', 'feminin': 'F', 'femme': 'F', 'female': 'F',
-            }.get(sexe_raw, '')
-            if sexe not in ('M', 'F'):
-                errors += 1
-                continue
-
-            telephone = _s(item.get('mobile', ''))
-            if not telephone:
-                errors += 1
-                continue
-
-            defaults = {
-                'nom': nom, 'prenoms': prenoms, 'sexe': sexe,
-                'date_naissance': date_naiss, 'telephone': telephone,
-            }
-
-            code_identifiant = _s(item.get('code_identifiant', ''))
-            existing = Patient.objects.filter(code_patient=code_identifiant).first() if code_identifiant else None
-            matched_by_own_code = existing is not None
-
-            if not existing:
-                nom_norm = _normalize_nom_patient(nom)
-                prenoms_norm = _normalize_nom_patient(prenoms)
-                existing = next((
-                    p for p in Patient.objects.filter(date_naissance=date_naiss)
-                    if _normalize_nom_patient(p.nom) == nom_norm and _normalize_nom_patient(p.prenoms) == prenoms_norm
-                ), None)
-
-            if code_identifiant and not matched_by_own_code:
-                # Ce n'est pas un de nos propres code_patient (ex. réimport de notre
-                # export) : c'est l'identifiant d'un système externe, on le conserve
-                # pour référence future sans l'afficher nulle part.
-                defaults['ancien_identifiant'] = code_identifiant
-
-            if existing:
-                if do_update:
-                    for k, v in defaults.items():
-                        setattr(existing, k, v)
-                    existing.save()
-                    updated += 1
-                else:
-                    skipped += 1
-            else:
-                Patient.objects.create(**defaults)
-                created += 1
-        except Exception:
-            errors += 1
-
-    if errors:
-        messages.warning(request, f'{created} créé(s), {updated} mis à jour, {skipped} ignoré(s), {errors} erreur(s).')
-    else:
-        messages.success(request, f'{created} patient(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
+    messages.info(request, "Import lancé en arrière-plan — il se poursuit même si vous quittez cette page.")
     return redirect('patients:list')
 
 
@@ -523,7 +673,8 @@ def _feuilles(noeuds):
 
 
 def _rdv_listing(request, base_qs, template_page, rdv_url_name,
-                 create_url=None, empty_sub=None, contexte_gyneco=False):
+                 create_url=None, empty_sub=None, contexte_gyneco=False,
+                 export_url_name='patients:rdv_export'):
     """Filtrage, regroupement et pagination communs aux deux listes de rendez-vous.
 
     Les pages « Rendez-vous » (patients) et « Rendez-vous » (gynécologie) offrent
@@ -539,12 +690,12 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         return redirection
 
     from datetime import date
-    from core.listing import (Listing, appliquer_conditions, champs_pour_navigateur,
-                              conditions_demandees, menu_filtres, menu_groupes)
-    from .rdv_listing import (FILTRES_PAR_DEFAUT, annoter_diagnostics, champs_rdv,
-                              construire_dimensions, dimensions_menu,
-                              dimensions_personnalisees, familles_rdv, libelle_periode,
-                              trier_pour_groupes)
+    from django.urls import reverse
+
+    from core.export_listing import contexte as contexte_export
+    from core.listing import champs_pour_navigateur, menu_filtres, menu_groupes
+    from .rdv_listing import (annoter_diagnostics, dimensions_menu,
+                              libelle_periode, listing_rdv, trier_pour_groupes)
 
     today     = date.today()
     q         = request.GET.get('q', '').strip()
@@ -558,37 +709,26 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     # formulaires : l'utilisateur peut regrouper sur n'importe lequel sans qu'on
     # l'ait prévu. La liste des champs est établie une fois et partagée entre le
     # regroupement et le constructeur de conditions.
-    champs = champs_rdv()
-    dims_perso = dimensions_personnalisees(champs)
-    listing = Listing(
-        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
-        familles=familles_rdv(contexte_gyneco),
-        dimensions=list(construire_dimensions(today).values()) + dims_perso,
-        par_page=100,
-        filtres_defaut=FILTRES_PAR_DEFAUT,
-        tri_defaut=('-date_heure',),
-    )
-    filtres = listing.filtres_demandes(request)   # défaut : la journée en cours
+    listing, champs, declarees, dims_perso = listing_rdv(today, contexte_gyneco)
 
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
-        'user': request.user, 'aujourdhui': today,
-        'date_from': date_from, 'date_to': date_to,
-    })
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
-    # liste des champs découverts : une condition inconnue est ignorée.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    qs = trier_pour_groupes(qs, groupes, today)
+    # Même chemin que `export_rdv` : le fichier téléchargé porte exactement les
+    # lignes de l'écran. `trier_pour_groupes` remplace le tri par défaut — la
+    # journée en cours se lit à l'endroit, les jours passés à l'envers.
+    selection = listing.selection(
+        request, base_qs, champs,
+        {'user': request.user, 'aujourdhui': today,
+         'date_from': date_from, 'date_to': date_to},
+        trier=lambda jeu, grp: trier_pour_groupes(jeu, grp, today))
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    dims = selection.dims
 
     # Avec un regroupement actif, on pagine les **groupes** et non les lignes :
     # les lignes d'un groupe n'arrivent qu'au moment où on le déplie, sans quoi
     # la page porterait, repliées, toutes les lignes de tous les groupes.
     from core.listing import PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, paginer_groupes
-    declarees = dict(construire_dimensions(today))
-    declarees.update({d.cle: d for d in dims_perso})
-    dims = [declarees[g] for g in groupes if g in declarees]
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -630,6 +770,10 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
         # parcourir ces structures.
         'listing_filtres':  menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes':  menu_groupes(dimensions_menu(contexte_gyneco, today) + dims_perso, groupes),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse(export_url_name),
+                          'les rendez-vous',
+                          None if dims else page_obj.paginator.count),
         'conditions':       conditions,
         'mode_conditions':  mode_conditions,
         # L'entrée de menu doit rester présente après un rafraîchissement AJAX :
@@ -1833,3 +1977,57 @@ def import_typevisite(request):
     else:
         messages.success(request, f'{created} type(s) de visite importé(s), {updated} mis à jour, {skipped} ignoré(s).')
     return redirect('gynecologie_typevisite_list')
+
+
+def _colonnes_rdv():
+    """Colonnes du fichier des rendez-vous."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('code_rdv', 'code_rdv', largeur=12),
+        Colonne('date_heure', 'date_heure', largeur=18),
+        Colonne('patient', lambda r: f'{r.patient.nom} {r.patient.prenoms}'.strip()
+                if r.patient_id else '', largeur=30),
+        Colonne('code_patient', 'patient__code_patient', largeur=16),
+        # Deux colonnes et non une : `age_detail` est ce que montre la liste et
+        # le seul lisible pour un nourrisson, mais un tableur ne sait pas
+        # trier « 26Ans0Mois9Jours ». Le nombre d'années reste filtrable.
+        Colonne('age', lambda r: r.patient.age if r.patient_id else '', largeur=8),
+        Colonne('age_detail', lambda r: r.patient.age_detail if r.patient_id else '',
+                largeur=20),
+        Colonne('genre', lambda r: r.patient.get_sexe_display() if r.patient_id else '',
+                largeur=10),
+        Colonne('medecin', lambda r: str(r.medecin) if r.medecin_id else '', largeur=26),
+        Colonne('departement', 'departement__nom', largeur=20),
+        Colonne('type_consultation', 'type_consultation__nom', largeur=32),
+        Colonne('type_rdv', lambda r: r.get_type_rdv_display(), largeur=16),
+        Colonne('urgence', lambda r: r.get_niveau_urgence_display(), largeur=14),
+        Colonne('motif', 'motif', largeur=34),
+        Colonne('statut', lambda r: r.get_statut_display(), largeur=16),
+        Colonne('duree_minutes', 'duree_minutes', largeur=14),
+    ]
+
+
+def _export_rdv(request, base_qs, contexte_gyneco, nom):
+    """Corps commun des exports de rendez-vous : même chemin que la page."""
+    from core.export_listing import repondre
+    from .rdv_listing import listing_rdv, trier_pour_groupes
+
+    today = date.today()
+    listing, champs, _declarees, _perso = listing_rdv(today, contexte_gyneco)
+    selection = listing.selection(
+        request, base_qs, champs,
+        {'user': request.user, 'aujourdhui': today,
+         'date_from': request.GET.get('date_from', ''),
+         'date_to': request.GET.get('date_to', '')},
+        trier=lambda jeu, grp: trier_pour_groupes(jeu, grp, today))
+    return repondre(request.GET.get('format', 'xlsx'), nom, _colonnes_rdv(),
+                    selection.qs, selection.dims, titre_feuille='Rendez-vous')
+
+
+@login_required
+@permission_required('patients.view_rendezvous', raise_exception=True)
+def rdv_export(request):
+    """Télécharge les rendez-vous tels que la liste les affiche."""
+    base_qs = RendezVous.objects.select_related(
+        'patient', 'medecin', 'medecin__employe', 'departement', 'type_consultation')
+    return _export_rdv(request, base_qs, False, 'rendez-vous')

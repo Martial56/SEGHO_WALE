@@ -96,3 +96,35 @@ def familles_caisses():
             ('etat_inactif', 'Inactive', Q(actif=False)),
         ]),
     ]
+
+
+def listing_caisses():
+    """Déclaration de la liste des caisses, partagée par la page et son export."""
+    from core.listing import Listing
+
+    return Listing(
+        recherche=('nom', 'code'),
+        familles=familles_caisses(),
+        par_page=100,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('nom',),
+    )
+
+
+def caisses_de_la_periode(filtres, aujourdhui, date_from, date_to):
+    """Caisses annotées de ce qu'elles ont encaissé sur la période retenue.
+
+    La période borne l'agrégat, pas le jeu : une caisse qui n'a rien encaissé
+    s'affiche à 0 F au lieu de disparaître. Une facture annulée a été
+    remboursée, son encaissement ne pèse plus dans la caisse.
+    """
+    from django.db.models import Count, Q, Sum
+
+    from .models import Caisse
+
+    encaisse = (condition_periode(filtres, aujourdhui, date_from, date_to)
+                & ~Q(paiements__facture__statut='annulee'))
+    return Caisse.objects.annotate(
+        total=Sum('paiements__montant', filter=encaisse),
+        nb_paiements=Count('paiements', filter=encaisse),
+    ).order_by('nom')

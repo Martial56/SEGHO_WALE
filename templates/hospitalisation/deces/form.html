@@ -212,7 +212,7 @@ html[data-theme="dark"] .pip-step.done   { background:rgba(var(--teal-500-rgb), 
         <span class="fc-auto-lbl">Âge</span>
         <div class="info-badge {% if not edit %}empty{% endif %}" id="display-age">
           <i class="bi bi-calendar3"></i>
-          {% if edit %}{{ deces.patient.age }} ans{% else %}—{% endif %}
+          {% if edit and deces.patient.date_naissance %}{{ deces.patient.age }} ans{% else %}—{% endif %}
         </div>
       </div>
     </div>
@@ -267,7 +267,7 @@ html[data-theme="dark"] .pip-step.done   { background:rgba(var(--teal-500-rgb), 
 <script id="patients-data" type="application/json">
 {
   {% for p in form.patient.field.queryset %}
-  "{{ p.pk }}": { "genre": "{{ p.get_sexe_display }}", "age": "{{ p.age }} ans" }{% if not forloop.last %},{% endif %}
+  "{{ p.pk }}": { "genre": "{{ p.get_sexe_display }}", "age": "{% if p.date_naissance %}{{ p.age }} ans{% else %}—{% endif %}" }{% if not forloop.last %},{% endif %}
   {% endfor %}
 }
 </script>

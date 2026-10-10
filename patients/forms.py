@@ -185,7 +185,12 @@ class PatientForm(forms.ModelForm):
         date_naissance = cleaned.get('date_naissance')
         telephone      = (cleaned.get('telephone') or '').strip()
 
-        if nom and prenoms and date_naissance and telephone:
+        # La date de naissance étant facultative, le garde-fou ne peut plus
+        # s'appuyer dessus seul : sans elle, il se rabat sur nom + prénoms +
+        # téléphone. Exiger les quatre revenait à ne plus rien contrôler dès
+        # qu'une date manquait — c'est-à-dire là où le doublon est le plus
+        # probable, puisque c'est le dossier saisi dans l'urgence.
+        if nom and prenoms and telephone:
             qs = Patient.objects.filter(
                 nom__iexact=nom,
                 prenoms__iexact=prenoms,
@@ -196,9 +201,11 @@ class PatientForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             doublon = qs.first()
             if doublon:
+                ne_le = (f', né(e) le {doublon.date_naissance.strftime("%d/%m/%Y")}'
+                         if doublon.date_naissance else '')
                 raise forms.ValidationError(
                     f'Un dossier patient identique existe déjà : {doublon.code_patient} — '
-                    f'{doublon.nom} {doublon.prenoms}, né(e) le {doublon.date_naissance.strftime("%d/%m/%Y")}, '
+                    f'{doublon.nom} {doublon.prenoms}{ne_le}, '
                     f'tél. {doublon.telephone}.'
                 )
         return cleaned

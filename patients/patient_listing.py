@@ -162,3 +162,27 @@ def dimensions_personnalisees(champs=None):
     """
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_patients(), exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_patients(aujourdhui=None):
+    """Déclaration de la liste patients, et champs du constructeur de conditions.
+
+    Déclarée ici plutôt que dans la vue parce que deux appelants en ont besoin :
+    la page, et son export. Les laisser la rebâtir chacun de leur côté garantit
+    qu'un jour l'un gagnera un filtre que l'autre ignorera — et le fichier
+    téléchargé cesserait silencieusement de correspondre à l'écran.
+    """
+    from core.listing import Listing
+
+    aujourdhui = aujourdhui or date.today()
+    champs = champs_patients()
+    declarees = construire_dimensions(aujourdhui)
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_patients(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=100,
+        tri_defaut=('nom', 'prenoms'),
+    )
+    return listing, champs, declarees, perso

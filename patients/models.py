@@ -24,7 +24,16 @@ class Patient(ModeleCentre):
     code_patient = models.CharField(max_length=20, unique=True, editable=False)
     nom = models.CharField(max_length=100)
     prenoms = models.CharField(max_length=200)
-    date_naissance = models.DateField()
+    # Facultative : un dossier s'ouvre parfois sans elle — patient hors d'état
+    # de la donner, pièce d'identité absente — et la refuser empêchait
+    # d'enregistrer quelqu'un qu'on est en train de soigner. Les écrans qui
+    # affichent un âge savent déjà n'en montrer aucun (voir `age`, `age_detail`
+    # et le groupement « Âge inconnu » de patients.patient_listing).
+    #
+    # Indexée : le rapprochement de doublons (formulaire de création, import,
+    # passerelle HPRIM) et le filtre par tranche d'âge de la liste patients
+    # la cherchent, sur une table qui passe la dizaine de milliers de lignes.
+    date_naissance = models.DateField(null=True, blank=True, db_index=True)
     lieu_naissance = models.CharField(max_length=100, blank=True)
     sexe = models.CharField(max_length=1, choices=SEXE)
     nationalite = models.CharField(max_length=50, default='Ivoirienne')

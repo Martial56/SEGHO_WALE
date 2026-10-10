@@ -7,6 +7,8 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from core import memoire_listing
+from core.export_listing import contexte as contexte_export
+from django.urls import reverse
 from .models import (Hospitalisation, Chambre, RegistreDeces,
                       ServiceAFacturer, ListeControleAdmission, ListeVerificationService,
                       ChecklistAdmission, ChecklistVerification, EvaluationClinique,
@@ -34,14 +36,10 @@ def hospitalisation_list(request):
     from django.core.paginator import Paginator
     from django.utils import timezone as tz
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
                               menu_filtres, menu_groupes, paginer_groupes)
-    from .hospitalisation_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
-                                          champs_hospitalisations,
-                                          construire_dimensions,
-                                          dimensions_personnalisees,
-                                          familles_hospitalisations, libelle_periode)
+    from .hospitalisation_listing import libelle_periode, listing_hospitalisations
 
     aujourd_hui = tz.now()
     today = aujourd_hui.date()
@@ -68,17 +66,7 @@ def hospitalisation_list(request):
     # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
     # liste des champs est établie une fois et sert aussi au constructeur de
     # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
-    champs = champs_hospitalisations()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_hospitalisations(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('-date_admission',),
-    )
+    listing, champs, declarees, dims_perso = listing_hospitalisations()
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -86,18 +74,15 @@ def hospitalisation_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Même chemin que `export_hospitalisations` : le fichier porte ce que
+    # l'écran montre.
+    selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
-    # liste des champs découverts : une condition portant sur autre chose est
-    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    qs = listing.trier(qs, groupes)
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
 
     vue = request.GET.get('vue', 'liste')
     if vue not in ('liste', 'kanban'):
@@ -165,6 +150,9 @@ def hospitalisation_list(request):
         'selection_active': bool(q or groupes or conditions
                                  or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('hospitalisation:export'),
+                          'les hospitalisations', total),
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
         'listing_filtre_perso': True,
@@ -1899,23 +1887,14 @@ def chambres_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, menu_filtres,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, menu_filtres,
                               menu_groupes, paginer_groupes)
-    from .chambre_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
-                                  construire_dimensions, familles_chambres)
+    from .chambre_listing import listing_chambres
 
     q = request.GET.get('q', '').strip()
     groupes = request.GET.getlist('group')
 
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_chambres(),
-        dimensions=list(declarees.values()),
-        par_page=25,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('salle_no',),
-    )
+    listing, declarees = listing_chambres()
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -1923,12 +1902,11 @@ def chambres_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(Chambre.objects.all(), q)
-    qs = listing.appliquer_filtres(qs, filtres)
-    qs = listing.trier(qs, groupes)
-
-    dims = [declarees[g] for g in groupes if g in declarees]
+    # Même chemin que `export_chambres` : le fichier porte ce que l'écran montre.
+    selection = listing.selection(request, Chambre.objects.all())
+    qs = selection.qs
+    filtres = selection.filtres
+    dims = selection.dims
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -1962,6 +1940,9 @@ def chambres_list(request):
         'listing_filtres': menu_filtres(listing.familles, filtres),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
         'types': Chambre.TYPE,
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('hospitalisation:chambres_export'),
+                          'les chambres', total),
     })
 
 
@@ -2038,10 +2019,23 @@ def _chambre_row(c):
 @login_required(login_url='login')
 @permission_required('hospitalisation.view_chambre', raise_exception=True)
 def chambres_export(request):
-    fmt = request.GET.get('format', 'json')
-    qs = Chambre.objects.order_by('salle_no')
-    rows = [_chambre_row(c) for c in qs]
-    return _export_file(fmt, 'chambres', _CHAMBRE_HDR, rows, [dict(zip(_CHAMBRE_HDR, r)) for r in rows])
+    """Télécharge les chambres telles que la liste les affiche.
+
+    Sortait `Chambre.objects.all()` quels que soient les filtres posés à
+    l'écran : le fichier ignorait la sélection. Les colonnes restent celles que
+    relit `chambres_import`, pour qu'un export se réimporte sans retouche.
+    """
+    from core.export_listing import Colonne, repondre
+    from .chambre_listing import listing_chambres
+
+    listing, _declarees = listing_chambres()
+    selection = listing.selection(request, Chambre.objects.all())
+    colonnes = [Colonne(entete, entete) for entete in _CHAMBRE_HDR]
+    # Virgule : ce CSV se réimporte par « Importer un fichier » (_parse_upload
+    # lit en virgule).
+    return repondre(request.GET.get('format', 'xlsx'), 'chambres', colonnes,
+                    selection.qs, selection.dims, titre_feuille='Chambres',
+                    separateur=',')
 
 
 @login_required(login_url='login')
@@ -2108,10 +2102,9 @@ def registre_deces(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, menu_filtres,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, menu_filtres,
                               menu_groupes, paginer_groupes)
-    from .deces_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
-                                construire_dimensions, familles_deces, libelle_periode)
+    from .deces_listing import libelle_periode, listing_deces
 
     from django.utils import timezone as tz
     today = tz.now().date()
@@ -2124,15 +2117,7 @@ def registre_deces(request):
         'patient', 'medecin', 'medecin__employe', 'hospitalisation'
     )
 
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_deces(),
-        dimensions=list(declarees.values()),
-        par_page=25,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('-date_deces',),
-    )
+    listing, declarees = listing_deces()
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -2140,14 +2125,13 @@ def registre_deces(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Même chemin que `deces_export` : le fichier porte ce que l'écran montre.
+    selection = listing.selection(request, base_qs, contexte={
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    qs = listing.trier(qs, groupes)
-
-    dims = [declarees[g] for g in groupes if g in declarees]
+    qs = selection.qs
+    filtres = selection.filtres
+    dims = selection.dims
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -2177,6 +2161,9 @@ def registre_deces(request):
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
         'today': today,
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('hospitalisation:deces_export'),
+                          'le registre', total),
     })
 
 @login_required(login_url='login')
@@ -2259,10 +2246,40 @@ def _rdeces_row(d):
 @login_required(login_url='login')
 @permission_required('hospitalisation.view_registredeces', raise_exception=True)
 def deces_export(request):
-    fmt = request.GET.get('format', 'json')
-    qs = RegistreDeces.objects.select_related('patient', 'hospitalisation', 'medecin__employe').order_by('-date_deces')
-    rows = [_rdeces_row(d) for d in qs]
-    return _export_file(fmt, 'registre_deces', _RDECES_HDR, rows, [dict(zip(_RDECES_HDR, r)) for r in rows])
+    """Télécharge le registre tel que la liste l'affiche.
+
+    Sortait tout le registre quels que soient les filtres posés. Les colonnes
+    restent celles que relit `deces_import`.
+    """
+    from django.utils import timezone
+
+    from core.export_listing import Colonne, repondre
+    from .deces_listing import listing_deces
+
+    base_qs = RegistreDeces.objects.select_related(
+        'patient', 'hospitalisation', 'medecin__employe')
+    listing, _declarees = listing_deces()
+    selection = listing.selection(request, base_qs, contexte={
+        'aujourdhui': timezone.now().date(),
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    colonnes = [
+        Colonne('code', 'code', largeur=16),
+        Colonne('patient', 'patient__code_patient', largeur=16),
+        Colonne('date_deces', 'date_deces', largeur=16),
+        Colonne('hospitalisation', lambda d: d.hospitalisation.numero
+                if d.hospitalisation_id else '', largeur=18),
+        Colonne('medecin', lambda d: d.medecin.employe.matricule
+                if d.medecin_id else '', largeur=16),
+        Colonne('raison_deces', 'raison_deces', largeur=34),
+        Colonne('remarques', 'remarques', largeur=34),
+        Colonne('statut', 'statut', largeur=14),
+    ]
+    # Virgule : comme les chambres, ce CSV se réimporte dans l'application.
+    return repondre(request.GET.get('format', 'xlsx'), 'registre_deces', colonnes,
+                    selection.qs, selection.dims, titre_feuille='Registre des décès',
+                    separateur=',')
 
 
 @login_required(login_url='login')
@@ -2632,3 +2649,43 @@ def liste_service_import(request):
     else:
         messages.success(request, f'{created} élément(s) importé(s), {updated} mis à jour, {skipped} ignoré(s).')
     return redirect('hospitalisation:config_liste_service')
+
+
+def _colonnes_hospitalisations():
+    """Colonnes du fichier des hospitalisations."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('numero', 'numero', largeur=16),
+        Colonne('patient', lambda h: f'{h.patient.nom} {h.patient.prenoms}'.strip()
+                if h.patient_id else '', largeur=30),
+        Colonne('code_patient', 'patient__code_patient', largeur=16),
+        Colonne('date_admission', 'date_admission', largeur=18),
+        Colonne('date_sortie', 'date_sortie', largeur=18),
+        Colonne('chambre', 'chambre__salle_no', largeur=14),
+        Colonne('medecin_traitant', lambda h: str(h.medecin_traitant)
+                if h.medecin_traitant_id else '', largeur=28),
+        Colonne('maladie', 'maladie__nom', largeur=28),
+        Colonne('statut', lambda h: h.get_statut_display(), largeur=22),
+    ]
+
+
+@login_required
+@permission_required('hospitalisation.view_hospitalisation', raise_exception=True)
+def export_hospitalisations(request):
+    """Télécharge les hospitalisations telles que la liste les affiche."""
+    from django.utils import timezone as tz
+
+    from core.export_listing import repondre
+    from .hospitalisation_listing import listing_hospitalisations
+
+    base_qs = Hospitalisation.objects.select_related(
+        'patient', 'medecin_traitant', 'medecin_traitant__employe', 'chambre', 'maladie')
+    listing, champs, _declarees, _perso = listing_hospitalisations()
+    selection = listing.selection(request, base_qs, champs, {
+        'aujourdhui': tz.now().date(),
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    return repondre(request.GET.get('format', 'xlsx'), 'hospitalisations',
+                    _colonnes_hospitalisations(), selection.qs, selection.dims,
+                    titre_feuille='Hospitalisations')

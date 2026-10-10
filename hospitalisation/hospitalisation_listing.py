@@ -327,3 +327,22 @@ def dimensions_personnalisees(champs=None):
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_hospitalisations(),
                            exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_hospitalisations():
+    """Déclaration de la liste des hospitalisations, partagée par la page et son
+    export — une seule source, pour que le fichier suive toujours l'écran."""
+    from core.listing import Listing
+
+    champs = champs_hospitalisations()
+    declarees = construire_dimensions()
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_hospitalisations(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_admission',),
+    )
+    return listing, champs, declarees, perso

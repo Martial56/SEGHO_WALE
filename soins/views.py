@@ -4,6 +4,8 @@ from datetime import datetime
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
 from core import memoire_listing
+from core.export_listing import contexte as contexte_export
+from django.urls import reverse
 
 _staff_required = user_passes_test(lambda u: u.is_staff, login_url='login')
 from django.contrib import messages
@@ -218,13 +220,10 @@ def soins_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
                               menu_filtres, menu_groupes, paginer_groupes)
-    from .soin_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
-                               champs_soins, construire_dimensions,
-                               dimensions_personnalisees, familles_soins,
-                               libelle_periode)
+    from .soin_listing import libelle_periode, listing_soins
 
     today = timezone.now().date()
     q = request.GET.get('q', '').strip()
@@ -264,18 +263,7 @@ def soins_list(request):
     # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
     # liste des champs est établie une fois et sert aussi au constructeur de
     # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
-    champs = champs_soins()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_soins(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
-        filtres_defaut=() if cible else FILTRES_DEFAUT,
-        tri_defaut=('-date_creation',),
-        tris=TRIS,
-    )
+    listing, champs, declarees, dims_perso = listing_soins(cible)
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -283,19 +271,17 @@ def soins_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Recherche, filtres, conditions personnalisées, tri et dimensions : le même
+    # chemin que celui qu'emprunte `export_soins`, pour que le fichier
+    # téléchargé porte exactement les lignes de l'écran.
+    selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
-    # liste des champs découverts : une condition portant sur autre chose est
-    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    tri, tri_sens = listing.tri_demande(request)
-    qs = listing.trier(qs, groupes, tri, tri_sens)
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    tri, tri_sens = selection.tri, selection.sens
 
     # Avec un regroupement on pagine les **groupes** ; les lignes d'un groupe
     # n'arrivent qu'à son dépliage.
@@ -356,6 +342,9 @@ def soins_list(request):
         'selection_active': bool(q or groupes or conditions
                                  or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('soins:export'),
+                          'les soins', total),
         # Menus générés depuis la déclaration : le gabarit ne fait que parcourir.
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
@@ -795,14 +784,10 @@ def procedure_list(request):
     """
     from django.core.paginator import Paginator
 
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
                               menu_filtres, menu_groupes, paginer_groupes)
-    from .procedure_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT,
-                                    TRIS as TRIS_PROCEDURE, champs_procedures,
-                                    construire_dimensions,
-                                    dimensions_personnalisees,
-                                    familles_procedures, libelle_periode)
+    from .procedure_listing import libelle_periode, listing_procedures
 
     today = timezone.now().date()
     q = request.GET.get('q', '').strip()
@@ -822,18 +807,7 @@ def procedure_list(request):
 
     # Déclarées plus celles générées depuis les champs du modèle : la liste des
     # champs sert aussi de liste blanche au constructeur de conditions.
-    champs = champs_procedures()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_procedures(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('-date',),
-        tris=TRIS_PROCEDURE,
-    )
+    listing, champs, declarees, dims_perso = listing_procedures()
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -841,21 +815,17 @@ def procedure_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Même chemin que `export_procedures` : le fichier téléchargé porte donc
+    # exactement les lignes de l'écran.
+    selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    # Conditions personnalisées, validées contre les champs découverts : une
-    # condition portant sur autre chose est ignorée.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    tri, tri_sens = listing.tri_demande(request)
-    qs = listing.trier(qs, groupes, tri, tri_sens)
-
-    declarees.update({d.cle: d for d in dims_perso})
-    dims = [declarees[g] for g in groupes if g in declarees]
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    tri, tri_sens = selection.tri, selection.sens
+    dims = selection.dims
     arbre = []
     if dims:
         arbre, page_obj, nb_groupes = paginer_groupes(
@@ -900,6 +870,9 @@ def procedure_list(request):
         'date_to': date_to,
         'filtre_pose': bool(filtres),
         'selection_active': bool(q or groupes or filtres or conditions),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('soins:export_procedures'),
+                          'les procédures', total),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
         'listing_filtres': menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes': menu_groupes(list(declarees.values()), groupes),
@@ -1204,3 +1177,96 @@ def procedure_facturer(request, pk):
 
     detail_url = reverse('facturation:detail', kwargs={'pk': facture.pk})
     return redirect(f'{detail_url}?next=/soins/procedures/{pk}/')
+
+
+def _colonnes_soins():
+    """Colonnes du fichier des soins infirmiers."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('numero', 'numero', largeur=14),
+        Colonne('patient', lambda s: f'{s.patient.nom} {s.patient.prenoms}'.strip()
+                if s.patient_id else '', largeur=30),
+        Colonne('code_patient', 'patient__code_patient', largeur=16),
+        Colonne('date', 'date_heure', largeur=18),
+        Colonne('infirmier', lambda s: s.infirmier.nom_complet if s.infirmier_id else '',
+                largeur=26),
+        Colonne('departement', 'departement__nom', largeur=20),
+        Colonne('motif', 'motif', largeur=34),
+        Colonne('statut', lambda s: s.get_statut_display(), largeur=20),
+        Colonne('observations', 'observations', largeur=40),
+    ]
+
+
+@login_required
+@permission_required('soins.view_soin', raise_exception=True)
+def export_soins(request):
+    """Télécharge les soins tels que la liste les affiche — filtres, recherche
+    et regroupement compris (voir core.export_listing)."""
+    from core.export_listing import repondre
+    from .soin_listing import listing_soins
+
+    today = timezone.now().date()
+    base_qs = Soin.objects.select_related('patient', 'infirmier', 'departement')
+    hospitalisation_id = request.GET.get('hospitalisation')
+    patient_id = request.GET.get('patient')
+    cible = bool(hospitalisation_id or patient_id)
+    if hospitalisation_id:
+        base_qs = base_qs.filter(hospitalisation_id=hospitalisation_id)
+    elif patient_id:
+        base_qs = base_qs.filter(patient_id=patient_id)
+
+    listing, champs, _declarees, _perso = listing_soins(cible)
+    selection = listing.selection(request, base_qs, champs, {
+        'aujourdhui': today,
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    return repondre(request.GET.get('format', 'xlsx'), 'soins',
+                    _colonnes_soins(), selection.qs, selection.dims,
+                    titre_feuille='Soins infirmiers')
+
+
+def _colonnes_procedures():
+    """Colonnes du fichier des procédures de soin."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('numero', 'numero', largeur=14),
+        Colonne('soin', 'soin__numero', largeur=14),
+        Colonne('patient', lambda p: f'{p.patient.nom} {p.patient.prenoms}'.strip()
+                if p.patient_id else '', largeur=30),
+        Colonne('code_patient', 'patient__code_patient', largeur=16),
+        Colonne('date', 'date', largeur=18),
+        Colonne('acte', 'soin_type__nom', largeur=34),
+        Colonne('prix', 'prix', largeur=12),
+        Colonne('infirmier', lambda p: p.infirmier.nom_complet if p.infirmier_id else '',
+                largeur=26),
+        Colonne('departement', 'departement__nom', largeur=20),
+        Colonne('maladie', 'maladie__nom', largeur=28),
+        Colonne('facture', 'facture__numero', largeur=22),
+        Colonne('statut', lambda p: p.get_statut_display(), largeur=14),
+    ]
+
+
+@login_required
+@permission_required('soins.view_proceduresoin', raise_exception=True)
+def export_procedures(request):
+    """Télécharge les procédures telles que la liste les affiche."""
+    from core.export_listing import repondre
+    from .procedure_listing import listing_procedures
+
+    today = timezone.now().date()
+    base_qs = ProcedureSoin.objects.select_related(
+        'patient', 'infirmier', 'departement', 'soin', 'soin_type', 'maladie', 'facture')
+    patient_id = request.GET.get('patient')
+    if patient_id:
+        base_qs = base_qs.filter(patient_id=patient_id)
+
+    listing, champs, _declarees, _perso = listing_procedures()
+    selection = listing.selection(request, base_qs, champs, {
+        'aujourdhui': today,
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    return repondre(request.GET.get('format', 'xlsx'), 'procedures-de-soin',
+                    _colonnes_procedures(), selection.qs, selection.dims,
+                    titre_feuille='Procédures de soin')

@@ -329,3 +329,30 @@ def dimensions_personnalisees(champs=None):
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_soins(),
                            exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_soins(cible=False):
+    """Déclaration de la liste des soins, et champs du constructeur de conditions.
+
+    Partagée par la page et son export : les laisser la rebâtir chacun de leur
+    côté finirait par faire diverger le fichier téléchargé de l'écran.
+
+    `cible` vaut vrai quand on arrive depuis une fiche patient ou une
+    hospitalisation : le filtre de période par défaut n'a alors plus de sens,
+    le jeu est déjà restreint en amont.
+    """
+    from core.listing import Listing
+
+    champs = champs_soins()
+    declarees = construire_dimensions()
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_soins(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=25,
+        filtres_defaut=() if cible else FILTRES_DEFAUT,
+        tri_defaut=('-date_creation',),
+        tris=TRIS,
+    )
+    return listing, champs, declarees, perso

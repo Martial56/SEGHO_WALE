@@ -6,6 +6,8 @@ hospitalisations, demandes et résultats d'examens — passent tous par
 chargeait donc des centaines de lignes en mémoire et dans la page.
 """
 
+from datetime import date, timedelta
+
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
 from django.urls import reverse
@@ -1045,3 +1047,492 @@ class TestLaNumerotationSurvitAUneSuppression(TestCase):
         self.assertGreater(suivant.code_patient, dernier)
         self.assertEqual(Patient.all_objects.filter(
             code_patient=suivant.code_patient).count(), 1)
+
+
+class TestLaNumerotationDesNaissances(TestCase):
+    """Même défaut, même correctif : `Naissance` numérotait par comptage."""
+
+    def setUp(self):
+        self.mere = Patient.objects.create(
+            nom='Mere', prenoms='Test', date_naissance='1990-06-01',
+            sexe='F', telephone='0700000000')
+
+    def _naissance(self):
+        from .models import Naissance
+        return Naissance.objects.create(
+            mere=self.mere, date_accouchement=timezone.now(), sexe_enfant='M')
+
+    def test_creer_apres_une_suppression_ne_leve_plus(self):
+        a, b, c = (self._naissance() for _ in range(3))
+        dernier = c.numero
+        b.delete()
+        suivant = self._naissance()
+        self.assertGreater(suivant.numero, dernier)
+
+
+class TestImportPatients(TestCase):
+    """Import de masse : rapprochement, numérotation et compteurs.
+
+    Le rapprochement se faisait une ligne à la fois, par une requête sur la date
+    de naissance — non indexée — et la numérotation retriait tous les codes à
+    chaque enregistrement. Sur 48 000 lignes le coût était quadratique. Les
+    clés sont désormais relevées une fois en mémoire ; ces tests fixent le
+    comportement que cette réécriture devait conserver.
+    """
+
+    def setUp(self):
+        from core.models import TacheImport
+        from core.taches import Avancement
+        self.tache = TacheImport.objects.create(libelle='Test')
+        self.avancement = Avancement(self.tache)
+
+    def _importer(self, lignes, do_update=False):
+        import json
+        from .views import _executer_import_patients
+        contenu = json.dumps(lignes).encode('utf-8')
+        message = _executer_import_patients(
+            self.avancement, 'fichier.json', contenu, do_update, None)
+        self.tache.refresh_from_db()
+        return message
+
+    @staticmethod
+    def _ligne(code='', nom='Kone Adama', age='30', genre='M', mobile='0700000001',
+               date_naissance=None):
+        ligne = {'code_identifiant': code, 'nom': nom, 'age': age,
+                 'genre': genre, 'mobile': mobile}
+        if date_naissance is not None:
+            ligne['date_naissance'] = date_naissance
+        return ligne
+
+    def test_cree_les_patients_avec_des_codes_distincts(self):
+        self._importer([
+            self._ligne(nom='Kone Adama', mobile='0700000001'),
+            self._ligne(nom='Traore Awa', genre='F', mobile='0700000002'),
+            self._ligne(nom='Yao Koffi', age='45', mobile='0700000003'),
+        ])
+        self.assertEqual(Patient.objects.count(), 3)
+        self.assertEqual(self.tache.crees, 3)
+        self.assertEqual(self.tache.traites, 3)
+        codes = set(Patient.objects.values_list('code_patient', flat=True))
+        self.assertEqual(len(codes), 3)
+        self.assertTrue(all(c.startswith('PAT') for c in codes))
+
+    def test_la_numerotation_reprend_apres_les_patients_existants(self):
+        existant = Patient.objects.create(
+            nom='Deja', prenoms='La', date_naissance='1980-01-01',
+            sexe='M', telephone='0700000000')
+        self._importer([self._ligne()])
+        nouveau = Patient.objects.exclude(pk=existant.pk).get()
+        self.assertGreater(nouveau.code_patient, existant.code_patient)
+
+    def test_un_patient_deja_connu_est_ignore_sans_mise_a_jour(self):
+        self._importer([self._ligne()])
+        self._importer([self._ligne(mobile='0799999999')])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.ignores, 1)
+        self.assertEqual(Patient.objects.get().telephone, '0700000001')
+
+    def test_un_patient_deja_connu_est_mis_a_jour_si_demande(self):
+        self._importer([self._ligne()])
+        self._importer([self._ligne(mobile='0799999999')], do_update=True)
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.mis_a_jour, 1)
+        self.assertEqual(Patient.objects.get().telephone, '0799999999')
+
+    def test_le_rapprochement_ignore_casse_et_accents(self):
+        self._importer([self._ligne(nom='Koné Adama')])
+        self._importer([self._ligne(nom='KONE adama')])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.ignores, 1)
+
+    def test_un_identifiant_externe_est_conserve(self):
+        self._importer([self._ligne(code='EXT-42')])
+        self.assertEqual(Patient.objects.get().ancien_identifiant, 'EXT-42')
+
+    def test_un_reimport_par_notre_propre_code_n_ecrase_pas_l_identifiant_externe(self):
+        self._importer([self._ligne(code='EXT-42')])
+        patient = Patient.objects.get()
+        self._importer(
+            [self._ligne(code=patient.code_patient, mobile='0799999999')],
+            do_update=True)
+        patient.refresh_from_db()
+        self.assertEqual(patient.telephone, '0799999999')
+        self.assertEqual(patient.ancien_identifiant, 'EXT-42')
+
+    def test_un_doublon_interne_au_fichier_n_est_cree_qu_une_fois(self):
+        self._importer([self._ligne(), self._ligne(), self._ligne()])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.crees, 1)
+        self.assertEqual(self.tache.ignores, 2)
+
+    def test_les_lignes_inexploitables_sont_comptees_en_erreur(self):
+        # Une ligne sans âge ni date de naissance n'en fait plus partie : elle
+        # s'importe, sans date (voir TestDateDeNaissanceFacultative). Restent
+        # le nom, le genre et le téléphone, qui eux sont exigés.
+        self._importer([
+            self._ligne(nom=''),
+            self._ligne(nom='Sans Genre', genre='?'),
+            self._ligne(nom='Sans Tel', mobile=''),
+            self._ligne(nom='Bon Dossier'),
+        ])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.erreurs, 3)
+        self.assertEqual(self.tache.traites, 4)
+
+    def test_l_avancement_est_tenu_a_jour(self):
+        self._importer([self._ligne(nom=f'Patient Numero{i}', mobile=f'070000{i:04d}')
+                        for i in range(10)])
+        self.assertEqual(self.tache.total, 10)
+        self.assertEqual(self.tache.traites, 10)
+        self.assertEqual(self.tache.pourcentage, 100)
+
+    def test_un_fichier_illisible_remonte_une_erreur(self):
+        from .views import _executer_import_patients
+        with self.assertRaises(ValueError):
+            _executer_import_patients(
+                self.avancement, 'fichier.txt', b'nimporte quoi', False, None)
+
+
+class TestStatutDeTache(TestCase):
+    """La jauge relit l'avancement par une URL dédiée — réservée à son auteur."""
+
+    def setUp(self):
+        from core.models import TacheImport
+        self.auteur = User.objects.create_user('auteur_tache', password='x')
+        self.tiers = User.objects.create_user('tiers_tache', password='x')
+        self.tache = TacheImport.objects.create(
+            libelle='Import de patients', utilisateur=self.auteur,
+            total=200, traites=50, crees=50, etape='Enregistrement…')
+
+    def _url(self):
+        return reverse('tache_statut', args=[self.tache.pk])
+
+    def test_l_auteur_lit_l_avancement(self):
+        self.client.login(username='auteur_tache', password='x')
+        data = self.client.get(self._url()).json()
+        self.assertEqual(data['pourcentage'], 25)
+        self.assertEqual(data['traites'], 50)
+        self.assertFalse(data['termine'])
+
+    def test_un_tiers_n_y_a_pas_acces(self):
+        self.client.login(username='tiers_tache', password='x')
+        self.assertEqual(self.client.get(self._url()).status_code, 403)
+
+    def test_une_tache_terminee_le_dit(self):
+        self.tache.etat = 'termine'
+        self.tache.save()
+        self.client.login(username='auteur_tache', password='x')
+        self.assertTrue(self.client.get(self._url()).json()['termine'])
+
+
+class TestDateDeNaissanceFacultative(TestCase):
+    """La date de naissance a remplacé l'âge à l'export et n'est plus exigée.
+
+    Elle manque parfois à l'ouverture d'un dossier — patient hors d'état de la
+    donner, pièce d'identité absente. La refuser empêchait d'enregistrer
+    quelqu'un qu'on est en train de soigner.
+    """
+
+    def setUp(self):
+        from core.models import TacheImport
+        from core.taches import Avancement
+        self.tache = TacheImport.objects.create(libelle='Test')
+        self.avancement = Avancement(self.tache)
+        User.objects.create_superuser('su_dn', password='x')
+        self.client = Client()
+        self.client.login(username='su_dn', password='x')
+
+    def _importer(self, lignes, do_update=False):
+        import json
+        from .views import _executer_import_patients
+        message = _executer_import_patients(
+            self.avancement, 'f.json', json.dumps(lignes, default=str).encode('utf-8'),
+            do_update, None)
+        self.tache.refresh_from_db()
+        return message
+
+    # ── Modèle ────────────────────────────────────────────────────────────
+
+    def test_un_patient_s_enregistre_sans_date_de_naissance(self):
+        patient = Patient.objects.create(
+            nom='Sans', prenoms='Date', sexe='M', telephone='0700000000')
+        self.assertIsNone(patient.date_naissance)
+        self.assertIsNone(patient.age)
+        self.assertIsNone(patient.age_detail)
+
+    # ── Export ────────────────────────────────────────────────────────────
+
+    def test_l_export_porte_la_date_de_naissance_et_plus_l_age(self):
+        from .views import _PATIENT_HDR
+        self.assertIn('date_naissance', _PATIENT_HDR)
+        self.assertNotIn('age', _PATIENT_HDR)
+
+    def test_l_export_json_rend_la_date_au_format_francais(self):
+        import json
+        Patient.objects.create(nom='Kone', prenoms='Adama', sexe='M',
+                               telephone='0700000001', date_naissance='1990-06-01')
+        contenu = json.loads(self.client.get(
+            reverse('patients:export_patients') + '?format=json').content)
+        self.assertEqual(contenu[0]['date_naissance'], '01/06/1990')
+
+    def test_l_export_laisse_la_colonne_vide_sans_date(self):
+        import json
+        Patient.objects.create(nom='Sans', prenoms='Date', sexe='M', telephone='0700000002')
+        contenu = json.loads(self.client.get(
+            reverse('patients:export_patients') + '?format=json').content)
+        self.assertEqual(contenu[0]['date_naissance'], '')
+
+    def test_l_export_csv_et_excel_repondent(self):
+        Patient.objects.create(nom='Kone', prenoms='Adama', sexe='M',
+                               telephone='0700000001', date_naissance='1990-06-01')
+        for fmt in ('csv', 'xlsx'):
+            reponse = self.client.get(
+                reverse('patients:export_patients') + f'?format={fmt}')
+            self.assertEqual(reponse.status_code, 200, fmt)
+        csv = self.client.get(
+            reverse('patients:export_patients') + '?format=csv').content.decode('utf-8')
+        self.assertIn('date_naissance', csv)
+        self.assertIn('01/06/1990', csv)
+
+    def test_le_modele_excel_repond(self):
+        self.assertEqual(self.client.get(reverse('patients:patients_modele')).status_code, 200)
+
+    # ── Import ────────────────────────────────────────────────────────────
+
+    def test_l_import_lit_la_date_au_format_francais(self):
+        self._importer([{'nom': 'Kone Adama', 'date_naissance': '14/05/1991',
+                         'genre': 'M', 'mobile': '0700000001'}])
+        self.assertEqual(Patient.objects.get().date_naissance, date(1991, 5, 14))
+
+    def test_l_import_lit_la_date_au_format_iso(self):
+        self._importer([{'nom': 'Kone Adama', 'date_naissance': '1991-05-14',
+                         'genre': 'M', 'mobile': '0700000001'}])
+        self.assertEqual(Patient.objects.get().date_naissance, date(1991, 5, 14))
+
+    def test_l_import_lit_une_cellule_datee_d_excel(self):
+        from datetime import datetime
+        from .views import _parse_date_naissance
+        self.assertEqual(
+            _parse_date_naissance(datetime(1991, 5, 14, 9, 30), date.today()),
+            date(1991, 5, 14))
+
+    def test_l_import_accepte_une_ligne_sans_date(self):
+        self._importer([{'nom': 'Sans Date', 'genre': 'F', 'mobile': '0700000003'}])
+        self.assertEqual(self.tache.crees, 1)
+        self.assertEqual(self.tache.erreurs, 0)
+        self.assertIsNone(Patient.objects.get().date_naissance)
+
+    def test_la_colonne_age_reste_acceptee(self):
+        self._importer([{'nom': 'Kone Adama', 'age': '30', 'genre': 'M',
+                         'mobile': '0700000001'}])
+        patient = Patient.objects.get()
+        self.assertIsNotNone(patient.date_naissance)
+        self.assertEqual(patient.age, 30)
+
+    def test_la_date_prime_sur_l_age(self):
+        self._importer([{'nom': 'Kone Adama', 'age': '30',
+                         'date_naissance': '14/05/1991', 'genre': 'M',
+                         'mobile': '0700000001'}])
+        self.assertEqual(Patient.objects.get().date_naissance, date(1991, 5, 14))
+
+    def test_une_date_future_est_ignoree_sans_perdre_le_patient(self):
+        demain = (date.today() + timedelta(days=1)).strftime('%d/%m/%Y')
+        self._importer([{'nom': 'Kone Adama', 'date_naissance': demain,
+                         'genre': 'M', 'mobile': '0700000001'}])
+        self.assertEqual(self.tache.crees, 1)
+        self.assertIsNone(Patient.objects.get().date_naissance)
+
+    def test_un_export_reimporte_ne_cree_pas_de_doublon(self):
+        import json
+        Patient.objects.create(nom='Kone', prenoms='Adama', sexe='M',
+                               telephone='0700000001', date_naissance='1991-05-14')
+        exporte = json.loads(self.client.get(
+            reverse('patients:export_patients') + '?format=json').content)
+        self._importer(exporte)
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.ignores, 1)
+
+    def test_deux_homonymes_sans_date_restent_deux_dossiers(self):
+        # Sans date de naissance, le nom seul ne prouve pas qu'il s'agit de la
+        # même personne : mieux vaut deux dossiers qu'une fusion abusive.
+        self._importer([{'nom': 'Kone Adama', 'genre': 'M', 'mobile': '0700000001'}])
+        self._importer([{'nom': 'Kone Adama', 'genre': 'M', 'mobile': '0700000009'}])
+        self.assertEqual(Patient.objects.count(), 2)
+
+    def test_un_identifiant_rapproche_meme_sans_date(self):
+        self._importer([{'code_identifiant': 'EXT-7', 'nom': 'Kone Adama',
+                         'genre': 'M', 'mobile': '0700000001'}])
+        patient = Patient.objects.get()
+        self._importer([{'code_identifiant': patient.code_patient, 'nom': 'Kone Adama',
+                         'genre': 'M', 'mobile': '0799999999'}], do_update=True)
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(Patient.objects.get().telephone, '0799999999')
+
+    # ── Formulaire ────────────────────────────────────────────────────────
+
+    def test_le_formulaire_n_exige_plus_la_date(self):
+        from .forms import PatientForm
+        self.assertFalse(PatientForm().fields['date_naissance'].required)
+
+    def test_le_doublon_est_detecte_sans_date_de_naissance(self):
+        from .forms import PatientForm
+        Patient.objects.create(nom='Kone', prenoms='Adama', sexe='M',
+                               telephone='0700000001')
+        form = PatientForm(data={
+            'nom': 'Kone', 'prenoms': 'Adama', 'sexe': 'M',
+            'telephone': '0700000001', 'adresse': 'Yamoussoukro',
+            'nationalite': 'Ivoirienne', 'ville': 'Yamoussoukro',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('existe déjà', ' '.join(form.errors.get('__all__', [])))
+
+
+class TestLExportSuitLaSelection(TestCase):
+    """Le fichier téléchargé porte ce que la liste affiche.
+
+    L'export faisait sa propre requête, sans filtre : on restreignait la liste
+    aux femmes de plus de 60 ans, on téléchargeait, et on recevait la table
+    entière. Le fichier ne répondait jamais à la question posée à l'écran.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create_superuser('su_exp', password='x')
+        aujourdhui = date.today()
+        cls.attendus = {}
+        for nom, sexe, age in [('Kone', 'F', 70), ('Traore', 'F', 30),
+                               ('Yao', 'M', 70), ('Bamba', 'M', 10)]:
+            cls.attendus[nom] = Patient.objects.create(
+                nom=nom, prenoms='Essai', sexe=sexe,
+                date_naissance=aujourdhui.replace(year=aujourdhui.year - age),
+                telephone=f'070000{age:04d}')
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(username='su_exp', password='x')
+
+    def _json(self, parametres=''):
+        import json
+        return json.loads(self.client.get(
+            reverse('patients:export_patients') + '?format=json' + parametres).content)
+
+    def _noms(self, data):
+        return sorted(ligne['nom'].split()[0] for ligne in data)
+
+    def test_sans_filtre_tout_sort(self):
+        self.assertEqual(len(self._json()), 4)
+
+    def test_un_filtre_restreint_le_fichier(self):
+        self.assertEqual(self._noms(self._json('&filter=femme')), ['Kone', 'Traore'])
+
+    def test_deux_filtres_de_familles_differentes_se_cumulent(self):
+        self.assertEqual(self._noms(self._json('&filter=femme&filter=senior')), ['Kone'])
+
+    def test_la_recherche_restreint_le_fichier(self):
+        self.assertEqual(self._noms(self._json('&q=Traore')), ['Traore'])
+
+    def test_le_regroupement_structure_le_fichier(self):
+        data = self._json('&group=sexe')
+        self.assertEqual([bloc['groupe'] for bloc in data], ['Féminin', 'Masculin'])
+        self.assertEqual([bloc['nombre'] for bloc in data], [2, 2])
+        self.assertEqual(
+            sorted(l['nom'].split()[0] for l in data[0]['lignes']), ['Kone', 'Traore'])
+
+    def test_filtre_et_regroupement_se_combinent(self):
+        data = self._json('&filter=senior&group=sexe')
+        self.assertEqual([(b['groupe'], b['nombre']) for b in data],
+                         [('Féminin', 1), ('Masculin', 1)])
+
+    def test_le_csv_porte_les_titres_de_groupe(self):
+        texte = self.client.get(
+            reverse('patients:export_patients')
+            + '?format=csv&group=sexe').content.decode('utf-8-sig')
+        self.assertIn('Féminin (2)', texte)
+        self.assertIn('Masculin (2)', texte)
+        # Virgule, et pas point-virgule : le fichier doit rester relisible par
+        # l'import de patients, dont le DictReader lit en virgule.
+        self.assertIn('code_identifiant,nom,date_naissance,genre,mobile', texte)
+
+    def test_deux_niveaux_s_emboitent_au_lieu_de_s_ecraser(self):
+        """Le parent une fois, ses enfants en dessous.
+
+        Les deux niveaux sortaient écrasés sur un seul titre — « Féminin ›
+        Senior » — réécrit en entier à chaque sous-groupe, et le compte du
+        parent n'apparaissait nulle part.
+        """
+        data = self._json('&group=sexe&group=age')
+        self.assertEqual([b['groupe'] for b in data], ['Féminin', 'Masculin'])
+        femmes = data[0]
+        self.assertEqual(femmes['nombre'], 2)          # le total du parent
+        self.assertNotIn('lignes', femmes)             # il ne porte rien en propre
+        self.assertEqual(sum(sg['nombre'] for sg in femmes['sous_groupes']), 2)
+
+    def test_le_csv_decale_les_sous_groupes(self):
+        texte = self.client.get(
+            reverse('patients:export_patients')
+            + '?format=csv&group=sexe&group=age').content.decode('utf-8-sig')
+        lignes = [l for l in texte.splitlines() if l.startswith('Féminin')]
+        self.assertEqual(lignes, ['Féminin (2)'])
+        # Les enfants sont décalés de deux espaces, le parent non.
+        self.assertTrue(any(l.startswith('  ') and l.strip().endswith(')')
+                            for l in texte.splitlines()))
+
+    def test_le_csv_groupe_se_reimporte_sans_creer_de_fantome(self):
+        """Les titres de groupe ne doivent pas devenir des patients.
+
+        Le fichier téléchargé reste un fichier d'import : regroupé, il porte des
+        lignes de titre que le lecteur verra passer. Elles sont sans nom, donc
+        comptées en erreur — jamais insérées.
+        """
+        from core.models import TacheImport
+        from core.taches import Avancement
+        from .views import _executer_import_patients
+
+        contenu = self.client.get(
+            reverse('patients:export_patients') + '?format=csv&group=sexe').content
+        tache = TacheImport.objects.create(libelle='Retour')
+        _executer_import_patients(Avancement(tache), 'patients.csv', contenu, False, None)
+        tache.refresh_from_db()
+
+        self.assertEqual(Patient.objects.count(), 4)
+        self.assertEqual(tache.crees, 0)
+        self.assertEqual(tache.ignores, 4)
+        self.assertEqual(tache.erreurs, 2)      # les deux titres de groupe
+
+    def test_l_excel_porte_les_titres_de_groupe(self):
+        import io
+        import openpyxl
+        contenu = self.client.get(
+            reverse('patients:export_patients') + '?format=xlsx&group=sexe').content
+        feuille = openpyxl.load_workbook(io.BytesIO(contenu)).active
+        premieres = [l[0] for l in feuille.iter_rows(values_only=True)]
+        self.assertIn('Féminin (2)', premieres)
+        self.assertIn('Masculin (2)', premieres)
+
+    def test_le_menu_annonce_ce_qu_il_telecharge(self):
+        page = self.client.get(reverse('patients:list')).content.decode('utf-8')
+        self.assertIn('Exporter les patients (4)', page)
+        selection = self.client.get(
+            reverse('patients:list') + '?filter=femme').content.decode('utf-8')
+        self.assertIn('Exporter la sélection (2)', selection)
+
+    def test_les_liens_du_menu_emportent_la_selection(self):
+        page = self.client.get(
+            reverse('patients:list') + '?filter=femme&q=Kone').content.decode('utf-8')
+        self.assertIn('?format=csv&amp;filter=femme&amp;q=Kone', page)
+
+    def test_les_liens_n_emportent_pas_la_pagination(self):
+        # `page` et le dépliage décrivent la façon de parcourir l'écran, pas la
+        # sélection : les emporter laisserait croire qu'on ne télécharge que la
+        # page affichée.
+        page = self.client.get(
+            reverse('patients:list') + '?filter=femme&page=2').content.decode('utf-8')
+        self.assertIn('filter=femme', page)
+        self.assertNotIn('format=csv&amp;filter=femme&amp;page=2', page)
+
+    def test_l_export_reste_aux_administrateurs(self):
+        User.objects.create_user('simple_exp', password='x')
+        client = Client()
+        client.login(username='simple_exp', password='x')
+        self.assertEqual(
+            client.get(reverse('patients:export_patients')).status_code, 403)

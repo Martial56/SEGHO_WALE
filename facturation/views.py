@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.urls import reverse
 from core import memoire_listing
+from core.export_listing import contexte as contexte_export
 
 from .models import Facture, LigneFacture, Acte, Paiement, Caisse
 from .forms import FactureForm
@@ -37,13 +38,10 @@ def facturation_list(request):
     s'imbriquent, et les comptes des en-têtes sont calculés en base sur toute la
     sélection.
     """
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
                               menu_filtres, menu_groupes, paginer_groupes)
-    from .facture_listing import (CHAMPS_RECHERCHE, FILTRES_DEFAUT, TRIS,
-                                  champs_factures, construire_dimensions,
-                                  dimensions_personnalisees, familles_factures,
-                                  libelle_periode)
+    from .facture_listing import libelle_periode, listing_factures
 
     today = date.today()
     q = request.GET.get('q', '').strip()
@@ -64,18 +62,7 @@ def facturation_list(request):
     # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
     # liste des champs est établie une fois et sert aussi au constructeur de
     # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
-    champs = champs_factures()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_factures(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('-date_emission',),
-        tris=TRIS,
-    )
+    listing, champs, declarees, dims_perso = listing_factures()
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -83,19 +70,16 @@ def facturation_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Même chemin que `export_factures` : le fichier porte donc exactement les
+    # lignes de l'écran.
+    selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
-    # liste des champs découverts : une condition portant sur autre chose est
-    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    tri, tri_sens = listing.tri_demande(request)
-    qs = listing.trier(qs, groupes, tri, tri_sens)
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    tri, tri_sens = selection.tri, selection.sens
 
     declarees.update({d.cle: d for d in dims_perso})
     dims = [declarees[g] for g in groupes if g in declarees]
@@ -165,6 +149,9 @@ def facturation_list(request):
         'conditions':        conditions,
         'mode_conditions':   mode_conditions,
         'selection_active':  bool(q or groupes or filtres or conditions),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('facturation:export'),
+                          'les factures', total),
         'periode_libelle':   libelle_periode(filtres, date_from, date_to),
         'listing_filtres':   menu_filtres(listing.familles, filtres, date_from, date_to),
         'listing_groupes':   menu_groupes(list(declarees.values()), groupes),
@@ -1125,8 +1112,8 @@ def caisses_list(request):
     depuis l'ouverture du centre. Le menu « Filtres » et son intervalle de dates
     viennent de core.listing, comme sur la liste des factures.
     """
-    from core.listing import Listing, menu_filtres
-    from .caisse_listing import FILTRES_DEFAUT, condition_periode, familles_caisses
+    from core.listing import menu_filtres
+    from .caisse_listing import caisses_de_la_periode, listing_caisses
     from .facture_listing import libelle_periode
 
     today = date.today()
@@ -1134,13 +1121,7 @@ def caisses_list(request):
     date_from = request.GET.get('date_from', '').strip()
     date_to = request.GET.get('date_to', '').strip()
 
-    listing = Listing(
-        recherche=('nom', 'code'),
-        familles=familles_caisses(),
-        par_page=100,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('nom',),
-    )
+    listing = listing_caisses()
 
     # Revenir sans paramètres après avoir filtré : on remet la sélection retenue
     # dans l'URL, comme la liste des factures (voir core.memoire_listing). Elle
@@ -1150,29 +1131,12 @@ def caisses_list(request):
         return redirection
 
     filtres = listing.filtres_demandes(request)
-
-    # La période borne l'agrégat, pas le queryset : une caisse qui n'a rien
-    # encaissé sur l'intervalle s'affiche à 0 F au lieu de disparaître de la
-    # liste (cf. caisse_listing.condition_periode).
-    #
-    # `total` annoté plutôt que lu via la propriété `Caisse.total_encaisse` :
-    # celle-ci ferait une requête par ligne. Le `filter` reprend sa règle — une
-    # facture annulée a été remboursée, son encaissement ne pèse plus dans la
-    # caisse — et les deux chiffres doivent rester d'accord.
-    encaisse = condition_periode(filtres, today, date_from, date_to) \
-        & ~Q(paiements__facture__statut='annulee')
-    # `order_by` explicite : le GROUP BY ajouté par l'annotation fait tomber
-    # l'ordre déclaré dans Meta, et la pagination avertit alors sur une liste
-    # non triée.
-    qs = Caisse.objects.annotate(
-        total=Sum('paiements__montant', filter=encaisse),
-        nb_paiements=Count('paiements', filter=encaisse),
-    ).order_by('nom')
-
-    qs = listing.appliquer_recherche(qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    base_qs = caisses_de_la_periode(filtres, today, date_from, date_to)
+    # Même chemin que `export_caisses` : le fichier porte ce que l'écran montre.
+    selection = listing.selection(request, base_qs, contexte={
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
+    qs = selection.qs
 
     page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page', 1))
     # Les cartes portent sur la sélection entière et non sur la page : elles
@@ -1200,6 +1164,9 @@ def caisses_list(request):
                                   or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle':   libelle_periode(filtres, date_from, date_to),
         'listing_filtres':   menu_filtres(listing.familles, filtres, date_from, date_to),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('facturation:caisses_export'),
+                          'les caisses', page_obj.paginator.count),
     })
 
 
@@ -1256,3 +1223,77 @@ def caisse_delete(request, pk):
         return JsonResponse({'ok': True, 'message': 'Caisse « %s » supprimée.' % nom})
     messages.success(request, 'Caisse « %s » supprimée.' % nom)
     return redirect('facturation:caisses_list')
+
+
+def _colonnes_factures():
+    """Colonnes du fichier des factures."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('numero', 'numero', largeur=22),
+        Colonne('date_emission', 'date_emission', largeur=18),
+        Colonne('patient', lambda f: f'{f.patient.nom} {f.patient.prenoms}'.strip()
+                if f.patient_id else '', largeur=30),
+        Colonne('code_patient', 'patient__code_patient', largeur=16),
+        Colonne('type', lambda f: f.get_type_facture_display(), largeur=18),
+        Colonne('montant_total', 'montant_total', largeur=14),
+        Colonne('montant_paye', 'montant_paye', largeur=14),
+        Colonne('reste', lambda f: f.montant_total - f.montant_paye, largeur=12),
+        Colonne('statut', lambda f: f.get_statut_display(), largeur=14),
+        Colonne('centre', 'centre__nom', largeur=24),
+    ]
+
+
+@login_required
+@permission_required('facturation.view_facture', raise_exception=True)
+def export_factures(request):
+    """Télécharge les factures telles que la liste les affiche."""
+    from core.export_listing import repondre
+    from .facture_listing import listing_factures
+
+    today = date.today()
+    base_qs = (Facture.objects.select_related('patient', 'centre')
+               .annotate(reste=F('montant_total') - F('montant_paye')))
+    listing, champs, _declarees, _perso = listing_factures()
+    selection = listing.selection(request, base_qs, champs, {
+        'aujourdhui': today,
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    return repondre(request.GET.get('format', 'xlsx'), 'factures',
+                    _colonnes_factures(), selection.qs, selection.dims,
+                    titre_feuille='Factures')
+
+
+def _colonnes_caisses():
+    """Colonnes du fichier des caisses — l'encaissé est celui de la période
+    retenue, pas le cumul depuis l'ouverture du centre."""
+    from core.export_listing import Colonne
+    return [
+        Colonne('code', 'code', largeur=14),
+        Colonne('nom', 'nom', largeur=30),
+        Colonne('modes_paiement', 'modes_paiement', largeur=42),
+        Colonne('nb_paiements', lambda c: c.nb_paiements or 0, largeur=14),
+        Colonne('total_encaisse', lambda c: int(c.total or 0), largeur=18),
+        Colonne('active', 'actif', largeur=10),
+    ]
+
+
+@login_required
+@permission_required('facturation.view_caisse', raise_exception=True)
+def export_caisses(request):
+    """Télécharge les caisses telles que la liste les affiche."""
+    from core.export_listing import repondre
+    from .caisse_listing import caisses_de_la_periode, listing_caisses
+
+    today = date.today()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+    listing = listing_caisses()
+    filtres = listing.filtres_demandes(request)
+    base_qs = caisses_de_la_periode(filtres, today, date_from, date_to)
+    selection = listing.selection(request, base_qs, contexte={
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    return repondre(request.GET.get('format', 'xlsx'), 'caisses',
+                    _colonnes_caisses(), selection.qs, selection.dims,
+                    titre_feuille='Caisses')
