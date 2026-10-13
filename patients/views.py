@@ -561,7 +561,8 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     champs = champs_rdv()
     dims_perso = dimensions_personnalisees(champs)
     listing = Listing(
-        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                   'patient__telephone'),
         familles=familles_rdv(contexte_gyneco),
         dimensions=list(construire_dimensions(today).values()) + dims_perso,
         par_page=100,
@@ -676,7 +677,8 @@ def rdv_global_list(request):
 @permission_required('patients.view_patient', raise_exception=True)
 def patient_info_json(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
-    return JsonResponse({'age': patient.age, 'telephone': patient.telephone})
+    return JsonResponse({'age': patient.age, 'age_affiche': patient.age_affiche,
+                         'telephone': patient.telephone})
 
 
 @login_required

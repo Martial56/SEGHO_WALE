@@ -90,6 +90,15 @@ class Patient(ModeleCentre):
             months += 12
         return f'{years}Ans{months}Mois{days}Jours'
 
+    @property
+    def age_affiche(self):
+        """Âge pour les formulaires : détaillé ('XAnsYMoisZJours') avant 5 ans,
+        sinon 'N ans'."""
+        age = self.age
+        if age is None:
+            return None
+        return self.age_detail if age < 5 else f'{age} ans'
+
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta(ModeleCentre.Meta):
         verbose_name = "Patient"

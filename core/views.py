@@ -1754,7 +1754,8 @@ def gynecologie_rdv(request):
         from patients.rdv_listing import FILTRES_PAR_DEFAUT, familles_rdv
         from datetime import date as _dexp
         _listing = Listing(
-            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                       'patient__telephone'),
             familles=familles_rdv(contexte_gyneco=True),
             filtres_defaut=FILTRES_PAR_DEFAUT,
         )
