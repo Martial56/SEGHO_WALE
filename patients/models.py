@@ -34,6 +34,14 @@ class Patient(ModeleCentre):
     # passerelle HPRIM) et le filtre par tranche d'âge de la liste patients
     # la cherchent, sur une table qui passe la dizaine de milliers de lignes.
     date_naissance = models.DateField(null=True, blank=True, db_index=True)
+    # L'import convertit un âge en date à partir du jour où il tourne : « 34 ans »
+    # importé le 1er octobre 2026 devient « né le 01/10/1992 ». 89 % de la base
+    # porte ainsi le même jour et le même mois. Sans ce drapeau, la recherche de
+    # doublons croit à de vraies dates identiques et rapproche n'importe qui.
+    # Seule l'année d'une date cochée veut dire quelque chose.
+    date_naissance_approx = models.BooleanField(
+        default=False, verbose_name='Date de naissance approximative',
+        help_text="Déduite d'un âge : seule l'année est fiable.")
     lieu_naissance = models.CharField(max_length=100, blank=True)
     sexe = models.CharField(max_length=1, choices=SEXE)
     nationalite = models.CharField(max_length=50, default='Ivoirienne')
@@ -68,6 +76,36 @@ class Patient(ModeleCentre):
             self.code_patient = prochain_code(
                 Patient.all_objects, 'code_patient', f'PAT{annee}', 5)
         super().save(*args, **kwargs)
+        self._rafraichir_cles_phonetiques(kwargs.get('update_fields'))
+
+    # ── Clés phonétiques ──────────────────────────────────────────────────
+    # Elles ne dépendent que du nom, des prénoms et de la date. Les réécrire à
+    # chaque enregistrement ferait deux requêtes de plus pour un changement
+    # d'adresse ou de téléphone, qui n'y change rien.
+
+    def _identite(self):
+        return (self.nom, self.prenoms, self.date_naissance)
+
+    @classmethod
+    def from_db(cls, db, field_names, values):
+        """Garde l'identité telle qu'elle était en base, pour la comparer à
+        l'enregistrement. Une requête `.only()` qui n'a pas chargé ces champs
+        ne laisse rien : on réécrira les clés, par sécurité."""
+        instance = super().from_db(db, field_names, values)
+        from .cles_phonetiques import CHAMPS_SURVEILLES
+        if all(champ in field_names for champ in CHAMPS_SURVEILLES):
+            instance._identite_chargee = instance._identite()
+        return instance
+
+    def _rafraichir_cles_phonetiques(self, update_fields=None):
+        from .cles_phonetiques import doit_rafraichir, rafraichir
+        if not doit_rafraichir(update_fields):
+            return
+        ancienne = getattr(self, '_identite_chargee', None)
+        if ancienne is not None and ancienne == self._identite():
+            return
+        rafraichir([self])
+        self._identite_chargee = self._identite()
 
     @property
     def age(self):
@@ -76,6 +114,12 @@ class Patient(ModeleCentre):
         from datetime import date
         t = date.today()
         return t.year - self.date_naissance.year - ((t.month, t.day) < (self.date_naissance.month, self.date_naissance.day))
+
+    @property
+    def date_precise(self):
+        """Nom attendu par `patients.doublons.scorer`, qui n'a pas à connaître
+        la façon dont le modèle enregistre l'information."""
+        return not self.date_naissance_approx
 
     @property
     def age_detail(self):
@@ -99,10 +143,175 @@ class Patient(ModeleCentre):
             months += 12
         return f'{years}Ans{months}Mois{days}Jours'
 
+    # ── Fusion et masquage (posés par l'étape 4, lus dès maintenant) ──────
+    # La détection de doublons doit déjà les ignorer : les ajouter plus tard
+    # obligerait à relancer le recalcul complet sur toute la base.
+    #
+    # PROTECT, et non CASCADE : supprimer la fiche gardée emporterait les
+    # fiches qu'elle a absorbées, c'est-à-dire l'historique de la fusion. On
+    # préfère que la suppression échoue.
+    fusionne_dans = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='fiches_absorbees', editable=False,
+        verbose_name='Fusionnée dans',
+        help_text="Renseigné par une fusion : la fiche n'est plus qu'une "
+                  "redirection vers celle qui l'a absorbée.")
+    masque = models.BooleanField(
+        default=False, editable=False, verbose_name='Masquée',
+        help_text="Dossier vide écarté à la main depuis l'écran des doublons.")
+
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta(ModeleCentre.Meta):
         verbose_name = "Patient"
         ordering = ['-date_creation']
+        permissions = [
+            # Passer outre un dossier déjà existant : réservé, et tracé au
+            # journal. Une permission plutôt qu'`is_superuser`, pour qu'on
+            # puisse l'accorder à la major de l'accueil dans /admin/ sans lui
+            # donner les clés du reste.
+            ('forcer_creation_doublon',
+             "Peut créer un dossier malgré un doublon signalé"),
+        ]
+
+
+class ClePhonetique(ModeleCentre):
+    """Un mot du nom d'une fiche, réduit à sa prononciation.
+
+    Une ligne par fiche et par mot — 2,7 en moyenne, 129 000 pour les 47 800
+    fiches de la base. Une table plutôt qu'un champ texte unique : « KWASI
+    AMENAN KAROLIN » dans une colonne ne se chercherait qu'en `LIKE '%KWASI%'`,
+    qu'aucun index ne sert. Les tableaux indexés (`ArrayField` + GIN)
+    règleraient le problème, mais n'existent que sur PostgreSQL, et le
+    développement tourne sur SQLite.
+
+    L'année de naissance est recopiée ici : la présélection croise toujours la
+    clé avec un second indice — une clé seule ramènerait les 3 092 fiches de
+    « KWASI » —, et la recopier évite une jointure sur `patients_patient`.
+
+    Table de travail : elle se régénère entièrement depuis les fiches (voir
+    `patients.cles_phonetiques`), rien n'y est saisi.
+    """
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                related_name='cles_phonetiques')
+    cle = models.CharField(max_length=32)
+    annee = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    def __str__(self): return f'{self.cle} ({self.patient_id})'
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Clé phonétique'
+        verbose_name_plural = 'Clés phonétiques'
+        constraints = [
+            models.UniqueConstraint(fields=['patient', 'cle'],
+                                    name='cle_phonetique_unique_par_fiche'),
+        ]
+        indexes = [
+            # Sur la clé d'abord, pas sur le centre : la présélection cherche
+            # `cle IN (…)` sans contrainte de centre — le périmètre est déjà
+            # appliqué par la requête qui l'englobe — et un index qui commence
+            # par le centre ne lui sert alors à rien.
+            models.Index(fields=['cle', 'annee'], name='cle_phon_cle_annee'),
+        ]
+
+
+class DoublonPaire(ModeleCentre):
+    """Deux fiches que le rapprochement a jugées proches.
+
+    Reconstruite en entier par le recalcul : rien de ce qu'une personne a
+    décidé ne vit ici (voir `PaireEcartee` et `ChoixFicheGardee`). Les groupes
+    ne sont pas stockés non plus — ils se calculent à la lecture depuis ces
+    paires, ce qui évite d'avoir à les réconcilier avec les décisions humaines
+    à chaque passage.
+
+    `patient_a` porte toujours le plus petit identifiant : sans cet ordre, la
+    même paire s'écrirait deux fois et la contrainte d'unicité ne servirait à
+    rien.
+    """
+
+    NIVEAU = [('certain', 'Quasi certain'), ('avertissement', 'À vérifier')]
+
+    patient_a = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                  related_name='doublons_a')
+    patient_b = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                  related_name='doublons_b')
+    score = models.PositiveSmallIntegerField()
+    niveau = models.CharField(max_length=15, choices=NIVEAU)
+    details = models.JSONField(default=dict, blank=True)
+    date_calcul = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return f'{self.patient_a_id} ≈ {self.patient_b_id} ({self.score} %)'
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Paire de doublons'
+        verbose_name_plural = 'Paires de doublons'
+        ordering = ['-score']
+        constraints = [
+            models.UniqueConstraint(fields=['patient_a', 'patient_b'],
+                                    name='doublon_paire_unique'),
+            models.CheckConstraint(condition=models.Q(patient_a__lt=models.F('patient_b')),
+                                   name='doublon_paire_ordonnee'),
+        ]
+        indexes = [
+            models.Index(fields=['centre', 'niveau', '-score'],
+                         name='doublon_paire_centre_niveau'),
+        ]
+
+
+class PaireEcartee(ModeleCentre):
+    """« Ce n'est pas un doublon » : la décision d'une personne.
+
+    Le recalcul ne touche jamais cette table. Comme la paire est désignée par
+    les deux identifiants, et non par ce que les fiches contiennent, la
+    décision survit à la modification de l'une ou de l'autre : corriger un
+    prénom ne fait pas revenir la question.
+    """
+
+    patient_a = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                  related_name='paires_ecartees_a')
+    patient_b = models.ForeignKey(Patient, on_delete=models.CASCADE,
+                                  related_name='paires_ecartees_b')
+    utilisateur = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL)
+    date = models.DateTimeField(auto_now_add=True)
+    raison = models.TextField(blank=True)
+
+    def __str__(self): return f'{self.patient_a_id} ≠ {self.patient_b_id}'
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Paire écartée'
+        verbose_name_plural = 'Paires écartées'
+        constraints = [
+            models.UniqueConstraint(fields=['patient_a', 'patient_b'],
+                                    name='paire_ecartee_unique'),
+            models.CheckConstraint(condition=models.Q(patient_a__lt=models.F('patient_b')),
+                                   name='paire_ecartee_ordonnee'),
+        ]
+
+
+class ChoixFicheGardee(ModeleCentre):
+    """« Quand cette fiche paraît dans un groupe, c'est elle qu'on garde. »
+
+    Attachée à la fiche, pas au groupe : un groupe n'est pas une ligne, il se
+    recompose à chaque recalcul, et une décision qui y serait rangée se
+    perdrait au premier passage. La suggestion automatique — la fiche la plus
+    complète, puis la plus ancienne — s'efface devant ce choix.
+
+    Si deux fiches choisies se retrouvent dans le même groupe, la plus récente
+    l'emporte.
+    """
+
+    patient = models.OneToOneField(Patient, on_delete=models.CASCADE,
+                                   related_name='choix_fiche_gardee')
+    utilisateur = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL)
+    date = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return f'garder {self.patient_id}'
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Fiche à garder'
+        verbose_name_plural = 'Fiches à garder'
 
 
 class RendezVous(ModeleCentre):

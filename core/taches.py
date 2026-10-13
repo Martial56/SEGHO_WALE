@@ -46,12 +46,14 @@ class Avancement:
             self.tache.total = total
         self._ecrire()
 
-    def ajouter(self, traites=0, crees=0, mis_a_jour=0, ignores=0, erreurs=0):
+    def ajouter(self, traites=0, crees=0, mis_a_jour=0, ignores=0, erreurs=0,
+                doublons_possibles=0):
         self.tache.traites += traites
         self.tache.crees += crees
         self.tache.mis_a_jour += mis_a_jour
         self.tache.ignores += ignores
         self.tache.erreurs += erreurs
+        self.tache.doublons_possibles += doublons_possibles
         if time.monotonic() - self._dernier_ecrit >= self.INTERVALLE_SECONDES:
             self._ecrire()
 
@@ -68,6 +70,7 @@ class Avancement:
     def _ecrire(self):
         self.tache.save(update_fields=[
             'etape', 'total', 'traites', 'crees', 'mis_a_jour', 'ignores', 'erreurs',
+            'doublons_possibles', 'codes_doublons',
         ])
         self._dernier_ecrit = time.monotonic()
 

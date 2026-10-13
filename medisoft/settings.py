@@ -157,3 +157,11 @@ DEFAULT_FROM_EMAIL = 'planning@cms-wale.ci'
 # signaux de blockchain_bridge vérifient ce flag avant tout appel réseau.
 BLOCKCHAIN_ENABLED = config('BLOCKCHAIN_ENABLED', default=False, cast=bool)
 BLOCKCHAIN_GATEWAY_URL = config('BLOCKCHAIN_GATEWAY_URL', default='http://localhost:8090')
+
+
+# ── Recherche de doublons patients (patients/doublons.py) ───────────────────
+# Vide, et non [(1, 1)] comme le défaut de la bibliothèque : le champ
+# `Patient.date_naissance_approx` dit désormais quelles dates sont des
+# estimations. Garder la règle du 1er janvier ferait un second pari, à tort,
+# sur les personnes réellement nées ce jour-là.
+DOUBLONS_PATIENTS_DATES_PAR_DEFAUT = []

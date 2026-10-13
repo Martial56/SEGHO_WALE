@@ -119,7 +119,7 @@ def relever_resultats():
                     if synthese["details"]:
                         echange.message_log += "\n" + "\n".join(synthese["details"])
                 else:
-                    _parsed, synthese = integrer_oru(contenu)
+                    _parsed, synthese = integrer_oru(contenu, centre=config.centre)
                     echange.statut = "traite"
                     echange.date_traitement = timezone.now()
                     echange.message_log = (

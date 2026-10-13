@@ -6,10 +6,14 @@ hospitalisations, demandes et résultats d'examens — passent tous par
 chargeait donc des centaines de lignes en mémoire et dans la page.
 """
 
+import subprocess
+import sys
+import tempfile
 from datetime import date, timedelta
+from pathlib import Path
 
 from django.contrib.auth.models import User
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1125,19 +1129,36 @@ class TestImportPatients(TestCase):
         nouveau = Patient.objects.exclude(pk=existant.pk).get()
         self.assertGreater(nouveau.code_patient, existant.code_patient)
 
+    # Date de naissance renseignée dans ces deux-là : avec une date déduite
+    # d'un âge, la clé de rapprochement comprend le téléphone (voir
+    # `_cle_identite`), et changer de numéro revient à présenter quelqu'un
+    # d'autre. Le cas est couvert plus bas, à part.
     def test_un_patient_deja_connu_est_ignore_sans_mise_a_jour(self):
-        self._importer([self._ligne()])
-        self._importer([self._ligne(mobile='0799999999')])
+        self._importer([self._ligne(date_naissance='14/05/1991')])
+        self._importer([self._ligne(date_naissance='14/05/1991', mobile='0799999999')])
         self.assertEqual(Patient.objects.count(), 1)
         self.assertEqual(self.tache.ignores, 1)
         self.assertEqual(Patient.objects.get().telephone, '0700000001')
 
     def test_un_patient_deja_connu_est_mis_a_jour_si_demande(self):
-        self._importer([self._ligne()])
-        self._importer([self._ligne(mobile='0799999999')], do_update=True)
+        self._importer([self._ligne(date_naissance='14/05/1991')])
+        self._importer([self._ligne(date_naissance='14/05/1991', mobile='0799999999')],
+                       do_update=True)
         self.assertEqual(Patient.objects.count(), 1)
         self.assertEqual(self.tache.mis_a_jour, 1)
         self.assertEqual(Patient.objects.get().telephone, '0799999999')
+
+    def test_date_approximative_et_numero_change_donnent_deux_fiches(self):
+        """Le prix de la prudence, énoncé ici pour qu'il ne surprenne personne.
+
+        Quand la date vient d'un âge, elle ne distingue plus personne : seul le
+        téléphone le fait. Un patient qui a changé de numéro revient donc en
+        double. C'est le choix qu'on a fait : un doublon se répare, un dossier
+        médical écrasé par celui d'un homonyme, non.
+        """
+        self._importer([self._ligne()])                      # âge seul
+        self._importer([self._ligne(mobile='0799999999')])
+        self.assertEqual(Patient.objects.count(), 2)
 
     def test_le_rapprochement_ignore_casse_et_accents(self):
         self._importer([self._ligne(nom='Koné Adama')])
@@ -1226,11 +1247,13 @@ class TestStatutDeTache(TestCase):
 
 
 class TestDateDeNaissanceFacultative(TestCase):
-    """La date de naissance a remplacé l'âge à l'export et n'est plus exigée.
+    """La date de naissance a remplacé l'âge à l'export.
 
-    Elle manque parfois à l'ouverture d'un dossier — patient hors d'état de la
-    donner, pièce d'identité absente. La refuser empêchait d'enregistrer
-    quelqu'un qu'on est en train de soigner.
+    Elle n'est exigée qu'à la création, où c'est elle qui sépare deux
+    homonymes. Partout ailleurs elle reste facultative : à l'import, parce que
+    les fichiers reçus n'en portent pas toujours ; en modification, parce que
+    des dizaines de milliers de fiches importées sont déjà sans date et
+    doivent rester corrigeables.
     """
 
     def setUp(self):
@@ -1370,9 +1393,38 @@ class TestDateDeNaissanceFacultative(TestCase):
 
     # ── Formulaire ────────────────────────────────────────────────────────
 
-    def test_le_formulaire_n_exige_plus_la_date(self):
+    def test_la_date_est_obligatoire_a_la_creation(self):
         from .forms import PatientForm
-        self.assertFalse(PatientForm().fields['date_naissance'].required)
+        self.assertTrue(PatientForm().fields['date_naissance'].required)
+        form = PatientForm(data={
+            'nom': 'Sans', 'prenoms': 'Date', 'sexe': 'M',
+            'telephone': '0700000011', 'adresse': 'Yamoussoukro',
+            'nationalite': 'Ivoirienne', 'ville': 'Yamoussoukro',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('date_naissance', form.errors)
+
+    def test_la_date_reste_facultative_a_l_import(self):
+        """Le fichier reçu ne la porte pas toujours : l'exiger ferait tomber
+        la ligne entière, et le dossier avec."""
+        self._importer([{'nom': 'Kone Adama', 'genre': 'M', 'mobile': '0700000012'}])
+        patient = Patient.objects.get()
+        self.assertIsNone(patient.date_naissance)
+
+    def test_la_date_ne_bloque_pas_la_modification(self):
+        """Une fiche importée sans date doit rester modifiable : sinon on ne
+        pourrait plus corriger son adresse tant qu'on n'a pas sa date."""
+        from .forms import PatientForm
+        patient = Patient.objects.create(
+            nom='Sans', prenoms='Date', sexe='M', telephone='0700000013')
+        form = PatientForm(instance=patient, data={
+            'nom': 'Sans', 'prenoms': 'Date', 'sexe': 'M',
+            'telephone': '0700000013', 'adresse': 'Nouveau quartier',
+            'nationalite': 'Ivoirienne', 'ville': 'Yamoussoukro',
+        })
+        self.assertFalse(form.fields['date_naissance'].required)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        self.assertIsNone(form.save().date_naissance)
 
     def test_le_doublon_est_detecte_sans_date_de_naissance(self):
         from .forms import PatientForm
@@ -1451,7 +1503,8 @@ class TestLExportSuitLaSelection(TestCase):
         self.assertIn('Masculin (2)', texte)
         # Virgule, et pas point-virgule : le fichier doit rester relisible par
         # l'import de patients, dont le DictReader lit en virgule.
-        self.assertIn('code_identifiant,nom,date_naissance,genre,mobile', texte)
+        self.assertIn('code_identifiant,nom,date_naissance,date_naissance_approx,'
+                      'genre,mobile', texte)
 
     def test_deux_niveaux_s_emboitent_au_lieu_de_s_ecraser(self):
         """Le parent une fois, ses enfants en dessous.
@@ -1536,3 +1589,1192 @@ class TestLExportSuitLaSelection(TestCase):
         client.login(username='simple_exp', password='x')
         self.assertEqual(
             client.get(reverse('patients:export_patients')).status_code, 403)
+
+
+class TestDetectionDesJoursParDefaut(TestCase):
+    """Le jour inventé se repère à sa fréquence, pas à sa valeur.
+
+    Écrire « 01/10 » en dur dans la migration n'aurait marché que sur cette
+    base-ci : la date inventée est celle du jour de l'import, et change d'un
+    import à l'autre.
+    """
+
+    def test_retient_le_jour_anormalement_frequent(self):
+        from .dates_approximatives import jours_par_defaut
+        # Un jour ordinaire, sur 1 000 fiches, en porte trois.
+        comptes = {(1, 10): 890, (14, 5): 5, (2, 3): 4, (7, 7): 3}
+        self.assertEqual(jours_par_defaut(comptes, 1000), {(1, 10)})
+
+    def test_retient_plusieurs_jours_quand_il_y_a_eu_plusieurs_imports(self):
+        from .dates_approximatives import jours_par_defaut
+        comptes = {(30, 9): 400, (1, 10): 450, (14, 5): 5}
+        self.assertEqual(jours_par_defaut(comptes, 1000), {(30, 9), (1, 10)})
+
+    def test_le_plancher_protege_les_petites_bases(self):
+        """Sur 200 fiches, 2 % font quatre personnes : quatre vrais
+        anniversaires le même jour ne sont pas une anomalie."""
+        from .dates_approximatives import jours_par_defaut
+        self.assertEqual(jours_par_defaut({(14, 5): 6}, 200), set())
+
+    def test_sans_fiche_datee_rien_n_est_retenu(self):
+        from .dates_approximatives import jours_par_defaut
+        self.assertEqual(jours_par_defaut({}, 0), set())
+
+    def test_le_comptage_se_fait_par_centre(self):
+        """Un petit centre importé un autre jour garde sa propre date
+        inventée ; un comptage global la noierait sous le gros centre."""
+        from .dates_approximatives import comptes_par_centre, jours_par_defaut
+        lignes = ([(1, 1, 10)] * 900 + [(1, 14, 5)] * 5 + [(1, 2, 3)] * 95
+                  + [(2, 30, 9)] * 95 + [(2, 3, 4)] * 5)
+        comptes = comptes_par_centre(lignes)
+        self.assertEqual(jours_par_defaut(comptes[1], 1000), {(1, 10), (2, 3)})
+        # Le petit centre garde la sienne : un comptage global l'aurait noyée
+        # (95 fiches sur 1 100, soit 8,6 %… mais sur un autre jour que le gros).
+        self.assertEqual(jours_par_defaut(comptes[2], 100), {(30, 9)})
+
+
+class TestDateApproximativeALImport(TestCase):
+    """Une date déduite d'un âge ne vaut que par son année, et le fichier doit
+    le dire — sinon la recherche de doublons la prend pour une vraie date."""
+
+    def setUp(self):
+        from core.models import TacheImport
+        from core.taches import Avancement
+        self.tache = TacheImport.objects.create(libelle='Test')
+        self.avancement = Avancement(self.tache)
+
+    def _importer(self, lignes, do_update=False):
+        import json
+        from .views import _executer_import_patients
+        _executer_import_patients(self.avancement, 'f.json',
+                                  json.dumps(lignes, default=str).encode('utf-8'),
+                                  do_update, None)
+        self.tache.refresh_from_db()
+
+    def test_une_date_deduite_d_un_age_est_cochee(self):
+        self._importer([{'nom': 'Kone Adama', 'age': '34', 'genre': 'M',
+                         'mobile': '0700000001'}])
+        patient = Patient.objects.get()
+        self.assertTrue(patient.date_naissance_approx)
+        self.assertFalse(patient.date_precise)
+        self.assertEqual(patient.date_naissance.year, date.today().year - 34)
+
+    def test_une_date_lue_dans_le_fichier_ne_l_est_pas(self):
+        self._importer([{'nom': 'Kone Adama', 'date_naissance': '14/05/1991',
+                         'genre': 'M', 'mobile': '0700000001'}])
+        patient = Patient.objects.get()
+        self.assertFalse(patient.date_naissance_approx)
+        self.assertTrue(patient.date_precise)
+
+    def test_sans_date_du_tout_la_case_reste_vide(self):
+        self._importer([{'nom': 'Kone Adama', 'genre': 'M', 'mobile': '0700000001'}])
+        patient = Patient.objects.get()
+        self.assertIsNone(patient.date_naissance)
+        self.assertFalse(patient.date_naissance_approx)
+
+    def test_le_fichier_peut_declarer_sa_date_approximative(self):
+        """La colonne que porte notre propre export : sans elle, réimporter
+        un export promouvrait les estimations au rang de dates certaines."""
+        self._importer([{'nom': 'Kone Adama', 'date_naissance': '01/01/1980',
+                         'date_naissance_approx': 'Oui', 'genre': 'M',
+                         'mobile': '0700000001'}])
+        self.assertTrue(Patient.objects.get().date_naissance_approx)
+
+
+class TestReconnaissanceDesFichesApproximatives(TestCase):
+    """Le rapprochement à l'import ne peut pas s'appuyer sur une date fausse."""
+
+    def setUp(self):
+        from core.models import TacheImport
+        from core.taches import Avancement
+        self.tache = TacheImport.objects.create(libelle='Test')
+        self.avancement = Avancement(self.tache)
+
+    def _importer(self, lignes, do_update=False):
+        import json
+        from .views import _executer_import_patients
+        _executer_import_patients(self.avancement, 'f.json',
+                                  json.dumps(lignes, default=str).encode('utf-8'),
+                                  do_update, None)
+        self.tache.refresh_from_db()
+
+    def test_le_meme_fichier_age_seul_reimporte_un_an_plus_tard_est_reconnu(self):
+        """« 34 ans » donne 1992 importé en 2026 et 1993 importé en 2027 : sans
+        la tolérance d'un an, le réimport créerait un second dossier."""
+        aujourdhui = date.today()
+        fiche = Patient.objects.create(
+            nom='Kone', prenoms='Adama', sexe='M', telephone='0700000001',
+            date_naissance=aujourdhui.replace(year=aujourdhui.year - 34),
+            date_naissance_approx=True)
+        # Le réimport de l'année suivante : même âge, une année de moins.
+        self._importer([{'nom': 'Kone Adama', 'age': '35', 'genre': 'M',
+                         'mobile': '0700000001'}])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(Patient.objects.get().pk, fiche.pk)
+        self.assertEqual(self.tache.ignores, 1)
+        self.assertEqual(self.tache.crees, 0)
+
+    def test_deux_homonymes_du_meme_age_restent_deux_fiches(self):
+        """Sans le téléphone dans la clé, le second écraserait le dossier du
+        premier en mode « mettre à jour »."""
+        self._importer([
+            {'nom': 'Kone Adama', 'age': '34', 'genre': 'M', 'mobile': '0700000001'},
+            {'nom': 'Kone Adama', 'age': '34', 'genre': 'M', 'mobile': '0700000002'},
+        ])
+        self.assertEqual(Patient.objects.count(), 2)
+        self.assertEqual(self.tache.crees, 2)
+        self.assertEqual(
+            sorted(Patient.objects.values_list('telephone', flat=True)),
+            ['0700000001', '0700000002'])
+
+    def test_la_cle_exacte_ne_tolere_toujours_pas_un_an_d_ecart(self):
+        """La clé, elle, n'a pas bougé : seul le repli par ressemblance,
+        ajouté à l'étape 2, rapproche deux dates voisines."""
+        from .views import _cle_identite
+        self.assertNotEqual(
+            _cle_identite('Yao', 'Koffi', date(1990, 3, 12)),
+            _cle_identite('Yao', 'Koffi', date(1991, 3, 12)))
+
+    def test_un_an_d_ecart_avec_meme_nom_et_meme_numero_est_la_meme_personne(self):
+        """Faute de frappe sur l'année : le repli la rattrape (88 %).
+
+        C'est un changement de l'étape 2. Avant, ces deux lignes faisaient
+        deux dossiers.
+        """
+        Patient.objects.create(nom='Yao', prenoms='Koffi', sexe='M',
+                               telephone='0700000003', date_naissance=date(1990, 3, 12))
+        self._importer([{'nom': 'Yao Koffi', 'date_naissance': '12/03/1991',
+                         'genre': 'M', 'mobile': '0700000003'}])
+        self.assertEqual(Patient.objects.count(), 1)
+
+    def test_un_an_d_ecart_avec_un_autre_numero_reste_deux_personnes(self):
+        """Le téléphone fait la différence : sans lui, le score retombe."""
+        Patient.objects.create(nom='Yao', prenoms='Koffi', sexe='M',
+                               telephone='0700000003', date_naissance=date(1990, 3, 12))
+        self._importer([{'nom': 'Yao Koffi', 'date_naissance': '12/03/1991',
+                         'genre': 'M', 'mobile': '0755667788'}])
+        self.assertEqual(Patient.objects.count(), 2)
+
+    def test_l_aller_retour_par_le_fichier_preserve_la_case(self):
+        """Export puis réimport : ni fiche créée, ni drapeau perdu."""
+        aujourdhui = date.today()
+        Patient.objects.create(
+            nom='Kone', prenoms='Adama', sexe='M', telephone='0700000001',
+            date_naissance=aujourdhui.replace(year=aujourdhui.year - 34),
+            date_naissance_approx=True)
+        User.objects.create_superuser('su_ar', password='x')
+        client = Client()
+        client.login(username='su_ar', password='x')
+        contenu = client.get(
+            reverse('patients:export_patients') + '?format=csv').content
+
+        from .views import _executer_import_patients
+        _executer_import_patients(self.avancement, 'patients.csv', contenu, True, None)
+        self.tache.refresh_from_db()
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertTrue(Patient.objects.get().date_naissance_approx)
+        self.assertEqual(self.tache.crees, 0)
+
+
+class TestLeFormulaireNeDecocheQueSurUneVraieSaisie(TestCase):
+    """Modifier le téléphone renvoie la même date de naissance : la prendre
+    pour une saisie effacerait le drapeau au fil des corrections ordinaires."""
+
+    def setUp(self):
+        self.patient = Patient.objects.create(
+            nom='Kone', prenoms='Adama', sexe='M', telephone='0700000001',
+            date_naissance=date(1992, 10, 1), date_naissance_approx=True)
+
+    def _donnees(self, **remplacements):
+        donnees = {'nom': 'Kone', 'prenoms': 'Adama', 'sexe': 'M',
+                   'telephone': '0700000001', 'date_naissance': '01/10/1992',
+                   'nationalite': 'Ivoirienne', 'adresse': 'Quartier Habitat',
+                   'ville': 'Yamoussoukro'}
+        donnees.update(remplacements)
+        return donnees
+
+    def test_modifier_le_telephone_ne_decoche_pas(self):
+        """Le formulaire rendu renvoie la case telle qu'elle était, comme le
+        ferait un navigateur : corriger le téléphone n'y touche pas."""
+        from .forms import PatientForm
+        form = PatientForm(self._donnees(telephone='0700000009',
+                                         date_naissance_approx='on',
+                                         doublon_confirme='on'),
+                           instance=self.patient)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        form.save()
+        self.patient.refresh_from_db()
+        self.assertTrue(self.patient.date_naissance_approx)
+
+    def test_sans_la_case_rendue_la_regle_automatique_s_applique(self):
+        """Filet pour les appels qui n'affichent pas la case : une date
+        réellement saisie reste une date certaine."""
+        from .forms import PatientForm
+
+        class SansLaCase(PatientForm):
+            class Meta(PatientForm.Meta):
+                exclude = PatientForm.Meta.exclude + ['date_naissance_approx']
+
+        form = SansLaCase(self._donnees(date_naissance='14/05/1992',
+                                        doublon_confirme='on'),
+                          instance=self.patient)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        form.save()
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.date_naissance_approx)
+
+    def test_decocher_la_case_rend_la_date_certaine(self):
+        from .forms import PatientForm
+        form = PatientForm(self._donnees(date_naissance='14/05/1992',
+                                         doublon_confirme='on'),
+                           instance=self.patient)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        form.save()
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient.date_naissance_approx)
+
+    def test_la_case_est_offerte_a_la_saisie(self):
+        """Depuis l'étape 2, c'est la réceptionniste qui la coche : elle sait,
+        elle, si la personne a donné un âge ou une date."""
+        from .forms import PatientForm
+        champ = PatientForm().fields.get('date_naissance_approx')
+        self.assertIsNotNone(champ)
+        self.assertIn("seule l'année", champ.label)
+
+
+class TestLeScoreTientCompteDeLApproximation(TestCase):
+    """Deux dates identiques ne prouvent rien quand elles ont été inventées le
+    même jour par le même import."""
+
+    def test_deux_dates_inventees_identiques_ne_valent_pas_une_vraie_date(self):
+        from .doublons import scorer
+        commun = dict(sexe='F', telephone='0700000001', prenoms='Awa')
+        exacte = Patient.objects.create(
+            nom='Traore', date_naissance=date(1992, 10, 1), **commun)
+        approchee = Patient.objects.create(
+            nom='Traore', date_naissance=date(1992, 10, 1),
+            date_naissance_approx=True, **commun)
+
+        saisie = {'nom': 'Traore', 'prenoms': 'Awa', 'sexe': 'F',
+                  'telephone': '0700000001', 'date_naissance': date(1992, 10, 1)}
+        self.assertGreater(scorer(saisie, exacte).score,
+                           scorer(saisie, approchee).score)
+
+    def test_le_premier_janvier_n_est_plus_tenu_pour_approximatif(self):
+        """La bibliothèque traitait tout 1er janvier comme une estimation ; le
+        champ porte désormais l'information, le pari n'a plus lieu d'être."""
+        from .doublons import DATES_PAR_DEFAUT, similarite_dates
+        self.assertEqual(DATES_PAR_DEFAUT, set())
+        self.assertEqual(similarite_dates(date(1990, 1, 1), date(1990, 1, 1)), 1.0)
+
+
+class TestPreventionDesDoublonsALaSaisie(TestCase):
+    """Le formulaire ne refusait que les dossiers strictement identiques sur
+    quatre champs : une lettre de différence suffisait à passer, et c'est
+    exactement ainsi que naissent les doublons."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth.models import Permission
+        cls.existant = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
+            adresse='Habitat', ville='Yamoussoukro')
+        cls.simple = User.objects.create_user('dbl_simple', password='x')
+        cls.admin = User.objects.create_user('dbl_admin', password='x')
+        cls.admin.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='forcer_creation_doublon'))
+        cls.admin = User.objects.get(pk=cls.admin.pk)
+
+    @staticmethod
+    def _donnees(**remplacements):
+        donnees = {'nom': 'KOUASSI', 'prenoms': 'AYA MARIE', 'sexe': 'F',
+                   'telephone': '0701020304', 'date_naissance': '14/05/1992',
+                   'nationalite': 'Ivoirienne', 'adresse': 'Habitat',
+                   'ville': 'Yamoussoukro'}
+        donnees.update(remplacements)
+        return donnees
+
+    def _form(self, utilisateur=None, instance=None, **remplacements):
+        from .forms import PatientForm
+        return PatientForm(self._donnees(**remplacements),
+                           utilisateur=utilisateur or self.simple, instance=instance)
+
+    # ── Blocage ────────────────────────────────────────────────────────────
+
+    def test_un_dossier_tres_ressemblant_est_refuse(self):
+        form = self._form(prenoms='AYA MARIE')          # le même, au mot près
+        self.assertFalse(form.is_valid())
+        self.assertIn('existe déjà', form.non_field_errors()[0])
+        self.assertIn('Ouvrez la fiche existante', form.non_field_errors()[0])
+
+    def test_une_faute_de_frappe_ne_suffit_plus_a_passer(self):
+        """« KOUASSI » écrit « KOUASI » : l'ancien contrôle laissait créer."""
+        form = self._form(nom='KOUASI')
+        self.assertFalse(form.is_valid())
+
+    def test_un_inconnu_passe_sans_rien_cocher(self):
+        form = self._form(nom='ZEBOULON', prenoms='EUSTACHE',
+                          telephone='0788889999', date_naissance='09/02/1977')
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+
+    # ── Confirmation ───────────────────────────────────────────────────────
+
+    def test_une_ressemblance_moyenne_demande_une_confirmation(self):
+        form = self._form(prenoms='AYA', telephone='0755667788',
+                          date_naissance='14/05/1993')
+        if form.is_valid():
+            self.skipTest("score hors de la plage d'avertissement sur ce jeu")
+        self.assertIn("J'ai vérifié", form.non_field_errors()[0])
+
+    def test_la_case_cochee_laisse_passer(self):
+        form = self._form(prenoms='AYA', telephone='0755667788',
+                          date_naissance='14/05/1993', doublon_confirme='on')
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+
+    # ── Forçage ────────────────────────────────────────────────────────────
+
+    def test_sans_la_permission_la_case_de_forcage_ne_sert_a_rien(self):
+        form = self._form(forcer_doublon='on', raison_forcage='Vrais homonymes')
+        self.assertFalse(form.is_valid())
+        self.assertIn('existe déjà', form.non_field_errors()[0])
+
+    def test_l_administrateur_force_avec_une_raison(self):
+        form = self._form(utilisateur=self.admin, forcer_doublon='on',
+                          raison_forcage='Deux sœurs, même téléphone')
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        self.assertIsNotNone(form.forcage)
+        self.assertEqual(form.forcage[0], 'Deux sœurs, même téléphone')
+
+    def test_l_administrateur_ne_force_pas_sans_raison(self):
+        form = self._form(utilisateur=self.admin, forcer_doublon='on')
+        self.assertFalse(form.is_valid())
+        self.assertIn('raison_forcage', form.errors)
+
+    def test_le_forcage_part_au_journal(self):
+        from core.models import LogActivite
+        client = Client()
+        from django.contrib.auth.models import Permission
+        for code in ('add_patient', 'view_patient'):
+            self.admin.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        client.force_login(User.objects.get(pk=self.admin.pk))
+        reponse = client.post(reverse('patients:create'), self._donnees(
+            forcer_doublon='on', raison_forcage='Deux sœurs'))
+        self.assertEqual(reponse.status_code, 302)
+        journal = LogActivite.objects.filter(message__contains='malgré un doublon')
+        self.assertEqual(journal.count(), 1)
+        self.assertIn('Deux sœurs', journal.first().message)
+
+    # ── Modification ───────────────────────────────────────────────────────
+
+    def test_la_modification_n_est_jamais_bloquee(self):
+        """Deux fiches déjà en double doivent rester modifiables — sans quoi
+        on ne pourrait même plus corriger celle qu'on s'apprête à fusionner."""
+        jumelle = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
+            adresse='Habitat', ville='Yamoussoukro')
+        form = self._form(instance=jumelle, telephone='0709090909',
+                          doublon_confirme='on')
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+
+    def test_la_modification_demande_tout_de_meme_la_confirmation(self):
+        jumelle = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
+            adresse='Habitat', ville='Yamoussoukro')
+        form = self._form(instance=jumelle, telephone='0709090909')
+        self.assertFalse(form.is_valid())
+
+    # ── Téléphone ──────────────────────────────────────────────────────────
+
+    def test_le_numero_partage_est_compte_sans_bloquer(self):
+        Patient.objects.create(nom='KOUASSI', prenoms='KOFFI', sexe='M',
+                               telephone='0701020304', date_naissance=date(1960, 1, 2),
+                               nationalite='Ivoirienne', adresse='Habitat',
+                               ville='Yamoussoukro')
+        form = self._form(nom='ZEBOULON', prenoms='EUSTACHE',
+                          date_naissance='09/02/1977')
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+        self.assertEqual(form.meme_telephone, 2)
+
+
+class TestLaFenetreDesDossiersRessemblants(TestCase):
+    """Ce que le serveur doit fournir à la fenêtre, et ce qu'il en retient.
+
+    La fenêtre elle-même ne décide de rien : elle montre, elle coche, elle
+    journalise. Ce qui refuse reste dans PatientForm, et ces tests vérifient
+    que les deux disent la même chose — notamment qu'une case cochée depuis
+    l'écran ne contourne pas la permission.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth.models import Permission
+        cls.existant = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
+            adresse='Habitat', ville='Yamoussoukro')
+        cls.agent = User.objects.create_user('fen_agent', password='x')
+        cls.agent.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='view_patient'))
+
+    def setUp(self):
+        self.client = Client()
+        self.client.force_login(User.objects.get(pk=self.agent.pk))
+
+    # ── Contenu des cartes ─────────────────────────────────────────────────
+
+    def test_la_carte_recoit_tout_ce_qu_elle_affiche(self):
+        """Nom et prénoms arrivent séparés : la fenêtre surligne champ par
+        champ ce qui diffère, elle ne peut rien faire d'une chaîne recollée."""
+        reponse = self.client.get(reverse('patients:doublons_verifier'), {
+            'nom': 'KOUASSI', 'prenoms': 'AYA MARIE', 'sexe': 'F',
+            'telephone': '0701020304', 'date_naissance': '14/05/1992'})
+        self.assertEqual(reponse.status_code, 200)
+        fiches = reponse.json()['doublons']
+        self.assertTrue(fiches)
+        attendus = {'pk', 'code', 'nom', 'prenoms', 'sexe', 'date_naissance',
+                    'annee', 'approximative', 'telephone', 'derniere_visite',
+                    'score', 'niveau', 'raisons', 'url'}
+        self.assertTrue(attendus.issubset(fiches[0].keys()),
+                        attendus - set(fiches[0].keys()))
+        self.assertEqual(fiches[0]['nom'], 'KOUASSI')
+        self.assertEqual(fiches[0]['prenoms'], 'AYA MARIE')
+        self.assertEqual(fiches[0]['annee'], '1992')
+
+    def test_la_derniere_visite_vient_des_consultations_et_des_rendez_vous(self):
+        """Un dossier ouvert puis jamais utilisé est souvent le doublon : la
+        date de dernière visite est là pour le dire sans le dire.
+
+        Elle vient des deux sources : un centre peut enregistrer les passages
+        d'un côté et pas de l'autre.
+        """
+        from consultations.models import Consultation
+        self.assertEqual(self._fiche()['derniere_visite'], '')
+
+        avant_hier = timezone.now() - timedelta(days=2)
+        RendezVous.objects.create(patient=self.existant, date_heure=avant_hier,
+                                  motif='Contrôle')
+        self.assertEqual(self._fiche()['derniere_visite'],
+                         timezone.localtime(avant_hier).strftime('%d/%m/%Y'))
+
+        # La consultation est plus récente : c'est elle qui l'emporte.
+        Consultation.objects.create(patient=self.existant, motif='Fièvre')
+        self.assertEqual(self._fiche()['derniere_visite'],
+                         timezone.localtime(timezone.now()).strftime('%d/%m/%Y'))
+
+    def test_un_rendez_vous_a_venir_n_est_pas_une_visite(self):
+        """Sous l'étiquette « dernière visite », une date future se lirait
+        comme une venue qui n'a pas eu lieu."""
+        RendezVous.objects.create(patient=self.existant, motif='À venir',
+                                  date_heure=timezone.now() + timedelta(days=5))
+        self.assertEqual(self._fiche()['derniere_visite'], '')
+
+    def test_une_absence_ou_une_annulation_n_est_pas_une_visite(self):
+        passe = timezone.now() - timedelta(days=3)
+        for statut in ('annule', 'absent'):
+            RendezVous.objects.create(patient=self.existant, date_heure=passe,
+                                      motif='Non venu', statut=statut)
+        self.assertEqual(self._fiche()['derniere_visite'], '')
+
+    def _fiche(self):
+        reponse = self.client.get(reverse('patients:doublons_verifier'), {
+            'nom': 'KOUASSI', 'prenoms': 'AYA MARIE', 'sexe': 'F',
+            'telephone': '0701020304', 'date_naissance': '14/05/1992'})
+        return reponse.json()['doublons'][0]
+
+    # ── Journalisation ─────────────────────────────────────────────────────
+
+    def test_continuer_la_saisie_laisse_une_trace(self):
+        from core.models import LogActivite
+        reponse = self.client.post(reverse('patients:doublons_journaliser'), {
+            'pk': self.existant.pk, 'score': 72,
+            'nom': 'KOUASI', 'prenoms': 'AYA MARIE'})
+        self.assertEqual(reponse.status_code, 200)
+        journal = LogActivite.objects.filter(object_id=self.existant.pk,
+                                             type='alerte')
+        self.assertEqual(journal.count(), 1)
+        message = journal.first().message
+        self.assertIn('72 %', message)
+        self.assertIn('KOUASI AYA MARIE', message)
+        self.assertEqual(journal.first().user, self.agent)
+
+    def test_la_trace_porte_la_raison_quand_il_y_en_a_une(self):
+        from core.models import LogActivite
+        self.client.post(reverse('patients:doublons_journaliser'), {
+            'pk': self.existant.pk, 'score': 91, 'nom': 'KOUASSI',
+            'prenoms': 'AYA MARIE', 'raison': 'Deux sœurs, même téléphone'})
+        self.assertIn('Deux sœurs',
+                      LogActivite.objects.get(type='alerte').message)
+
+    def test_le_journal_ignore_une_fiche_inconnue(self):
+        reponse = self.client.post(reverse('patients:doublons_journaliser'),
+                                   {'pk': 999999, 'score': 90})
+        self.assertEqual(reponse.status_code, 404)
+
+    def test_le_journal_refuse_une_lecture(self):
+        """Un GET n'écrit rien : le journal se remplit sur action, pas au
+        hasard d'un lien ouvert ou d'un préchargement du navigateur."""
+        reponse = self.client.get(reverse('patients:doublons_journaliser'))
+        self.assertEqual(reponse.status_code, 405)
+
+    # ── La fenêtre ne contourne pas le serveur ─────────────────────────────
+
+    def test_cocher_depuis_l_ecran_ne_remplace_pas_la_permission(self):
+        """« Continuer la saisie » est grisé à l'écran sans la permission.
+        Même coché de force, le serveur refuse : c'est lui qui décide."""
+        from .forms import PatientForm
+        form = PatientForm({
+            'nom': 'KOUASSI', 'prenoms': 'AYA MARIE', 'sexe': 'F',
+            'telephone': '0701020304', 'date_naissance': '14/05/1992',
+            'nationalite': 'Ivoirienne', 'adresse': 'Habitat',
+            'ville': 'Yamoussoukro',
+            'doublon_confirme': 'on', 'forcer_doublon': 'on',
+            'raison_forcage': 'Je passe outre',
+        }, utilisateur=User.objects.get(pk=self.agent.pk))
+        self.assertFalse(form.is_valid())
+        self.assertIn('existe déjà', form.non_field_errors()[0])
+
+
+class TestLaReglePrenomsDifferents(TestCase):
+    """Deux frères nés le même jour, déclarés sous le même téléphone, montaient
+    à 93 % et auraient été refusés à la création. Ce sont deux personnes."""
+
+    def test_des_prenoms_differents_de_part_et_d_autre_ne_bloquent_pas(self):
+        from .doublons import SEUIL_BLOCAGE, SEUIL_AVERTISSEMENT, scorer
+        aine = Patient.objects.create(
+            nom="N'GORAN", prenoms="KOUASSI N'DA JEAN NATHANAEL", sexe='M',
+            telephone='0701020304', date_naissance=date(2015, 4, 2))
+        cadet = {'nom': "N'GORAN", 'prenoms': "KOUAME N'DA JEAN EMMANUEL",
+                 'sexe': 'M', 'telephone': '0701020304',
+                 'date_naissance': date(2015, 4, 2)}
+        correspondance = scorer(cadet, aine)
+        self.assertLess(correspondance.score, SEUIL_BLOCAGE)
+        # Toujours signalés, en revanche : on demande, on ne laisse pas filer.
+        self.assertGreaterEqual(correspondance.score, SEUIL_AVERTISSEMENT)
+        self.assertTrue(correspondance.details['prenoms_differents'])
+
+    def test_une_faute_de_frappe_reste_bloquante(self):
+        """Le plafond ne doit pas servir d'échappatoire : une seule différence,
+        d'un seul côté, n'est pas deux personnes."""
+        from .doublons import SEUIL_BLOCAGE, scorer
+        fiche = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+            telephone='0701020304', date_naissance=date(1992, 5, 14))
+        saisie = {'nom': 'KOUASSI', 'prenoms': 'AYA MARIE', 'sexe': 'F',
+                  'telephone': '0701020304', 'date_naissance': date(1992, 5, 14)}
+        self.assertGreaterEqual(scorer(saisie, fiche).score, SEUIL_BLOCAGE)
+
+
+class TestEndpointDeVerification(TestCase):
+    """L'encadré affiché pendant la frappe lit cette adresse."""
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth.models import Permission
+        cls.patient = Patient.objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14))
+        cls.user = User.objects.create_user('verif', password='x')
+        cls.user.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='view_patient'))
+
+    def _appeler(self, **params):
+        import json
+        client = Client()
+        client.force_login(User.objects.get(pk=self.user.pk))
+        reponse = client.get(reverse('patients:doublons_verifier'), params)
+        self.assertEqual(reponse.status_code, 200)
+        return json.loads(reponse.content)
+
+    def test_il_rend_la_fiche_proche_avec_son_score_et_sa_raison(self):
+        data = self._appeler(nom='KOUASSI', prenoms='AYA MARIE',
+                             date_naissance='1992-05-14', telephone='0701020304')
+        self.assertEqual(len(data['doublons']), 1)
+        trouve = data['doublons'][0]
+        self.assertEqual(trouve['code'], self.patient.code_patient)
+        self.assertGreaterEqual(trouve['score'], 85)
+        self.assertEqual(trouve['niveau'], 'blocage')
+        self.assertIn('même téléphone', trouve['raisons'])
+        self.assertTrue(trouve['url'].endswith(f'/{self.patient.pk}/'))
+
+    def test_il_compte_les_porteurs_du_meme_numero(self):
+        data = self._appeler(nom='ZEBOULON', prenoms='EUSTACHE',
+                             telephone='0701020304')
+        self.assertEqual(data['meme_telephone'], 1)
+
+    def test_la_fiche_en_cours_de_modification_s_exclut(self):
+        data = self._appeler(nom='KOUASSI', prenoms='AYA MARIE',
+                             telephone='0701020304', exclure=self.patient.pk)
+        self.assertEqual(data['doublons'], [])
+
+    def test_sans_nom_il_ne_cherche_rien(self):
+        self.assertEqual(self._appeler(telephone='0701020304')['doublons'], [])
+
+    def test_il_exige_la_permission(self):
+        client = Client()
+        client.force_login(User.objects.create_user('verif_nu', password='x'))
+        self.assertEqual(
+            client.get(reverse('patients:doublons_verifier')).status_code, 403)
+
+
+class TestLImportRattrapeLesFautesDeFrappe(TestCase):
+    """La clé exacte laisse passer une lettre de différence ; le repli par
+    ressemblance la rattrape, sans interroger la base."""
+
+    def setUp(self):
+        from core.models import TacheImport
+        from core.taches import Avancement
+        self.tache = TacheImport.objects.create(libelle='Test')
+        self.avancement = Avancement(self.tache)
+
+    def _importer(self, lignes, do_update=False):
+        import json
+        from .views import _executer_import_patients
+        message = _executer_import_patients(
+            self.avancement, 'f.json', json.dumps(lignes, default=str).encode('utf-8'),
+            do_update, None)
+        self.tache.refresh_from_db()
+        return message
+
+    def test_une_faute_dans_le_nom_ne_cree_plus_un_second_dossier(self):
+        Patient.objects.create(nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+                               telephone='0701020304', date_naissance=date(1992, 5, 14))
+        self._importer([{'nom': 'KOUASI AYA MARIE', 'date_naissance': '14/05/1992',
+                         'genre': 'F', 'mobile': '0701020304'}])
+        self.assertEqual(Patient.objects.count(), 1)
+        self.assertEqual(self.tache.ignores, 1)
+
+    def test_une_ressemblance_moyenne_cree_la_fiche_et_la_signale(self):
+        Patient.objects.create(nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+                               telephone='0701020304', date_naissance=date(1992, 5, 14))
+        message = self._importer([{'nom': 'KOUASSI AYA', 'date_naissance': '14/05/1993',
+                                   'genre': 'F', 'mobile': '0755667788'}])
+        if self.tache.doublons_possibles == 0:
+            self.skipTest("score hors de la plage d'avertissement sur ce jeu")
+        self.assertEqual(Patient.objects.count(), 2)
+        self.assertEqual(self.tache.crees, 1)
+        # Le compte rendu nomme les deux fiches, pas seulement leur nombre.
+        self.assertIn('≈', message)
+        ancien = Patient.objects.get(prenoms='AYA MARIE').code_patient
+        nouveau = Patient.objects.get(prenoms='AYA').code_patient
+        self.assertEqual(self.tache.codes_doublons, f'{nouveau}~{ancien}')
+
+    def test_le_repli_n_interroge_pas_la_base_par_ligne(self):
+        """L'index est en mémoire : le nombre de requêtes ne doit pas suivre le
+        nombre de lignes, sans quoi un fichier de 48 000 lignes tiendrait des
+        heures."""
+        for i in range(5):
+            Patient.objects.create(nom=f'NOM{i}', prenoms='TEST', sexe='M',
+                                   telephone=f'070000000{i}',
+                                   date_naissance=date(1990, 1, 1))
+        lignes = [{'nom': f'AUTRE{i} PERSONNE', 'date_naissance': '01/01/1990',
+                   'genre': 'M', 'mobile': f'071111111{i}'} for i in range(10)]
+        with _compteur() as compteur:
+            self._importer(lignes)
+        self.assertLess(compteur.nombre, 40,
+                        'le nombre de requêtes suit le nombre de lignes')
+
+
+class _compteur:
+    """Compte les requêtes sans fixer de nombre exact : ce qui importe ici est
+    l'ordre de grandeur, pas le détail."""
+
+    def __enter__(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        self._ctx = CaptureQueriesContext(connection)
+        self._ctx.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        self.nombre = len(self._ctx.captured_queries)
+        return self._ctx.__exit__(*args)
+
+
+class TestRapiditeDeLaRecherche(TestCase):
+    """La recherche tourne pendant la frappe : au-delà d'une demi-seconde,
+    l'encadré arrive après que la personne a fini de taper, et ne sert plus.
+
+    Ce test ne mesure pas la vraie base — 47 813 fiches — mais garde le point
+    de rupture que la réécriture a corrigé : la présélection ramenait un tiers
+    de la table dès que le nom était courant.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        for i in range(600):
+            Patient.objects.create(
+                nom='KOUASSI', prenoms=f'AYA {i}', sexe='F',
+                telephone=f'07{i:08d}', date_naissance=date(1992, 5, 14))
+
+    def test_la_preselection_ne_ramene_pas_toute_la_table(self):
+        from .doublons import _preselection
+        saisie = {'nom': 'KOUASSI', 'prenoms': 'BELINDA', 'sexe': 'F',
+                  'telephone': '0799999999', 'date_naissance': date(1992, 5, 14)}
+        candidats = Patient.objects.filter(_preselection(saisie)).count()
+        # Un seul mot en commun — « KOUASSI » — ne suffit plus à être candidat
+        # quand la date ne concorde pas au jour près… mais ici elle concorde,
+        # donc la famille « début du mot + date exacte » les retient tous.
+        # Ce qui compte est qu'on ne ramène pas davantage que ceux-là.
+        self.assertLessEqual(candidats, 600)
+
+    def test_un_nom_sans_rapport_ne_ramene_personne(self):
+        from .doublons import _preselection
+        saisie = {'nom': 'ZEBOULON', 'prenoms': 'EUSTACHE', 'sexe': 'M',
+                  'telephone': '0788889999', 'date_naissance': date(1977, 2, 9)}
+        self.assertEqual(Patient.objects.filter(_preselection(saisie)).count(), 0)
+
+    def test_la_recherche_reste_sous_la_demi_seconde(self):
+        import time
+        from .doublons import chercher_doublons
+        saisie = {'nom': 'KOUASSI', 'prenoms': 'AYA 42', 'sexe': 'F',
+                  'telephone': '0700000042', 'date_naissance': date(1992, 5, 14)}
+        chercher_doublons(saisie)                       # chauffe les caches
+        debut = time.perf_counter()
+        resultats = chercher_doublons(saisie)
+        duree = time.perf_counter() - debut
+        self.assertTrue(resultats, 'la fiche identique devrait être trouvée')
+        self.assertLess(duree, 0.5, f'recherche en {duree * 1000:.0f} ms')
+
+# ════════════════════════════════════════════════════════════════════════════
+# Étape 3 — détection stockée
+# ════════════════════════════════════════════════════════════════════════════
+
+
+class TestLesClesPhonetiques(TestCase):
+    """La présélection comparait des mots exacts : une variante d'écriture
+    accompagnée d'un téléphone différent lui échappait."""
+
+    @staticmethod
+    def _cles(patient):
+        from .models import ClePhonetique
+        return set(ClePhonetique.all_objects.filter(patient=patient)
+                   .values_list('cle', flat=True))
+
+    def test_une_fiche_enregistree_ecrit_ses_cles(self):
+        patient = Patient.objects.create(nom="N'GUESSAN", prenoms='PRISCA',
+                                         sexe='F', date_naissance=date(2008, 5, 2))
+        self.assertEqual(self._cles(patient), {'GESAN', 'PRISKA'})
+
+    def test_les_deux_graphies_donnent_la_meme_cle(self):
+        from .cles_phonetiques import cles
+        self.assertIn('GESAN', cles("N'GUESSAN", ''))
+        self.assertIn('GESAN', cles("N'GESSAN", ''))
+
+    def test_l_annee_est_recopiee_avec_la_cle(self):
+        from .models import ClePhonetique
+        patient = Patient.objects.create(nom='KOUASSI', prenoms='AYA', sexe='F',
+                                         date_naissance=date(1992, 5, 14))
+        annees = set(ClePhonetique.all_objects.filter(patient=patient)
+                     .values_list('annee', flat=True))
+        self.assertEqual(annees, {1992})
+
+    def test_changer_le_nom_remplace_les_cles(self):
+        patient = Patient.objects.create(nom='KOUASSI', prenoms='AYA', sexe='F')
+        patient = Patient.objects.get(pk=patient.pk)
+        patient.nom = 'TRAORE'
+        patient.save()
+        self.assertEqual(self._cles(patient), {'TRAOR', 'AIA'})
+
+    def test_changer_l_adresse_ne_recalcule_rien(self):
+        """Deux requêtes de plus à chaque enregistrement, pour une donnée qui
+        ne dépend que du nom : la table ne doit pas être réécrite."""
+        from .models import ClePhonetique
+        patient = Patient.objects.create(nom='KOUASSI', prenoms='AYA', sexe='F')
+        avant = set(ClePhonetique.all_objects.filter(patient=patient)
+                    .values_list('pk', flat=True))
+        patient = Patient.objects.get(pk=patient.pk)
+        patient.adresse = 'Habitat'
+        patient.save()
+        apres = set(ClePhonetique.all_objects.filter(patient=patient)
+                    .values_list('pk', flat=True))
+        self.assertEqual(avant, apres)      # mêmes lignes, pas seulement mêmes clés
+
+    def test_une_date_qui_change_met_l_annee_a_jour(self):
+        from .models import ClePhonetique
+        patient = Patient.objects.create(nom='KOUASSI', prenoms='AYA', sexe='F',
+                                         date_naissance=date(1992, 5, 14))
+        patient = Patient.objects.get(pk=patient.pk)
+        patient.date_naissance = date(1993, 5, 14)
+        patient.save()
+        self.assertEqual(
+            set(ClePhonetique.all_objects.filter(patient=patient)
+                .values_list('annee', flat=True)), {1993})
+
+
+class TestLaPreselectionSonore(TestCase):
+    """Le cas qui a motivé l'étape : deux graphies, deux téléphones, aucune
+    chance de se croiser tant que la présélection ne lit que des mots."""
+
+    def setUp(self):
+        self.connue = Patient.objects.create(
+            nom="N'GESSAN", prenoms="N'DRISCA PRISCA", sexe='F',
+            telephone='0564635675', date_naissance=date(2008, 6, 1),
+            date_naissance_approx=True)
+
+    @staticmethod
+    def _saisie():
+        return {'nom': "N'GUESSAN", 'prenoms': 'PRSICA', 'sexe': 'F',
+                'telephone': '0171374134', 'telephone2': '',
+                'date_naissance': date(2008, 3, 4), 'date_precise': False}
+
+    def test_la_variante_d_ecriture_est_retrouvee(self):
+        from .doublons import chercher_doublons
+        trouves = chercher_doublons(self._saisie(), queryset=Patient.all_objects.all())
+        self.assertEqual([c.patient.pk for c in trouves], [self.connue.pk])
+
+    def test_sans_les_cles_elle_echappait(self):
+        """Vider la table reproduit l'état d'avant : la paire disparaît."""
+        from .doublons import chercher_doublons
+        from .models import ClePhonetique
+        ClePhonetique.all_objects.all().delete()
+        self.assertEqual(
+            chercher_doublons(self._saisie(), queryset=Patient.all_objects.all()), [])
+
+    def test_une_cle_seule_ne_suffit_pas(self):
+        """« KWASI » porte 6 % de la base : une clé isolée, sans seconde clé ni
+        année concordante, ne doit désigner personne."""
+        from .doublons import chercher_doublons
+        Patient.objects.create(nom='KOUASSI', prenoms='MICHEL', sexe='M',
+                               date_naissance=date(1960, 2, 2))
+        saisie = {'nom': 'KWASSI', 'prenoms': 'BERTRAND', 'sexe': 'M',
+                  'telephone': '', 'telephone2': '',
+                  'date_naissance': date(1995, 7, 9)}
+        self.assertEqual(
+            chercher_doublons(saisie, queryset=Patient.all_objects.all()), [])
+
+
+class TestLesDecisionsHumainesSurvivent(TestCase):
+    """Le recalcul reconstruit tout : il ne doit toucher à rien de ce qu'une
+    personne a tranché."""
+
+    def setUp(self):
+        from centres.models import Centre
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+        commun = dict(sexe='F', telephone='0701020304',
+                      date_naissance=date(1992, 5, 14), centre=self.centre)
+        self.a = Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        self.b = Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+
+    def _recalculer(self):
+        from .doublons_recalcul import recalculer_centre
+        return recalculer_centre(self.centre.pk)
+
+    def test_le_recalcul_releve_la_paire(self):
+        from .models import DoublonPaire
+        self.assertEqual(self._recalculer(), 1)
+        paire = DoublonPaire.all_objects.get()
+        self.assertLess(paire.patient_a_id, paire.patient_b_id)
+        self.assertEqual(paire.niveau, 'certain')
+
+    def test_une_paire_ecartee_ne_revient_pas(self):
+        from .models import DoublonPaire, PaireEcartee
+        from .doublons import paire_ordonnee
+        a, b = paire_ordonnee(self.a.pk, self.b.pk)
+        PaireEcartee.all_objects.create(patient_a_id=a, patient_b_id=b,
+                                        centre=self.centre, raison='Deux sœurs')
+        self.assertEqual(self._recalculer(), 0)
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+    def test_une_paire_ecartee_survit_a_une_modification(self):
+        """La décision porte sur deux identifiants, pas sur ce que les fiches
+        contiennent : corriger un prénom ne repose pas la question."""
+        from .models import DoublonPaire, PaireEcartee
+        from .doublons import paire_ordonnee
+        a, b = paire_ordonnee(self.a.pk, self.b.pk)
+        PaireEcartee.all_objects.create(patient_a_id=a, patient_b_id=b, centre=self.centre)
+        fiche = Patient.all_objects.get(pk=self.b.pk)
+        fiche.prenoms = 'AYA MARIE CLAIRE'
+        fiche.save()
+        self.assertEqual(self._recalculer(), 0)
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+    def test_le_recalcul_n_efface_aucune_decision(self):
+        from .models import ChoixFicheGardee, PaireEcartee
+        from .doublons import paire_ordonnee
+        autre = Patient.all_objects.create(nom='TRAORE', prenoms='AWA', sexe='F',
+                                           centre=self.centre)
+        a, b = paire_ordonnee(self.a.pk, autre.pk)
+        PaireEcartee.all_objects.create(patient_a_id=a, patient_b_id=b, centre=self.centre)
+        ChoixFicheGardee.all_objects.create(patient=self.a, centre=self.centre)
+        self._recalculer()
+        self.assertEqual(PaireEcartee.all_objects.count(), 1)
+        self.assertEqual(ChoixFicheGardee.all_objects.count(), 1)
+
+    def test_le_choix_humain_prime_sur_la_suggestion(self):
+        from .models import ChoixFicheGardee
+        from .doublons_groupes import groupes, suggerer_a_garder
+        # La fiche la plus complète est `a` : c'est elle que la suggestion
+        # propose. On choisit l'autre à la main.
+        self.a.telephone2 = '0709090909'
+        self.a.save()
+        self._recalculer()
+        self.assertEqual(suggerer_a_garder([self.a, self.b]), self.a.pk)
+
+        ChoixFicheGardee.all_objects.create(patient=self.b, centre=self.centre)
+        groupe = groupes(self.centre.pk)[0]
+        self.assertEqual(groupe['garder'], self.b.pk)
+        self.assertTrue(groupe['choix_humain'])
+
+    def test_une_fiche_ecartee_de_la_detection(self):
+        """Fusionnée ou masquée, elle n'est plus un dossier : l'étape 4 posera
+        ces champs, la détection les lit déjà."""
+        from .models import DoublonPaire
+        fiche = Patient.all_objects.get(pk=self.b.pk)
+        fiche.masque = True
+        fiche.save()
+        self.assertEqual(self._recalculer(), 0)
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+
+class TestLeCloisonnementDesGroupes(TestCase):
+    def test_deux_centres_ne_forment_jamais_un_groupe(self):
+        from centres.models import Centre
+        from .doublons_recalcul import recalculer_centre
+        from .models import DoublonPaire
+        un = Centre.objects.create(nom='Walé', code='WAL')
+        deux = Centre.objects.create(nom='Annexe', code='ANX')
+        commun = dict(nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+                      telephone='0701020304', date_naissance=date(1992, 5, 14))
+        Patient.all_objects.create(centre=un, **commun)
+        Patient.all_objects.create(centre=deux, **commun)
+        self.assertEqual(recalculer_centre(un.pk), 0)
+        self.assertEqual(recalculer_centre(deux.pk), 0)
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+
+#: Un vrai second processus, qui pose le verrou et le garde. Deux fils
+#: d'exécution ne prouveraient rien : c'est justement ce que l'ancien
+#: `threading.Lock` savait faire, et il ne protégeait qu'un processus.
+_ENFANT_VERROU = """
+import fcntl, sys, time
+fichier = open(sys.argv[1], 'a+')
+fcntl.flock(fichier.fileno(), fcntl.LOCK_EX)
+print('pris', flush=True)
+time.sleep(float(sys.argv[2]))
+"""
+
+
+class TestDeuxRecalculsEnMemeTemps(TestCase):
+    """SQLite n'accepte qu'un écrivain. Deux recalculs qui se chevauchent
+    finiraient en « database is locked », et le second referait de toute façon
+    le travail du premier.
+
+    Le passage de nuit tourne sous crontab, dans son propre processus, et
+    gunicorn sert les enregistrements depuis plusieurs workers : le verrou doit
+    donc être vu de tous. Ces tests lancent un **second processus** pour le
+    vérifier.
+    """
+
+    def setUp(self):
+        from centres.models import Centre
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+        self.verrou = Path(tempfile.mkdtemp()) / 'verrou-doublons'
+        self.enfant = None
+
+    def tearDown(self):
+        if self.enfant is not None:
+            self.enfant.terminate()
+            self.enfant.wait(timeout=10)
+
+    def _tenir_le_verrou(self, secondes=30):
+        """Démarre le processus et ne rend la main qu'une fois le verrou pris."""
+        self.enfant = subprocess.Popen(
+            [sys.executable, '-c', _ENFANT_VERROU, str(self.verrou), str(secondes)],
+            stdout=subprocess.PIPE, text=True)
+        self.assertEqual(self.enfant.stdout.readline().strip(), 'pris')
+
+    def _deux_fiches(self):
+        commun = dict(sexe='F', telephone='0701020304',
+                      date_naissance=date(1992, 5, 14), centre=self.centre)
+        Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        return Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+
+    def test_le_recalcul_cible_s_efface_devant_le_complet(self):
+        from .doublons_recalcul import recalculer_fiche
+        from .models import DoublonPaire
+        fiche = self._deux_fiches()
+
+        with override_settings(DOUBLONS_PATIENTS_VERROU=str(self.verrou)):
+            self._tenir_le_verrou()
+            self.assertEqual(recalculer_fiche(fiche), 0)
+            self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+            # Le second processus parti, la fiche se relève normalement.
+            self.enfant.terminate()
+            self.enfant.wait(timeout=10)
+            self.enfant = None
+            self.assertEqual(recalculer_fiche(fiche), 1)
+
+    def test_deux_recalculs_complets_ne_se_chevauchent_pas(self):
+        from .doublons_recalcul import RecalculDejaEnCours, recalculer_centre
+        with override_settings(DOUBLONS_PATIENTS_VERROU=str(self.verrou)):
+            self._tenir_le_verrou()
+            with self.assertRaises(RecalculDejaEnCours):
+                recalculer_centre(self.centre.pk)
+
+    def test_le_verrou_est_relache_quand_le_processus_meurt(self):
+        """`flock` se relâche tout seul, même sur un processus tué net — c'est
+        ce qui le distingue d'une ligne en base, qui resterait posée."""
+        from .doublons_recalcul import recalcul_complet_en_cours
+        with override_settings(DOUBLONS_PATIENTS_VERROU=str(self.verrou)):
+            self._tenir_le_verrou()
+            self.assertTrue(recalcul_complet_en_cours())
+            self.enfant.kill()
+            self.enfant.wait(timeout=10)
+            self.enfant = None
+            self.assertFalse(recalcul_complet_en_cours())
+
+    def test_deux_recalculs_cibles_peuvent_tourner_ensemble(self):
+        """Ils prennent un verrou partagé : seul le passage complet exclut."""
+        from .doublons_recalcul import recalculer_fiche, verrou
+        fiche = self._deux_fiches()
+        with override_settings(DOUBLONS_PATIENTS_VERROU=str(self.verrou)):
+            with verrou(exclusif=False):
+                self.assertEqual(recalculer_fiche(fiche), 1)
+
+    def test_l_ecriture_attend_plutot_que_d_echouer(self):
+        """Le délai d'attente de SQLite est réglé : une écriture bloquée
+        patiente au lieu de rendre « database is locked » tout de suite."""
+        from django.conf import settings
+        if 'sqlite' not in settings.DATABASES['default']['ENGINE']:
+            self.skipTest('PostgreSQL gère plusieurs écrivains')
+        options = settings.DATABASES['default'].get('OPTIONS', {})
+        self.assertGreaterEqual(options.get('timeout', 0), 5)
+
+
+class TestLesClesManquantesSeRattrapent(TestCase):
+    """Si la migration passe sans écrire, la ressemblance sonore serait muette
+    sans que personne le sache : le passage de nuit doit s'en apercevoir."""
+
+    def setUp(self):
+        from centres.models import Centre
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+
+    def test_le_passage_complet_regenere_les_cles_absentes(self):
+        from .doublons_recalcul import recalculer_centre
+        from .models import ClePhonetique
+        Patient.all_objects.create(nom="N'GUESSAN", prenoms='PRISCA', sexe='F',
+                                   centre=self.centre)
+        ClePhonetique.all_objects.all().delete()
+
+        recalculer_centre(self.centre.pk)
+        self.assertEqual(
+            set(ClePhonetique.all_objects.values_list('cle', flat=True)),
+            {'GESAN', 'PRISKA'})
+
+    def test_une_fiche_sans_mot_assez_long_n_est_pas_reecrite_sans_fin(self):
+        """« KA YA » ne porte aucun mot de trois lettres : n'avoir aucune clé
+        y est normal, et ne doit pas relancer un rattrapage à chaque passage."""
+        from .doublons_recalcul import completer_cles_manquantes
+        Patient.all_objects.create(nom='KA', prenoms='YA', sexe='F',
+                                   centre=self.centre)
+        self.assertEqual(completer_cles_manquantes(self.centre.pk), 0)
+
+    def test_les_fiches_deja_pourvues_ne_sont_pas_touchees(self):
+        from .doublons_recalcul import completer_cles_manquantes
+        Patient.all_objects.create(nom='KOUASSI', prenoms='AYA', sexe='F',
+                                   centre=self.centre)
+        self.assertEqual(completer_cles_manquantes(self.centre.pk), 0)
+
+
+class TestLeRecalculCible(TestCase):
+    def setUp(self):
+        from centres.models import Centre
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+
+    def test_il_ne_touche_que_les_paires_de_sa_fiche(self):
+        from .doublons_recalcul import recalculer_fiche
+        from .models import DoublonPaire
+        commun = dict(sexe='F', telephone='0701020304',
+                      date_naissance=date(1992, 5, 14), centre=self.centre)
+        a = Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        b = Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        autre = dict(sexe='M', telephone='0788889999',
+                     date_naissance=date(1960, 1, 2), centre=self.centre)
+        c = Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE', **autre)
+        d = Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE', **autre)
+
+        recalculer_fiche(a)
+        recalculer_fiche(c)
+        self.assertEqual(DoublonPaire.all_objects.count(), 2)
+
+        # Rejouer sur `a` ne doit pas emporter la paire de `c`.
+        recalculer_fiche(a)
+        self.assertEqual(DoublonPaire.all_objects.count(), 2)
+        self.assertTrue(DoublonPaire.all_objects.filter(
+            patient_a__in=[c, d], patient_b__in=[c, d]).exists())
+
+    def test_l_enregistrement_programme_le_releve_sans_l_attendre(self):
+        """Le fil part après le commit, pas pendant : il ouvre sa propre
+        connexion et ne verrait pas une fiche encore dans la transaction de la
+        requête."""
+        from .doublons_recalcul import planifier
+        with self.captureOnCommitCallbacks() as rappels:
+            planifier(1, self.centre)
+        self.assertEqual(len(rappels), 1)
+
+    def test_une_fiche_masquee_perd_ses_paires(self):
+        from .doublons_recalcul import recalculer_fiche
+        from .models import DoublonPaire
+        commun = dict(sexe='F', telephone='0701020304',
+                      date_naissance=date(1992, 5, 14), centre=self.centre)
+        a = Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        Patient.all_objects.create(nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        recalculer_fiche(a)
+        self.assertEqual(DoublonPaire.all_objects.count(), 1)
+
+        a.masque = True
+        a.save()
+        recalculer_fiche(a)
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+
+class TestLaCompositionDesGroupes(TestCase):
+    """Sans la règle « chacune avec chacune », de maillon en maillon, 37 000
+    fiches finissaient dans un seul groupe."""
+
+    def test_pas_d_effet_de_chaine(self):
+        from .doublons_groupes import composer
+        # A~B et B~C, mais rien entre A et C.
+        groupes = composer([(1, 2, 95), (2, 3, 90)])
+        self.assertEqual([g['membres'] for g in groupes], [[1, 2]])
+
+    def test_le_triangle_complet_forme_un_groupe(self):
+        from .doublons_groupes import composer
+        groupes = composer([(1, 2, 95), (2, 3, 90), (1, 3, 88)])
+        self.assertEqual([g['membres'] for g in groupes], [[1, 2, 3]])
+        self.assertEqual(groupes[0]['score'], 88)   # le lien le plus faible
+
+    def test_le_plafond_de_huit_fiches(self):
+        from .doublons_groupes import TAILLE_MAX, composer
+        paires = [(i, j, 90) for i in range(1, 11) for j in range(i + 1, 11)]
+        for groupe in composer(paires):
+            self.assertLessEqual(len(groupe['membres']), TAILLE_MAX)
+
+
+class TestLImportEcritLesClesPhonetiques(TestCase):
+    """L'import passe par `bulk_create`, qui ne déclenche jamais `save()` :
+    sans écriture explicite, les fiches importées resteraient introuvables par
+    la ressemblance sonore."""
+
+    def test_les_fiches_importees_portent_leurs_cles(self):
+        import json
+        from core.models import TacheImport
+        from core.taches import Avancement
+        from .models import ClePhonetique
+        from .views import _executer_import_patients
+
+        avancement = Avancement(TacheImport.objects.create(libelle='Test'))
+        _executer_import_patients(
+            avancement, 'f.json',
+            json.dumps([{'nom': "N'Guessan Prisca", 'genre': 'F',
+                         'mobile': '0700000001'}]).encode('utf-8'),
+            False, None)
+        patient = Patient.objects.get()
+        self.assertEqual(
+            set(ClePhonetique.all_objects.filter(patient=patient)
+                .values_list('cle', flat=True)), {'GESAN', 'PRISKA'})

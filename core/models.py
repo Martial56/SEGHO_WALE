@@ -18,6 +18,10 @@ class LogActivite(models.Model):
         ('suppression', 'Suppression'),
         ('connexion', 'Connexion'),
         ('consultation', 'Consultation'),
+        # Posé quand on est passé outre un garde-fou : création d'un dossier
+        # malgré un doublon signalé, saisie poursuivie sur un patient proche.
+        # C'est ce type que le futur menu « Doublons » filtrera.
+        ('alerte', 'Alerte'),
     ]
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id    = models.PositiveIntegerField()
@@ -129,6 +133,12 @@ class TacheImport(models.Model):
     mis_a_jour = models.PositiveIntegerField(default=0)
     ignores = models.PositiveIntegerField(default=0)
     erreurs = models.PositiveIntegerField(default=0)
+    # Lignes créées bien qu'une fiche leur ressemble : trop proches pour être
+    # passées sous silence, trop éloignées pour être rapprochées d'office.
+    doublons_possibles = models.PositiveIntegerField(default=0)
+    codes_doublons = models.TextField(
+        blank=True, help_text="Codes des fiches créées malgré une ressemblance, "
+                              "pour qu'on puisse aller les vérifier.")
     message = models.TextField(blank=True)
     utilisateur = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     date_debut = models.DateTimeField(auto_now_add=True)

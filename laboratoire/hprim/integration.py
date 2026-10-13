@@ -121,7 +121,7 @@ _ANORMALITE_MAP = {
 }
 
 
-def integrer_oru(contenu: bytes):
+def integrer_oru(contenu: bytes, centre=None):
     """
     Analyse un message ORU et crée/complète les enregistrements de résultats.
     Retourne un dict de synthèse {patients, demandes, resultats, details}.
@@ -129,6 +129,11 @@ def integrer_oru(contenu: bytes):
     Le rapprochement se fait via :
       - 9.3.2 (id_demande) <-> DemandeExamen.numero
       - 8.3   (id_demandeur) <-> Patient.code_patient
+      - à défaut, la ressemblance (patients.doublons), au seuil de blocage
+
+    `centre` borne explicitement la recherche. `Patient.objects` s'appuie sur
+    le centre actif, une variable de fil d'exécution : la relève automatique
+    la pose bien, mais rien ne garantit qu'un autre appelant le fera.
     """
     # Imports locaux pour éviter les imports circulaires au chargement du module
     from laboratoire.models import (
@@ -136,14 +141,41 @@ def integrer_oru(contenu: bytes):
     )
     from patients.models import Patient
 
+    from patients.doublons import SEUIL_BLOCAGE, chercher_doublons
+
+    perimetre = (Patient.all_objects.filter(centre=centre) if centre is not None
+                 else Patient.objects.all())
+
     parsed = parse_message(contenu)
     synthese = {"patients": 0, "demandes": 0, "resultats": 0, "details": []}
 
     for p in parsed.patients:
-        patient_obj = Patient.objects.filter(code_patient=p.id_demandeur).first()
+        patient_obj = perimetre.filter(code_patient=p.id_demandeur).first()
         if patient_obj is None and (p.nom or p.prenom):
-            patient_obj = Patient.objects.filter(
-                nom__iexact=p.nom, prenoms__iexact=p.prenom).first()
+            # Le nom exact ne rattrapait rien : l'automate du laboratoire
+            # écrit « KOUASSI AYA » là où le dossier dit « KOUASSI AYA MARIE »,
+            # et le résultat se perdait. Le segment patient porte aussi la
+            # date de naissance, le sexe et le téléphone : de quoi décider.
+            saisie = {
+                "nom": p.nom, "prenoms": p.prenom,
+                "sexe": p.sexe if p.sexe in ("M", "F") else "",
+                "telephone": p.telephone,
+                "date_naissance": p.date_naissance.date() if p.date_naissance else None,
+            }
+            proches = chercher_doublons(saisie, seuil=SEUIL_BLOCAGE, limite=1,
+                                        queryset=perimetre)
+            if proches:
+                patient_obj = proches[0].patient
+            else:
+                # On ne rapproche pas en dessous du seuil, mais on le dit :
+                # rattacher un résultat au mauvais dossier serait pire que de
+                # le laisser en attente.
+                hesitants = chercher_doublons(saisie, limite=2, queryset=perimetre)
+                if hesitants:
+                    synthese["details"].append(
+                        f"Patient {p.nom} {p.prenom} non rapproché d'office : "
+                        + ", ".join(f"{c.patient.code_patient} ({c.score} %)"
+                                    for c in hesitants))
         synthese["patients"] += 1
 
         for d in p.demandes:

@@ -252,23 +252,102 @@ But : ne plus deviner les dates par défaut.
 - Formulaire : décocher automatiquement si l'utilisateur saisit une vraie date.
 - Tests : migration, import (date approx), score avec date approx.
 
-### Étape 2 — Prévention à la création
-Formulaire + endpoint JSON de vérification en direct + gabarit (encadré et
-cases de confirmation), règle jumeaux, présélection resserrée et chronométrée
-sur la base dev (objectif : < 300 ms par appel), import Excel et HPRIM
-branchés sur `chercher_doublons`. Tests : blocage, confirmation, admin qui
-force, modification non bloquée, jumeaux, API.
+### Étape 2 — Prévention à la création *(faite, 12/10/2026)*
+Formulaire + endpoint JSON de vérification en direct + fenêtre modale des
+dossiers ressemblants, règle « prénoms différents de part et d'autre »
+(plafond à 84 : confirmation, jamais blocage — le logiciel ne suppose rien sur
+la raison), présélection resserrée et chronométrée, import Excel et HPRIM
+branchés sur `chercher_doublons`, date de naissance obligatoire à la création
+seulement.
 
-### Étape 3 — Détection stockée
-Modèle(s) pour les paires/groupes détectés et pour les paires « pas un
-doublon » ; commande de recalcul (reprend `_cles()` / `regrouper()` du script) ;
-recalcul ciblé quand une fiche est créée ou modifiée.
+Mesures sur la base dev (47 813 fiches) :
+
+| | |
+|---|---|
+| Recherche d'un doublon à la saisie | 7 920 ms → **215 ms** |
+| Couples quasi certains (≥ 85) retrouvés par la présélection SQL | **938 / 938 — 100 %** |
+| Idem, contre l'ancien filet large, sur 2 226 fiches | **1 876 / 1 876 — 100 %** |
+| Couples « à vérifier » (65–84), contre l'ancien filet large | **1 196 / 1 214 — 98,5 %** |
+
+Les 18 couples perdus sont tous entre 65 et 70, au plancher de la bande
+« à vérifier » ; 15 situations distinctes, dont une seule vraie (voir la clé
+phonétique en étape 3).
+
+### Étape 3 — Détection stockée *(faite, 13/10/2026)*
+`ClePhonetique`, `DoublonPaire`, `PaireEcartee`, `ChoixFicheGardee` ; commande
+`recalculer_doublons` ; recalcul ciblé après chaque enregistrement. Les
+groupes ne sont pas stockés : ils se recomposent à la lecture (905 groupes en
+143 ms), ce qui évite de les réconcilier avec les décisions humaines à chaque
+passage.
+
+**Le verrou est un `flock` de fichier, pas un verrou de processus.** Le
+passage de nuit tourne sous crontab, gunicorn sert les enregistrements depuis
+plusieurs workers : un `threading.Lock` n'en protégeait qu'un. Exclusif pour
+le passage complet, partagé pour le recalcul ciblé — plusieurs ciblés peuvent
+donc tourner ensemble, aucun pendant un passage complet. `flock` se relâche
+tout seul quand le processus meurt, là où une ligne en base resterait posée
+après un arrêt brutal.
+
+Mesures sur la base dev (47 813 fiches) :
+
+| | |
+|---|---|
+| Clés phonétiques | 129 490 lignes, 2,71 par fiche |
+| Recherche à l'écran | médiane 179 ms, 9ᵉ décile 264 ms (inchangée par la clé sonore) |
+| Passage complet | 9,5 min, 939 paires certaines et 7 626 à vérifier |
+| Rattrapage des clés absentes | 55 ms quand il n'y a rien à faire |
+| Rappel | +65 paires rapprochées par la clé sonore, 0 perdue, toutes en « à vérifier » |
+
+Reste à traiter plus tard : la recherche dépasse 300 ms sur les noms très
+courants (jusqu'à 2 823 candidats présélectionnés). Le défaut est antérieur à
+la clé sonore, qui n'y change rien.
+
+**À traiter dans cette étape — clé phonétique indexée.** La présélection, en
+SQL comme en mémoire, rapproche des **mots exacts**. Une variante d'écriture
+accompagnée d'un téléphone différent passe donc à travers, alors que le score
+la reconnaîtrait : mesuré le 12/10/2026 sur la base dev,
+
+```
+70 | PAT202639804  N'GESSAN N'DRISCA PRISCA  (≈2008, F, 0564635675)
+   | PAT202641602  N'GUESSAN PRSICA          (≈2008, F, 0171374134)
+```
+
+que l'utilisateur tient pour la même personne. `cle_phonetique()` sait déjà
+rapprocher ces deux graphies — elle n'intervient qu'au scoring, trop tard,
+puisque la paire n'est jamais présentée.
+
+Le travail : un champ phonétique stocké et indexé sur `Patient`, rempli à
+l'enregistrement et par une migration de données, puis une famille de clés de
+plus dans `_preselection()` et dans `cles_blocage()`. Ensuite **refaire la
+mesure du rappel** (voir les chiffres de l'étape 2 ci-dessus) : c'est elle
+qui dira ce que la clé phonétique rattrape, et ce qu'elle coûte en candidats
+présélectionnés.
 
 ### Étape 4 — Menu « Doublons » et fusion
 Liste, écran côte à côte, actions Fusionner / Pas un doublon / Masquer,
 aperçu (« cette fusion va déplacer 3 RDV et 2 factures »), journal de fusion,
 annulation, redirection de l'ancien code. Tests : chaque FK déplacée,
 comptage, rollback en cas d'erreur, annulation, test « nouvelle FK non gérée ».
+
+**Cinq liens vers `Patient` à NE PAS déplacer lors d'une fusion.** La règle
+générale — « toute FK vers `Patient` change de propriétaire », établie par
+introspection pour que les futurs modules soient couverts d'office — ne vaut
+pas pour les tables de l'étape 3, qui parlent *de* la fiche et non de ce qui
+lui est arrivé. Les déplacer créerait des paires de la fiche gardée avec
+elle-même, et ressusciterait des décisions prises sur une fiche qui n'existe
+plus comme dossier.
+
+| Lien | Ce qu'il faut faire à la fusion |
+|---|---|
+| `ClePhonetique.patient` | Supprimer celles de la fiche absorbée. Elle sort de la détection, ses clés n'ont plus d'objet. |
+| `DoublonPaire.patient_a` / `.patient_b` | Supprimer toutes les paires qui la citent. Le relevé se refait. |
+| `PaireEcartee.patient_a` / `.patient_b` | **Reporter** sur la fiche gardée, en sautant celles qui la désigneraient elle-même, et sans écraser une paire déjà écartée. Une décision « ce n'est pas la même personne » doit survivre à la fusion. |
+| `ChoixFicheGardee.patient` | Supprimer si elle porte sur la fiche absorbée ; la fusion vient de trancher. |
+| `Patient.fusionne_dans` | Jamais déplacé. Il est le résultat de la fusion, pas une donnée rattachée. En `PROTECT` : supprimer la fiche gardée emporterait sinon l'historique de la fusion. |
+
+Le test « nouvelle FK non gérée » doit donc connaître cette liste
+d'exceptions, et échouer si une FK apparaît en dehors d'elle **et** de la
+règle générale.
 
 ### Étape 5 — Nettoyage de la base
 D'abord en simulation, puis un lot de 20 groupes vérifiés, puis le reste par lots.

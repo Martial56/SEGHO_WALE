@@ -6,14 +6,16 @@ from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from django.utils import timezone
 from core import memoire_listing, taches
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from . import origines as origines_patient
 from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
 from .utils import departements_medecine_generale_ids
+from .doublons_recalcul import planifier
 from .forms import (PatientForm, RendezVousForm, PathologieForm, TypeVisiteForm,
                     TypeVisiteCurativeForm)
 from medecins.models import Medecin
@@ -146,7 +148,8 @@ def patient_list(request):
 
 # ── Export / Import des patients ────────────────────────────────────────────
 
-_PATIENT_HDR = ['code_identifiant', 'nom', 'date_naissance', 'genre', 'mobile']
+_PATIENT_HDR = ['code_identifiant', 'nom', 'date_naissance',
+                'date_naissance_approx', 'genre', 'mobile']
 
 
 def _colonnes_patients():
@@ -157,6 +160,9 @@ def _colonnes_patients():
         Colonne('code_identifiant', 'code_patient', largeur=16),
         Colonne('nom', lambda p: f'{p.nom} {p.prenoms}'.strip(), largeur=32),
         Colonne('date_naissance', 'date_naissance', largeur=15),
+        # Sans cette colonne, réimporter notre propre export promouvrait
+        # 42 725 dates déduites d'un âge au rang de dates certaines.
+        Colonne('date_naissance_approx', 'date_naissance_approx', largeur=22),
         Colonne('genre', 'sexe', largeur=8),
         Colonne('mobile', 'telephone', largeur=16),
     ]
@@ -210,9 +216,11 @@ def patients_modele_excel(request):
         cell.fill, cell.font = fill, fnt
         cell.alignment = Alignment(horizontal='center')
     from datetime import date as _date
-    ws.append(['', 'Koné Aminata', _date(1991, 5, 14), 'F', '0708091011'])
+    ws.append(['', 'Koné Aminata', _date(1991, 5, 14), 'Non', 'F', '0708091011'])
     # Seconde ligne sans date : la colonne peut rester vide, autant le montrer.
-    ws.append(['', 'Yao Koffi', '', 'M', '0101020304'])
+    ws.append(['', 'Yao Koffi', '', '', 'M', '0101020304'])
+    # Troisième : une date dont seule l'année est sûre, déduite d'un âge.
+    ws.append(['', 'Traoré Salif', _date(1980, 1, 1), 'Oui', 'M', '0505060708'])
     for cellule in ws['C']:
         cellule.number_format = 'DD/MM/YYYY'
     for col in ws.columns:
@@ -327,7 +335,8 @@ def _parse_age_to_date(v, today):
 _LOT_IMPORT = 1000
 
 # Champs réécrits sur un patient déjà connu, quand « mettre à jour » est coché.
-_CHAMPS_PATIENT = ['nom', 'prenoms', 'sexe', 'date_naissance', 'telephone']
+_CHAMPS_PATIENT = ['nom', 'prenoms', 'sexe', 'date_naissance',
+                   'date_naissance_approx', 'telephone']
 
 _SEXES_IMPORT = {
     'm': 'M', 'masculin': 'M', 'homme': 'M', 'male': 'M',
@@ -335,18 +344,83 @@ _SEXES_IMPORT = {
 }
 
 
-def _cle_identite(nom, prenoms, date_naissance):
-    """Clé de rapprochement d'un patient dépourvu d'identifiant : même date de
-    naissance et mêmes nom/prénoms une fois la casse et les accents gommés.
+def _cle_identite(nom, prenoms, date_naissance, approx=False, telephone=''):
+    """Clé de rapprochement d'un patient dépourvu d'identifiant.
 
-    None quand la date de naissance manque : le nom seul ne suffit pas à dire
-    qu'il s'agit de la même personne, et deux homonymes fondus en un seul
-    dossier médical coûtent bien plus cher qu'un doublon. Ces lignes-là ne se
-    rapprochent donc que par leur identifiant.
+    Date exacte : la date, le nom et les prénoms, casse et accents gommés.
+
+    Date approximative — déduite d'un âge, donc fausse au jour près — la date
+    ne peut pas servir de clé : « 34 ans » donne 1992 importé en octobre 2026
+    et 1993 importé en mars 2027. On retient alors le **téléphone** et
+    l'**année**, et la lecture tolère un an d'écart (voir `_cles_a_tester`).
+    Le téléphone n'est pas un luxe : sans lui, deux homonymes du même âge
+    n'auraient plus rien qui les distingue, et en mode « mettre à jour » le
+    second écraserait le dossier du premier.
+
+    None quand il manque de quoi conclure — pas de date, ou date approximative
+    sans téléphone exploitable. Le nom seul ne dit pas qu'il s'agit de la même
+    personne, et deux homonymes fondus en un seul dossier médical coûtent bien
+    plus cher qu'un doublon. Ces lignes-là ne se rapprochent que par leur
+    identifiant.
     """
     if date_naissance is None:
         return None
-    return (date_naissance, _normalize_nom_patient(nom), _normalize_nom_patient(prenoms))
+    nom_n, prenoms_n = _normalize_nom_patient(nom), _normalize_nom_patient(prenoms)
+    if not approx:
+        return (date_naissance, nom_n, prenoms_n)
+    from .doublons import normaliser_telephone
+    tel = normaliser_telephone(telephone)
+    if not tel:
+        return None
+    return ('~', nom_n, prenoms_n, tel, date_naissance.year)
+
+
+def _cles_a_tester(cle):
+    """Les clés sous lesquelles chercher `cle` dans le relevé des fiches.
+
+    Une clé approximative est posée sur une année qui dépend du jour de
+    l'import. On regarde donc aussi l'année précédente et la suivante, en
+    commençant par la sienne pour que le résultat ne dépende pas de l'ordre du
+    fichier. Une clé exacte ne se cherche qu'à l'identique.
+    """
+    if cle is None or cle[0] != '~':
+        return (cle,)
+    marque, nom, prenoms, tel, annee = cle
+    return tuple((marque, nom, prenoms, tel, annee + ecart) for ecart in (0, -1, 1))
+
+
+class _FicheLegere:
+    """Ce que l'index de blocage a besoin de connaître d'un patient.
+
+    Charger 48 000 instances de `Patient` pour les comparer tiendrait des
+    centaines de mégaoctets ; `__slots__` ramène chaque fiche à ses huit
+    champs utiles. Les noms d'attributs sont ceux que lit `doublons.scorer`.
+    """
+
+    __slots__ = ('nom', 'prenoms', 'date_naissance', 'date_naissance_approx',
+                 'telephone', 'telephone2', 'sexe', 'code_patient')
+
+    def __init__(self, nom, prenoms, date_naissance, approx, telephone,
+                 telephone2, sexe, code_patient):
+        self.nom = nom
+        self.prenoms = prenoms
+        self.date_naissance = date_naissance
+        self.date_naissance_approx = approx
+        self.telephone = telephone
+        self.telephone2 = telephone2 or ''
+        self.sexe = sexe
+        self.code_patient = code_patient
+
+    @property
+    def date_precise(self):
+        return not self.date_naissance_approx
+
+
+def _lire_oui_non(valeur):
+    """Booléen d'un fichier : « Oui », « true », 1… Vide vaut non."""
+    if isinstance(valeur, bool):
+        return valeur
+    return str(valeur or '').strip().lower() in ('1', 'true', 'vrai', 'oui', 'yes', 'x')
 
 
 def _champs_depuis_ligne(item, today):
@@ -363,8 +437,15 @@ def _champs_depuis_ligne(item, today):
     # changement, et pour les exports d'autres logiciels qui ne donnent que lui.
     # Ni l'une ni l'autre n'est obligatoire : une ligne sans date s'importe.
     date_naissance = _parse_date_naissance(item.get('date_naissance'), today)
+    # Une date lue dans le fichier est tenue pour exacte, sauf si le fichier
+    # dit le contraire : c'est la colonne que porte notre propre export, pour
+    # qu'un aller-retour ne transforme pas une estimation en date certaine.
+    approx = _lire_oui_non(item.get('date_naissance_approx'))
     if date_naissance is None:
+        # Déduite d'un âge et du jour de l'import : fausse au jour près, et
+        # différente d'un import à l'autre. Seule l'année veut dire quelque chose.
         date_naissance = _parse_age_to_date(item.get('age'), today)
+        approx = date_naissance is not None
 
     sexe = _SEXES_IMPORT.get(_s(item.get('genre', '')).lower(), '')
     if sexe not in ('M', 'F'):
@@ -375,7 +456,9 @@ def _champs_depuis_ligne(item, today):
         return None
 
     return {'nom': nom, 'prenoms': prenoms, 'sexe': sexe,
-            'date_naissance': date_naissance, 'telephone': telephone}
+            'date_naissance': date_naissance,
+            'date_naissance_approx': approx and date_naissance is not None,
+            'telephone': telephone}
 
 
 def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centre):
@@ -391,6 +474,7 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
     """
     from django.core.files.uploadedfile import SimpleUploadedFile
     from core.numerotation import prochain_code
+    from .doublons import SEUIL_BLOCAGE, IndexBlocage
 
     avancement.etape('Lecture du fichier…')
     data, err = _parse_pathologie_upload(SimpleUploadedFile(nom_fichier, contenu))
@@ -410,12 +494,24 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
 
     par_code = {}
     par_identite = {}
-    for pk, code, nom, prenoms, naissance in deja_en_base.values_list(
-            'pk', 'code_patient', 'nom', 'prenoms', 'date_naissance').iterator(chunk_size=5000):
+    # Rapprochement par ressemblance, pour les lignes que la clé exacte ne
+    # retrouve pas : une faute de frappe dans le nom suffit à lui échapper.
+    # L'index est tenu en mémoire — interroger la base ligne à ligne coûterait
+    # des heures sur un fichier de 48 000 lignes, alors que les fiches sont
+    # déjà toutes relevées ici.
+    index = IndexBlocage()
+    par_pk = {}
+    for pk, code, nom, prenoms, naissance, approx, tel, tel2, sexe in deja_en_base.values_list(
+            'pk', 'code_patient', 'nom', 'prenoms', 'date_naissance',
+            'date_naissance_approx', 'telephone', 'telephone2', 'sexe'
+            ).iterator(chunk_size=5000):
         par_code[code] = pk
-        identite = _cle_identite(nom, prenoms, naissance)
+        identite = _cle_identite(nom, prenoms, naissance, approx, tel)
         if identite is not None:
             par_identite[identite] = pk
+        fiche = _FicheLegere(nom, prenoms, naissance, approx, tel, tel2, sexe, code)
+        index.ajouter(pk, fiche)
+        par_pk[pk] = fiche
 
     # Les codes sont uniques tous centres confondus : pour en attribuer de
     # nouveaux il faut connaître ceux de tous les centres, pas seulement ceux
@@ -439,24 +535,34 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
 
     avancement.etape('Enregistrement…')
     a_creer, a_modifier, a_modifier_avec_identifiant = [], [], []
+    # « code créé ~ code ressemblant » : le compte rendu les donne pour qu'on
+    # puisse aller voir, un nombre seul n'étant d'aucun secours.
+    codes_doublons = []
     # Un même patient figurant deux fois dans le fichier n'était rattrapé que
     # parce que la première occurrence était déjà en base au moment de lire la
     # seconde. Sans écriture immédiate, il faut s'en souvenir ici.
     identites_creees = set()
 
     def vider_les_lots():
+        # `bulk_create` et `bulk_update` ne passent pas par `save()` : les clés
+        # phonétiques doivent être écrites ici, sans quoi les fiches importées
+        # resteraient introuvables par la ressemblance sonore.
+        from .cles_phonetiques import rafraichir
         if a_creer:
             Patient.all_objects.bulk_create(a_creer, batch_size=_LOT_IMPORT)
+            rafraichir(a_creer)
             a_creer.clear()
         if a_modifier:
             Patient.all_objects.bulk_update(
                 a_modifier, _CHAMPS_PATIENT + ['date_modification'], batch_size=_LOT_IMPORT)
+            rafraichir(a_modifier)
             a_modifier.clear()
         if a_modifier_avec_identifiant:
             Patient.all_objects.bulk_update(
                 a_modifier_avec_identifiant,
                 _CHAMPS_PATIENT + ['date_modification', 'ancien_identifiant'],
                 batch_size=_LOT_IMPORT)
+            rafraichir(a_modifier_avec_identifiant)
             a_modifier_avec_identifiant.clear()
 
     for item in data:
@@ -469,9 +575,27 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
             code_identifiant = _s(item.get('code_identifiant', ''))
             pk = par_code.get(code_identifiant) if code_identifiant else None
             reconnu_par_son_code = pk is not None
-            identite = _cle_identite(champs['nom'], champs['prenoms'], champs['date_naissance'])
+            identite = _cle_identite(
+                champs['nom'], champs['prenoms'], champs['date_naissance'],
+                champs['date_naissance_approx'], champs['telephone'])
             if pk is None and identite is not None:
-                pk = par_identite.get(identite)
+                for candidate in _cles_a_tester(identite):
+                    pk = par_identite.get(candidate)
+                    if pk is not None:
+                        break
+
+            # La clé exacte n'a rien trouvé : on regarde la ressemblance.
+            # Au-delà du seuil de blocage, c'est la même personne malgré la
+            # faute de frappe. Entre les deux seuils, on crée la fiche mais on
+            # la signale : trancher à sa place rapprocherait des inconnus.
+            doublon_signale = None
+            if pk is None:
+                proche_pk, score = index.meilleur(champs)
+                if proche_pk is not None:
+                    if score >= SEUIL_BLOCAGE:
+                        pk = proche_pk
+                    else:
+                        doublon_signale = par_pk[proche_pk].code_patient
 
             if code_identifiant and not reconnu_par_son_code:
                 # Ce n'est pas un de nos propres code_patient (ex. réimport de
@@ -479,7 +603,8 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
                 # le conserve pour référence future sans l'afficher nulle part.
                 champs['ancien_identifiant'] = code_identifiant
 
-            if pk is None and identite is not None and identite in identites_creees:
+            if pk is None and identite is not None and any(
+                    c in identites_creees for c in _cles_a_tester(identite)):
                 # Doublon interne au fichier, déjà créé quelques lignes plus haut.
                 avancement.ajouter(traites=1, ignores=1)
                 continue
@@ -494,10 +619,23 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
                 else:
                     avancement.ajouter(traites=1, ignores=1)
             else:
-                a_creer.append(Patient(code_patient=code_suivant(), centre=centre, **champs))
+                nouveau = Patient(code_patient=code_suivant(), centre=centre, **champs)
+                a_creer.append(nouveau)
                 if identite is not None:
                     identites_creees.add(identite)
-                avancement.ajouter(traites=1, crees=1)
+                # La fiche entre dans l'index : deux lignes qui se ressemblent
+                # au sein du même fichier doivent se reconnaître entre elles,
+                # sans attendre d'être écrites en base.
+                fiche = _FicheLegere(
+                    champs['nom'], champs['prenoms'], champs['date_naissance'],
+                    champs['date_naissance_approx'], champs['telephone'], '',
+                    champs['sexe'], nouveau.code_patient)
+                index.ajouter(nouveau.code_patient, fiche)
+                par_pk[nouveau.code_patient] = fiche
+                if doublon_signale:
+                    codes_doublons.append(f'{nouveau.code_patient}~{doublon_signale}')
+                avancement.ajouter(traites=1, crees=1,
+                                   doublons_possibles=1 if doublon_signale else 0)
         except Exception:
             avancement.ajouter(traites=1, erreurs=1)
 
@@ -506,12 +644,22 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
             vider_les_lots()
 
     vider_les_lots()
+    # Les codes sont posés avant la dernière écriture, pour partir avec elle.
+    avancement.tache.codes_doublons = ' '.join(codes_doublons)
     avancement.enregistrer()
 
     tache = avancement.tache
     n = lambda valeur: f'{valeur:,}'.replace(',', '\u202f')  # noqa: E731 — séparateur de milliers français
-    return (f'{n(tache.crees)} patient(s) importé(s), {n(tache.mis_a_jour)} mis à jour, '
-            f'{n(tache.ignores)} ignoré(s), {n(tache.erreurs)} erreur(s).')
+    resume = (f'{n(tache.crees)} patient(s) importé(s), {n(tache.mis_a_jour)} mis à jour, '
+              f'{n(tache.ignores)} reconnu(s) (déjà en base), {n(tache.erreurs)} erreur(s).')
+    if codes_doublons:
+        # Les paires, pas seulement le nombre : « 12 doublons possibles » ne
+        # dit pas lesquels aller regarder.
+        paires = ', '.join(c.replace('~', ' ≈ ') for c in codes_doublons[:40])
+        reste = '' if len(codes_doublons) <= 40 else f' (et {len(codes_doublons) - 40} autres)'
+        resume += (f' {n(len(codes_doublons))} doublon(s) possible(s), créés malgré '
+                   f'une fiche ressemblante : {paires}{reste}.')
+    return resume
 
 
 @login_required
@@ -628,15 +776,187 @@ def patient_detail(request, pk):
 @login_required
 @permission_required('patients.add_patient', raise_exception=True)
 def patient_create(request):
+    centre = getattr(request, 'centre', None)
     if request.method == 'POST':
-        form = PatientForm(request.POST, request.FILES)
+        form = PatientForm(request.POST, request.FILES,
+                           utilisateur=request.user, centre=centre)
         if form.is_valid():
             patient = form.save()
+            _journaliser_forcage(request, patient, form)
+            planifier(patient.pk, centre)
             messages.success(request, f'Patient {patient.nom} {patient.prenoms} enregistré avec le code {patient.code_patient}.')
             return redirect('patients:list')
     else:
-        form = PatientForm()
-    return render(request, 'patients/form.html', {'form': form, 'titre': 'Nouveau patient', 'edit': False})
+        form = PatientForm(utilisateur=request.user, centre=centre)
+    return render(request, 'patients/form.html', {
+        'form': form, 'titre': 'Nouveau patient', 'edit': False,
+        'peut_forcer': form.peut_forcer(),
+        'url_verif_doublons': reverse('patients:doublons_verifier'),
+        'url_journal_doublons': reverse('patients:doublons_journaliser'),
+    })
+
+
+@login_required
+@permission_required('patients.view_patient', raise_exception=True)
+def doublons_verifier(request):
+    """Les fiches proches de ce qui est en train d'être saisi.
+
+    Appelée pendant la frappe, une demi-seconde après la dernière touche. Elle
+    ne décide de rien : elle montre, pour qu'on ouvre la fiche existante au
+    lieu d'en ouvrir une seconde. Le contrôle qui refuse est dans le
+    formulaire, à l'enregistrement.
+    """
+    from .doublons import chercher_doublons, normaliser_telephone
+
+    def lire_date(valeur):
+        for forme in ('%Y-%m-%d', '%d/%m/%Y'):
+            try:
+                return datetime.strptime(valeur, forme).date()
+            except (ValueError, TypeError):
+                continue
+        return None
+
+    saisie = {
+        'nom': (request.GET.get('nom') or '').strip(),
+        'prenoms': (request.GET.get('prenoms') or '').strip(),
+        'sexe': (request.GET.get('sexe') or '').strip(),
+        'telephone': (request.GET.get('telephone') or '').strip(),
+        'telephone2': (request.GET.get('telephone2') or '').strip(),
+        'date_naissance': lire_date(request.GET.get('date_naissance')),
+        'date_precise': request.GET.get('date_naissance_approx') not in ('1', 'true', 'on'),
+    }
+    exclure = request.GET.get('exclure') or None
+
+    # Périmètre explicite : la vue tourne dans une requête, mais le même code
+    # doit valoir ailleurs (voir PatientForm._perimetre).
+    centre = getattr(request, 'centre', None)
+    perimetre = (Patient.all_objects.filter(centre=centre) if centre is not None
+                 else Patient.all_objects.all())
+
+    correspondances = []
+    if saisie['nom'] or saisie['prenoms']:
+        correspondances = chercher_doublons(saisie, exclure_pk=exclure, queryset=perimetre)
+
+    tel = normaliser_telephone(saisie['telephone'])
+    meme_tel = 0
+    if tel:
+        qs = perimetre.filter(telephone__endswith=tel[-8:])
+        if exclure:
+            qs = qs.exclude(pk=exclure)
+        meme_tel = qs.count()
+
+    visites = _dernieres_visites([c.patient.pk for c in correspondances])
+
+    return JsonResponse({
+        'meme_telephone': meme_tel,
+        'doublons': [{
+            'pk': c.patient.pk,
+            'code': c.patient.code_patient,
+            # Nom et prénoms séparés : la fenêtre surligne champ par champ ce
+            # qui diffère de la saisie, elle ne peut pas le faire sur une
+            # chaîne déjà recollée.
+            'nom': c.patient.nom,
+            'prenoms': c.patient.prenoms,
+            'sexe': c.patient.get_sexe_display() if c.patient.sexe else '',
+            'date_naissance': (c.patient.date_naissance.strftime('%d/%m/%Y')
+                               if c.patient.date_naissance else ''),
+            'annee': (c.patient.date_naissance.strftime('%Y')
+                      if c.patient.date_naissance else ''),
+            'approximative': c.patient.date_naissance_approx,
+            'telephone': c.patient.telephone,
+            'derniere_visite': visites.get(c.patient.pk, ''),
+            'score': c.score,
+            'niveau': c.niveau,
+            'raisons': c.raisons,
+            'url': reverse('patients:detail', args=[c.patient.pk]),
+        } for c in correspondances],
+    })
+
+
+def _dernieres_visites(pks):
+    """{pk: '12/03/2026'} pour les quelques fiches proposées.
+
+    La plus récente des deux traces qu'une venue laisse : la consultation et
+    le rendez-vous. Ni l'une ni l'autre seule ne suffit — un centre peut
+    enregistrer les passages d'un côté et pas de l'autre, et la base de
+    développement n'a aucune consultation.
+
+    Les rendez-vous à venir sont écartés : sous l'étiquette « dernière
+    visite », une date future se lirait comme une venue qui n'a pas eu lieu.
+    Les annulations et les absences aussi, pour la même raison — ce sont
+    précisément les fois où le patient n'est pas venu.
+
+    Une fiche sans aucune trace est absente du résultat, et la fenêtre affiche
+    « aucune visite ». C'est en soi un indice : un dossier ouvert puis jamais
+    utilisé est souvent le doublon.
+    """
+    if not pks:
+        return {}
+    from django.db.models import Max
+    from consultations.models import Consultation
+
+    maintenant = timezone.now()
+    dates = {}
+
+    def retenir(lignes):
+        for ligne in lignes:
+            quand, pk = ligne['derniere'], ligne['patient_id']
+            if quand is not None and (pk not in dates or quand > dates[pk]):
+                dates[pk] = quand
+
+    retenir(Consultation.objects.filter(patient_id__in=pks, date_heure__lte=maintenant)
+            .values('patient_id').annotate(derniere=Max('date_heure')))
+    retenir(RendezVous.all_objects.filter(patient_id__in=pks, date_heure__lte=maintenant)
+            .exclude(statut__in=('annule', 'absent'))
+            .values('patient_id').annotate(derniere=Max('date_heure')))
+
+    return {pk: timezone.localtime(quand).strftime('%d/%m/%Y')
+            for pk, quand in dates.items()}
+
+
+@login_required
+@permission_required('patients.view_patient', raise_exception=True)
+@require_POST
+def doublons_journaliser(request):
+    """Garde la trace d'un « Continuer la saisie » sur un patient proche.
+
+    La trace est portée par la fiche existante, pas par celle qu'on est en
+    train de saisir : à cet instant la seconde n'existe pas encore, et peut
+    ne jamais exister. C'est de toute façon sur la fiche déjà en base que le
+    futur menu « Doublons » ira chercher ce qui a été passé outre.
+    """
+    patient = Patient.all_objects.filter(pk=request.POST.get('pk')).first()
+    if patient is None:
+        return JsonResponse({'journalise': False}, status=404)
+
+    score = (request.POST.get('score') or '?').strip()
+    saisie = ' '.join(((request.POST.get('nom') or '').strip(),
+                       (request.POST.get('prenoms') or '').strip())).strip()
+    raison = (request.POST.get('raison') or '').strip()
+    message = (f'Saisie poursuivie malgré la ressemblance à {score} % '
+               f'avec « {saisie or "(sans nom)"} ».')
+    if raison:
+        message += f' Raison : {raison}'
+    log_event(patient, request.user, message, type='alerte')
+    return JsonResponse({'journalise': True})
+
+
+def _journaliser_forcage(request, patient, form):
+    """Un dossier créé malgré un doublon signalé laisse une trace.
+
+    Sans elle, la permission ne servirait à rien : on saurait qu'elle existe,
+    jamais qui s'en est servi ni pourquoi.
+    """
+    if not form.forcage:
+        return
+    from core.views import log_event
+    raison, correspondance = form.forcage
+    autre = correspondance.patient
+    log_event(
+        patient, request.user,
+        f'Dossier créé malgré un doublon signalé à {correspondance.score} % '
+        f'({autre.code_patient} — {autre.nom} {autre.prenoms}). Raison : {raison}',
+        type='alerte')
 
 
 @login_required
@@ -644,21 +964,27 @@ def patient_create(request):
 def patient_edit(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
     ctx_origine = origines_patient.contexte(request)
+    centre = getattr(request, 'centre', None)
     if request.method == 'POST':
-        form = PatientForm(request.POST, request.FILES, instance=patient)
+        form = PatientForm(request.POST, request.FILES, instance=patient,
+                           utilisateur=request.user, centre=centre)
         if form.is_valid():
             form.save()
+            planifier(patient.pk, centre)
             messages.success(request, 'Dossier patient mis à jour.')
             # Enregistrer ramène à la fiche d'où l'on venait, provenance comprise.
             return redirect(reverse('patients:detail', args=[patient.pk])
                             + ctx_origine['origine_qs'])
     else:
-        form = PatientForm(instance=patient)
+        form = PatientForm(instance=patient, utilisateur=request.user, centre=centre)
     return render(request, 'patients/form.html', {
         'form': form,
         'patient': patient,
         'titre': f'Modifier — {patient.nom} {patient.prenoms}',
         'edit': True,
+        'peut_forcer': form.peut_forcer(),
+        'url_verif_doublons': reverse('patients:doublons_verifier'),
+        'url_journal_doublons': reverse('patients:doublons_journaliser'),
         **ctx_origine,
     })
 

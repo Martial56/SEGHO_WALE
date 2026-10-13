@@ -114,15 +114,51 @@ class PatientForm(forms.ModelForm):
                 'data-photo-input': 'patient',
                 'style': 'display:none',
             }),
+            'date_naissance_approx': forms.CheckboxInput(attrs={
+                'class': 'o-check', 'id': 'id_date_naissance_approx',
+            }),
+        }
+        labels = {
+            'date_naissance_approx': 'Date approximative (seule l\'année est connue)',
         }
 
-    def __init__(self, *args, **kwargs):
+    # ── Garde-fou contre les doublons ──────────────────────────────────────
+    # Ces trois champs ne sont pas dans le modèle : ils ne servent qu'à
+    # recueillir ce que la personne affirme au moment d'enregistrer.
+    doublon_confirme = forms.BooleanField(
+        required=False, label="J'ai vérifié, c'est une autre personne",
+        widget=forms.CheckboxInput(attrs={'class': 'o-check'}))
+    forcer_doublon = forms.BooleanField(
+        required=False, label='Créer malgré le dossier existant',
+        widget=forms.CheckboxInput(attrs={'class': 'o-check'}))
+    raison_forcage = forms.CharField(
+        required=False, label='Raison',
+        widget=forms.TextInput(attrs={
+            'class': _ul, 'placeholder': 'Ex. : deux sœurs, même téléphone'}))
+
+    def __init__(self, *args, utilisateur=None, centre=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.utilisateur = utilisateur
+        self.centre = centre
+        #: Rempli par `clean` : ce que l'écran doit montrer après coup.
+        self.doublons = []
+        self.meme_telephone = 0
+        #: (raison, fiche) quand un administrateur est passé outre — la vue le
+        #: porte au journal, le formulaire n'écrit pas dans LogActivite.
+        self.forcage = None
         self.fields['assurance'].queryset = Assurance.objects.filter(actif=True)
         self.fields['assurance'].empty_label = '— Aucune assurance —'
         self.fields['nationalite'].initial = 'Ivoirienne'
         self.fields['ville'].initial = 'Yamoussoukro'
         self.fields['adresse'].required = True
+        # La date de naissance n'est obligatoire qu'à la création. C'est elle
+        # qui sépare deux homonymes ; sans elle la recherche de doublons ne
+        # tient plus qu'au téléphone, souvent partagé en famille. En
+        # modification on ne l'exige pas : des dizaines de milliers de fiches
+        # importées n'en portent pas, et exiger ici une information que
+        # personne n'a interdirait de corriger leur adresse ou leur téléphone.
+        # L'import ne passe pas par ce formulaire : elle y reste facultative.
+        self.fields['date_naissance'].required = not (self.instance and self.instance.pk)
         for field in self.fields.values():
             field.error_messages = {
                 'required': 'Ce champ est obligatoire.',
@@ -185,30 +221,117 @@ class PatientForm(forms.ModelForm):
         date_naissance = cleaned.get('date_naissance')
         telephone      = (cleaned.get('telephone') or '').strip()
 
-        # La date de naissance étant facultative, le garde-fou ne peut plus
-        # s'appuyer dessus seul : sans elle, il se rabat sur nom + prénoms +
-        # téléphone. Exiger les quatre revenait à ne plus rien contrôler dès
-        # qu'une date manquait — c'est-à-dire là où le doublon est le plus
-        # probable, puisque c'est le dossier saisi dans l'urgence.
-        if nom and prenoms and telephone:
-            qs = Patient.objects.filter(
-                nom__iexact=nom,
-                prenoms__iexact=prenoms,
-                date_naissance=date_naissance,
-                telephone=telephone,
-            )
-            if self.instance and self.instance.pk:
-                qs = qs.exclude(pk=self.instance.pk)
-            doublon = qs.first()
-            if doublon:
-                ne_le = (f', né(e) le {doublon.date_naissance.strftime("%d/%m/%Y")}'
-                         if doublon.date_naissance else '')
-                raise forms.ValidationError(
-                    f'Un dossier patient identique existe déjà : {doublon.code_patient} — '
-                    f'{doublon.nom} {doublon.prenoms}{ne_le}, '
-                    f'tél. {doublon.telephone}.'
-                )
+        # Le contrôle ne cherchait qu'une fiche strictement identique sur les
+        # quatre champs : une lettre de différence dans le prénom suffisait à
+        # passer, et c'est précisément ainsi que naissent les doublons. Il
+        # passe désormais par `patients.doublons`, qui mesure la ressemblance.
+        self.doublons = self._chercher_doublons(nom, prenoms, date_naissance, telephone)
+        self.meme_telephone = self._compter_meme_telephone(telephone)
+        self._appliquer_garde_fou(cleaned)
         return cleaned
+
+    # ── Doublons ───────────────────────────────────────────────────────────
+
+    def _perimetre(self):
+        """Toujours un périmètre explicite : `Patient.objects` s'appuie sur le
+        centre actif, qui n'existe pas hors requête (commande, tâche de fond)."""
+        if self.centre is not None:
+            return Patient.all_objects.filter(centre=self.centre)
+        if self.instance and self.instance.centre_id:
+            return Patient.all_objects.filter(centre_id=self.instance.centre_id)
+        return Patient.all_objects.all()
+
+    def _chercher_doublons(self, nom, prenoms, date_naissance, telephone):
+        if not (nom or prenoms):
+            return []
+        from .doublons import chercher_doublons
+        saisie = {
+            'nom': nom, 'prenoms': prenoms, 'date_naissance': date_naissance,
+            'sexe': self.cleaned_data.get('sexe'),
+            'telephone': telephone,
+            'telephone2': (self.cleaned_data.get('telephone2') or '').strip(),
+            'date_precise': not self.cleaned_data.get('date_naissance_approx'),
+        }
+        return chercher_doublons(saisie, exclure_pk=self.instance.pk if self.instance else None,
+                                 queryset=self._perimetre())
+
+    def _compter_meme_telephone(self, telephone):
+        """Pour information seulement : un numéro partagé est courant dans une
+        famille, il ne prouve rien et ne doit donc jamais bloquer."""
+        from .doublons import normaliser_telephone
+        tel = normaliser_telephone(telephone)
+        if not tel:
+            return 0
+        qs = self._perimetre().filter(telephone__endswith=tel[-8:])
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        return qs.count()
+
+    def peut_forcer(self):
+        return bool(self.utilisateur
+                    and self.utilisateur.has_perm('patients.forcer_creation_doublon'))
+
+    def _appliquer_garde_fou(self, cleaned):
+        """Refuse, demande confirmation, ou laisse passer.
+
+        En modification, jamais de refus : deux fiches déjà en double doivent
+        rester modifiables, sans quoi on ne pourrait même plus corriger celle
+        qu'on s'apprête à fusionner.
+        """
+        from .doublons import SEUIL_BLOCAGE
+
+        if not self.doublons:
+            return
+        edition = bool(self.instance and self.instance.pk)
+        bloquants = [c for c in self.doublons if c.score >= SEUIL_BLOCAGE]
+
+        if bloquants and not edition:
+            if not self.peut_forcer():
+                raise forms.ValidationError(self._message_blocage(bloquants[0]))
+            if not cleaned.get('forcer_doublon'):
+                raise forms.ValidationError(self._message_blocage(bloquants[0]))
+            raison = (cleaned.get('raison_forcage') or '').strip()
+            if not raison:
+                self.add_error('raison_forcage',
+                               'Indiquez pourquoi ce dossier doit être créé malgré tout.')
+                return
+            self.forcage = (raison, bloquants[0])
+            return
+
+        if not cleaned.get('doublon_confirme'):
+            proche = self.doublons[0]
+            raise forms.ValidationError(
+                f'Un dossier ressemblant existe déjà : {self._decrire(proche)}. '
+                "Cochez « J'ai vérifié, c'est une autre personne » pour continuer.")
+
+    def _message_blocage(self, correspondance):
+        return (f'Ce dossier existe déjà : {self._decrire(correspondance)}. '
+                'Ouvrez la fiche existante plutôt que d\'en créer une seconde.')
+
+    @staticmethod
+    def _decrire(correspondance):
+        p = correspondance.patient
+        ne_le = (f', né(e) le {p.date_naissance.strftime("%d/%m/%Y")}'
+                 if p.date_naissance else '')
+        raisons = ', '.join(correspondance.raisons)
+        return (f'{p.code_patient} — {p.nom} {p.prenoms}{ne_le}, tél. {p.telephone} '
+                f'({correspondance.score} % : {raisons})')
+
+    def save(self, commit=True):
+        """La case « date approximative » fait foi quand elle est affichée.
+
+        Elle l'est depuis l'étape 2 : la personne qui ouvre le dossier voit
+        l'état et le corrige. Le formulaire rendu la renvoie cochée, modifier
+        le téléphone ne l'efface donc pas.
+
+        La règle automatique de l'étape 1 ne sert plus que de filet pour les
+        appels où la case n'est pas rendue : une date saisie à la main est une
+        date certaine, mais seulement si le champ a réellement changé.
+        """
+        if ('date_naissance_approx' not in self.fields
+                and 'date_naissance' in self.changed_data):
+            self.instance.date_naissance_approx = False
+        return super().save(commit=commit)
 
 
 class RendezVousForm(forms.ModelForm):
