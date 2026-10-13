@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views
+from . import doublons_vues, views
 
 app_name = 'patients'
 
@@ -46,6 +46,25 @@ urlpatterns = [
     path('<int:pk>/examens-resultats/', views.patient_resultat_examens_list, name='resultat_examens_list'),
     path('doublons/verifier/', views.doublons_verifier, name='doublons_verifier'),
     path('doublons/journaliser/', views.doublons_journaliser, name='doublons_journaliser'),
+    # ── L'écran des doublons (étape 4a) ──────────────────────────────────
+    # Les adresses fixes d'abord : `<str:cle>` attrape n'importe quel segment,
+    # et prendrait « journaliser » pour un groupe à comparer.
+    path('doublons/', doublons_vues.doublons_liste, name='doublons_liste'),
+    path('doublons/journal/', doublons_vues.doublons_journal, name='doublons_journal'),
+    path('doublons/recalculer/', doublons_vues.doublons_recalculer,
+         name='doublons_recalculer'),
+    path('doublons/reafficher/<int:pk>/', doublons_vues.doublons_reafficher,
+         name='doublons_reafficher'),
+    path('doublons/<str:cle>/', doublons_vues.doublons_comparer,
+         name='doublons_comparer'),
+    path('doublons/<str:cle>/ecarter/', doublons_vues.doublons_ecarter,
+         name='doublons_ecarter'),
+    path('doublons/<str:cle>/reprendre/', doublons_vues.doublons_reprendre,
+         name='doublons_reprendre'),
+    path('doublons/<str:cle>/garder/<int:pk>/', doublons_vues.doublons_garder,
+         name='doublons_garder'),
+    path('doublons/<str:cle>/masquer/<int:pk>/', doublons_vues.doublons_masquer,
+         name='doublons_masquer'),
     path('export/', views.export_patients, name='export_patients'),
     path('import/', views.import_patients, name='import_patients'),
     path('import/modele/', views.patients_modele_excel, name='patients_modele'),

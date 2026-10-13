@@ -1908,7 +1908,14 @@ def post_note(request):
     return redirect(next_url)
 
 
-def log_event(instance, user, message, type='note', duree_secondes=None, module=None):
+def log_event(instance, user, message, type='note', duree_secondes=None, module=None,
+              code=''):
+    """`code` : un repère technique stable (ex. « doublon.forcage »).
+
+    Le message est écrit pour être lu ; il se reformule. Un écran qui veut
+    retrouver une famille d'événements doit s'appuyer sur le code, jamais sur
+    le texte.
+    """
     from django.contrib.contenttypes.models import ContentType
     from core.middleware import get_current_ip
     from core.models import LogActivite
@@ -1919,6 +1926,7 @@ def log_event(instance, user, message, type='note', duree_secondes=None, module=
         user=user if user and user.is_authenticated else None,
         message=message,
         type=type,
+        code=code,
         ip_address=get_current_ip(),
         duree_secondes=duree_secondes,
         module=module if module else ct.app_label,

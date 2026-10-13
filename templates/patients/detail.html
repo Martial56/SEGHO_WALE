@@ -337,6 +337,28 @@ une patiente. Voir patients/origines.py.
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
+{% if patient.masque or patient.fusionne_dans %}
+{% comment %}
+Cette fiche n'apparaît plus nulle part ailleurs : ni dans la liste, ni dans la
+recherche, ni dans les listes de choix. Celui qui arrive ici par un ancien lien
+doit comprendre pourquoi, et où aller.
+{% endcomment %}
+<div style="background:rgba(var(--amber-rgb),.16); border-radius:8px;
+            padding:12px 16px; margin:12px 0; font-size:13.5px;
+            display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+  <i class="bi bi-eye-slash-fill"></i>
+  <span>
+    {% if patient.fusionne_dans %}Fiche fusionnée{% else %}Fiche masquée{% endif %}
+    {% if patient.remplacee_par %}
+      — doublon de <strong>{{ patient.remplacee_par.code_patient }}</strong>
+    {% endif %}
+  </span>
+  {% if patient.remplacee_par %}
+  <a href="{% url 'patients:detail' patient.remplacee_par.pk %}"
+     style="margin-left:auto;">Ouvrir la fiche gardée →</a>
+  {% endif %}
+</div>
+{% endif %}
 <!-- ══ Subheader ══ -->
 <div class="o-subheader">
   <div class="o-subheader-row">

@@ -2506,7 +2506,7 @@ class TestLesDecisionsHumainesSurvivent(TestCase):
 
     def test_le_choix_humain_prime_sur_la_suggestion(self):
         from .models import ChoixFicheGardee
-        from .doublons_groupes import groupes, suggerer_a_garder
+        from .doublons_groupes import garnir, index, suggerer_a_garder
         # La fiche la plus complète est `a` : c'est elle que la suggestion
         # propose. On choisit l'autre à la main.
         self.a.telephone2 = '0709090909'
@@ -2515,7 +2515,7 @@ class TestLesDecisionsHumainesSurvivent(TestCase):
         self.assertEqual(suggerer_a_garder([self.a, self.b]), self.a.pk)
 
         ChoixFicheGardee.all_objects.create(patient=self.b, centre=self.centre)
-        groupe = groupes(self.centre.pk)[0]
+        groupe = garnir(index(self.centre.pk))[0]
         self.assertEqual(groupe['garder'], self.b.pk)
         self.assertTrue(groupe['choix_humain'])
 
@@ -2778,3 +2778,694 @@ class TestLImportEcritLesClesPhonetiques(TestCase):
         self.assertEqual(
             set(ClePhonetique.all_objects.filter(patient=patient)
                 .values_list('cle', flat=True)), {'GESAN', 'PRISKA'})
+
+# ════════════════════════════════════════════════════════════════════════════
+# Étape 4a — le menu « Doublons »
+# ════════════════════════════════════════════════════════════════════════════
+
+
+class BaseDoublons(TestCase):
+    """Deux fiches jumelles dans un centre, et un compte qui sait les traiter."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+        from centres.models import Centre
+        from .doublons_recalcul import recalculer_centre
+
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+        commun = dict(sexe='F', telephone='0701020304',
+                      date_naissance=date(1992, 5, 14), centre=self.centre,
+                      nationalite='Ivoirienne', ville='Yamoussoukro')
+        self.gardee = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', telephone2='0709090909', **commun)
+        self.doublon = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', **commun)
+        recalculer_centre(self.centre.pk)
+
+        self.agent = User.objects.create_user('dbl_agent', password='x')
+        for code in ('view_patient', 'gerer_doublons'):
+            self.agent.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.agent = User.objects.get(pk=self.agent.pk)
+        self.client = Client()
+        self.client.force_login(self.agent)
+
+    @property
+    def cle(self):
+        from .doublons_groupes import cle_groupe
+        return cle_groupe([self.gardee.pk, self.doublon.pk])
+
+
+class TestLAccesALEcranDesDoublons(BaseDoublons):
+    def test_la_liste_est_refusee_sans_la_permission(self):
+        simple = User.objects.create_user('dbl_sans', password='x')
+        client = Client()
+        client.force_login(simple)
+        self.assertEqual(
+            client.get(reverse('patients:doublons_liste')).status_code, 403)
+
+    def test_la_liste_s_ouvre_avec_la_permission(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, self.gardee.code_patient)
+
+    def test_le_filtre_par_defaut_est_quasi_certain(self):
+        """Les 905 cas sûrs d'abord ; les 7 600 « à vérifier » viennent après."""
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(reponse.context['niveau'], 'certain')
+
+    def test_la_recherche_porte_sur_le_nom_et_sur_le_code(self):
+        url = reverse('patients:doublons_liste')
+        self.assertEqual(len(self.client.get(url, {'q': 'kouassi'}).context['groupes']), 1)
+        self.assertEqual(
+            len(self.client.get(url, {'q': self.gardee.code_patient}).context['groupes']), 1)
+        self.assertEqual(len(self.client.get(url, {'q': 'zeboulon'}).context['groupes']), 0)
+
+
+class TestLesComptesDeDonneesRattachees(BaseDoublons):
+    def test_les_comptes_sont_affiches_par_fiche(self):
+        from .liens_patient import comptes
+        RendezVous.objects.create(patient=self.gardee, motif='Contrôle',
+                                  date_heure=timezone.now())
+        resultat = comptes([self.gardee.pk, self.doublon.pk])
+        self.assertEqual(resultat[self.gardee.pk], {'Rendez-vous': 1})
+        self.assertEqual(resultat[self.doublon.pk], {})
+
+    def test_le_libelle_s_accorde_au_nombre(self):
+        """« 1 factures » se lit mal, et retirer le « s » final ne suffit pas
+        pour « demandes d'examen »."""
+        from facturation.models import Facture
+        from .liens_patient import comptes
+        Facture.objects.create(patient=self.gardee, montant_total=1000)
+        self.assertIn('Facture', comptes([self.gardee.pk])[self.gardee.pk])
+        Facture.objects.create(patient=self.gardee, montant_total=2000)
+        self.assertIn('Factures', comptes([self.gardee.pk])[self.gardee.pk])
+
+    def test_la_suggestion_prefere_la_fiche_qui_porte_des_donnees(self):
+        """Garder celle qui porte trois rendez-vous, c'est trois lignes de
+        moins à déplacer le jour de la fusion."""
+        from .doublons_groupes import suggerer_a_garder
+        from .liens_patient import comptes
+        # `self.gardee` a un second téléphone : sans les données rattachées,
+        # c'est elle que la complétude désigne.
+        self.assertEqual(suggerer_a_garder([self.gardee, self.doublon]), self.gardee.pk)
+        RendezVous.objects.create(patient=self.doublon, motif='Contrôle',
+                                  date_heure=timezone.now())
+        rattachees = comptes([self.gardee.pk, self.doublon.pk])
+        self.assertEqual(
+            suggerer_a_garder([self.gardee, self.doublon], rattachees), self.doublon.pk)
+
+    def test_une_requete_par_table_et_non_par_fiche(self):
+        from .liens_patient import comptes, liens
+        with self.assertNumQueries(len(liens())):
+            comptes([self.gardee.pk, self.doublon.pk])
+
+    def test_les_tables_internes_ne_comptent_pas(self):
+        """Clés phonétiques et paires de doublons parlent *de* la fiche : les
+        compter ferait passer toute fiche pour pleine de données."""
+        from .liens_patient import LIENS_INTERNES, liens
+        internes = {(m._meta.app_label, m.__name__) for m, _, _ in liens()}
+        self.assertFalse(internes & LIENS_INTERNES)
+
+
+class TestNouveauLienVersPatient(TestCase):
+    """Si un module ajoute une table liée au patient, la fusion devra la
+    déplacer. Ce test échoue tant que personne ne l'a rangée quelque part."""
+
+    #: Les 13 liens métier connus au 13/10/2026.
+    CONNUS = {
+        ('consultations', 'Consultation'), ('consultations', 'Ordonnance'),
+        ('facturation', 'Facture'), ('hospitalisation', 'Hospitalisation'),
+        ('hospitalisation', 'RegistreDeces'), ('laboratoire', 'AnalyseLaboratoire'),
+        ('laboratoire', 'DemandeExamen'), ('laboratoire', 'ExamenImagerie'),
+        ('patients', 'Naissance'), ('patients', 'RendezVous'),
+        ('pharmacie', 'VentePharmacie'), ('soins', 'ProcedureSoin'),
+        ('soins', 'Soin'),
+    }
+
+    def test_aucun_lien_inconnu(self):
+        from .liens_patient import liens
+        trouves = {(m._meta.app_label, m.__name__) for m, _, _ in liens()}
+        nouveaux = trouves - self.CONNUS
+        self.assertFalse(
+            nouveaux,
+            f'Nouvelles tables liées à Patient : {nouveaux}. '
+            'Décidez ce que la fusion doit en faire, puis ajoutez-les ici '
+            '(ou dans LIENS_INTERNES si elles relèvent du mécanisme des doublons).')
+
+    def test_le_lien_generique_du_journal_est_connu(self):
+        """`LogActivite` vise n'importe quel objet : l'introspection par clé
+        étrangère ne le voit pas, la fusion devra le traiter à part."""
+        from django.apps import apps
+        from django.contrib.contenttypes.fields import GenericForeignKey
+        generiques = {(m._meta.app_label, m.__name__) for m in apps.get_models()
+                      for f in m._meta.private_fields
+                      if isinstance(f, GenericForeignKey)}
+        self.assertEqual(generiques, {('core', 'LogActivite')})
+
+
+class TestPasUnDoublon(BaseDoublons):
+    def test_la_paire_quitte_la_liste(self):
+        from .models import PaireEcartee
+        reponse = self.client.post(
+            reverse('patients:doublons_ecarter', args=[self.cle]),
+            {'raison': 'Deux sœurs'}, follow=True)
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(PaireEcartee.all_objects.count(), 1)
+        self.assertEqual(PaireEcartee.all_objects.get().raison, 'Deux sœurs')
+        self.assertEqual(
+            len(self.client.get(reverse('patients:doublons_liste')).context['groupes']), 0)
+
+    def _un_second_groupe(self):
+        """Pour que la table ne se vide pas : sans lui, le relevé tomberait à
+        zéro et le cache se contournerait tout seul, sans rien prouver."""
+        from .doublons_recalcul import recalculer_centre
+        commun = dict(sexe='M', telephone='0788889999',
+                      date_naissance=date(1960, 1, 2), centre=self.centre)
+        Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE', **commun)
+        Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE', **commun)
+        recalculer_centre(self.centre.pk)
+
+    def test_le_groupe_traite_quitte_la_liste_tout_de_suite(self):
+        """Le relevé est mis en cache : si sa clé ne tenait qu'à la date du
+        dernier calcul, un groupe qu'on vient d'écarter resterait affiché —
+        les autres paires gardent la même date."""
+        self._un_second_groupe()
+        url = reverse('patients:doublons_liste')
+        self.assertEqual(len(self.client.get(url).context['groupes']), 2)
+        self.client.post(reverse('patients:doublons_ecarter', args=[self.cle]), {})
+        groupes = self.client.get(url).context['groupes']
+        self.assertEqual(len(groupes), 1)
+        self.assertNotIn(self.gardee.pk, groupes[0]['membres'])
+
+    def test_une_fiche_masquee_quitte_la_liste_tout_de_suite(self):
+        self._un_second_groupe()
+        url = reverse('patients:doublons_liste')
+        self.assertEqual(len(self.client.get(url).context['groupes']), 2)
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.assertEqual(len(self.client.get(url).context['groupes']), 1)
+
+    def test_elle_ne_revient_pas_apres_un_recalcul(self):
+        from .doublons_recalcul import recalculer_centre
+        self.client.post(reverse('patients:doublons_ecarter', args=[self.cle]), {})
+        self.assertEqual(recalculer_centre(self.centre.pk), 0)
+
+    def test_l_annulation_la_ramene(self):
+        from .models import DoublonPaire, PaireEcartee
+        self.client.post(reverse('patients:doublons_ecarter', args=[self.cle]), {})
+        self.client.post(reverse('patients:doublons_reprendre', args=[self.cle]), {})
+        self.assertEqual(PaireEcartee.all_objects.count(), 0)
+        # Reprise tout de suite : on n'attend pas le passage de nuit.
+        self.assertEqual(DoublonPaire.all_objects.count(), 1)
+
+
+class TestMasquerUneFiche(BaseDoublons):
+    def _masquer(self, fiche, au_profit_de):
+        return self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, fiche.pk]),
+            {'au_profit_de': au_profit_de.pk}, follow=True)
+
+    def test_une_fiche_vide_se_masque_au_profit_d_une_autre(self):
+        self._masquer(self.doublon, self.gardee)
+        fiche = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertTrue(fiche.masque)
+        self.assertEqual(fiche.doublon_de_id, self.gardee.pk)
+        self.assertEqual(fiche.remplacee_par, self.gardee)
+
+    def test_une_fiche_avec_des_donnees_est_refusee_cote_serveur(self):
+        """Le bouton grisé ne suffit pas : une requête forgée ne doit pas
+        pouvoir faire disparaître un dossier qui porte des rendez-vous."""
+        RendezVous.objects.create(patient=self.doublon, motif='Contrôle',
+                                  date_heure=timezone.now())
+        reponse = self._masquer(self.doublon, self.gardee)
+        self.assertFalse(Patient.all_objects.get(pk=self.doublon.pk).masque)
+        self.assertContains(reponse, 'il faut la fusionner')
+
+    def test_une_fiche_masquee_disparait_partout(self):
+        self._masquer(self.doublon, self.gardee)
+        self.assertNotIn(self.doublon.pk,
+                         Patient.all_objects.filter(masque=False).values_list('pk', flat=True))
+        # Le gestionnaire par défaut l'écarte : liste, recherche, listes de choix.
+        from core.middleware import centre_actif
+        with centre_actif(self.centre):
+            self.assertEqual(Patient.objects.filter(pk=self.doublon.pk).count(), 0)
+            self.assertEqual(Patient.objects.filter(pk=self.gardee.pk).count(), 1)
+
+    def test_elle_reste_accessible_par_son_adresse_avec_la_permission(self):
+        self._masquer(self.doublon, self.gardee)
+        reponse = self.client.get(reverse('patients:detail', args=[self.doublon.pk]))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, 'Fiche masquée')
+        self.assertContains(reponse, self.gardee.code_patient)
+
+    def test_elle_est_introuvable_sans_la_permission(self):
+        from django.contrib.auth.models import Permission
+        self._masquer(self.doublon, self.gardee)
+        simple = User.objects.create_user('dbl_lecteur', password='x')
+        simple.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='view_patient'))
+        client = Client()
+        client.force_login(User.objects.get(pk=simple.pk))
+        self.assertEqual(
+            client.get(reverse('patients:detail', args=[self.doublon.pk])).status_code, 404)
+
+    def test_l_annulation_la_rend_a_la_liste(self):
+        self._masquer(self.doublon, self.gardee)
+        self.client.post(reverse('patients:doublons_reafficher', args=[self.doublon.pk]), {})
+        fiche = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertFalse(fiche.masque)
+        self.assertIsNone(fiche.doublon_de_id)
+
+    def test_l_avertissement_sur_les_informations_en_plus(self):
+        """Une fiche sans rendez-vous peut tout de même porter des allergies
+        que l'autre n'a pas : les perdre serait silencieux."""
+        from .liens_patient import champs_en_plus
+        self.doublon.allergies = 'Pénicilline'
+        self.doublon.save()
+        manquants = champs_en_plus(
+            Patient.all_objects.get(pk=self.doublon.pk), self.gardee)
+        self.assertIn('Allergies', manquants)
+        reponse = self.client.get(reverse('patients:doublons_comparer', args=[self.cle]))
+        self.assertContains(reponse, 'utilisez plutôt la fusion')
+
+
+class TestUneFicheMasqueeNeRecoitPlusRien(BaseDoublons):
+    def test_l_import_rattache_a_la_fiche_gardee(self):
+        """Un fichier qui porte encore l'ancien code ne doit pas réveiller la
+        fiche masquée."""
+        import json
+        from core.models import TacheImport
+        from core.taches import Avancement
+        from .views import _executer_import_patients
+
+        self.doublon.masque = True
+        self.doublon.doublon_de = self.gardee
+        self.doublon.save()
+
+        avancement = Avancement(TacheImport.objects.create(libelle='Test'))
+        _executer_import_patients(
+            avancement, 'f.json',
+            json.dumps([{'code_identifiant': self.doublon.code_patient,
+                         'nom': 'Kouassi Aya Marie', 'genre': 'F',
+                         'mobile': '0788889999'}], default=str).encode('utf-8'),
+            True, self.centre)
+
+        self.assertEqual(
+            Patient.all_objects.get(pk=self.gardee.pk).telephone, '0788889999')
+        # La fiche masquée n'a pas bougé.
+        self.assertEqual(
+            Patient.all_objects.get(pk=self.doublon.pk).telephone, '0701020304')
+
+    def test_hprim_rattache_a_la_fiche_gardee(self):
+        from laboratoire.hprim.integration import _fiche_courante
+        self.doublon.masque = True
+        self.doublon.doublon_de = self.gardee
+        self.doublon.save()
+        synthese = {'details': []}
+        courante = _fiche_courante(
+            Patient.all_objects.get(pk=self.doublon.pk), synthese)
+        self.assertEqual(courante.pk, self.gardee.pk)
+        self.assertIn('rattachement sur', ' '.join(synthese['details']))
+
+    def test_hprim_refuse_plutot_que_de_mal_ranger(self):
+        """Sans fiche de remplacement, mieux vaut signaler que de ranger le
+        résultat dans un dossier que plus personne n'ouvre."""
+        from laboratoire.hprim.integration import _fiche_courante
+        self.doublon.masque = True
+        self.doublon.save()
+        synthese = {'details': []}
+        self.assertIsNone(_fiche_courante(
+            Patient.all_objects.get(pk=self.doublon.pk), synthese))
+        self.assertIn('non rattaché', ' '.join(synthese['details']))
+
+
+class TestChoisirLaFicheAGarder(BaseDoublons):
+    def test_le_choix_est_enregistre_et_prime(self):
+        from .doublons_groupes import garnir, index
+        from .models import ChoixFicheGardee
+        self.client.post(
+            reverse('patients:doublons_garder', args=[self.cle, self.doublon.pk]), {})
+        self.assertEqual(ChoixFicheGardee.all_objects.get().patient_id, self.doublon.pk)
+        groupe = garnir(index(self.centre.pk))[0]
+        self.assertEqual(groupe['garder'], self.doublon.pk)
+        self.assertTrue(groupe['choix_humain'])
+
+    def test_un_seul_choix_par_groupe(self):
+        from .models import ChoixFicheGardee
+        for fiche in (self.doublon, self.gardee):
+            self.client.post(
+                reverse('patients:doublons_garder', args=[self.cle, fiche.pk]), {})
+        self.assertEqual(ChoixFicheGardee.all_objects.count(), 1)
+        self.assertEqual(ChoixFicheGardee.all_objects.get().patient_id, self.gardee.pk)
+
+
+class TestLOngletDesCreationsForcees(BaseDoublons):
+    def test_les_traces_sont_retrouvees_par_leur_code(self):
+        """Pas par le texte du message : un message se reformule."""
+        from core.views import log_event
+        from . import journal_doublons
+        log_event(self.gardee, self.agent, 'Peu importe le texte',
+                  type='alerte', code=journal_doublons.CONFIRMATION)
+        log_event(self.gardee, self.agent, 'Autre texte',
+                  type='alerte', code=journal_doublons.FORCAGE)
+        log_event(self.gardee, self.agent, 'Un événement sans rapport', type='modif')
+
+        reponse = self.client.get(reverse('patients:doublons_journal'))
+        self.assertEqual(reponse.context['page'].paginator.count, 2)
+        self.assertContains(reponse, 'Saisie poursuivie')
+        self.assertContains(reponse, 'Création forcée')
+        self.assertNotContains(reponse, 'sans rapport')
+
+    def test_la_saisie_pose_bien_le_code(self):
+        from core.models import LogActivite
+        from . import journal_doublons
+        reponse = self.client.post(reverse('patients:doublons_journaliser'),
+                                   {'pk': self.gardee.pk, 'score': 72,
+                                    'nom': 'KOUASI', 'prenoms': 'AYA'})
+        self.assertEqual(reponse.status_code, 200, reponse.content[:300])
+        self.assertEqual(LogActivite.objects.get(code=journal_doublons.CONFIRMATION)
+                         .object_id, self.gardee.pk)
+
+
+class TestLeBoutonRecalculer(BaseDoublons):
+    def test_il_cree_une_tache(self):
+        from core.models import TacheImport
+        reponse = self.client.post(reverse('patients:doublons_recalculer'))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertEqual(TacheImport.objects.filter(
+            libelle='Recalcul des doublons').count(), 1)
+
+
+class TestCeQueLaCartePorte(BaseDoublons):
+    """Avec le nom seul, on ne peut pas juger : la carte doit en dire assez
+    pour trancher sans ouvrir la comparaison."""
+
+    def _carte(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(len(reponse.context['groupes']), 1)
+        return reponse, reponse.context['groupes'][0]
+
+    def test_la_date_de_naissance_et_le_telephone_sont_affiches(self):
+        reponse, groupe = self._carte()
+        self.assertEqual(groupe['fiches'][0].naissance, '14/05/1992')
+        self.assertContains(reponse, '14/05/1992')
+        self.assertContains(reponse, '0701020304')
+
+    def test_une_date_approximative_se_lit_comme_une_annee(self):
+        from .doublons_groupes import naissance_affichee
+        self.doublon.date_naissance_approx = True
+        self.doublon.save()
+        self.assertEqual(
+            naissance_affichee(Patient.all_objects.get(pk=self.doublon.pk)),
+            '≈ 1992')
+
+    def test_la_raison_du_rapprochement_est_affichee(self):
+        reponse, groupe = self._carte()
+        self.assertIn('même nom', groupe['raisons'])
+        self.assertIn('même téléphone', groupe['raisons'])
+        self.assertContains(reponse, 'même téléphone')
+
+    def test_ce_qui_differe_est_surligne_des_deux_cotes(self):
+        self.doublon.nom = 'KOUASSY'
+        self.doublon.save()
+        reponse, groupe = self._carte()
+        for fiche in groupe['fiches']:
+            self.assertTrue(fiche.differe['nom'])
+            self.assertFalse(fiche.differe['prenoms'])
+            self.assertFalse(fiche.differe['telephone'])
+        self.assertContains(reponse, 'class="diff"')
+
+    def test_un_champ_vide_d_un_cote_ne_contredit_rien(self):
+        """Seul un écart entre deux valeurs renseignées en est un : surligner
+        une absence détournerait le regard de ce qui se contredit vraiment."""
+        self.doublon.telephone = ''
+        self.doublon.save()
+        _reponse, groupe = self._carte()
+        self.assertFalse(groupe['fiches'][0].differe['telephone'])
+
+    def test_une_date_estimee_ne_contredit_pas_la_date_precise(self):
+        self.doublon.date_naissance_approx = True
+        self.doublon.save()
+        _reponse, groupe = self._carte()
+        self.assertFalse(groupe['fiches'][0].differe['naissance'])
+
+
+class TestLActionRapideSurLaCarte(BaseDoublons):
+    """La plupart des groupes sont une fiche pleine et sa copie vide : les
+    ouvrir un par un pour n'y rien lire ferait des centaines d'écrans."""
+
+    def _groupe(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        return reponse, reponse.context['groupes'][0]
+
+    def test_elle_est_proposee_quand_l_autre_fiche_n_apprend_rien(self):
+        reponse, groupe = self._groupe()
+        self.assertEqual(groupe['masquable'].pk, self.doublon.pk)
+        self.assertNotEqual(groupe['masquable'].pk, groupe['garder'])
+        self.assertContains(reponse, 'Masquer le doublon')
+
+    def test_elle_disparait_si_la_fiche_porte_des_donnees(self):
+        RendezVous.objects.create(patient=self.doublon, motif='Contrôle',
+                                  date_heure=timezone.now())
+        reponse, groupe = self._groupe()
+        self.assertIsNone(groupe['masquable'])
+        self.assertNotContains(reponse, 'Masquer le doublon')
+
+    def test_elle_disparait_si_la_fiche_porte_un_champ_que_l_autre_n_a_pas(self):
+        """« Vide » ne suffit pas : des allergies se perdraient en silence."""
+        self.doublon.allergies = 'Pénicilline'
+        self.doublon.save()
+        _reponse, groupe = self._groupe()
+        self.assertIsNone(groupe['masquable'])
+
+    def test_elle_ne_se_propose_pas_sur_un_groupe_de_trois(self):
+        Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
+            date_naissance=date(1992, 5, 14), centre=self.centre)
+        from .doublons_recalcul import recalculer_centre
+        recalculer_centre(self.centre.pk)
+        _reponse, groupe = self._groupe()
+        self.assertEqual(len(groupe['fiches']), 3)
+        self.assertIsNone(groupe['masquable'])
+
+
+class TestLeMasquageEnAjax(BaseDoublons):
+    AJAX = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+
+    def test_il_rend_de_quoi_annoncer_et_annuler(self):
+        reponse = self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk}, **self.AJAX)
+        self.assertEqual(reponse.status_code, 200)
+        corps = reponse.json()
+        self.assertTrue(corps['ok'])
+        self.assertEqual(corps['code'], self.doublon.code_patient)
+        self.assertEqual(corps['code_gardee'], self.gardee.code_patient)
+        self.assertEqual(corps['annuler'],
+                         reverse('patients:doublons_reafficher', args=[self.doublon.pk]))
+
+    def test_le_groupe_traite_quitte_la_liste(self):
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk}, **self.AJAX)
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(len(reponse.context['groupes']), 0)
+
+    def test_un_refus_se_dit_sans_masquer(self):
+        RendezVous.objects.create(patient=self.doublon, motif='Contrôle',
+                                  date_heure=timezone.now())
+        reponse = self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk}, **self.AJAX)
+        self.assertEqual(reponse.status_code, 409)
+        self.assertFalse(reponse.json()['ok'])
+        self.assertFalse(Patient.all_objects.get(pk=self.doublon.pk).masque)
+
+
+class TestLaBanderoleDeMasquage(BaseDoublons):
+    def test_elle_annonce_la_fiche_et_propose_d_annuler(self):
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        reponse = self.client.get(reverse('patients:doublons_liste'),
+                                  {'masque': self.doublon.pk})
+        self.assertEqual(reponse.context['masquage'].pk, self.doublon.pk)
+        self.assertContains(reponse, 'est masquée')
+        self.assertContains(reponse, 'Annuler')
+        self.assertContains(reponse, reverse('patients:doublons_reafficher',
+                                             args=[self.doublon.pk]))
+
+    def test_le_masquage_redirige_en_portant_la_fiche(self):
+        reponse = self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk,
+             'retour': reverse('patients:doublons_liste') + '?niveau=certain'})
+        self.assertIn(f'masque={self.doublon.pk}', reponse['Location'])
+        self.assertIn('niveau=certain', reponse['Location'])
+
+    def test_elle_s_efface_une_fois_le_masquage_annule(self):
+        """Rien n'est gardé en session : la banderole se tait d'elle-même dès
+        que la fiche est redevenue visible, rechargement compris."""
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.client.post(
+            reverse('patients:doublons_reafficher', args=[self.doublon.pk]), {})
+        reponse = self.client.get(reverse('patients:doublons_liste'),
+                                  {'masque': self.doublon.pk})
+        self.assertIsNone(reponse.context['masquage'])
+
+
+class TestLEcranDeComparaison(BaseDoublons):
+    def _comparer(self):
+        return self.client.get(reverse('patients:doublons_comparer', args=[self.cle]))
+
+    def test_les_donnees_rattachees_ont_leur_ligne_par_table(self):
+        RendezVous.objects.create(patient=self.gardee, motif='Contrôle',
+                                  date_heure=timezone.now())
+        reponse = self._comparer()
+        rattachees = reponse.context['rattachees']
+        libelles = [ligne['libelle'] for ligne in rattachees['lignes']]
+        self.assertEqual(libelles, ['Rendez-vous'])
+        indice = [c['fiche'].pk for c in reponse.context['cartes']].index(self.gardee.pk)
+        self.assertEqual(rattachees['lignes'][0]['nombres'][indice], 1)
+        self.assertEqual(rattachees['totaux'][indice], 1)
+        self.assertFalse(rattachees['rien'])
+
+    def test_sans_rien_de_rattache_le_tableau_le_dit(self):
+        reponse = self._comparer()
+        self.assertTrue(reponse.context['rattachees']['rien'])
+        self.assertContains(reponse, 'Aucune donnée rattachée')
+
+    def test_les_champs_vides_des_deux_cotes_sont_comptes_a_part(self):
+        reponse = self._comparer()
+        vides = [l['libelle'] for l in reponse.context['comparaison'] if l['vide']]
+        self.assertIn('Allergies', vides)
+        self.assertNotIn('Nom', vides)
+        self.assertEqual(reponse.context['champs_vides'], len(vides))
+        self.assertContains(reponse, 'champs vides')
+
+    def test_la_raison_du_blocage_est_ecrite_sous_le_bouton(self):
+        """Un bouton gris sans explication se lit comme une panne, et le
+        survol n'existe pas sur une tablette."""
+        # La fiche gardée en porte davantage : celle qu'on pourrait masquer
+        # n'est donc pas vide pour autant.
+        for _ in range(2):
+            RendezVous.objects.create(patient=self.gardee, motif='Contrôle',
+                                      date_heure=timezone.now())
+        RendezVous.objects.create(patient=self.doublon, motif='Contrôle',
+                                  date_heure=timezone.now())
+        reponse = self._comparer()
+        raisons = {c['fiche'].pk: c['raison_blocage']
+                   for c in reponse.context['cartes']}
+        self.assertEqual(raisons[self.gardee.pk], "C'est la fiche qu'on garde.")
+        self.assertEqual(raisons[self.doublon.pk],
+                         'Contient des données : il faut la fusionner.')
+        self.assertContains(reponse, 'Contient des données')
+
+    def test_la_fiche_gardee_n_offre_pas_de_bouton_masquer(self):
+        reponse = self._comparer()
+        garde = next(c for c in reponse.context['cartes'] if c['garder'])
+        self.assertFalse(garde['peut_masquer'])
+        self.assertNotContains(
+            reponse, f"Masquer {garde['fiche'].code_patient}")
+
+    def test_les_actions_sont_rassemblees_dans_la_barre(self):
+        reponse = self._comparer()
+        corps = reponse.content.decode()
+        barre = corps[corps.index('cmp-barre'):]
+        for attendu in ('Garder ', 'Masquer ', 'Pas un doublon', 'Fusionner'):
+            self.assertIn(attendu, barre)
+
+
+class TestLeSurlignageMotAMot(BaseDoublons):
+    """« ASSENA ELIAQUIM » contre « ASSENA ELIAKIM » : seul le second mot
+    diffère, et c'est lui seul qu'il faut montrer."""
+
+    def test_seul_le_mot_qui_differe_est_marque(self):
+        from .doublons_groupes import mots_marques
+        marques = mots_marques(['ASSENA ELIAQUIM', 'ASSENA ELIAKIM'])
+        self.assertEqual([(m['mot'], m['diff']) for m in marques[0]],
+                         [('ASSENA', False), ('ELIAQUIM', True)])
+        self.assertEqual([(m['mot'], m['diff']) for m in marques[1]],
+                         [('ASSENA', False), ('ELIAKIM', True)])
+
+    def test_un_mot_commun_au_milieu_reste_intact(self):
+        from .doublons_groupes import mots_marques
+        marques = mots_marques(['MEL BIDPESS MATY', 'MEL BISPESS MATY'])
+        self.assertEqual([m['diff'] for m in marques[0]], [False, True, False])
+
+    def test_l_ecriture_d_origine_est_conservee(self):
+        """On rapproche sur la forme normalisée, on affiche ce qui est écrit."""
+        from .doublons_groupes import mots_marques
+        marques = mots_marques(["N'Guéssan Kôné", 'NGUESSAN KONE'])
+        self.assertEqual([m['mot'] for m in marques[0]], ["N'Guéssan", 'Kôné'])
+        self.assertEqual([m['diff'] for m in marques[0]], [False, False])
+
+    def test_une_valeur_vide_ne_marque_rien_chez_l_autre(self):
+        from .doublons_groupes import mots_marques
+        marques = mots_marques(['RAYAN', ''])
+        self.assertEqual([m['diff'] for m in marques[0]], [False])
+
+    def test_la_carte_ne_surligne_que_le_prenom_qui_differe(self):
+        self.doublon.prenoms = 'AYA MARIANE'
+        self.doublon.save()
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        groupe = reponse.context['groupes'][0]
+        for fiche in groupe['fiches']:
+            marques = {m['mot']: m['diff'] for m in fiche.mots_identite}
+            self.assertFalse(marques['KOUASSI'])
+            self.assertFalse(marques['AYA'])
+        mots = {m['mot'] for fiche in groupe['fiches']
+                for m in fiche.mots_identite if m['diff']}
+        self.assertEqual(mots, {'MARIE', 'MARIANE'})
+
+    def test_le_tableau_de_comparaison_marque_aussi_mot_a_mot(self):
+        self.doublon.prenoms = 'AYA MARIANE'
+        self.doublon.save()
+        reponse = self.client.get(
+            reverse('patients:doublons_comparer', args=[self.cle]))
+        prenoms = next(l for l in reponse.context['comparaison']
+                       if l['libelle'] == 'Prénoms')
+        self.assertEqual([m['diff'] for m in prenoms['mots'][0]], [False, True])
+
+
+class TestLaRaisonDuRapprochement(BaseDoublons):
+    """« même nom » affirme une identité d'écriture : elle doit être vraie."""
+
+    def _raisons(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        return reponse.context['groupes'][0]['raisons']
+
+    def test_meme_ecriture_donne_meme_nom(self):
+        self.assertIn('même nom', self._raisons())
+
+    def test_une_ecriture_differente_ne_dit_pas_meme_nom(self):
+        """BALO et BALLO passent au-dessus du seuil sans être le même mot."""
+        self.doublon.nom = 'KOUASSY'
+        self.doublon.save()
+        raisons = self._raisons()
+        self.assertIn('nom presque identique', raisons)
+        self.assertNotIn('même nom', raisons)
+
+    def test_la_raison_se_corrige_sans_attendre_un_recalcul(self):
+        """Le relevé range des mesures ; l'écriture se relit sur les fiches."""
+        from .models import DoublonPaire
+        avant = list(DoublonPaire.all_objects.values_list('date_calcul', flat=True))
+        self.doublon.nom = 'KOUASSY'
+        self.doublon.save(update_fields=['nom'])
+        DoublonPaire.all_objects.update(details={'noms': 0.99, 'date': 1.0,
+                                                 'telephone': True,
+                                                 'noms_identiques': True})
+        self.assertIn('nom presque identique', self._raisons())
+        self.assertEqual(
+            len(avant), DoublonPaire.all_objects.count())
+
+    def test_les_accents_et_apostrophes_ne_comptent_pas(self):
+        from .doublons import memes_noms
+        self.assertTrue(memes_noms({'nom': "N'Guéssan", 'prenoms': 'Kôné'},
+                                   Patient(nom='NGUESSAN', prenoms='KONE')))
+        self.assertFalse(memes_noms({'nom': 'BALO', 'prenoms': 'RAYAN'},
+                                    Patient(nom='BALLO', prenoms='RAYAN')))

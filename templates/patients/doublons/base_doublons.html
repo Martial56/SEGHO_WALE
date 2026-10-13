@@ -1,0 +1,214 @@
+{% extends 'patients/base.html' %}
+{% comment %}
+Socle des trois pages de l'écran des doublons : la feuille de style, le
+sous-en-tête, les deux onglets et la zone des banderoles. Les pages n'ont plus
+qu'à remplir `doublons_contenu`.
+
+Les classes `.o-*` sont celles des autres listes du projet ; on reprend les
+mêmes noms pour que l'écran ait la même tête, et on ne redéfinit ici que ce
+dont il se sert.
+{% endcomment %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* `.content` est déclaré `overflow-y: auto` pour toute l'application, ce qui
+     en fait un conteneur de défilement. À l'intérieur, `position: sticky` ne
+     s'accroche à rien : c'est la fenêtre qui défile, pas lui. Le rendre
+     `visible` ici ne déplace rien — il n'a jamais de hauteur contrainte, donc
+     il ne défile jamais — et rend au sous-en-tête comme à la barre d'actions
+     l'ancrage qu'ils annoncent. */
+  .content { overflow: visible; }
+
+  .o-subheader { background: var(--surface); border-bottom: 1px solid var(--border);
+                 padding: 6px 16px; display: flex; flex-direction: column; gap: 5px;
+                 position: sticky; top: var(--header-h); z-index: 190; margin: 0 -32px; }
+  .o-subheader-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .o-page-title { font-size: 17px; font-weight: 400; color: var(--text); }
+  .o-count { font-size: 12px; color: var(--text-muted); }
+
+  .dbl-onglets { display: flex; gap: 2px; }
+  .dbl-onglet { padding: 5px 14px; font-size: 12.5px; text-decoration: none;
+                color: var(--text-muted); border-bottom: 2px solid transparent; }
+  .dbl-onglet.actif { color: var(--accent-text); border-bottom-color: var(--accent);
+                      font-weight: 600; }
+  .dbl-filtres { display: flex; gap: 4px; }
+  .dbl-filtre { padding: 3px 12px; border-radius: 999px; font-size: 12px;
+                text-decoration: none; border: 1px solid var(--border-strong);
+                color: var(--text-muted); }
+  .dbl-filtre:hover { border-color: var(--accent); color: var(--accent-text); }
+  .dbl-filtre.actif { background: var(--teal-500); border-color: var(--teal-500);
+                      color: #fff; }
+  .dbl-filtre.actif:hover { color: #fff; }
+
+  .o-search-bar { display: flex; align-items: center; border-bottom: 1px solid #bbb;
+                  background: transparent; min-height: 28px; padding: 2px 4px;
+                  gap: 4px; width: 280px; }
+  .o-search-input { border: none; outline: none; font-size: 12px; color: var(--text);
+                    flex: 1; min-width: 60px; background: transparent; }
+  html[data-theme="dark"] .o-search-bar { border-bottom-color: var(--border-strong); }
+
+  .o-btn { background: var(--teal-500); color: #fff; border: none; padding: 5px 14px;
+           border-radius: 4px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+           text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+           font-family: var(--font-main); white-space: nowrap; }
+  .o-btn:hover { background: var(--teal-600); }
+  .o-btn.neutre { background: rgba(0,0,0,.07); color: var(--text); }
+  .o-btn.neutre:hover { background: rgba(0,0,0,.12); }
+  .o-btn.danger { background: transparent; color: #b02a37; border: 1px solid #e3a0a7; }
+  .o-btn.danger:hover { background: #fdf2f3; }
+  .o-btn:disabled, .o-btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .o-btn.neutre:disabled:hover { background: rgba(0,0,0,.07); }
+  .o-btn.danger:disabled:hover { background: transparent; }
+  html[data-theme="dark"] .o-btn.neutre { background: rgba(255,255,255,.08); color: var(--text); }
+  html[data-theme="dark"] .o-btn.neutre:hover { background: rgba(255,255,255,.14); }
+  html[data-theme="dark"] .o-btn.danger { color: #f09aa3; border-color: rgba(240,154,163,.5); }
+  html[data-theme="dark"] .o-btn.danger:hover { background: rgba(240,154,163,.12); }
+
+  /* ── Les banderoles ──────────────────────────────────────────────────────
+     Une décision prise doit s'annoncer, et surtout se reprendre : le lien
+     « Annuler » tient dans la banderole même, là où l'œil arrive. */
+  #dbl-bandeau:empty { display: none; }
+  .o-alerte { display: flex; align-items: center; gap: 10px; font-size: 13px;
+              padding: 10px 14px; border-radius: var(--radius-sm);
+              margin: 12px 0 0; border: 1px solid transparent; }
+  .o-alerte .bi { font-size: 15px; }
+  .o-alerte-texte { flex: 1 1 auto; }
+  .o-alerte.succes { background: rgba(var(--green-rgb), .12); color: var(--text);
+                     border-color: rgba(var(--green-rgb), .35); }
+  .o-alerte.succes .bi { color: var(--green); }
+  .o-alerte.erreur { background: rgba(var(--rose-rgb), .12); color: var(--text);
+                     border-color: rgba(var(--rose-rgb), .35); }
+  .o-alerte.erreur .bi { color: var(--rose); }
+  .o-lien { background: none; border: none; padding: 0; font: inherit;
+            color: var(--accent-text); font-weight: 600; cursor: pointer;
+            text-decoration: underline; font-family: var(--font-main); }
+  .o-lien:hover { color: var(--accent); }
+
+  /* ── La grille de cartes ─────────────────────────────────────────────────
+     Neuf cents groupes à parcourir : autant en voir une douzaine d'un coup
+     d'œil plutôt que six bandes pleine largeur. La largeur minimale laisse
+     tenir un nom long sans le couper. */
+  .dbl-grille { display: grid; gap: 12px;
+                grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .dbl-carte-groupe { position: relative; background: var(--surface);
+                      border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
+                      border-radius: var(--radius-sm); padding: 10px 14px 11px;
+                      display: flex; flex-direction: column; gap: 8px;
+                      color: var(--text); transition: border-color .12s, box-shadow .12s; }
+  .dbl-carte-groupe.certain { border-left-color: #c0392b; }
+  .dbl-carte-groupe.avertissement { border-left-color: var(--amber); }
+  .dbl-carte-groupe:hover { border-color: var(--accent); border-left-color: var(--accent);
+                            box-shadow: var(--shadow-sm); }
+  .dbl-carte-groupe.partie { opacity: .25; pointer-events: none;
+                             transition: opacity .25s; }
+  /* Toute la carte mène à la comparaison, mais un bouton ne peut pas vivre
+     dans un lien : le lien se superpose, et l'action rapide repasse dessus. */
+  .dbl-lien { position: absolute; inset: 0; z-index: 0; border-radius: inherit; }
+  .dbl-carte-groupe > *:not(.dbl-lien) { position: relative; z-index: 1;
+                                         pointer-events: none; }
+  .dbl-carte-groupe .dbl-rapide { pointer-events: auto; }
+
+  .dbl-tete-groupe { display: flex; align-items: center; gap: 8px; }
+  .dbl-pastille { font-weight: 700; font-size: 12px; padding: 1px 8px;
+                  border-radius: 999px; letter-spacing: .2px; }
+  .dbl-pastille.certain { color: #b02a37; background: rgba(var(--rose-rgb), .13); }
+  .dbl-pastille.avertissement { color: var(--amber-text); background: rgba(var(--amber-rgb), .16); }
+  html[data-theme="dark"] .dbl-pastille.certain { color: #f09aa3; }
+  html[data-theme="dark"] .dbl-pastille.avertissement { color: #e8b84b; }
+  .dbl-nombre { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+
+  .dbl-identites { display: flex; flex-direction: column; }
+  .dbl-identite { font-size: 13px; line-height: 1.45; padding: 5px 0; }
+  .dbl-identite + .dbl-identite { border-top: 1px dashed var(--border); }
+  .dbl-identite .code { font-family: var(--font-mono); font-size: 10.5px;
+                        color: var(--text-muted); margin-right: 5px; }
+  .dbl-identite .nom { font-weight: 600; }
+  .dbl-identite .etoile { color: var(--amber); margin-right: 2px; }
+  /* Même surlignage qu'à la fenêtre de saisie, porté par un span intérieur :
+     sur la ligne entière, il s'étirerait jusqu'au bord de la carte. */
+  .dbl-identite .diff { background: rgba(var(--amber-rgb), .22); border-radius: 3px;
+                        padding: 0 3px; }
+  .dbl-traits { display: block; font-size: 12px; color: var(--text-muted);
+                margin-top: 1px; }
+  .dbl-rattache { display: block; font-size: 11.5px; color: var(--text-muted); }
+  .dbl-vide { color: var(--text-faint); font-style: italic; }
+
+  .dbl-pied { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+              border-top: 1px solid var(--border); padding-top: 8px; }
+  .dbl-raisons { flex: 1 1 auto; font-size: 11.5px; color: var(--text-muted);
+                 display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .dbl-raisons .bi { font-size: 12px; flex: 0 0 auto; }
+  .dbl-rapide { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+  .dbl-rapide-btn { background: transparent; border: 1px solid var(--border-strong);
+                    color: var(--text-muted); border-radius: 4px; padding: 3px 9px;
+                    font-size: 11.5px; font-family: var(--font-main); cursor: pointer;
+                    white-space: nowrap; }
+  .dbl-rapide-btn:hover { border-color: #c0392b; color: #b02a37; background: #fdf2f3; }
+  html[data-theme="dark"] .dbl-rapide-btn:hover { border-color: #f09aa3; color: #f09aa3;
+                                                  background: rgba(240,154,163,.12); }
+  .dbl-confirme { display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+                  color: var(--text); }
+  .dbl-confirme[hidden] { display: none; }
+  .dbl-confirme .oui { background: #c0392b; color: #fff; border: none; border-radius: 4px;
+                       padding: 3px 9px; font-size: 11.5px; cursor: pointer;
+                       font-family: var(--font-main); }
+  .dbl-confirme .oui:hover { background: #a93226; }
+  .dbl-confirme .non { background: none; border: none; color: var(--text-muted);
+                       font-size: 11.5px; cursor: pointer; text-decoration: underline;
+                       font-family: var(--font-main); padding: 0; }
+
+  .o-pagination { display: flex; align-items: center; gap: 4px; font-size: 12px;
+                  color: var(--text-muted); }
+  .o-pag-btn { display: inline-flex; align-items: center; justify-content: center;
+               min-width: 26px; height: 26px; padding: 0 8px; border-radius: 5px;
+               border: 1px solid transparent; color: var(--text-muted);
+               text-decoration: none; font-size: 12.5px; font-weight: 600; }
+  .o-pag-btn:hover { background: var(--teal-50); color: var(--accent-text-soft); }
+  .o-pag-btn.disabled { opacity: .3; pointer-events: none; }
+  html[data-theme="dark"] .o-pag-btn:hover { background: rgba(var(--teal-600-rgb),.15); }
+
+  .o-empty { padding: 48px 16px; text-align: center; color: var(--text-muted);
+             font-size: 13px; }
+  .dbl-contenu { padding: 14px 0; }
+  .dbl-barre { padding: 6px 16px 0; margin: 0 -32px; background: var(--surface);
+               border-bottom: 1px solid var(--border); }
+  #dbl-zone { transition: opacity .12s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="o-subheader">
+  <div class="o-subheader-row">
+    <span class="o-page-title">{{ titre }}</span>
+    <div class="dbl-onglets">
+      <a href="{% url 'patients:doublons_liste' %}"
+         class="dbl-onglet {% block onglet_liste %}{% endblock %}">Groupes</a>
+      <a href="{% url 'patients:doublons_journal' %}"
+         class="dbl-onglet {% block onglet_journal %}{% endblock %}">Créations forcées et confirmations</a>
+    </div>
+    <div class="o-subheader-row-right">
+      {% block subheader_droite %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+{% comment %}
+Les décisions prises s'annoncent ici. La zone reste présente même vide : le
+masquage en AJAX y dépose sa banderole sans avoir à recharger la page.
+{% endcomment %}
+<div id="dbl-bandeau">
+  {% if masquage %}{% include 'patients/doublons/includes/bandeau_masquage.html' %}{% endif %}
+  {% for message in messages %}
+  <div class="o-alerte {% if message.level_tag == 'error' %}erreur{% else %}succes{% endif %}">
+    <i class="bi {% if message.level_tag == 'error' %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+    <span class="o-alerte-texte">{{ message }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{% block doublons_contenu %}{% endblock %}
+{% endblock %}

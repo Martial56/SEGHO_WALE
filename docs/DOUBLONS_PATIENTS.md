@@ -323,8 +323,81 @@ mesure du rappel** (voir les chiffres de l'étape 2 ci-dessus) : c'est elle
 qui dira ce que la clé phonétique rattrape, et ce qu'elle coûte en candidats
 présélectionnés.
 
-### Étape 4 — Menu « Doublons » et fusion
-Liste, écran côte à côte, actions Fusionner / Pas un doublon / Masquer,
+### Étape 4a — Menu « Doublons », sans fusion *(faite, 13/10/2026)*
+Liste des groupes (filtre « Quasi certain » par défaut), écran côte à côte avec
+les différences surlignées, et trois décisions réversibles : « pas un doublon »,
+« masquer », « garder celle-ci ». Onglet des créations forcées et des saisies
+poursuivies, retrouvées par un **code** sur `LogActivite` — jamais par le texte
+du message, qui se reformule. Bouton « Recalculer maintenant » avec la jauge.
+
+**Une fiche masquée disparaît partout** : `Patient.objects` l'écarte, donc la
+liste, la recherche et toutes les listes déroulantes avec elle. Elle reste
+ouvrable par son adresse directe, pour qui détient `patients.gerer_doublons`,
+avec un bandeau et le lien vers la fiche gardée. Elle ne reçoit plus rien :
+l'import et la passerelle HPRIM suivent `doublon_de` / `fusionne_dans` et
+rattachent à la fiche gardée — ou refusent et le signalent, plutôt que de
+ranger au mauvais endroit.
+
+« Vide » ne suffit pas à masquer : si la fiche porte une information absente de
+l'autre (allergies, antécédents, assurance, contact d'urgence, photo, second
+téléphone), l'écran renvoie vers la fusion. Et masquer se fait toujours depuis
+un groupe, en notant de quelle fiche c'est le doublon.
+
+La suggestion « ★ à garder » préfère désormais la fiche **qui porte le plus de
+données**, puis la plus complète, puis la plus ancienne : c'est autant de
+lignes en moins à déplacer le jour de la fusion.
+
+#### Retouches d'affichage *(13/10/2026)*
+La liste est une grille de cartes, quatre par rangée. Chaque fiche y porte sa
+date de naissance (ou « ≈ année ») et son téléphone — avec le nom seul, on ne
+peut pas juger —, ce qui diffère d'une fiche à l'autre est surligné comme à la
+saisie, et la raison du rapprochement est écrite au bas de la carte. Une
+différence n'en est une qu'entre deux valeurs **renseignées** : un champ vide
+d'un côté ne contredit rien.
+
+Le surlignage se fait **mot à mot**, sur la carte comme dans le tableau : entre
+« ASSENA ELIAQUIM » et « ASSENA ELIAKIM », seul le second mot s'allume. Le
+rapprochement porte sur la forme normalisée — « Kôné » et « KONE » sont le même
+mot — mais c'est l'écriture d'origine qui s'affiche.
+
+La raison dit **« même nom »** seulement quand les deux fiches s'écrivent
+exactement pareil (accents, apostrophes et espaces mis à part), sinon **« nom
+presque identique »** : le seuil ne distingue pas BALO de BALLO, et l'annoncer
+comme le même nom serait affirmer ce qu'on n'a pas mesuré. `scorer` range le
+verdict dans `details['noms_identiques']`, et l'écran le **relit sur les
+fiches** au moment de l'affichage — ainsi la phrase est juste tout de suite,
+sans attendre le prochain recalcul.
+
+**Action rapide.** Quand un groupe de deux n'a rien à lire — aucune donnée
+rattachée d'un côté, et pas un champ que l'autre n'ait déjà — la carte propose
+« Masquer le doublon », avec une confirmation sur place. C'est le cas de plus
+de huit groupes sur dix ; les ouvrir un par un ferait des centaines d'écrans.
+Le masquage part en AJAX, la carte s'efface, le compte **et** la pagination se
+corrigent sur place (« 1–48 sur 903 » devient « 1–47 sur 902 »), et une
+banderole de succès annonce la décision avec son « Annuler ». La fiche annoncée est lue dans l'adresse
+(`?masque=`), pas gardée en session : la banderole se tait d'elle-même dès que
+la fiche est redevenue visible.
+
+**L'écran de comparaison** met le tableau en premier, chaque colonne sous sa
+fiche, et les données rattachées y tiennent leurs propres lignes (une par
+table, plus un total) : c'est souvent là que se décide la fiche à garder. Les
+champs vides des deux côtés se replient derrière « Afficher les N champs
+vides » — sans quoi quatorze lignes de tirets repoussaient les comptes sous la
+ligne de flottaison. Les actions sont rassemblées dans une barre collante en
+bas : « Garder PAT… », « Masquer PAT… », « Pas un doublon » avec sa raison, et
+« Fusionner », encore grisé. Quand « Masquer » est bloqué, la raison est
+**écrite sous le bouton** : un bouton gris sans explication se lit comme une
+panne, et le survol n'existe pas sur une tablette.
+
+Au passage, `.content` est repassé en `overflow: visible` sur ces pages. Le
+style global le déclare `overflow-y: auto` pour toute l'application, ce qui en
+fait un conteneur de défilement : à l'intérieur, `position: sticky` ne
+s'accroche à rien, puisque c'est la fenêtre qui défile. Rien ne bouge — il n'a
+jamais de hauteur contrainte — mais le sous-en-tête et la barre d'actions
+tiennent enfin ce qu'ils annoncent.
+
+### Étape 4b — La fusion
+Écran côte à côte, actions Fusionner / Pas un doublon / Masquer,
 aperçu (« cette fusion va déplacer 3 RDV et 2 factures »), journal de fusion,
 annulation, redirection de l'ancien code. Tests : chaque FK déplacée,
 comptage, rollback en cas d'erreur, annulation, test « nouvelle FK non gérée ».

@@ -91,7 +91,14 @@ def lancer(libelle, utilisateur, centre, travail):
 
 
 def _executer(tache_id, centre, travail):
-    tache = TacheImport.objects.get(pk=tache_id)
+    try:
+        tache = TacheImport.objects.get(pk=tache_id)
+    except Exception:
+        # Le fil n'a pas pu relire sa propre tâche — connexion fermée, ligne
+        # encore dans une transaction non validée. Sans ce garde-fou, le fil
+        # mourait en crachant sa trace sur la sortie, sans rien dire à personne.
+        connection.close()
+        return
     avancement = Avancement(tache)
     try:
         with centre_actif(centre):

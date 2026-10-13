@@ -1,0 +1,18 @@
+{% comment %}
+La fiche qu'on vient de masquer, et le moyen de revenir dessus. Le même
+balisage est reconstruit en JavaScript après un masquage en AJAX : le modifier
+ici demande de le modifier là-bas aussi (bloc `banderole` de liste.html).
+{% endcomment %}
+<div class="o-alerte succes" data-bandeau-masquage>
+  <i class="bi bi-check-circle-fill"></i>
+  <span class="o-alerte-texte">
+    <b>{{ masquage.code_patient }}</b> est masquée{% if masquage.doublon_de %},
+    doublon de <b>{{ masquage.doublon_de.code_patient }}</b>{% endif %}.
+  </span>
+  <form method="post" action="{% url 'patients:doublons_reafficher' masquage.pk %}"
+        data-annuler-masquage>
+    {% csrf_token %}
+    <input type="hidden" name="retour" value="{% url 'patients:doublons_liste' %}">
+    <button type="submit" class="o-lien">Annuler</button>
+  </form>
+</div>

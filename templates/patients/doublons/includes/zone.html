@@ -1,0 +1,23 @@
+{% comment %}
+Tout ce qui change quand on filtre, cherche ou tourne la page : les pastilles,
+le compte, la pagination et les cartes. C'est ce fragment seul que le serveur
+renvoie en AJAX — le reste de la page ne bouge pas.
+{% endcomment %}
+<div class="o-subheader-row dbl-barre">
+  <div class="dbl-filtres">
+    <a href="?niveau=certain{% if q %}&q={{ q|urlencode }}{% endif %}"
+       class="dbl-filtre {% if niveau == 'certain' %}actif{% endif %}">Quasi certain</a>
+    <a href="?niveau=avertissement{% if q %}&q={{ q|urlencode }}{% endif %}"
+       class="dbl-filtre {% if niveau == 'avertissement' %}actif{% endif %}">À vérifier</a>
+    <a href="?niveau=tous{% if q %}&q={{ q|urlencode }}{% endif %}"
+       class="dbl-filtre {% if niveau != 'certain' and niveau != 'avertissement' %}actif{% endif %}">Tous</a>
+  </div>
+  <span class="o-count">{{ total }} groupe{{ total|pluralize }}</span>
+  <div class="o-subheader-row-right">
+    {% include 'patients/doublons/includes/pagination.html' %}
+  </div>
+</div>
+
+<div class="dbl-contenu">
+  {% include 'patients/doublons/includes/liste_corps.html' %}
+</div>

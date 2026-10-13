@@ -5,12 +5,13 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from core import memoire_listing, taches
 from datetime import date, datetime, timedelta
 
+from . import journal_doublons
 from . import origines as origines_patient
 from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
@@ -494,6 +495,11 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
 
     par_code = {}
     par_identite = {}
+    # Une fiche masquée ou absorbée n'est plus un dossier : un fichier qui
+    # porte encore son ancien code ne doit pas lui rattacher de nouvelles
+    # lignes. On garde le code — il a servi, il peut revenir — mais il renvoie
+    # désormais vers la fiche qui l'a remplacée.
+    remplacee = {}
     # Rapprochement par ressemblance, pour les lignes que la clé exacte ne
     # retrouve pas : une faute de frappe dans le nom suffit à lui échapper.
     # L'index est tenu en mémoire — interroger la base ligne à ligne coûterait
@@ -501,17 +507,32 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
     # déjà toutes relevées ici.
     index = IndexBlocage()
     par_pk = {}
-    for pk, code, nom, prenoms, naissance, approx, tel, tel2, sexe in deja_en_base.values_list(
+    for (pk, code, nom, prenoms, naissance, approx, tel, tel2, sexe,
+         masque, fusionne, doublon) in deja_en_base.values_list(
             'pk', 'code_patient', 'nom', 'prenoms', 'date_naissance',
-            'date_naissance_approx', 'telephone', 'telephone2', 'sexe'
+            'date_naissance_approx', 'telephone', 'telephone2', 'sexe',
+            'masque', 'fusionne_dans_id', 'doublon_de_id'
             ).iterator(chunk_size=5000):
         par_code[code] = pk
+        if masque or fusionne:
+            # Retirée : on note où elle renvoie, et on la tient hors du
+            # rapprochement — elle n'a pas à être proposée comme doublon.
+            remplacee[pk] = fusionne or doublon
+            continue
         identite = _cle_identite(nom, prenoms, naissance, approx, tel)
         if identite is not None:
             par_identite[identite] = pk
         fiche = _FicheLegere(nom, prenoms, naissance, approx, tel, tel2, sexe, code)
         index.ajouter(pk, fiche)
         par_pk[pk] = fiche
+
+    def suivre(pk):
+        """Remonte jusqu'à la fiche qui remplace celle-ci, s'il y en a une."""
+        vus = set()
+        while pk in remplacee and pk not in vus:
+            vus.add(pk)
+            pk = remplacee[pk]
+        return pk
 
     # Les codes sont uniques tous centres confondus : pour en attribuer de
     # nouveaux il faut connaître ceux de tous les centres, pas seulement ceux
@@ -575,6 +596,7 @@ def _executer_import_patients(avancement, nom_fichier, contenu, do_update, centr
             code_identifiant = _s(item.get('code_identifiant', ''))
             pk = par_code.get(code_identifiant) if code_identifiant else None
             reconnu_par_son_code = pk is not None
+            pk = suivre(pk)
             identite = _cle_identite(
                 champs['nom'], champs['prenoms'], champs['date_naissance'],
                 champs['date_naissance_approx'], champs['telephone'])
@@ -697,7 +719,16 @@ def import_patients(request):
 @login_required
 @permission_required('patients.view_patient', raise_exception=True)
 def patient_detail(request, pk):
-    patient = get_object_or_404(Patient, pk=pk)
+    # `Patient.objects` écarte les fiches retirées : c'est ce qui les fait
+    # disparaître partout ailleurs. Ici on les laisse s'ouvrir, mais seulement
+    # pour qui traite les doublons — sinon un ancien lien ou un signet mènerait
+    # à un dossier qu'on croit vivant.
+    patient = Patient.objects.filter(pk=pk).first()
+    if patient is None and request.user.has_perm('patients.gerer_doublons'):
+        patient = Patient.all_objects.filter(pk=pk).select_related(
+            'doublon_de', 'fusionne_dans').first()
+    if patient is None:
+        raise Http404('Aucun dossier à cette adresse.')
 
     rdv_count = patient.rendez_vous.count()
     consultation_count = patient.consultations.count()
@@ -937,7 +968,8 @@ def doublons_journaliser(request):
                f'avec « {saisie or "(sans nom)"} ».')
     if raison:
         message += f' Raison : {raison}'
-    log_event(patient, request.user, message, type='alerte')
+    log_event(patient, request.user, message, type='alerte',
+              code=journal_doublons.CONFIRMATION)
     return JsonResponse({'journalise': True})
 
 
@@ -956,7 +988,7 @@ def _journaliser_forcage(request, patient, form):
         patient, request.user,
         f'Dossier créé malgré un doublon signalé à {correspondance.score} % '
         f'({autre.code_patient} — {autre.nom} {autre.prenoms}). Raison : {raison}',
-        type='alerte')
+        type='alerte', code=journal_doublons.FORCAGE)
 
 
 @login_required

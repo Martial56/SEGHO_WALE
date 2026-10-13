@@ -32,6 +32,11 @@ class LogActivite(models.Model):
     date         = models.DateTimeField(auto_now_add=True)
     ip_address   = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
     duree_secondes = models.PositiveIntegerField(null=True, blank=True, verbose_name="Durée (secondes)")
+    #: Repère technique stable, pour retrouver une famille d'événements sans
+    #: fouiller le texte des messages — qui se reformule au gré des versions.
+    #: Exemples : « doublon.forcage », « doublon.confirmation ».
+    code         = models.CharField(max_length=50, blank=True, db_index=True,
+                                    verbose_name='Code')
     module       = models.CharField(
         max_length=50, blank=True, verbose_name="Module",
         help_text="Nom de l'app Django concernée — indépendant de l'objet lié, "

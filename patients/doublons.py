@@ -302,21 +302,48 @@ class Correspondance:
 
     @property
     def raisons(self):
-        r = []
-        d = self.details
-        if d.get('noms', 0) >= 0.97:
-            r.append('même nom')
-        elif d.get('noms', 0) >= 0.85:
-            r.append('nom très proche')
-        if d.get('date', 0) == 1.0:
-            r.append('même date de naissance')
-        elif d.get('date', 0) >= 0.6:
-            r.append('date de naissance proche')
-        if d.get('telephone'):
-            r.append('même téléphone')
-        if d.get('prenoms_differents'):
-            r.append('prénoms différents')
-        return r
+        return raisons(self.details)
+
+
+#: En dessous, la ressemblance des noms ne vaut pas d'être annoncée : si la
+#: paire est là, c'est la date ou le téléphone qui l'a amenée.
+SEUIL_NOM_ANNONCE = 0.85
+
+
+def memes_noms(a, b):
+    """Les deux fiches s'écrivent-elles exactement pareil ?
+
+    Accents, apostrophes et espaces mis à part — « N'Guéssan Kôné » et
+    « NGUESSAN KONE » sont la même écriture. Le seuil ne répond pas à cette
+    question : BALO et BALLO passent au-dessus de 0,97 sans être le même mot,
+    et annoncer « même nom » là-dessus serait affirmer ce qu'on n'a pas mesuré.
+    """
+    def ecrit(x):
+        return normaliser_texte(f"{_champ(x, 'nom') or ''} "
+                                f"{_champ(x, 'prenoms') or ''}")
+    return ecrit(a) == ecrit(b)
+
+
+def raisons(details):
+    """Pourquoi ces deux fiches se ressemblent, en clair.
+
+    Une fonction et non plus une seule propriété : l'écran des doublons relit
+    des `details` rangés en base, sans la `Correspondance` qui les a produits.
+    """
+    r = []
+    d = details or {}
+    if d.get('noms', 0) >= SEUIL_NOM_ANNONCE:
+        r.append('même nom' if d.get('noms_identiques')
+                 else 'nom presque identique')
+    if d.get('date', 0) == 1.0:
+        r.append('même date de naissance')
+    elif d.get('date', 0) >= 0.6:
+        r.append('date de naissance proche')
+    if d.get('telephone'):
+        r.append('même téléphone')
+    if d.get('prenoms_differents'):
+        r.append('prénoms différents')
+    return r
 
 
 def _telephones(obj):
@@ -352,6 +379,7 @@ def scorer(saisie, existant):
         score = min(score, SEUIL_BLOCAGE - 1)
     return Correspondance(existant, score,
                           {'noms': round(s_noms, 3), 'date': s_date,
+                           'noms_identiques': memes_noms(saisie, existant),
                            'telephone': meme_tel,
                            'prenoms_differents': prenoms_differents})
 

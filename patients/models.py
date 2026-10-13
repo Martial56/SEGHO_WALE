@@ -2,7 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
 
-from centres.models import ModeleCentre
+from centres.models import CentreManager, ModeleCentre
 
 
 class Assurance(models.Model):
@@ -15,6 +15,23 @@ class Assurance(models.Model):
     def __str__(self): return self.nom
     class Meta:
         verbose_name = "Assurance"
+
+
+class PatientManager(CentreManager):
+    """Le centre actif, et rien que des dossiers vivants.
+
+    Une fiche masquée ou absorbée par une fusion n'est plus un dossier : elle
+    ne doit plus paraître dans la liste des patients, dans la recherche, dans
+    la fenêtre de saisie, ni dans les listes déroulantes d'un rendez-vous ou
+    d'une facture. Poser la règle ici la pose partout d'un coup — y compris
+    dans les `ModelChoiceField`, qui s'adressent au gestionnaire par défaut.
+
+    `all_objects` reste non filtré : l'écran des doublons, le recalcul et la
+    fiche ouverte par son adresse directe doivent, eux, continuer de la voir.
+    """
+
+    def get_queryset(self):
+        return super().get_queryset().filter(masque=False, fusionne_dans__isnull=True)
 
 
 class Patient(ModeleCentre):
@@ -159,6 +176,34 @@ class Patient(ModeleCentre):
     masque = models.BooleanField(
         default=False, editable=False, verbose_name='Masquée',
         help_text="Dossier vide écarté à la main depuis l'écran des doublons.")
+    # Masquer se fait toujours depuis un groupe : on sait donc de quelle fiche
+    # celle-ci est le double. Sans cette référence, le bandeau de la fiche
+    # masquée n'aurait rien à montrer, et l'import n'aurait pas où rediriger
+    # ce qu'on tenterait d'y rattacher.
+    doublon_de = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='fiches_masquees', editable=False,
+        verbose_name='Doublon de')
+
+    #: Les deux gestionnaires. `objects` écarte les fiches retirées, voir
+    #: `PatientManager` ; `all_objects` ne filtre rien du tout.
+    objects = PatientManager()
+    all_objects = models.Manager()
+
+    @property
+    def remplacee_par(self):
+        """La fiche à ouvrir à la place de celle-ci, ou None.
+
+        Une fusion la renseigne par `fusionne_dans`, un masquage par
+        `doublon_de` : pour tout ce qui doit rediriger — le bandeau, l'import,
+        la passerelle HPRIM — c'est la même question.
+        """
+        return self.fusionne_dans or self.doublon_de
+
+    @property
+    def retiree(self):
+        """Vrai si la fiche n'est plus un dossier ouvert."""
+        return self.masque or self.fusionne_dans_id is not None
 
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta(ModeleCentre.Meta):
@@ -171,6 +216,11 @@ class Patient(ModeleCentre):
             # donner les clés du reste.
             ('forcer_creation_doublon',
              "Peut créer un dossier malgré un doublon signalé"),
+            # L'écran des doublons : écarter une paire, masquer une fiche,
+            # désigner celle qu'on garde. Séparée de `forcer_creation_doublon`,
+            # qui ne concerne que la saisie.
+            ('gerer_doublons',
+             "Peut traiter les doublons de patients"),
         ]
 
 

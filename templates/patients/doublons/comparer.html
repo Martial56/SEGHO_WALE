@@ -1,0 +1,287 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Les deux fiches côte à côte. Le tableau vient en premier, chaque colonne sous
+sa fiche : ce qui diffère est surligné, et c'est la seule chose qu'on ait
+besoin de lire pour trancher. Les données rattachées y tiennent leurs propres
+lignes — c'est souvent elles qui désignent la fiche à garder.
+
+Les actions sont rassemblées dans une barre collante au bas de l'écran :
+la décision se prend après avoir lu, pas avant.
+{% endcomment %}
+
+{% block onglet_liste %}actif{% endblock %}
+
+{% block subheader_droite %}
+  <a href="{{ retour }}" class="o-btn neutre"><i class="bi bi-arrow-left"></i> Retour</a>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .cmp-page { padding-bottom: 24px; }
+
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px;
+               background: var(--surface); border: 1px solid var(--border);
+               border-radius: var(--radius-sm); overflow: hidden; }
+  .cmp-table th, .cmp-table td { padding: 7px 14px; border-top: 1px solid var(--border);
+                                 vertical-align: top; }
+  .cmp-table tbody th { text-align: left; font-weight: 500; color: var(--text-muted);
+                        font-size: 12px; width: 180px; }
+  .cmp-table tbody td { width: auto; }
+  .cmp-table tr.differe td .marque { background: rgba(var(--amber-rgb), .22);
+                                     border-radius: 3px; padding: 0 4px; font-weight: 600; }
+  .cmp-vide { color: var(--text-faint); }
+  /* Vingt champs dont quatorze vides des deux côtés : la comparaison tenait
+     sous la ligne de flottaison et les données rattachées encore plus bas.
+     Les lignes muettes se replient, et se redéploient d'un clic. */
+  .cmp-ligne-vide { display: none; }
+  .cmp-table.tout .cmp-ligne-vide { display: table-row; }
+  .cmp-replie { display: flex; justify-content: flex-end; margin-bottom: 7px; }
+  .cmp-replie button { background: none; border: none; cursor: pointer; padding: 0;
+                       font-family: var(--font-main); font-size: 12px;
+                       color: var(--text-muted); display: inline-flex;
+                       align-items: center; gap: 5px; }
+  .cmp-replie button:hover { color: var(--accent-text); }
+
+  /* L'en-tête porte l'identité de chaque colonne : sans lui, trois cellules
+     alignées ne disent pas de qui elles parlent. */
+  .cmp-table thead th { border-top: none; background: var(--surface-muted);
+                        text-align: left; vertical-align: bottom;
+                        padding: 12px 14px; border-bottom: 2px solid var(--border); }
+  .cmp-coin { width: 180px; }
+  .cmp-colonne { display: table-cell; }
+  .cmp-colonne.gardee { background: rgba(var(--teal-500-rgb), .09);
+                        box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent); }
+  .cmp-code { display: block; font-family: var(--font-mono); font-size: 11px;
+              color: var(--text-muted); font-weight: 400; }
+  .cmp-nom { display: block; font-size: 15px; font-weight: 600; color: var(--text);
+             margin-top: 2px; }
+  .cmp-badge { display: inline-block; font-size: 10.5px; font-weight: 700;
+               border-radius: 999px; padding: 1px 8px; margin-top: 5px; }
+  .cmp-badge.gardee { color: var(--accent-text); background: rgba(var(--teal-500-rgb), .18); }
+  .cmp-badge.masquee { color: var(--amber-text); background: rgba(var(--amber-rgb), .18); }
+  html[data-theme="dark"] .cmp-badge.masquee { color: #e8b84b; }
+  .cmp-ouvrir { display: block; margin-top: 6px; font-size: 11.5px;
+                color: var(--accent-text); text-decoration: none; font-weight: 600; }
+  .cmp-ouvrir:hover { text-decoration: underline; }
+
+  .cmp-section th { background: var(--surface-muted); font-size: 11px !important;
+                    text-transform: uppercase; letter-spacing: .4px;
+                    color: var(--text-muted) !important; font-weight: 700 !important;
+                    width: auto !important; }
+  .cmp-total th, .cmp-total td { font-weight: 700; color: var(--text); }
+  .cmp-aucune { color: var(--text-faint); font-style: italic; }
+
+  .cmp-bandeau { background: rgba(var(--teal-500-rgb), .10); border-radius: var(--radius-sm);
+                 padding: 10px 14px; font-size: 13px; margin-bottom: 14px;
+                 display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* ── La barre d'actions ──────────────────────────────────────────────────
+     Collée en bas : sur un groupe aux champs nombreux, les boutons restaient
+     sinon sous la ligne de flottaison, et il fallait remonter pour agir. */
+  .cmp-barre { position: sticky; bottom: 0; z-index: 180; margin: 16px -32px 0;
+               padding: 11px 32px; background: var(--surface);
+               border-top: 1px solid var(--border);
+               box-shadow: 0 -2px 10px rgba(0,0,0,.07);
+               display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+  html[data-theme="dark"] .cmp-barre { box-shadow: 0 -2px 10px rgba(0,0,0,.35); }
+  .cmp-barre-droite { margin-left: auto; display: flex; align-items: flex-start;
+                      gap: 10px; flex-wrap: wrap; }
+  .cmp-action { display: flex; flex-direction: column; gap: 3px; }
+  /* La raison est écrite sous le bouton, pas enfermée dans une infobulle : un
+     bouton gris sans explication se lit comme une panne, et le survol
+     n'existe pas sur une tablette. */
+  .cmp-pourquoi { font-size: 11px; color: var(--text-muted); line-height: 1.35;
+                  max-width: 240px; }
+  .cmp-pourquoi.avertit { color: var(--amber-text); }
+  html[data-theme="dark"] .cmp-pourquoi.avertit { color: #e8b84b; }
+  .cmp-pas-doublon { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .cmp-pas-doublon input { border: none; border-bottom: 1px solid var(--border-strong);
+                           background: transparent; color: var(--text); font-size: 12.5px;
+                           padding: 4px 2px; font-family: var(--font-main); width: 220px; }
+  .cmp-pas-doublon input:focus { outline: none; border-bottom-color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-contenu cmp-page">
+
+{% if ecartee %}
+<div class="cmp-bandeau">
+  <i class="bi bi-check-circle"></i>
+  <span>
+    Marquées « pas un doublon »
+    {% if ecartee.utilisateur %}par {{ ecartee.utilisateur }}{% endif %}
+    le {{ ecartee.date|date:'d/m/Y' }}{% if ecartee.raison %} — {{ ecartee.raison }}{% endif %}
+  </span>
+  <form method="post" action="{% url 'patients:doublons_reprendre' cle=cle %}"
+        style="margin-left:auto;">
+    {% csrf_token %}
+    <input type="hidden" name="retour" value="{{ retour }}">
+    <button type="submit" class="o-btn neutre">Remettre dans la liste</button>
+  </form>
+</div>
+{% endif %}
+
+{% if champs_vides %}
+<div class="cmp-replie">
+  <button type="button" id="cmp-bascule" aria-expanded="false">
+    <i class="bi bi-chevron-down"></i>
+    <span>Afficher les {{ champs_vides }} champs vides</span>
+  </button>
+</div>
+{% endif %}
+
+<table class="cmp-table" id="cmp-table">
+  <thead>
+    <tr>
+      <th class="cmp-coin"></th>
+      {% for carte in cartes %}
+      <th class="cmp-colonne {% if carte.garder %}gardee{% endif %}">
+        <span class="cmp-code">{{ carte.fiche.code_patient }}</span>
+        <span class="cmp-nom">{{ carte.fiche.nom }} {{ carte.fiche.prenoms }}</span>
+        {% if carte.garder %}
+        <span class="cmp-badge gardee">★ {% if carte.choix_humain %}Fiche gardée{% else %}Suggérée{% endif %}</span>
+        {% endif %}
+        {% if carte.fiche.masque %}
+        <span class="cmp-badge masquee">Masquée{% if carte.fiche.doublon_de %} — doublon de {{ carte.fiche.doublon_de.code_patient }}{% endif %}</span>
+        {% endif %}
+        <a class="cmp-ouvrir" href="{% url 'patients:detail' carte.fiche.pk %}"
+           target="_blank" rel="noopener">Ouvrir la fiche <i class="bi bi-box-arrow-up-right"></i></a>
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for ligne in comparaison %}
+    <tr class="{% if ligne.different %}differe{% endif %}{% if ligne.vide %} cmp-ligne-vide{% endif %}">
+      <th>{{ ligne.libelle }}</th>
+      {% if ligne.mots %}
+        {% for liste in ligne.mots %}
+        <td>{% if liste %}{% for mot in liste %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="marque">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+        {% endfor %}
+      {% else %}
+        {% for valeur in ligne.valeurs %}
+        <td>{% if valeur %}<span class="marque">{{ valeur }}</span>{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+        {% endfor %}
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+
+  <tbody>
+    <tr class="cmp-section">
+      <th colspan="{{ cartes|length|add:1 }}">Données rattachées</th>
+    </tr>
+    {% for ligne in rattachees.lignes %}
+    <tr>
+      <th>{{ ligne.libelle }}</th>
+      {% for nombre in ligne.nombres %}
+      <td>{% if nombre %}{{ nombre }}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% if rattachees.rien %}
+    <tr>
+      <td class="cmp-aucune" colspan="{{ cartes|length|add:1 }}">
+        Aucune donnée rattachée à ces fiches.
+      </td>
+    </tr>
+    {% else %}
+    <tr class="cmp-total">
+      <th>Total</th>
+      {% for total in rattachees.totaux %}<td>{{ total }}</td>{% endfor %}
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+<div class="cmp-barre">
+  {% if not ecartee and cartes|length == 2 %}
+  <form method="post" action="{% url 'patients:doublons_ecarter' cle=cle %}"
+        class="cmp-pas-doublon">
+    {% csrf_token %}
+    <input type="hidden" name="retour" value="{{ retour }}">
+    <input type="text" name="raison" placeholder="Raison (facultative)"
+           aria-label="Raison">
+    <button type="submit" class="o-btn neutre">
+      <i class="bi bi-x-circle"></i> Pas un doublon
+    </button>
+  </form>
+  {% endif %}
+
+  <div class="cmp-barre-droite">
+    {% for carte in cartes %}
+      {% if carte.fiche.masque %}
+      <div class="cmp-action">
+        <form method="post" action="{% url 'patients:doublons_reafficher' carte.fiche.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+          <button type="submit" class="o-btn neutre">
+            <i class="bi bi-eye"></i> Réafficher {{ carte.fiche.code_patient }}
+          </button>
+        </form>
+      </div>
+      {% elif not carte.garder %}
+      <div class="cmp-action">
+        <form method="post" action="{% url 'patients:doublons_garder' cle=cle pk=carte.fiche.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="o-btn neutre">
+            <i class="bi bi-star"></i> Garder {{ carte.fiche.code_patient }}
+          </button>
+        </form>
+      </div>
+      <div class="cmp-action">
+        <form method="post" action="{% url 'patients:doublons_masquer' cle=cle pk=carte.fiche.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="au_profit_de" value="{{ garder_pk }}">
+          <input type="hidden" name="retour" value="{{ retour }}">
+          <button type="submit" class="o-btn danger"
+                  {% if not carte.peut_masquer %}disabled{% endif %}>
+            <i class="bi bi-eye-slash"></i> Masquer {{ carte.fiche.code_patient }}
+          </button>
+        </form>
+        {% if carte.raison_blocage %}
+        <span class="cmp-pourquoi">{{ carte.raison_blocage }}</span>
+        {% elif carte.informations_en_plus %}
+        <span class="cmp-pourquoi avertit">
+          Contient {{ carte.informations_en_plus|join:', '|lower }} que l'autre n'a pas :
+          utilisez plutôt la fusion.
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="cmp-action">
+      <button type="button" class="o-btn neutre" disabled>
+        <i class="bi bi-arrow-left-right"></i> Fusionner
+      </button>
+      <span class="cmp-pourquoi">Pas encore disponible.</span>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var bascule = document.getElementById('cmp-bascule');
+  var tableau = document.getElementById('cmp-table');
+  if (!bascule || !tableau) { return; }
+  var vides = tableau.querySelectorAll('.cmp-ligne-vide').length;
+  bascule.addEventListener('click', function () {
+    var ouvert = tableau.classList.toggle('tout');
+    bascule.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    bascule.querySelector('i').className = ouvert ? 'bi bi-chevron-up'
+                                                  : 'bi bi-chevron-down';
+    bascule.querySelector('span').textContent = ouvert
+      ? 'Masquer les champs vides'
+      : 'Afficher les ' + vides + ' champs vides';
+  });
+})();
+</script>
+{% endblock %}

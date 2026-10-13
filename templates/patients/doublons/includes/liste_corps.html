@@ -1,0 +1,73 @@
+{% comment %}
+Une carte par groupe, en grille. Chaque fiche y donne de quoi juger sans
+ouvrir la comparaison : nom, date de naissance, téléphone, ce qu'elle porte.
+Ce qui se contredit d'une fiche à l'autre est surligné, comme à la saisie.
+
+L'action rapide n'apparaît que lorsque l'autre fiche n'apprendrait rien de
+plus — c'est le cas de la plupart des groupes, et les ouvrir un par un pour
+n'y rien lire ferait des centaines d'écrans.
+{% endcomment %}
+{% if groupes %}
+<div class="dbl-grille">
+  {% for groupe in groupes %}
+  <div class="dbl-carte-groupe {{ groupe.niveau }}" data-groupe="{{ groupe.cle }}">
+    <a class="dbl-lien" aria-label="Comparer ces {{ groupe.fiches|length }} fiches"
+       href="{% url 'patients:doublons_comparer' cle=groupe.cle %}?retour={{ request.get_full_path|urlencode }}"></a>
+
+    <div class="dbl-tete-groupe">
+      <span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span>
+      {% if groupe.fiches|length > 2 %}
+      <span class="dbl-nombre">{{ groupe.fiches|length }} fiches</span>
+      {% endif %}
+    </div>
+
+    <div class="dbl-identites">
+      {% for fiche in groupe.fiches %}
+      <div class="dbl-identite">
+        <span class="code">{{ fiche.code_patient }}</span>
+        {% if fiche.pk == groupe.garder %}<span class="etoile" title="Fiche à garder">★</span>{% endif %}
+        <span class="nom">{% for mot in fiche.mots_identite %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="diff">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}</span>
+        {% if fiche.masque %}<span class="dbl-vide">(masquée)</span>{% endif %}
+        <span class="dbl-traits">
+          {% if fiche.naissance %}{% if fiche.differe.naissance %}<span class="diff">{{ fiche.naissance }}</span>{% else %}{{ fiche.naissance }}{% endif %}{% else %}<span class="dbl-vide">date inconnue</span>{% endif %}
+          ·
+          {% if fiche.telephone %}{% if fiche.differe.telephone %}<span class="diff">{{ fiche.telephone }}</span>{% else %}{{ fiche.telephone }}{% endif %}{% else %}<span class="dbl-vide">pas de téléphone</span>{% endif %}
+        </span>
+        <span class="dbl-rattache">
+          {% if fiche.rattache_resume %}{{ fiche.rattache_resume }}
+          {% else %}<span class="dbl-vide">aucune donnée rattachée</span>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dbl-pied">
+      <span class="dbl-raisons">
+        {% if groupe.raisons %}<i class="bi bi-info-circle"></i>{{ groupe.raisons|join:', ' }}{% endif %}
+      </span>
+      {% if groupe.masquable %}
+      <form class="dbl-rapide" method="post"
+            action="{% url 'patients:doublons_masquer' cle=groupe.cle pk=groupe.masquable.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="au_profit_de" value="{{ groupe.garder }}">
+        <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+        <button type="button" class="dbl-rapide-btn" data-demander>
+          <i class="bi bi-eye-slash"></i> Masquer le doublon
+        </button>
+        <span class="dbl-confirme" hidden>
+          Masquer {{ groupe.masquable.code_patient }} ?
+          <button type="submit" class="oui">Oui</button>
+          <button type="button" class="non" data-renoncer>Non</button>
+        </span>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="o-empty">
+  {% if q %}Aucun groupe ne correspond à cette recherche.
+  {% else %}Aucun doublon à ce niveau.{% endif %}
+</div>
+{% endif %}

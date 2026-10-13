@@ -121,6 +121,33 @@ _ANORMALITE_MAP = {
 }
 
 
+def _fiche_courante(patient, synthese=None):
+    """La fiche à laquelle rattacher, quand celle trouvée a été retirée.
+
+    Un automate de laboratoire garde longtemps l'IPP qu'on lui a donné : il
+    continue d'envoyer des résultats au nom d'une fiche masquée ou absorbée
+    par une fusion. Les y rattacher les enterrerait dans un dossier que plus
+    personne n'ouvre.
+
+    Si la fiche retirée ne dit pas par quoi elle est remplacée, on rend None :
+    le résultat sera signalé comme non rattaché, ce qui vaut mieux que de le
+    ranger au mauvais endroit.
+    """
+    vus = set()
+    while patient is not None and (patient.masque or patient.fusionne_dans_id):
+        if patient.pk in vus:
+            return None                     # boucle : on s'arrête là
+        vus.add(patient.pk)
+        suivante = patient.remplacee_par
+        if synthese is not None:
+            synthese["details"].append(
+                f"{patient.code_patient} est une fiche retirée : "
+                + (f"rattachement sur {suivante.code_patient}." if suivante
+                   else "aucune fiche de remplacement, résultat non rattaché."))
+        patient = suivante
+    return patient
+
+
 def integrer_oru(contenu: bytes, centre=None):
     """
     Analyse un message ORU et crée/complète les enregistrements de résultats.
@@ -150,7 +177,8 @@ def integrer_oru(contenu: bytes, centre=None):
     synthese = {"patients": 0, "demandes": 0, "resultats": 0, "details": []}
 
     for p in parsed.patients:
-        patient_obj = perimetre.filter(code_patient=p.id_demandeur).first()
+        patient_obj = _fiche_courante(
+            perimetre.filter(code_patient=p.id_demandeur).first(), synthese)
         if patient_obj is None and (p.nom or p.prenom):
             # Le nom exact ne rattrapait rien : l'automate du laboratoire
             # écrit « KOUASSI AYA » là où le dossier dit « KOUASSI AYA MARIE »,
@@ -181,7 +209,7 @@ def integrer_oru(contenu: bytes, centre=None):
         for d in p.demandes:
             demande_obj = DemandeExamen.objects.filter(numero=d.id_demande).first()
             if patient_obj is None and demande_obj is not None:
-                patient_obj = demande_obj.patient
+                patient_obj = _fiche_courante(demande_obj.patient, synthese)
 
             if patient_obj is None:
                 synthese["details"].append(
