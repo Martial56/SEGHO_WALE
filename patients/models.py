@@ -193,6 +193,17 @@ class Patient(ModeleCentre):
         'self', null=True, blank=True, on_delete=models.PROTECT,
         related_name='fiches_masquees', editable=False,
         verbose_name='Doublon de')
+    # Qui a masqué, et quand. Portés par la fiche plutôt que déduits du
+    # journal : `LogActivite` enregistre l'écriture, pas la décision, et le
+    # retrouver demanderait de fouiller le texte d'un message — qui se
+    # reformule. L'onglet « Fiches masquées » doit pouvoir le dire sans
+    # supposer.
+    masque_par = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='fiches_masquees', editable=False,
+        verbose_name='Masquée par')
+    masque_le = models.DateTimeField(null=True, blank=True, editable=False,
+                                     verbose_name='Masquée le')
 
     #: Les deux gestionnaires. `objects` écarte les fiches retirées, voir
     #: `PatientManager` ; `all_objects` ne filtre rien du tout.
@@ -230,6 +241,11 @@ class Patient(ModeleCentre):
             # qui ne concerne que la saisie.
             ('gerer_doublons',
              "Peut traiter les doublons de patients"),
+            # Séparée de `gerer_doublons` : masquer se défait d'un clic,
+            # fusionner déplace des factures et des rendez-vous. Réversible,
+            # mais par le journal, et pas par n'importe qui.
+            ('fusionner_patients',
+             "Peut fusionner deux fiches patient"),
         ]
 
 
@@ -371,6 +387,208 @@ class ChoixFicheGardee(ModeleCentre):
     class Meta(ModeleCentre.Meta):
         verbose_name = 'Fiche à garder'
         verbose_name_plural = 'Fiches à garder'
+
+
+class FusionPatient(ModeleCentre):
+    """Le journal d'une fusion, et de quoi la défaire.
+
+    La fusion ne copie ni ne supprime : elle change le propriétaire des lignes
+    liées. Pour la défaire, il suffit donc de savoir **exactement** lesquelles
+    ont bougé — d'où `lignes`, qui garde table par table les identifiants
+    déplacés, plutôt qu'un critère qu'on rejouerait à l'envers et qui
+    ramasserait au passage ce qui est arrivé depuis.
+
+    `copie` garde la fiche absorbée telle qu'elle était, champ par champ. Elle
+    n'est pas supprimée par la fusion — elle reste en base, marquée
+    `fusionne_dans` — mais ses champs, eux, ont pu servir à compléter la fiche
+    gardée : `champs` dit lesquels, ce qu'on a retenu et ce qu'il y avait
+    avant.
+
+    Les deux fiches peuvent en revanche être **supprimées définitivement** plus
+    tard (voir `patients.suppression`). D'où `SET_NULL` plutôt que `PROTECT` :
+    une suppression ne doit pas être refusée par le journal, et le journal ne
+    doit pas disparaître avec la fiche — c'est lui qui garde la copie. Les
+    trois repères recopiés ci-dessous prennent alors le relais : des cartes et
+    des reçus imprimés portent l'ancien code, il doit continuer de mener à la
+    fiche gardée même quand plus aucune ligne de `Patient` ne le porte.
+    """
+
+    gardee = models.ForeignKey(Patient, null=True, blank=True,
+                               on_delete=models.SET_NULL,
+                               related_name='fusions_recues')
+    absorbee = models.ForeignKey(Patient, null=True, blank=True,
+                                 on_delete=models.SET_NULL,
+                                 related_name='fusions_subies')
+    #: Les repères des deux fiches, recopiés pour survivre à leur suppression.
+    #: Indexés : la recherche d'un ancien code passe par eux.
+    code_absorbee = models.CharField(max_length=20, blank=True, db_index=True)
+    ancien_identifiant_absorbee = models.CharField(max_length=50, blank=True,
+                                                   db_index=True)
+    code_gardee = models.CharField(max_length=20, blank=True, db_index=True)
+    utilisateur = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL)
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    #: Tous les champs de la fiche absorbée, tels quels, au moment de la fusion.
+    copie = models.JSONField(default=dict, blank=True)
+    #: {champ: {'choix': 'gardee'|'absorbee'|'manuel', 'avant': …, 'apres': …}}
+    champs = models.JSONField(default=dict, blank=True)
+    #: {'facturation.Facture': [12, 13], 'core.LogActivite': [8], …}
+    lignes = models.JSONField(default=dict, blank=True)
+    #: Ce que les cas particuliers ont changé en plus, et comment le défaire :
+    #: hospitalisation clôturée, rendez-vous annulés, paires écartées reportées.
+    effets = models.JSONField(default=dict, blank=True)
+
+    annulee_le = models.DateTimeField(null=True, blank=True)
+    annulee_par = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL,
+                                    related_name='fusions_annulees')
+
+    def __str__(self):
+        return f'{self.code_absorbee or self.absorbee_id} → ' \
+               f'{self.code_gardee or self.gardee_id}'
+
+    @property
+    def active(self):
+        return self.annulee_le is None
+
+    @property
+    def annulable(self):
+        """Une fusion dont une fiche a été supprimée ne se défait plus.
+
+        Il n'y a plus où remettre ce qui avait été déplacé : la copie du
+        journal dit ce qu'il y avait, elle ne recrée pas le dossier.
+        """
+        return (self.active and self.gardee_id is not None
+                and self.absorbee_id is not None)
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Fusion de fiches'
+        verbose_name_plural = 'Fusions de fiches'
+        ordering = ['-date']
+
+
+class LotDoublons(ModeleCentre):
+    """Une décision appliquée à plusieurs groupes d'un coup, et de quoi la défaire.
+
+    Un lot n'est pas qu'une boucle sur l'action unitaire : il se prépare, puis
+    il s'exécute. Entre les deux, quelqu'un a pu fusionner une des fiches
+    depuis un autre poste. D'où `cles`, **figée à la confirmation** : on
+    exécute exactement la liste qu'on a montrée, et un groupe qui a changé
+    passe dans les écartés avec sa raison, au lieu d'être traité en silence
+    ou de faire tomber le lot entier.
+
+    `faits` garde de quoi revenir en arrière groupe par groupe — la fiche
+    masquée et au profit de qui, la paire écartée, la fusion écrite. C'est ce
+    qui permet « Annuler ce lot » : il défait ce qui peut encore l'être et dit
+    ce qui ne le peut plus.
+    """
+
+    ACTIONS = [('masquer', 'Masquage'), ('ecarter', 'Pas un doublon'),
+               ('fusionner', 'Fusion')]
+    ETATS = [('prepare', 'Préparé'), ('execute', 'Exécuté'),
+             ('annule', 'Annulé')]
+
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    action = models.CharField(max_length=10, choices=ACTIONS)
+    etat = models.CharField(max_length=10, choices=ETATS, default='prepare')
+    utilisateur = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL,
+                                    related_name='lots_doublons')
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    execute_le = models.DateTimeField(null=True, blank=True)
+
+    #: La raison commune d'un « pas un doublon » en lot, facultative.
+    raison = models.TextField(blank=True)
+
+    #: Les clés de groupe figées au moment de la confirmation.
+    cles = models.JSONField(default=list, blank=True)
+    #: Ce que la confirmation a écarté d'avance : [[clé, raison], …]
+    ignores = models.JSONField(default=list, blank=True)
+    #: Ce qui a été fait, groupe par groupe : [{'cle', …}, …]
+    faits = models.JSONField(default=list, blank=True)
+    #: Ce que l'exécution a écarté en plus : [[clé, raison], …]
+    ecartes = models.JSONField(default=list, blank=True)
+
+    annule_le = models.DateTimeField(null=True, blank=True)
+    annule_par = models.ForeignKey(User, null=True, blank=True,
+                                   on_delete=models.SET_NULL,
+                                   related_name='lots_doublons_annules')
+    #: Ce que l'annulation n'a pas pu rendre : [[clé, raison], …]
+    annulation_partielle = models.JSONField(default=list, blank=True)
+
+    #: La tâche de fond, pour une fusion en lot : cent soixante millisecondes
+    #: par fusion, on ne fait pas attendre un navigateur là-dessus.
+    tache = models.ForeignKey('core.TacheImport', null=True, blank=True,
+                              on_delete=models.SET_NULL)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(
+                LotDoublons.all_objects, 'numero',
+                f'LOT{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.numero} — {self.get_action_display()}'
+
+    @property
+    def annulable(self):
+        return self.etat == 'execute' and bool(self.faits)
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Lot de doublons'
+        verbose_name_plural = 'Lots de doublons'
+        ordering = ['-date']
+
+
+class SuppressionPatient(ModeleCentre):
+    """Ce qui reste d'une fiche supprimée définitivement.
+
+    La suppression est le seul geste irréversible du menu Doublons. Elle est
+    réservée aux fiches qui ne portent plus rien — masquées ou versées dans
+    une autre — mais « ne porte rien » ne veut pas dire « n'a jamais rien
+    été » : la fiche a existé, quelqu'un l'a créée, et son journal raconte ce
+    qui lui est arrivé.
+
+    Tout cela est recopié ici avant l'effacement. `journal` surtout :
+    `LogActivite` est générique, aucune relation inverse ne le rattache à la
+    fiche, il ne tombe donc dans aucune cascade — sans cette copie, ses lignes
+    resteraient en base en désignant une fiche qui n'existe plus, et personne
+    ne les reverrait jamais.
+    """
+
+    ETAT = [('masquee', 'Masquée'), ('fusionnee', 'Fusionnée')]
+
+    code_patient = models.CharField(max_length=20, db_index=True)
+    ancien_identifiant = models.CharField(max_length=50, blank=True,
+                                          db_index=True)
+    nom = models.CharField(max_length=100)
+    prenoms = models.CharField(max_length=200)
+    etat = models.CharField(max_length=10, choices=ETAT)
+    #: Le code de la fiche vers laquelle celle-ci redirigeait, s'il y en avait
+    #: une : la fiche gardée d'une fusion, ou celle d'un masquage.
+    code_remplacante = models.CharField(max_length=20, blank=True)
+
+    #: Tous les champs de la fiche, tels quels, au moment de la suppression.
+    copie = models.JSONField(default=dict, blank=True)
+    #: Les lignes de `LogActivite` qui la visaient : [{date, type, code,
+    #: message, utilisateur}, …], les plus récentes d'abord.
+    journal = models.JSONField(default=list, blank=True)
+
+    utilisateur = models.ForeignKey(User, null=True, blank=True,
+                                    on_delete=models.SET_NULL,
+                                    related_name='patients_supprimes')
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f'{self.code_patient} supprimée le {self.date:%d/%m/%Y}'
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = 'Suppression de fiche'
+        verbose_name_plural = 'Suppressions de fiches'
+        ordering = ['-date']
 
 
 class RendezVous(ModeleCentre):

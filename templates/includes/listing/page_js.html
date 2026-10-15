@@ -249,6 +249,11 @@ nomme le sien autrement le déclare avec la variable `listing_resultats`.
   });
 
   window.addEventListener('popstate', function () {
+    // Une page qui échange davantage que la barre et les résultats — des
+    // onglets, par exemple — gère elle-même le retour arrière et le déclare.
+    // Sans cela, deux échanges partiraient en même temps pour la même
+    // adresse, et le plus lent écraserait le plus récent.
+    if (window.listePopstate === false) return;
     rafraichir(window.location.href, false);
   });
 

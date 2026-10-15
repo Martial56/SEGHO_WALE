@@ -10,11 +10,51 @@ n'y rien lire ferait des centaines d'écrans.
 {% if groupes %}
 <div class="dbl-grille">
   {% for groupe in groupes %}
-  <div class="dbl-carte-groupe {{ groupe.niveau }}" data-groupe="{{ groupe.cle }}">
+  {% if grouper %}{% ifchanged groupe.section %}
+  {% comment %}
+  La bande d'une section, sur toute la largeur de la grille — celle des autres
+  listes : même classe, même chevron, même `lstBasculerGroupe`. Les cartes
+  portent `data-parent`, et c'est tout ce qu'il faut au script partagé pour
+  les replier sans rien demander au serveur.
+
+  `data-charge="1"` et pas de `data-feuille` : les cartes sont déjà là, il n'y
+  a rien à aller chercher au dépliage ni à précharger.
+
+  Son nombre vient de l'ensemble filtré, pas de la page : une section qui
+  déborde doit dire ce qu'elle contient, pas ce qu'on en voit.
+  {% endcomment %}
+  <div class="lst-groupe lst-groupe-bande open"
+       data-chemin="{{ groupe.section_rang }}" data-parent=""
+       data-total="{{ groupe.section_total }}" data-charge="1"
+       onclick="lstBasculerGroupe(this)">
+    <span class="dbl-bande-titre">
+      <i class="bi bi-chevron-right lst-chevron"></i>
+      {% comment %}
+      La case ne déplie pas : sans ce frein, cocher la section la refermerait
+      aussitôt.
+      {% endcomment %}
+      <label class="dbl-coche-section" onclick="event.stopPropagation();">
+        <input type="checkbox" data-section="{{ groupe.section }}">
+        <span>{{ groupe.section }}</span>
+      </label>
+      <span class="lst-compte">{{ groupe.section_total }}</span>
+    </span>
+  </div>
+  {% endifchanged %}{% endif %}
+  <div class="dbl-carte-groupe {{ groupe.niveau }}" data-groupe="{{ groupe.cle }}"
+       data-niveau="{{ groupe.niveau }}"
+       {% if grouper %}data-parent="{{ groupe.section_rang }}"{% endif %}
+       data-section="{{ groupe.section|default:'' }}">
     <a class="dbl-lien" aria-label="Comparer ces {{ groupe.fiches|length }} fiches"
        href="{% url 'patients:doublons_comparer' cle=groupe.cle %}?retour={{ request.get_full_path|urlencode }}"></a>
 
     <div class="dbl-tete-groupe">
+      {% comment %}
+      La case est au-dessus du lien qui couvre la carte (`.dbl-lien`) : sans
+      cela, cocher ouvrirait la comparaison.
+      {% endcomment %}
+      <input type="checkbox" class="dbl-coche" value="{{ groupe.cle }}"
+             aria-label="Sélectionner ce groupe">
       <span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span>
       {% if groupe.fiches|length > 2 %}
       <span class="dbl-nombre">{{ groupe.fiches|length }} fiches</span>
@@ -68,6 +108,7 @@ n'y rien lire ferait des centaines d'écrans.
 {% else %}
 <div class="o-empty">
   {% if q %}Aucun groupe ne correspond à cette recherche.
-  {% else %}Aucun doublon à ce niveau.{% endif %}
+  {% elif niveau != 'tous' %}Aucun doublon à ce niveau.
+  {% else %}Aucun doublon relevé dans ce centre.{% endif %}
 </div>
 {% endif %}

@@ -12,6 +12,8 @@ from datetime import date
 
 from django.db.models import Case, CharField, Q, Value, When
 
+from .resolution import condition_reperes
+
 from core.utils import annees_avant
 
 
@@ -25,7 +27,10 @@ LIBELLE_MINEUR = 'Mineurs (< 18 ans)'
 LIBELLE_ADULTE = 'Adultes (18–60 ans)'
 LIBELLE_SENIOR = 'Seniors (> 60 ans)'
 
-CHAMPS_RECHERCHE = ('nom', 'prenoms', 'code_patient', 'telephone')
+#: `ancien_identifiant` en fait partie : les dossiers venus de l'ancien
+#: logiciel se cherchent encore par le numéro qu'ils y portaient.
+CHAMPS_RECHERCHE = ('nom', 'prenoms', 'code_patient', 'telephone',
+                    'ancien_identifiant')
 
 
 def _bornes(aujourdhui):
@@ -180,6 +185,9 @@ def listing_patients(aujourdhui=None):
     perso = dimensions_personnalisees(champs)
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
+        # Le code et l'ancien identifiant d'une fiche fusionnée ramènent la
+        # fiche gardée : voir `patients.resolution`.
+        recherche_en_plus=condition_reperes,
         familles=familles_patients(),
         dimensions=list(declarees.values()) + perso,
         par_page=100,

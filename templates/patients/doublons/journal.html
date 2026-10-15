@@ -6,32 +6,16 @@ code, jamais par le texte du message — un message est écrit pour être lu, il
 se reformule.
 {% endcomment %}
 
-{% block onglet_journal %}actif{% endblock %}
+{% block onglet_journal %}active{% endblock %}
 
-{% block extra_css %}
-{{ block.super }}
-<style>
-  .jnl { width: 100%; border-collapse: collapse; font-size: 12.5px;
-         background: var(--surface); }
-  .jnl thead th { text-align: left; font-size: 11px; text-transform: uppercase;
-                  color: var(--text-muted); font-weight: 600; padding: 8px 14px;
-                  border-bottom: 1px solid var(--border); }
-  .jnl td { padding: 9px 14px; border-bottom: 1px solid var(--border);
-            vertical-align: top; }
-  .jnl .quand { white-space: nowrap; color: var(--text-muted); }
-  .jnl .code { font-family: var(--font-mono); font-size: 11px; }
-  .jnl .genre { font-weight: 600; white-space: nowrap; }
-  .jnl .genre.forcage { color: #b02a37; }
-  html[data-theme="dark"] .jnl .genre.forcage { color: #f09aa3; }
-</style>
-{% endblock %}
+{% block subheader_compte %}<span class="o-page-count">{{ page.paginator.count }}</span>{% endblock %}
 
-{% block subheader_droite %}
-  <span class="o-count">{{ page.paginator.count }} trace{{ page.paginator.count|pluralize }}</span>
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Fiche ou utilisateur…" %}
 {% endblock %}
 
 {% block doublons_contenu %}
-<div class="dbl-contenu">
+<div class="dbl-tableau">
 <table class="jnl">
   <thead>
     <tr>
@@ -55,12 +39,15 @@ se reformule.
       <td>{{ ligne.trace.message }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="5" class="o-empty">Aucune trace pour le moment.</td></tr>
+    <tr><td colspan="5" class="o-empty">
+      {% if q %}Aucune trace ne correspond à cette recherche.
+      {% else %}Aucune trace pour le moment.{% endif %}
+    </td></tr>
   {% endfor %}
   </tbody>
 </table>
+</div>
 <div style="padding:12px 0;">
   {% include 'patients/doublons/includes/pagination.html' %}
-</div>
 </div>
 {% endblock %}

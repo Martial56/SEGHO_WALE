@@ -1,0 +1,168 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+L'écran de confirmation : ce qui part, ce qui reste, et le code à taper.
+
+Il se lit avant de décider, dans cet ordre : la fiche, son état, ce que la
+suppression emporte, ce qu'elle laisse. Le code se tape en dernier. Aucun de
+ces contrôles n'est un garde-fou à lui seul — la vue les refait tous au
+moment de supprimer.
+{% endcomment %}
+
+{% comment %}
+L'onglet allumé est celui d'où l'on vient : une fiche masquée se supprime
+depuis « Fiches masquées », une fiche versée depuis « Fusions ».
+{% endcomment %}
+{% block onglet_masquees %}{% if etat == 'masquee' %}active{% endif %}{% endblock %}
+{% block onglet_fusions %}{% if etat == 'fusionnee' %}active{% endif %}{% endblock %}
+
+{% block subheader_gauche %}
+  <a class="o-back-btn" href="{{ retour }}">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .sup-page { max-width: 760px; padding: 20px 0 40px; }
+  .sup-fiche { border: 1px solid var(--border); border-radius: 8px;
+               padding: 14px 16px; background: var(--surface); }
+  .sup-fiche .code { font-family: var(--font-mono); font-size: 12px;
+                     color: var(--text-muted); }
+  .sup-nom { font-size: 16px; font-weight: 600; margin: 2px 0 8px; }
+  .sup-ligne { font-size: 13px; color: var(--text-muted); }
+  .sup-titre { font-size: 13px; font-weight: 600; margin: 22px 0 8px; }
+  .sup-liste { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .sup-liste li { padding: 6px 0; border-bottom: 1px dashed var(--border);
+                  display: flex; justify-content: space-between; gap: 16px; }
+  .sup-liste li:last-child { border-bottom: none; }
+  .sup-liste .nombre { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+  /* L'avertissement dit ce qui ne pourra plus être défait. Il n'est pas
+     décoratif : c'est la seule phrase de l'écran qu'on ne peut pas rattraper
+     après coup. */
+  .sup-avertit { margin: 18px 0; padding: 12px 14px; border-radius: 6px;
+                 font-size: 13px; line-height: 1.55;
+                 background: rgba(var(--rose-rgb), .08);
+                 border: 1px solid rgba(var(--rose-rgb), .30);
+                 color: var(--rose-text); }
+  html[data-theme="dark"] .sup-avertit { background: rgba(240,154,163,.10);
+                                         border-color: rgba(240,154,163,.38);
+                                         color: #f09aa3; }
+  .sup-refus { margin: 18px 0; padding: 12px 14px; border-radius: 6px;
+               font-size: 13px; background: var(--surface-muted);
+               border: 1px solid var(--border); color: var(--text-muted); }
+  .sup-confirme { margin-top: 24px; border-top: 1px solid var(--border);
+                  padding-top: 18px; }
+  .sup-confirme label { display: block; font-size: 13px; margin-bottom: 8px; }
+  .sup-saisie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sup-saisie input { font-family: var(--font-mono); font-size: 13px;
+                      padding: 7px 10px; border: 1px solid var(--border);
+                      border-radius: 4px; background: var(--surface);
+                      color: var(--text); width: 190px; }
+  .sup-btn { background: var(--rose-text); border: 1px solid var(--rose-text);
+             color: #fff; border-radius: 4px; padding: 7px 14px; font-size: 13px;
+             font-family: inherit; cursor: pointer; }
+  .sup-btn:disabled { opacity: .40; cursor: not-allowed; }
+  .sup-erreur { color: var(--rose-text); font-size: 13px; margin-top: 10px; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="sup-page">
+
+  <div class="sup-fiche">
+    <span class="code">{{ fiche.code_patient }}</span>
+    {% if fiche.ancien_identifiant %}
+      <span class="code">· {{ fiche.ancien_identifiant }}</span>
+    {% endif %}
+    <div class="sup-nom">{{ fiche.nom }} {{ fiche.prenoms }}</div>
+    <div class="sup-ligne">
+      {{ fiche.date_naissance|date:'d/m/Y'|default:'naissance inconnue' }}
+      · {{ fiche.telephone|default:'sans téléphone' }}
+    </div>
+    <div class="sup-ligne" style="margin-top:6px;">
+      {% if etat == 'fusionnee' %}
+        Versée dans {{ remplacante.code_patient }} — {{ remplacante.nom }} {{ remplacante.prenoms }}.
+      {% elif etat == 'masquee' %}
+        Masquée{% if remplacante %}, doublon de {{ remplacante.code_patient }} —
+        {{ remplacante.nom }} {{ remplacante.prenoms }}{% endif %}.
+      {% endif %}
+    </div>
+  </div>
+
+  {% if obstacles %}
+  <div class="sup-refus">
+    <b>Cette fiche ne peut pas être supprimée.</b>
+    <ul class="sup-liste" style="margin-top:8px;">
+      {% for raison in obstacles %}<li>{{ raison }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% else %}
+
+  {% if etat == 'fusionnee' %}
+  <div class="sup-avertit">
+    <b>La fusion ne pourra plus être annulée.</b>
+    Le journal gardera la copie de la fiche, mais il ne la recréera pas :
+    ce qui a été versé dans {{ remplacante.code_patient }} y restera.
+  </div>
+  {% endif %}
+
+  <div class="sup-titre">Ce que la suppression emporte</div>
+  <ul class="sup-liste">
+    {% for libelle, nombre in emporte %}
+    <li><span>{{ libelle }}</span><span class="nombre">{{ nombre }}</span></li>
+    {% empty %}
+    <li><span>Rien d'autre que la fiche elle-même.</span></li>
+    {% endfor %}
+  </ul>
+
+  <div class="sup-titre">Ce qui reste</div>
+  <ul class="sup-liste">
+    <li><span>La trace : qui, quand, et la copie complète de la fiche.</span></li>
+    <li><span>Son journal d'activité, recopié dans cette trace.</span></li>
+    {% if etat == 'fusionnee' %}
+    <li><span>La redirection : {{ fiche.code_patient }}
+      {% if fiche.ancien_identifiant %}et {{ fiche.ancien_identifiant }}
+      {% endif %}mèneront toujours à {{ remplacante.code_patient }}.</span></li>
+    {% endif %}
+  </ul>
+
+  <form method="post" class="sup-confirme" id="sup-form">
+    {% csrf_token %}
+    <input type="hidden" name="retour" value="{{ retour }}">
+    <label for="sup-code">
+      Pour confirmer, tapez le code de la fiche :
+      <b>{{ fiche.code_patient }}</b>
+    </label>
+    <div class="sup-saisie">
+      <input type="text" id="sup-code" name="code" autocomplete="off"
+             spellcheck="false" placeholder="PAT…"
+             data-attendu="{{ fiche.code_patient }}">
+      <button type="submit" class="sup-btn" id="sup-valider" disabled>
+        Supprimer définitivement
+      </button>
+    </div>
+    {% if erreur %}<div class="sup-erreur">{{ erreur }}</div>{% endif %}
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+  // Le bouton ne s'allume que si le code tapé est le bon. Ce n'est qu'un
+  // garde-fou de surface : la vue revérifie, comme elle revérifie l'état de
+  // la fiche et ce qu'elle porte.
+  (function () {
+    var saisie = document.getElementById('sup-code');
+    var bouton = document.getElementById('sup-valider');
+    if (!saisie || !bouton) return;
+    saisie.addEventListener('input', function () {
+      bouton.disabled = saisie.value.trim().toUpperCase() !== saisie.dataset.attendu;
+    });
+  })();
+</script>
+{% endblock %}

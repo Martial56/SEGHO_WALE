@@ -1,0 +1,75 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Après coup : ce qui a été fait, et ce qui ne l'a pas été.
+
+Le bilan ne se résume pas à un nombre. Un groupe ignoré est un groupe qui
+reste à traiter : il est nommé, avec la raison, et un lien pour l'ouvrir.
+{% endcomment %}
+
+{% block onglet_liste %}active{% endblock %}
+
+{% block subheader_gauche %}
+  <a class="o-back-btn" href="{{ retour }}">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .lot-page { padding: 18px 0 40px; }
+  .lot-annonce { font-size: 15px; margin-bottom: 4px; }
+  .lot-annonce b { font-size: 17px; }
+  .lot-sous { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
+  .lot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lot-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .lot-table .code { font-family: var(--font-mono); font-size: 11px;
+                     color: var(--text-muted); }
+  .lot-titre { font-size: 13px; font-weight: 600; margin: 24px 0 8px; }
+  .lot-pourquoi { color: var(--text-muted); }
+  .lot-actions { display: flex; gap: 12px; margin-top: 26px; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="lot-page">
+  {% with ignores=lot.ignores|length|add:lot.ecartes|length %}
+  <div class="lot-annonce">
+    <b>{{ lot.faits|length }}</b> {% if lot.action == 'masquer' %}masqué{{ lot.faits|length|pluralize }}{% elif lot.action == 'ecarter' %}écarté{{ lot.faits|length|pluralize }}{% else %}fusionné{{ lot.faits|length|pluralize }}{% endif %}{% if ignores %}, {{ ignores }} ignoré{{ ignores|pluralize }}{% endif %}.
+  </div>
+  {% endwith %}
+  <div class="lot-sous">
+    Lot {{ lot.numero }} · {{ lot.execute_le|date:'d/m/Y H:i' }}
+    {% if lot.utilisateur %}· par {{ lot.utilisateur }}{% endif %}
+  </div>
+
+  {% if lot.ignores or lot.ecartes %}
+  <div class="lot-titre">Ignorés — à traiter un par un</div>
+  <table class="lot-table">
+    <tbody>
+      {% for cle, pourquoi in lot.ignores %}
+      <tr>
+        <td style="width:140px;"><a class="o-lien"
+           href="{% url 'patients:doublons_comparer' cle=cle %}">Voir le groupe</a></td>
+        <td class="lot-pourquoi">{{ pourquoi }}</td>
+      </tr>
+      {% endfor %}
+      {% for cle, pourquoi in lot.ecartes %}
+      <tr>
+        <td style="width:140px;"><a class="o-lien"
+           href="{% url 'patients:doublons_comparer' cle=cle %}">Voir le groupe</a></td>
+        <td class="lot-pourquoi">{{ pourquoi }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="lot-actions">
+    <a class="o-btn-create" href="{{ retour }}">Revenir au relevé</a>
+    <a class="o-ctrl-btn" href="{% url 'patients:doublons_lots' %}">Voir les lots</a>
+  </div>
+</div>
+{% endblock %}

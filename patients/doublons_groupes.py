@@ -16,7 +16,11 @@ groupe. Deux groupes ne se réunissent que si **chaque** fiche de l'un ressemble
 Les paires « à vérifier », elles, ne se regroupent pas : chacune reste un duo.
 """
 
+import datetime
+
 from django.core.cache import cache
+
+from .doublons import normaliser_texte
 
 #: Au-delà, ce n'est plus « la même personne saisie plusieurs fois ».
 TAILLE_MAX = 8
@@ -30,7 +34,7 @@ DUREE_CACHE = 3600
 #: Sans cela, un serveur fraîchement déployé continue de servir l'ancienne
 #: forme jusqu'au recalcul suivant — et l'écran perd en silence ce qu'elle
 #: n'avait pas encore (la raison du rapprochement, par exemple).
-VERSION_INDEX = 3
+VERSION_INDEX = 4
 
 
 def _scores_certains(centre_id):
@@ -128,18 +132,52 @@ def _construire_index(centre_id):
                        'niveau': 'avertissement', 'paire': (a, b),
                        'details': detail})
 
-    # De quoi chercher par nom ou par code sans relire la table à chaque frappe.
-    identites = dict(Patient.all_objects.filter(
-        pk__in={pk for ligne in lignes for pk in ligne['membres']}
-    ).values_list('pk', 'code_patient'))
-    noms = {pk: f'{n} {p}'.strip() for pk, n, p in Patient.all_objects.filter(
-        pk__in=identites).values_list('pk', 'nom', 'prenoms')}
+    # Une seule lecture des fiches citées : de quoi chercher par nom ou par
+    # code sans relire la table à chaque frappe, et de quoi composer la
+    # phrase de raison une fois pour toutes (voir `_phrase_de_la_ligne`).
+    fiches = {pk: (code, nom, prenoms) for pk, code, nom, prenoms
+              in Patient.all_objects.filter(
+                  pk__in={pk for ligne in lignes for pk in ligne['membres']}
+              ).values_list('pk', 'code_patient', 'nom', 'prenoms')}
+    # Les écritures mises à plat une fois par fiche, et non une fois par
+    # ligne : les mêmes fiches reviennent dans plusieurs paires, et
+    # normaliser huit mille cinq cents fois de plus coûtait une demi-seconde.
+    normes = {pk: (normaliser_texte(nom), normaliser_texte(prenoms))
+              for pk, (_code, nom, prenoms) in fiches.items()}
     for ligne in lignes:
         ligne['cle'] = cle_groupe(ligne['membres'])
         ligne['recherche'] = ' '.join(
-            f"{identites.get(pk, '')} {noms.get(pk, '')}" for pk in ligne['membres']
-        ).lower()
+            '{} {} {}'.format(*fiches.get(pk, ('', '', '')))
+            for pk in ligne['membres']).lower()
+        ligne['raison'] = _phrase_de_la_ligne(ligne, normes)
     return lignes
+
+
+def _phrase_de_la_ligne(ligne, normes):
+    """La phrase de raison, rangée dans l'index pour pouvoir filtrer dessus.
+
+    L'affichage, lui, la recompose à partir des fiches chargées (voir
+    `_raisons_du_groupe`) : c'est ce qui la corrige sans attendre un
+    recalcul. Les deux peuvent donc se contredire sur un groupe dont un nom
+    vient d'être corrigé, le temps que l'index se refasse — un lot le refait
+    tout de suite, le recalcul de nuit sinon.
+
+    `normes` porte les écritures déjà mises à plat. « Même nom » se recompose
+    ici à partir des deux champs plutôt que d'appeler `memes_noms`, qui
+    normaliserait une troisième chaîne : la mise à plat réunit les champs par
+    une espace et replie les blancs, les deux calculs donnent le même mot.
+    """
+    from .doublons import raisons
+
+    details = dict(ligne.get('details') or {})
+    a, b = ligne.get('paire') or (None, None)
+    if a in normes and b in normes:
+        (nom_a, prenoms_a), (nom_b, prenoms_b) = normes[a], normes[b]
+        details['nom_identique'] = nom_a == nom_b
+        details['prenoms_identiques'] = prenoms_a == prenoms_b
+        details['noms_identiques'] = (f'{nom_a} {prenoms_a}'.strip()
+                                      == f'{nom_b} {prenoms_b}'.strip())
+    return ', '.join(raisons(details))
 
 
 def index(centre_id):
@@ -170,15 +208,111 @@ def index(centre_id):
     return lignes
 
 
-def filtrer(lignes, niveau='certain', recherche=''):
-    """Le filtre de niveau et la recherche par nom ou code."""
+#: Les trois états de données rattachées, et ce qu'ils veulent dire sur un
+#: groupe. L'ordre est celui du menu, du plus facile à traiter au moins.
+RATTACHEES = [
+    ('aucune', 'Aucune des deux fiches'),
+    ('une', 'Une seule des deux'),
+    ('deux', 'Les deux fiches'),
+]
+
+
+def classer_rattachees(ligne, totaux):
+    """« aucune », « une » ou « deux » pour ce groupe.
+
+    « deux » se lit « au moins deux » : un groupe de trois fiches dont deux
+    portent des données se traite comme un groupe de deux qui en portent.
+    """
+    porteuses = sum(1 for pk in ligne['membres'] if totaux.get(pk))
+    if not porteuses:
+        return 'aucune'
+    return 'une' if porteuses == 1 else 'deux'
+
+
+def filtrer(lignes, niveau='tous', recherche='', raisons=(), rattachees=(),
+            totaux=None):
+    """Les quatre filtres de l'écran, cumulables.
+
+    `niveau` est exclusif — un groupe est quasi certain ou à vérifier ;
+    `raisons` et `rattachees` sont des listes : cocher deux phrases montre
+    les groupes de l'une **ou** de l'autre.
+
+    `totaux` ({pk: nombre rattaché}) n'est demandé que si le filtre des
+    données rattachées est posé : il coûte une seconde et demie à constituer
+    (voir `liens_patient.totaux_rattaches`), autant ne pas le payer pour
+    rien.
+    """
     if niveau in ('certain', 'avertissement'):
         lignes = [l for l in lignes if l['niveau'] == niveau]
     recherche = (recherche or '').strip().lower()
     if recherche:
         mots = recherche.split()
         lignes = [l for l in lignes if all(m in l['recherche'] for m in mots)]
+    if raisons:
+        voulues = set(raisons)
+        lignes = [l for l in lignes if l.get('raison') in voulues]
+    if rattachees and totaux is not None:
+        voulus = set(rattachees)
+        lignes = [l for l in lignes
+                  if classer_rattachees(l, totaux) in voulus]
     return lignes
+
+
+def compter_par_raison(lignes):
+    """[(phrase, nombre)] de la plus fréquente à la moins fréquente.
+
+    Compté sur les lignes qu'on lui donne, c'est-à-dire sur le relevé déjà
+    filtré par les *autres* filtres : le nombre annoncé est celui qu'on
+    obtiendra en cochant, pas un nombre théorique.
+    """
+    from collections import Counter
+
+    comptes = Counter(l.get('raison') or '' for l in lignes)
+    return [(phrase, nombre) for phrase, nombre
+            in sorted(comptes.items(), key=lambda c: (-c[1], c[0])) if phrase]
+
+
+def compter_par_niveau(lignes):
+    from collections import Counter
+    return Counter(l['niveau'] for l in lignes)
+
+
+def compter_par_rattachees(lignes, totaux):
+    from collections import Counter
+    return Counter(classer_rattachees(l, totaux) for l in lignes)
+
+
+#: Les dimensions de regroupement, et le libellé de leur bande.
+DIMENSIONS = [
+    ('raison', 'Raison'),
+    ('niveau', 'Niveau de ressemblance'),
+    ('rattachees', 'Données rattachées'),
+]
+
+NIVEAUX_AFFICHES = {'certain': 'Quasi certain', 'avertissement': 'À vérifier'}
+
+
+def sections(lignes, dimension, totaux=None):
+    """Les lignes rangées en sections, et le total de chacune.
+
+    Rendu : [(libellé, [lignes])], les sections les plus fournies d'abord.
+    Le total vient de l'ensemble filtré, pas de la page : une section qui
+    déborde doit annoncer ce qu'elle contient, pas ce qu'on en voit.
+    """
+    if dimension == 'raison':
+        cle = lambda l: l.get('raison') or 'Sans raison relevée'          # noqa: E731
+    elif dimension == 'niveau':
+        cle = lambda l: NIVEAUX_AFFICHES.get(l['niveau'], l['niveau'])    # noqa: E731
+    elif dimension == 'rattachees':
+        libelles = dict(RATTACHEES)
+        cle = lambda l: libelles[classer_rattachees(l, totaux or {})]     # noqa: E731
+    else:
+        return None
+
+    paquets = {}
+    for ligne in lignes:
+        paquets.setdefault(cle(ligne), []).append(ligne)
+    return sorted(paquets.items(), key=lambda s: (-len(s[1]), s[0]))
 
 
 # ── Les fiches d'une page ───────────────────────────────────────────────────
@@ -218,7 +352,8 @@ def garnir(lignes):
                             else suggerer_a_garder(membres, rattachees))
         garnie['choix_humain'] = bool(humains)
         garnie['raisons'] = _raisons_du_groupe(ligne, fiches)
-        garnie['masquable'] = _masquable(membres, garnie['garder'], champs_en_plus)
+        garnie['masquable'] = _masquable(membres, garnie['garder'],
+                                         champs_en_plus, ligne.get('niveau'))
         garnies.append(garnie)
     return garnies
 
@@ -240,13 +375,71 @@ def _raisons_du_groupe(ligne, fiches):
     prochain recalcul : « même nom » ne doit jamais s'afficher devant BALO et
     BALLO.
     """
-    from .doublons import memes_noms, raisons
+    from .doublons import memes_champs, memes_noms, raisons
 
     details = dict(ligne.get('details') or {})
     a, b = ligne.get('paire') or (None, None)
     if a in fiches and b in fiches:
         details['noms_identiques'] = memes_noms(fiches[a], fiches[b])
+        (details['nom_identique'],
+         details['prenoms_identiques']) = memes_champs(fiches[a], fiches[b])
     return raisons(details)
+
+
+def resume_du_groupe(fiches):
+    """Le score et la raison de ce groupe, relus en base. None si plus rien.
+
+    L'écran de comparaison s'ouvre depuis une carte qui portait les deux ; les
+    perdre en chemin oblige à revenir en arrière pour se rappeler pourquoi ces
+    fiches sont rapprochées.
+
+    Le score retenu est celui du **maillon le plus faible**, comme dans la
+    liste : annoncer celui du lien le plus sûr promettrait au groupe entier
+    une ressemblance que sa paire la moins bonne n'a pas.
+    """
+    from .models import DoublonPaire
+
+    pks = [f.pk for f in fiches]
+    paires = list(DoublonPaire.all_objects
+                  .filter(patient_a_id__in=pks, patient_b_id__in=pks)
+                  .values_list('patient_a_id', 'patient_b_id', 'score',
+                               'niveau', 'details'))
+    if not paires:
+        return None
+    a, b, score, _niveau, details = min(paires, key=lambda paire: paire[2])
+    return {
+        'score': score,
+        # Le groupe est « certain » dès qu'un de ses liens l'est : c'est ainsi
+        # que l'index le classe, et la pastille doit dire la même chose.
+        'niveau': ('certain' if any(p[3] == 'certain' for p in paires)
+                   else 'avertissement'),
+        'raisons': _raisons_du_groupe({'details': details, 'paire': (a, b)},
+                                      {f.pk: f for f in fiches}),
+    }
+
+
+def valeur_affichee(fiche, champ):
+    """Un champ de la fiche, tel qu'il doit se lire à l'écran.
+
+    Ici plutôt que dans chaque gabarit : la comparaison côte à côte et l'écran
+    de fusion montrent les mêmes champs, et doivent les montrer pareil. Une
+    date approximative dit « ≈ 1996 », un sexe dit « Masculin » et non « M »,
+    une photo dit son nom de fichier.
+    """
+    if champ == 'date_naissance':
+        return naissance_affichee(fiche)
+    if champ == 'sexe':
+        return fiche.get_sexe_display() if fiche.sexe else ''
+    if champ == 'assurance':
+        return str(fiche.assurance) if fiche.assurance_id else ''
+    valeur = getattr(fiche, champ, None)
+    if hasattr(valeur, 'storage'):                       # FieldFile
+        return valeur.name.rsplit('/', 1)[-1] if valeur.name else ''
+    if valeur is None or valeur is False:
+        return ''
+    if isinstance(valeur, datetime.date):
+        return valeur.strftime('%d/%m/%Y')
+    return str(valeur)
 
 
 def marquer_differences(membres):
@@ -313,7 +506,7 @@ def _se_contredisent(valeurs):
     return len({v for v in valeurs if v}) > 1
 
 
-def _masquable(membres, garder, champs_en_plus):
+def _masquable(membres, garder, champs_en_plus, niveau='certain'):
     """La fiche qu'on peut retirer d'un clic, s'il y en a une.
 
     La grande majorité des groupes sont une fiche pleine et sa copie vide,
@@ -321,7 +514,16 @@ def _masquable(membres, garder, champs_en_plus):
     ferait des centaines d'écrans ; le bouton n'apparaît que lorsqu'il n'y a
     précisément rien à lire : deux fiches, aucune donnée rattachée d'un côté,
     et pas un champ que l'autre n'ait déjà.
+
+    Jamais sur un groupe « à vérifier ». Ces groupes-là sont souvent deux
+    personnes différentes — un prénom voisin, deux dates qui ne concordent
+    pas —, et la fiche vide est alors simplement une fiche neuve. Un clic
+    rapide la ferait disparaître sous le nom d'une autre. Il reste possible
+    de la masquer, mais depuis l'écran de comparaison, les deux fiches sous
+    les yeux.
     """
+    if niveau != 'certain':
+        return None
     if len(membres) != 2 or any(f.masque for f in membres):
         return None
     gardee = next((f for f in membres if f.pk == garder), None)
@@ -337,6 +539,23 @@ def resumer(rattache):
     """« 3 rendez-vous, 2 factures », ou rien du tout."""
     return ', '.join(f'{nombre} {libelle.lower()}'
                      for libelle, nombre in sorted(rattache.items()))
+
+
+def fiche_a_garder(fiches, rattachees=None):
+    """(pk de la fiche gardée, les fiches explicitement choisies).
+
+    Le choix d'une personne prime sur la suggestion ; s'il y en a plusieurs
+    dans le groupe, le plus récent l'emporte. L'écran côte à côte et l'écran
+    de fusion doivent répondre pareil, d'où cette fonction partagée.
+    """
+    from .models import ChoixFicheGardee
+
+    choisis = dict(ChoixFicheGardee.all_objects.filter(patient__in=fiches)
+                   .values_list('patient_id', 'date'))
+    humains = [f.pk for f in fiches if f.pk in choisis]
+    if humains:
+        return max(humains, key=lambda pk: choisis[pk]), set(choisis)
+    return suggerer_a_garder(fiches, rattachees or {}), set(choisis)
 
 
 def suggerer_a_garder(fiches, rattachees=None):

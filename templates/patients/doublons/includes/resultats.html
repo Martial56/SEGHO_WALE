@@ -1,0 +1,48 @@
+{% comment %}
+Les deux vues du relevé et la pagination basse, exactement comme la liste des
+patients : les cartes d'abord, le tableau replié (`#list-view` est masqué par
+le partiel des composants), la pagination numérotée en pied de page.
+{% endcomment %}
+{% include 'patients/doublons/includes/entete_resultats.html' %}
+
+<div id="dbl-cartes" class="dbl-contenu">
+  {% include 'patients/doublons/includes/liste_corps.html' %}
+</div>
+
+<div id="list-view">
+  {% include 'patients/doublons/includes/liste_tableau.html' %}
+</div>
+
+{% include 'patients/doublons/includes/barre_lot.html' %}
+
+{% if page.has_other_pages %}
+<div class="pagination">
+  <span>
+    Page {{ page.number }} sur {{ page.paginator.num_pages }}
+    &nbsp;·&nbsp; <span data-total>{{ page.paginator.count }}</span> groupes
+  </span>
+  <div class="pagination-pages">
+    {% if page.has_previous %}
+      <a href="?{{ qs_base }}page=1" title="Première">«</a>
+      <a href="?{{ qs_base }}page={{ page.previous_page_number }}">‹</a>
+    {% else %}
+      <span class="disabled">«</span>
+      <span class="disabled">‹</span>
+    {% endif %}
+    {% for num in page.paginator.page_range %}
+      {% if num == page.number %}
+        <span class="current">{{ num }}</span>
+      {% elif num >= page.number|add:"-2" and num <= page.number|add:"2" %}
+        <a href="?{{ qs_base }}page={{ num }}">{{ num }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page.has_next %}
+      <a href="?{{ qs_base }}page={{ page.next_page_number }}">›</a>
+      <a href="?{{ qs_base }}page={{ page.paginator.num_pages }}" title="Dernière">»</a>
+    {% else %}
+      <span class="disabled">›</span>
+      <span class="disabled">»</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

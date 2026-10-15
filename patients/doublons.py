@@ -324,6 +324,41 @@ def memes_noms(a, b):
     return ecrit(a) == ecrit(b)
 
 
+def memes_champs(a, b):
+    """(le nom s'écrit pareil, les prénoms s'écrivent pareil).
+
+    `memes_noms` ne répond que pour l'ensemble des deux champs : il ne dit pas
+    lequel diffère. Or c'est justement ce que la liste doit annoncer — devant
+    ASSENA ELIAQUIM et ASSENA ELIAKIM, « nom presque identique » est faux : le
+    nom est le même, c'est le prénom qui change.
+    """
+    def ecrit(x, champ):
+        return normaliser_texte(_champ(x, champ) or '')
+    return (ecrit(a, 'nom') == ecrit(b, 'nom'),
+            ecrit(a, 'prenoms') == ecrit(b, 'prenoms'))
+
+
+def _raison_des_noms(d):
+    """Lequel des deux champs rapproche ces fiches, et lequel diffère.
+
+    Les relevés antérieurs au 14/10/2026 ne portent pas le détail par champ.
+    On retombe alors sur l'ancienne phrase, qui ne dit rien de faux, plutôt
+    que de deviner. Les écrans, eux, relisent l'écriture sur les fiches
+    (voir `doublons_groupes._raisons_du_groupe`) : la phrase s'y corrige sans
+    attendre le recalcul suivant.
+    """
+    if d.get('noms_identiques'):
+        return 'même nom'
+    if 'nom_identique' not in d:
+        return 'nom presque identique'
+    nom, prenoms = d.get('nom_identique'), d.get('prenoms_identiques')
+    if nom and not prenoms:
+        return 'prénom presque identique'
+    if prenoms and not nom:
+        return 'nom presque identique'
+    return 'nom et prénom presque identiques'
+
+
 def raisons(details):
     """Pourquoi ces deux fiches se ressemblent, en clair.
 
@@ -333,8 +368,7 @@ def raisons(details):
     r = []
     d = details or {}
     if d.get('noms', 0) >= SEUIL_NOM_ANNONCE:
-        r.append('même nom' if d.get('noms_identiques')
-                 else 'nom presque identique')
+        r.append(_raison_des_noms(d))
     if d.get('date', 0) == 1.0:
         r.append('même date de naissance')
     elif d.get('date', 0) >= 0.6:
@@ -377,9 +411,12 @@ def scorer(saisie, existant):
     prenoms_differents = gauche and droite
     if prenoms_differents:
         score = min(score, SEUIL_BLOCAGE - 1)
+    nom_identique, prenoms_identiques = memes_champs(saisie, existant)
     return Correspondance(existant, score,
                           {'noms': round(s_noms, 3), 'date': s_date,
                            'noms_identiques': memes_noms(saisie, existant),
+                           'nom_identique': nom_identique,
+                           'prenoms_identiques': prenoms_identiques,
                            'telephone': meme_tel,
                            'prenoms_differents': prenoms_differents})
 

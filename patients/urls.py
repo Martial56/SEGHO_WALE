@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import doublons_vues, views
+from . import doublons_vues, fusion_vues, views
 
 app_name = 'patients'
 
@@ -50,7 +50,21 @@ urlpatterns = [
     # Les adresses fixes d'abord : `<str:cle>` attrape n'importe quel segment,
     # et prendrait « journaliser » pour un groupe à comparer.
     path('doublons/', doublons_vues.doublons_liste, name='doublons_liste'),
+    path('doublons/fusions/', fusion_vues.fusion_journal, name='fusions'),
+    path('doublons/fusions/<int:pk>/annuler/', fusion_vues.fusion_annuler,
+         name='fusion_annuler'),
     path('doublons/journal/', doublons_vues.doublons_journal, name='doublons_journal'),
+    path('doublons/masquees/', doublons_vues.doublons_masquees,
+         name='doublons_masquees'),
+    path('doublons/lots/', doublons_vues.doublons_lots, name='doublons_lots'),
+    path('doublons/lots/preparer/', doublons_vues.doublons_lot_preparer,
+         name='doublons_lot_preparer'),
+    path('doublons/lots/<int:pk>/executer/', doublons_vues.doublons_lot_executer,
+         name='doublons_lot_executer'),
+    path('doublons/lots/<int:pk>/annuler/', doublons_vues.doublons_lot_annuler,
+         name='doublons_lot_annuler'),
+    path('doublons/supprimer/<int:pk>/', doublons_vues.doublons_supprimer,
+         name='doublons_supprimer'),
     path('doublons/recalculer/', doublons_vues.doublons_recalculer,
          name='doublons_recalculer'),
     path('doublons/reafficher/<int:pk>/', doublons_vues.doublons_reafficher,
@@ -65,6 +79,8 @@ urlpatterns = [
          name='doublons_garder'),
     path('doublons/<str:cle>/masquer/<int:pk>/', doublons_vues.doublons_masquer,
          name='doublons_masquer'),
+    path('doublons/<str:cle>/fusionner/<int:pk>/', fusion_vues.fusion_ecran,
+         name='fusionner'),
     path('export/', views.export_patients, name='export_patients'),
     path('import/', views.import_patients, name='import_patients'),
     path('import/modele/', views.patients_modele_excel, name='patients_modele'),

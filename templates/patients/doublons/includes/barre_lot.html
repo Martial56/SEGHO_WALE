@@ -1,0 +1,63 @@
+{% comment %}
+La barre d'actions en lot : cachée tant que rien n'est coché, collée au bas de
+l'écran dès qu'un groupe l'est — comme la barre de l'écran de comparaison.
+
+Elle ne décide de rien : elle envoie la sélection à l'écran de confirmation,
+qui dit ce qui sera fait et ce qui sera ignoré. « Fusionner » n'apparaît que
+pour qui en a le droit.
+
+Le formulaire porte les filtres en cours : « tout le relevé filtré » les
+renvoie au serveur plutôt que neuf cents clés, et c'est le serveur qui refait
+le tri.
+
+« Masquer » et « Fusionner » ne valent que pour les groupes quasi certains.
+La barre le dit dès qu'un « à vérifier » est coché, et s'éteint s'il n'y a
+qu'eux ; le serveur, lui, les écarte de toute façon.
+{% endcomment %}
+<form class="dbl-barre-lot" id="dbl-barre-lot" method="post" hidden
+      action="{% url 'patients:doublons_lot_preparer' %}">
+  {% csrf_token %}
+  <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+  <input type="hidden" name="action" id="dbl-lot-action">
+  <input type="hidden" name="tout" id="dbl-lot-tout">
+  <input type="hidden" name="niveau" value="{{ niveau }}">
+  <input type="hidden" name="q" value="{{ q }}">
+  <input type="hidden" name="grouper" value="{{ grouper }}">
+  {% for phrase in raisons %}<input type="hidden" name="raison" value="{{ phrase }}">{% endfor %}
+  {% for code in rattache %}<input type="hidden" name="rattache" value="{{ code }}">{% endfor %}
+  <div id="dbl-lot-cles"></div>
+
+  <span class="dbl-lot-compte"><b id="dbl-lot-nombre">0</b> groupe(s) sélectionné(s)</span>
+
+  <button type="button" class="dbl-lot-lien" id="dbl-lot-filtre"
+          onclick="dblToutLeFiltre()" hidden>
+    Tout sélectionner selon le filtre (<span id="dbl-lot-total">{{ total }}</span> groupes)
+  </button>
+  <button type="button" class="dbl-lot-lien" onclick="dblViderSelection()">
+    Tout décocher
+  </button>
+
+  <span class="dbl-lot-avertis" id="dbl-lot-avertis" hidden></span>
+
+  <span class="dbl-lot-espace"></span>
+
+  <label class="dbl-lot-raison" hidden id="dbl-lot-raison">
+    Raison commune (facultative)
+    <input type="text" name="raison_commune" maxlength="200"
+           placeholder="Deux sœurs, par exemple">
+  </label>
+
+  <button type="submit" class="o-ctrl-btn" id="dbl-lot-masquer"
+          onclick="dblLot('masquer')">
+    <i class="bi bi-eye-slash"></i> Masquer les doublons
+  </button>
+  <button type="submit" class="o-ctrl-btn" onclick="dblLot('ecarter')">
+    <i class="bi bi-x-lg"></i> Pas un doublon
+  </button>
+  {% if perms.patients.fusionner_patients %}
+  <button type="submit" class="o-btn-create" id="dbl-lot-fusionner"
+          onclick="dblLot('fusionner')">
+    <i class="bi bi-arrow-left-right"></i> Fusionner
+  </button>
+  {% endif %}
+</form>

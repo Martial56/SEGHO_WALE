@@ -1,0 +1,105 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Le journal des fusions : ce qui a été versé où, par qui, et de quoi le défaire.
+Une fusion plus récente qui touche les mêmes fiches bloque l'annulation des
+précédentes — la ligne dit alors laquelle annuler d'abord.
+{% endcomment %}
+
+{% block onglet_fusions %}active{% endblock %}
+
+{% block subheader_compte %}<span class="o-page-count">{{ page.paginator.count }}</span>{% endblock %}
+
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Fiche ou utilisateur…" %}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .fus-actions { display: flex; align-items: center; gap: 4px;
+                 justify-content: flex-end; flex-wrap: wrap; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-tableau">
+<table class="fus-journal">
+  <thead>
+    <tr>
+      <th>Quand</th><th>Qui</th><th>Fiche versée</th><th>Fiche gardée</th>
+      <th>Déplacé</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for ligne in lignes %}
+    <tr class="{% if not ligne.fusion.active %}annulee{% endif %}">
+      <td class="quand">{{ ligne.fusion.date|date:'d/m/Y H:i' }}</td>
+      <td>{{ ligne.fusion.utilisateur|default:'—' }}</td>
+      {% comment %}
+      Une fiche supprimée définitivement ne laisse que son code, recopié au
+      journal : la ligne doit continuer de se lire sans elle.
+      {% endcomment %}
+      <td>
+        {% if ligne.fusion.absorbee %}
+        <a href="{% url 'patients:detail' ligne.fusion.absorbee.pk %}"
+           class="code">{{ ligne.fusion.absorbee.code_patient }}</a>
+        {{ ligne.fusion.absorbee.nom }} {{ ligne.fusion.absorbee.prenoms }}
+        {% else %}
+        <span class="code">{{ ligne.fusion.code_absorbee }}</span>
+        <span class="cmp-vide">fiche supprimée</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if ligne.fusion.gardee %}
+        <a href="{% url 'patients:detail' ligne.fusion.gardee.pk %}"
+           class="code">{{ ligne.fusion.gardee.code_patient }}</a>
+        {{ ligne.fusion.gardee.nom }} {{ ligne.fusion.gardee.prenoms }}
+        {% else %}
+        <span class="code">{{ ligne.fusion.code_gardee }}</span>
+        <span class="cmp-vide">fiche supprimée</span>
+        {% endif %}
+      </td>
+      <td>{{ ligne.total }} ligne{{ ligne.total|pluralize }}</td>
+      <td class="fus-actions">
+        {% if not ligne.fusion.active %}
+          Annulée le {{ ligne.fusion.annulee_le|date:'d/m/Y' }}
+          {% if ligne.fusion.annulee_par %}par {{ ligne.fusion.annulee_par }}{% endif %}
+        {% elif not ligne.fusion.annulable %}
+          <span class="empeche">
+            Une des deux fiches a été supprimée : la fusion ne peut plus être
+            annulée.
+          </span>
+        {% elif ligne.bloquante %}
+          <span class="empeche">
+            Annulez d'abord {{ ligne.bloquante.absorbee.code_patient }} →
+            {{ ligne.bloquante.gardee.code_patient }}, du
+            {{ ligne.bloquante.date|date:'d/m/Y H:i' }}.
+          </span>
+        {% else %}
+        <form method="post"
+              action="{% url 'patients:fusion_annuler' ligne.fusion.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="o-ctrl-btn">Annuler la fusion</button>
+        </form>
+        {% endif %}
+        {% if user.is_superuser and ligne.fusion.absorbee and ligne.fusion.active %}
+        <a class="o-btn-danger"
+           href="{% url 'patients:doublons_supprimer' ligne.fusion.absorbee.pk %}?retour={{ request.get_full_path|urlencode }}">
+          Supprimer la fiche versée
+        </a>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="o-empty">
+      {% if q %}Aucune fusion ne correspond à cette recherche.
+      {% else %}Aucune fusion pour le moment.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div style="padding:12px 0;">
+  {% include 'patients/doublons/includes/pagination.html' %}
+</div>
+{% endblock %}

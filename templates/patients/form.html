@@ -1180,6 +1180,16 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
     // ── Rappel sous le bloc d'identité ─────────────────────────────────────
 
     function majRappel() {
+        // Sans centre actif, le serveur ne cherche rien et dit pourquoi. On
+        // le montre ici plutôt que de laisser croire qu'aucun dossier ne
+        // ressemble : l'enregistrement sera refusé pour la même raison.
+        if (donnees && donnees.message) {
+            rappel.hidden = false;
+            rappel.textContent = donnees.message;
+            rappel.classList.add('blocage');
+            info.hidden = true;
+            return;
+        }
         rappel.hidden = fiches.length === 0;
         rappel.textContent = fiches.length === 1
             ? '1 patient proche — revoir'
@@ -1373,7 +1383,8 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
         if (choisi === null) { return; }
         window.open(fiches[choisi].url, '_blank', 'noopener');
     });
-    rappel.addEventListener('click', ouvrir);
+    // Rien à ouvrir quand le rappel ne porte qu'un message.
+    rappel.addEventListener('click', function () { if (fiches.length) { ouvrir(); } });
     voile.addEventListener('mousedown', function (e) {
         // Un clic hors de la fenêtre vaut « Continuer la saisie » : la fermer
         // sans cocher laisserait l'enregistrement refusé sans rien dire.

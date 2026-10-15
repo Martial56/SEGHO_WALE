@@ -13,6 +13,8 @@ from datetime import date, datetime, timedelta
 
 from . import journal_doublons
 from . import origines as origines_patient
+# La même phrase que le menu Doublons : une seule règle, un seul mot.
+from .doublons_acces import CHOISIR
 from .rdv_destination import url_fiche_rdv
 from .models import Patient, RendezVous, Pathologie, TypeVisiteCurative
 from .utils import departements_medecine_generale_ids
@@ -716,6 +718,25 @@ def import_patients(request):
     return redirect('patients:list')
 
 
+def _retiree_lisible(request, pk):
+    """La fiche retirée à cette adresse, si elle est du centre de qui demande.
+
+    `Patient.objects` cloisonne ; `all_objects` ne cloisonne rien. Sans ce
+    filtre, l'adresse directe d'une fiche masquée ou fusionnée ouvrait le
+    dossier d'un autre centre à qui détient `gerer_doublons`.
+    """
+    fiches = Patient.all_objects.filter(pk=pk).select_related(
+        'doublon_de', 'fusionne_dans')
+    centre = getattr(request, 'centre', None)
+    if centre is not None:
+        return fiches.filter(centre=centre).first()
+    # Sans centre actif, la même règle que `CentreManager` : un
+    # super-utilisateur voit tout, les autres ne voient rien.
+    if getattr(request.user, 'is_superuser', False):
+        return fiches.first()
+    return None
+
+
 @login_required
 @permission_required('patients.view_patient', raise_exception=True)
 def patient_detail(request, pk):
@@ -724,9 +745,17 @@ def patient_detail(request, pk):
     # pour qui traite les doublons — sinon un ancien lien ou un signet mènerait
     # à un dossier qu'on croit vivant.
     patient = Patient.objects.filter(pk=pk).first()
-    if patient is None and request.user.has_perm('patients.gerer_doublons'):
-        patient = Patient.all_objects.filter(pk=pk).select_related(
-            'doublon_de', 'fusionne_dans').first()
+    if patient is None:
+        retiree = _retiree_lisible(request, pk)
+        if retiree is not None and request.user.has_perm('patients.gerer_doublons'):
+            patient = retiree
+        elif retiree is not None and retiree.fusionne_dans_id:
+            # L'ancienne adresse mène à la fiche gardée : un lien ou un signet
+            # pris avant la fusion doit continuer de tomber sur le bon dossier,
+            # même pour qui ne traite pas les doublons. Une fiche seulement
+            # **masquée** reste, elle, introuvable : son contenu n'est allé
+            # nulle part, il n'y en avait pas.
+            return redirect('patients:detail', pk=retiree.fusionne_dans_id)
     if patient is None:
         raise Http404('Aucun dossier à cette adresse.')
 
@@ -858,11 +887,17 @@ def doublons_verifier(request):
     }
     exclure = request.GET.get('exclure') or None
 
-    # Périmètre explicite : la vue tourne dans une requête, mais le même code
-    # doit valoir ailleurs (voir PatientForm._perimetre).
+    # Sans centre actif, pas de périmètre : la fenêtre ne propose rien et le
+    # dit. Chercher « partout » montrerait les dossiers d'un autre centre à
+    # qui n'a rien choisi, et un super-utilisateur ne fait pas exception —
+    # c'est la règle du menu Doublons (voir patients/doublons_acces.py).
+    # Hors requête, le périmètre est passé explicitement : voir
+    # `PatientForm._perimetre` et l'import par lots.
     centre = getattr(request, 'centre', None)
-    perimetre = (Patient.all_objects.filter(centre=centre) if centre is not None
-                 else Patient.all_objects.all())
+    if centre is None:
+        return JsonResponse({'doublons': [], 'meme_telephone': 0,
+                             'message': CHOISIR})
+    perimetre = Patient.all_objects.filter(centre=centre)
 
     correspondances = []
     if saisie['nom'] or saisie['prenoms']:
@@ -956,7 +991,13 @@ def doublons_journaliser(request):
     ne jamais exister. C'est de toute façon sur la fiche déjà en base que le
     futur menu « Doublons » ira chercher ce qui a été passé outre.
     """
-    patient = Patient.all_objects.filter(pk=request.POST.get('pk')).first()
+    # Cloisonné comme le reste : la trace se pose sur une fiche du centre
+    # actif, jamais sur celle d'un centre voisin dont on aurait l'identifiant.
+    perimetre = Patient.all_objects
+    centre = getattr(request, 'centre', None)
+    if centre is not None:
+        perimetre = perimetre.filter(centre=centre)
+    patient = perimetre.filter(pk=request.POST.get('pk')).first()
     if patient is None:
         return JsonResponse({'journalise': False}, status=404)
 
@@ -1213,10 +1254,16 @@ def patient_search_json(request):
         return JsonResponse({'results': []})
     else:
         # Même découpage en mots que la liste : « anoh josiane » doit trouver
-        # la fiche, alors que le nom et les prénoms sont deux colonnes.
+        # la fiche, alors que le nom et les prénoms sont deux colonnes. Et le
+        # même rattrapage : le code d'une fiche fusionnée ramène la gardée.
         from core.listing import condition_recherche
-        qs = base_qs.filter(condition_recherche(
-            ('nom', 'prenoms', 'code_patient', 'telephone'), q))[:20]
+        from .patient_listing import CHAMPS_RECHERCHE
+        from .resolution import condition_reperes
+        condition = condition_recherche(CHAMPS_RECHERCHE, q)
+        reperes = condition_reperes(q)
+        if reperes is not None:
+            condition |= reperes
+        qs = base_qs.filter(condition)[:20]
     return JsonResponse({'results': [_to_dict(p) for p in qs]})
 
 

@@ -217,8 +217,14 @@ class Listing:
     """Déclaration complète d'une liste."""
 
     def __init__(self, recherche=(), familles=(), dimensions=(),
-                 par_page=25, filtres_defaut=(), tri_defaut=(), tris=None):
+                 par_page=25, filtres_defaut=(), tri_defaut=(), tris=None,
+                 recherche_en_plus=None):
         self.recherche = tuple(recherche)
+        #: Appelable `(q) -> Q | None`, ajouté **en OU** à la recherche libre.
+        #: De quoi reconnaître un repère que les colonnes ne portent pas : chez
+        #: les patients, le code d'une fiche fusionnée, qui doit ramener la
+        #: fiche gardée.
+        self.recherche_en_plus = recherche_en_plus
         self.familles = list(familles)
         self.dimensions = OrderedDict((d.cle, d) for d in dimensions)
         self.par_page = par_page
@@ -244,7 +250,9 @@ class Listing:
     def appliquer_recherche(self, qs, q):
         if not q or not self.recherche:
             return qs
-        return qs.filter(condition_recherche(self.recherche, q))
+        condition = condition_recherche(self.recherche, q)
+        en_plus = self.recherche_en_plus(q) if self.recherche_en_plus else None
+        return qs.filter(condition | en_plus if en_plus is not None else condition)
 
     def appliquer_filtres(self, qs, filtres, contexte=None):
         """Applique chaque famille en ET ; les valeurs d'une famille en OU."""

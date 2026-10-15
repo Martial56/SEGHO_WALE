@@ -22,6 +22,7 @@ LIENS_INTERNES = {
     ('patients', 'DoublonPaire'),
     ('patients', 'PaireEcartee'),
     ('patients', 'ChoixFicheGardee'),
+    ('patients', 'FusionPatient'),    # le journal parle de la fiche, il ne la suit pas
     ('patients', 'Patient'),          # fusionne_dans, doublon_de
 }
 
@@ -125,12 +126,50 @@ def total(pk):
     return sum(comptes([pk])[pk].values())
 
 
+#: Le relevé entier représente dix-sept mille fiches : les compter coûte une
+#: seconde et demie, treize requêtes groupées. Trop pour chaque frappe dans un
+#: filtre, assez peu pour une minute de mémoire — d'autant que ces nombres ne
+#: servent qu'à trier et à compter, jamais à autoriser : les cartes affichent
+#: les leurs, relus à chaque page, et chaque action revérifie avant d'agir.
+DUREE_CACHE_TOTAUX = 60
+
+CLE_CACHE_TOTAUX = 'patients:totaux-rattaches'
+
+
+def totaux_rattaches(pks):
+    """{pk: nombre de lignes rattachées} pour un grand lot de fiches.
+
+    Mis en cache une minute, et **oublié dès qu'une décision est prise**
+    (voir `oublier_les_totaux`) : sans cela le filtre « aucune donnée »
+    continuerait de proposer des groupes déjà traités.
+    """
+    from django.core.cache import cache
+
+    pks = list(pks)
+    if not pks:
+        return {}
+    connus = cache.get(CLE_CACHE_TOTAUX) or {}
+    manquants = [pk for pk in pks if pk not in connus]
+    if manquants:
+        connus = dict(connus)
+        connus.update({pk: sum(tables.values())
+                       for pk, tables in comptes_par_table(manquants).items()})
+        cache.set(CLE_CACHE_TOTAUX, connus, DUREE_CACHE_TOTAUX)
+    return {pk: connus.get(pk, 0) for pk in pks}
+
+
+def oublier_les_totaux():
+    """À appeler après tout masquage, écartement, fusion ou suppression."""
+    from django.core.cache import cache
+    cache.delete(CLE_CACHE_TOTAUX)
+
+
 #: Champs propres à la fiche qu'une comparaison doit ignorer : ils ne disent
 #: rien du patient, ou se recalculent.
 CHAMPS_TECHNIQUES = {
     'id', 'code_patient', 'centre', 'date_creation', 'date_modification',
     'masque', 'fusionne_dans', 'doublon_de', 'ancien_identifiant',
-    'date_naissance_approx',
+    'date_naissance_approx', 'masque_par', 'masque_le',
 }
 
 

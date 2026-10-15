@@ -1,0 +1,374 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Fusionner deux fiches : à gauche celle qu'on garde, à droite celle qu'on verse
+dedans. Chaque ligne se tranche d'un clic, et ce qui demande vraiment une
+décision est annoncé en haut, en rouge.
+
+Les champs identiques des deux côtés se replient : ils n'apprennent rien, et
+les laisser déroulés repousse ce qui compte sous la ligne de flottaison.
+{% endcomment %}
+
+{% block onglet_liste %}active{% endblock %}
+
+{% block subheader_gauche %}
+  {% comment %}
+  Le bouton retour du projet (`.o-back-btn`, global.css), à gauche, comme sur
+  les écrans de détail des autres modules.
+  {% endcomment %}
+  <a class="o-back-btn" href="{{ retour }}">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .fus-avis { display: flex; gap: 10px; align-items: flex-start; font-size: 13px;
+              padding: 10px 14px; border-radius: var(--radius-sm); margin-top: 12px;
+              border: 1px solid transparent; }
+  .fus-avis .bi { font-size: 15px; flex: 0 0 auto; margin-top: 1px; }
+  .fus-avis-corps { flex: 1 1 auto; }
+  .fus-avis.grave { background: rgba(var(--rose-rgb), .12);
+                    border-color: rgba(var(--rose-rgb), .40); }
+  .fus-avis.grave .bi { color: var(--rose); }
+  .fus-avis.doux { background: rgba(var(--amber-rgb), .13);
+                   border-color: rgba(var(--amber-rgb), .40); }
+  .fus-avis.doux .bi { color: var(--amber); }
+  .fus-avis h4 { margin: 0 0 4px; font-size: 13px; font-weight: 700; }
+  .fus-choix { display: flex; flex-direction: column; gap: 5px; margin-top: 7px; }
+  .fus-choix label { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; }
+  .fus-choix label.interdit { color: var(--text-muted); }
+  .fus-pourquoi { font-size: 11.5px; color: var(--text-muted); }
+
+  .fus-table { width: 100%; border-collapse: collapse; font-size: 13px;
+               margin-top: 14px; background: var(--surface);
+               border: 1px solid var(--border); border-radius: var(--radius-sm);
+               overflow: hidden; }
+  .fus-table th, .fus-table td { padding: 7px 14px; border-top: 1px solid var(--border);
+                                 vertical-align: top; }
+  .fus-table tbody th { text-align: left; font-weight: 500; color: var(--text-muted);
+                        font-size: 12px; width: 180px; }
+  .fus-table thead th { border-top: none; background: var(--surface-muted);
+                        text-align: left; vertical-align: bottom; padding: 12px 14px;
+                        border-bottom: 2px solid var(--border); }
+  .fus-colonne.gardee { background: rgba(var(--teal-500-rgb), .09);
+                        box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent); }
+  .fus-code { display: block; font-family: var(--font-mono); font-size: 11px;
+              color: var(--text-muted); font-weight: 400; }
+  .fus-nom { display: block; font-size: 15px; font-weight: 600; color: var(--text);
+             margin-top: 2px; }
+  .fus-role { display: inline-block; font-size: 10.5px; font-weight: 700;
+              border-radius: 999px; padding: 1px 8px; margin-top: 5px; }
+  .fus-role.garde { color: var(--accent-text); background: rgba(var(--teal-500-rgb), .18); }
+  .fus-role.verse { color: var(--amber-text); background: rgba(var(--amber-rgb), .18); }
+  html[data-theme="dark"] .fus-role.verse { color: #e8b84b; }
+
+  .fus-opt { display: flex; align-items: baseline; gap: 7px; cursor: pointer; }
+  .fus-opt input { margin: 0; flex: 0 0 auto; }
+  .fus-vide { color: var(--text-faint); }
+  .fus-ligne.choisir { background: rgba(var(--rose-rgb), .07); }
+  .fus-ligne.choisir th { color: #b02a37; font-weight: 700; }
+  html[data-theme="dark"] .fus-ligne.choisir th { color: #f09aa3; }
+  .fus-motif { display: block; font-size: 11px; color: var(--text-muted);
+               font-weight: 400; margin-top: 2px; }
+  .fus-correction td { border-top: none; padding-top: 0; }
+  .fus-correction th { border-top: none; }
+  .fus-manuel { display: flex; align-items: baseline; gap: 7px; margin-top: 4px; }
+  .fus-manuel-titre { flex: 0 0 auto; font-size: 12px; color: var(--text-muted); }
+  /* Le sélecteur doit viser la saisie, pas le bouton radio qui la précède :
+     « input » tout court étirait la pastille sur toute la largeur. */
+  .fus-manuel input[type="radio"] { flex: 0 0 auto; margin: 0; }
+  .fus-manuel input[type="text"], .fus-manuel textarea {
+      flex: 1 1 auto; min-width: 0; border: none;
+      border-bottom: 1px solid var(--border-strong);
+      background: transparent; color: var(--text); font-size: 12.5px;
+      padding: 3px 2px; font-family: var(--font-main); }
+  .fus-manuel input[type="text"]:focus, .fus-manuel textarea:focus {
+      outline: none; border-color: var(--accent); }
+  .fus-manuel textarea { border: 1px solid var(--border-strong); border-radius: 4px;
+                         padding: 5px 7px; min-height: 52px; resize: vertical; }
+  .fus-ligne-identique { display: none; }
+  .fus-table.tout .fus-ligne-identique { display: table-row; }
+  .fus-replie { display: flex; justify-content: flex-end; margin-top: 12px; }
+  .fus-replie button { background: none; border: none; cursor: pointer; padding: 0;
+                       font-family: var(--font-main); font-size: 12px;
+                       color: var(--text-muted); display: inline-flex;
+                       align-items: center; gap: 5px; }
+  .fus-replie button:hover { color: var(--accent-text); }
+
+  .fus-barre { position: sticky; bottom: 0; z-index: 180; margin: 16px -32px 0;
+               padding: 11px 32px; background: var(--surface);
+               border-top: 1px solid var(--border);
+               box-shadow: 0 -2px 10px rgba(0,0,0,.07);
+               display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  html[data-theme="dark"] .fus-barre { box-shadow: 0 -2px 10px rgba(0,0,0,.35); }
+  .fus-apercu { flex: 1 1 320px; font-size: 13px; color: var(--text); }
+  .fus-apercu .rien { color: var(--text-muted); font-style: italic; }
+  .fus-valider { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  /* Un bouton grisé sans raison se lit comme une panne : ce qui manque est
+     écrit à côté, et disparaît dès que c'est choisi. */
+  .fus-manque { font-size: 12px; color: #b02a37; max-width: 280px;
+                line-height: 1.3; text-align: right; }
+  .fus-manque[hidden] { display: none; }
+  html[data-theme="dark"] .fus-manque { color: #f09aa3; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-contenu">
+<form method="post" id="fus-formulaire">
+  {% csrf_token %}
+  <input type="hidden" name="retour" value="{{ retour }}">
+
+  {% if erreur %}
+  <div class="fus-avis grave">
+    <i class="bi bi-exclamation-octagon-fill"></i>
+    <div class="fus-avis-corps"><b>La fusion n'a pas eu lieu.</b> {{ erreur }}</div>
+  </div>
+  {% endif %}
+
+  {% if deces %}
+  <div class="fus-avis grave">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div class="fus-avis-corps">
+      <h4>Décès enregistré</h4>
+      {{ deces.message }}
+      <div class="fus-choix">
+        <label><input type="checkbox" name="deces_confirme" required>
+          Je confirme : la fiche {{ gardee.code_patient }} portera ce décès.</label>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if hospitalisations %}
+  <div class="fus-avis grave">
+    <i class="bi bi-hospital-fill"></i>
+    <div class="fus-avis-corps">
+      <h4>Deux hospitalisations en cours</h4>
+      {{ hospitalisations.message }}
+      <div class="fus-choix">
+        {% for sejour in hospitalisations.details.hospitalisations %}
+        <label>
+          <input type="radio" name="hospitalisation_active" value="{{ sejour.pk }}" required>
+          <span>{{ sejour.numero }} — {{ sejour.patient.code_patient }}
+            {% if sejour.chambre %}, salle {{ sejour.chambre.salle_no }}{% endif %}
+            {% if sejour.numero_lit %}lit {{ sejour.numero_lit }}{% endif %}
+            <span class="fus-pourquoi">(admis le {{ sejour.date_admission|date:'d/m/Y' }})</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sexe %}
+  <div class="fus-avis grave">
+    <i class="bi bi-gender-ambiguous"></i>
+    <div class="fus-avis-corps">
+      <h4>Sexe différent d'une fiche à l'autre</h4>
+      {{ sexe.message }} Le choix est plus bas, dans la ligne « Sexe ».
+    </div>
+  </div>
+  {% endif %}
+
+  {% if rdv %}
+  <div class="fus-avis doux">
+    <i class="bi bi-calendar2-x"></i>
+    <div class="fus-avis-corps">
+      <h4>Rendez-vous en double</h4>
+      {{ rdv.message }} Rien n'est supprimé : cocher une case passe le second
+      rendez-vous en « annulé (doublon) ».
+      <div class="fus-choix">
+        {% for paire in rdv.details.paires %}
+        <label class="{% if not paire.annulable %}interdit{% endif %}">
+          <input type="checkbox" name="annuler_rdv" value="{{ paire.absorbee.pk }}"
+                 {% if not paire.annulable %}disabled{% endif %}>
+          <span>
+            {{ paire.absorbee.date_heure|date:'d/m/Y' }} avec
+            {{ paire.absorbee.medecin }} — annuler celui de
+            {{ absorbee.code_patient }}
+            {% if not paire.annulable %}
+            <span class="fus-pourquoi">impossible : {{ paire.empeche }}</span>
+            {% endif %}
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if identiques %}
+  <div class="fus-replie">
+    <button type="button" id="fus-bascule" aria-expanded="false">
+      <i class="bi bi-chevron-down"></i>
+      <span>Afficher les {{ identiques }} champs identiques</span>
+    </button>
+  </div>
+  {% endif %}
+
+  <table class="fus-table" id="fus-table">
+    <thead>
+      <tr>
+        <th style="width:180px;"></th>
+        <th class="fus-colonne gardee">
+          <span class="fus-code">{{ gardee.code_patient }}</span>
+          <span class="fus-nom">{{ gardee.nom }} {{ gardee.prenoms }}</span>
+          <span class="fus-role garde">★ Fiche gardée</span>
+        </th>
+        <th class="fus-colonne">
+          <span class="fus-code">{{ absorbee.code_patient }}</span>
+          <span class="fus-nom">{{ absorbee.nom }} {{ absorbee.prenoms }}</span>
+          <span class="fus-role verse">Versée dans l'autre</span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ligne in lignes %}
+      <tr class="fus-ligne {% if ligne.identique %}fus-ligne-identique{% endif %}{% if ligne.obligatoire %} choisir{% endif %}">
+        <th>{{ ligne.libelle }}
+          {% if ligne.motif %}<span class="fus-motif">{{ ligne.motif }}</span>{% endif %}
+        </th>
+        {% if ligne.identique %}
+        <td colspan="2">{% if ligne.vue_gardee %}{{ ligne.vue_gardee }}{% else %}<span class="fus-vide">—</span>{% endif %}</td>
+        {% else %}
+        <td>
+          <label class="fus-opt">
+            <input type="radio" name="champ_{{ ligne.champ }}" value="gardee"
+                   {% if ligne.defaut == 'gardee' %}checked{% endif %}
+                   {% if ligne.obligatoire %}required{% endif %}>
+            <span>{% if ligne.vue_gardee %}{{ ligne.vue_gardee }}{% else %}<span class="fus-vide">vide</span>{% endif %}</span>
+          </label>
+        </td>
+        <td>
+          <label class="fus-opt">
+            <input type="radio" name="champ_{{ ligne.champ }}" value="absorbee"
+                   {% if ligne.defaut == 'absorbee' %}checked{% endif %}>
+            <span>{% if ligne.vue_absorbee %}{{ ligne.vue_absorbee }}{% else %}<span class="fus-vide">vide</span>{% endif %}</span>
+          </label>
+        </td>
+        {% endif %}
+      </tr>
+      {% if not ligne.identique %}
+      {% comment %}
+      La correction à la main porte sur la ligne entière, pas sur l'une des deux
+      fiches : elle tient donc sa propre rangée, sous les deux colonnes.
+      {% endcomment %}
+      <tr class="fus-correction{% if ligne.obligatoire %} choisir{% endif %}">
+        <th></th>
+        <td colspan="2">
+          {% if ligne.defaut == 'additionner' %}
+          <label class="fus-opt">
+            <input type="radio" name="champ_{{ ligne.champ }}" value="additionner" checked>
+            <span><b>Garder les deux</b> — {{ ligne.texte|linebreaksbr }}</span>
+          </label>
+          {% endif %}
+          <label class="fus-manuel">
+            <input type="radio" name="champ_{{ ligne.champ }}" value="manuel">
+            <span class="fus-manuel-titre">Corriger&nbsp;:</span>
+            {% if ligne.defaut == 'additionner' %}
+            <textarea name="manuel_{{ ligne.champ }}">{{ ligne.texte }}</textarea>
+            {% else %}
+            <input type="text" name="manuel_{{ ligne.champ }}"
+                   placeholder="saisir une autre valeur">
+            {% endif %}
+          </label>
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="fus-barre">
+    <div class="fus-apercu">
+      {% if apercu.total %}
+      Cette fusion va transférer <b>{{ apercu.morceaux|join:', ' }}</b>
+      vers <b>{{ gardee.code_patient }}</b>.
+      {% else %}
+      <span class="rien">La fiche {{ absorbee.code_patient }} ne porte aucune
+        donnée rattachée : rien ne sera déplacé.</span>
+      {% endif %}
+    </div>
+    <div class="fus-valider">
+      <span class="fus-manque" id="fus-manque" hidden></span>
+      <a href="{{ retour }}" class="o-ctrl-btn">Abandonner</a>
+      <button type="submit" class="o-btn-create" id="fus-valider"
+              {% if refus %}disabled{% endif %}>
+        <i class="bi bi-arrow-left-right"></i> Fusionner
+      </button>
+    </div>
+  </div>
+</form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var bascule = document.getElementById('fus-bascule');
+  var tableau = document.getElementById('fus-table');
+  if (tableau) {
+    // Saisir dans une correction vaut choix : sans cela, on tape un texte et
+    // c'est l'ancienne valeur qui part.
+    tableau.addEventListener('input', function (e) {
+      if (!e.target.name || e.target.name.indexOf('manuel_') !== 0) { return; }
+      var bouton = e.target.closest('.fus-manuel')
+                   .querySelector('input[value=manuel]');
+      if (bouton) { bouton.checked = true; }
+    });
+  }
+  // ── Ce qui manque encore ───────────────────────────────────────────────
+  // Le serveur refuse de toute façon ; l'écran le dit avant, pour qu'on ne
+  // valide pas un formulaire qui va revenir en erreur.
+  (function () {
+    var valider = document.getElementById('fus-valider');
+    var manque = document.getElementById('fus-manque');
+    var formulaire = document.getElementById('fus-formulaire');
+    if (!valider || !manque || !formulaire || valider.disabled) { return; }
+
+    var attendus = [
+      { nom: 'champ_sexe', phrase: 'Choisissez le sexe.' },
+      { nom: 'hospitalisation_active',
+        phrase: 'Choisissez l’hospitalisation qui reste active.' },
+      { nom: 'deces_confirme', phrase: 'Confirmez le décès enregistré.' }
+    ];
+
+    function verifier() {
+      var absents = attendus.filter(function (attendu) {
+        var cases = formulaire.querySelectorAll('[name=' + attendu.nom + ']');
+        if (!cases.length) { return false; }
+        return !Array.prototype.some.call(cases, function (c) { return c.checked; });
+      });
+      valider.disabled = absents.length > 0;
+      manque.hidden = absents.length === 0;
+      manque.textContent = absents.map(function (a) { return a.phrase; }).join(' ');
+    }
+
+    // `change` pour les clics, `input` pour la frappe : cocher un bouton
+    // radio depuis le code ne déclenche pas `change`, et taper dans une
+    // correction coche justement celui de sa ligne.
+    formulaire.addEventListener('change', verifier);
+    formulaire.addEventListener('input', verifier);
+    verifier();
+  })();
+
+  if (!bascule || !tableau) { return; }
+  var identiques = tableau.querySelectorAll('.fus-ligne-identique').length;
+  bascule.addEventListener('click', function () {
+    var ouvert = tableau.classList.toggle('tout');
+    bascule.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+    bascule.querySelector('i').className = ouvert ? 'bi bi-chevron-up'
+                                                  : 'bi bi-chevron-down';
+    bascule.querySelector('span').textContent = ouvert
+      ? 'Masquer les champs identiques'
+      : 'Afficher les ' + identiques + ' champs identiques';
+  });
+})();
+</script>
+{% endblock %}

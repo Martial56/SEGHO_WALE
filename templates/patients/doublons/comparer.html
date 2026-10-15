@@ -1,75 +1,130 @@
 {% extends 'patients/doublons/base_doublons.html' %}
 {% comment %}
-Les deux fiches côte à côte. Le tableau vient en premier, chaque colonne sous
-sa fiche : ce qui diffère est surligné, et c'est la seule chose qu'on ait
-besoin de lire pour trancher. Les données rattachées y tiennent leurs propres
-lignes — c'est souvent elles qui désignent la fiche à garder.
+Les deux fiches côte à côte, pour trancher sans ouvrir ni l'une ni l'autre.
 
-Les actions sont rassemblées dans une barre collante au bas de l'écran :
-la décision se prend après avoir lu, pas avant.
+L'écran se lit de haut en bas, dans l'ordre où la décision se prend :
+pourquoi ces fiches sont rapprochées, ce qui les sépare, ce qu'elles portent,
+puis les actions. Les contrôles de lecture — retour, champs vides — sont dans
+le sous-en-tête avec les autres contrôles du projet ; les actions sont dans
+une barre collée au bas de l'écran, parce qu'on décide après avoir lu.
 {% endcomment %}
 
-{% block onglet_liste %}actif{% endblock %}
+{% block onglet_liste %}active{% endblock %}
 
-{% block subheader_droite %}
-  <a href="{{ retour }}" class="o-btn neutre"><i class="bi bi-arrow-left"></i> Retour</a>
+{% block subheader_gauche %}
+  {% comment %}
+  Le bouton retour du projet (`.o-back-btn`, global.css), à gauche, comme sur
+  les écrans de détail des autres modules.
+  {% endcomment %}
+  <a class="o-back-btn" href="{{ retour }}">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour
+  </a>
 {% endblock %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-  .cmp-page { padding-bottom: 24px; }
+  .cmp-page { padding: 14px 0 24px; }
 
-  .cmp-table { width: 100%; border-collapse: collapse; font-size: 13px;
-               background: var(--surface); border: 1px solid var(--border);
-               border-radius: var(--radius-sm); overflow: hidden; }
-  .cmp-table th, .cmp-table td { padding: 7px 14px; border-top: 1px solid var(--border);
-                                 vertical-align: top; }
+  /* ── Le résumé ───────────────────────────────────────────────────────────
+     Le score et la raison étaient sur la carte d'où l'on vient ; sans eux,
+     il faut revenir en arrière pour se rappeler pourquoi ces deux fiches
+     sont ensemble. La recommandation dit ce que le logiciel a mesuré — quelle
+     fiche porte les données — et non ce qu'il faudrait en conclure. */
+  .cmp-resume { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+                margin-bottom: 14px; font-size: 13px; color: var(--text-muted); }
+  .cmp-resume .dbl-pastille { font-size: 13px; padding: 2px 10px; }
+  .cmp-resume-sep { width: 1px; height: 16px; background: var(--border); }
+  .cmp-resume b { color: var(--text); font-weight: 600; }
+  .cmp-resume .code { font-family: var(--font-mono); font-size: 12px; }
+
+  /* ── Le tableau ──────────────────────────────────────────────────────── */
+  .cmp-table { width: 100%; border-collapse: separate; border-spacing: 0;
+               font-size: 13px; background: var(--surface);
+               border: 1px solid var(--border); border-radius: var(--radius-sm);
+               overflow: hidden; }
+  .cmp-table th, .cmp-table td { padding: 8px 16px; vertical-align: top;
+                                 border-top: 1px solid var(--border); }
   .cmp-table tbody th { text-align: left; font-weight: 500; color: var(--text-muted);
-                        font-size: 12px; width: 180px; }
+                        font-size: 12px; width: 190px; white-space: nowrap; }
   .cmp-table tbody td { width: auto; }
-  .cmp-table tr.differe td .marque { background: rgba(var(--amber-rgb), .22);
-                                     border-radius: 3px; padding: 0 4px; font-weight: 600; }
   .cmp-vide { color: var(--text-faint); }
+
+  /* Les lignes qui se contredisent portent la décision : on les marque dans
+     la marge, pour que l'œil les trouve sans lire le reste. */
+  .cmp-table tr.differe th { color: var(--text); font-weight: 600;
+                             box-shadow: inset 3px 0 0 var(--amber); }
+  .cmp-table tr.differe td .marque { background: rgba(var(--amber-rgb), .22);
+                                     border-radius: 3px; padding: 0 4px;
+                                     font-weight: 600; }
+
   /* Vingt champs dont quatorze vides des deux côtés : la comparaison tenait
      sous la ligne de flottaison et les données rattachées encore plus bas.
-     Les lignes muettes se replient, et se redéploient d'un clic. */
+     Les lignes muettes se replient, et se redéploient depuis le sous-en-tête. */
   .cmp-ligne-vide { display: none; }
   .cmp-table.tout .cmp-ligne-vide { display: table-row; }
-  .cmp-replie { display: flex; justify-content: flex-end; margin-bottom: 7px; }
-  .cmp-replie button { background: none; border: none; cursor: pointer; padding: 0;
-                       font-family: var(--font-main); font-size: 12px;
-                       color: var(--text-muted); display: inline-flex;
-                       align-items: center; gap: 5px; }
-  .cmp-replie button:hover { color: var(--accent-text); }
+  .cmp-voir-plus td { padding: 0; }
+  .cmp-voir-plus button { width: 100%; background: none; border: none;
+                          cursor: pointer; padding: 8px 16px; text-align: left;
+                          font-family: var(--font-main); font-size: 12px;
+                          color: var(--text-muted); display: inline-flex;
+                          align-items: center; gap: 6px; }
+  .cmp-voir-plus button:hover { color: var(--accent-text);
+                                background: rgba(var(--teal-500-rgb), .06); }
 
-  /* L'en-tête porte l'identité de chaque colonne : sans lui, trois cellules
-     alignées ne disent pas de qui elles parlent. */
+  /* ── Les deux en-têtes de colonne ─────────────────────────────────────
+     Sans eux, trois cellules alignées ne disent pas de qui elles parlent.
+     La fiche gardée porte un bandeau d'accent sur toute la hauteur de la
+     colonne : une teinte seule se confond avec le survol. */
   .cmp-table thead th { border-top: none; background: var(--surface-muted);
-                        text-align: left; vertical-align: bottom;
-                        padding: 12px 14px; border-bottom: 2px solid var(--border); }
-  .cmp-coin { width: 180px; }
-  .cmp-colonne { display: table-cell; }
-  .cmp-colonne.gardee { background: rgba(var(--teal-500-rgb), .09);
-                        box-shadow: inset 2px 0 0 var(--accent), inset -2px 0 0 var(--accent); }
+                        text-align: left; vertical-align: top;
+                        padding: 14px 16px 13px;
+                        border-bottom: 2px solid var(--border); }
+  /* La carte entière est la cible du clic, pas le petit badge : le creux
+     autour du bouton n'avait pas à être une zone morte. */
+  .cmp-table thead th.cmp-colonne { padding: 0; }
+  .cmp-coin { width: 190px; }
+  .cmp-colonne.gardee { background: rgba(var(--teal-500-rgb), .10);
+                        box-shadow: inset 0 3px 0 var(--accent); }
+  .cmp-table tbody td.gardee { background: rgba(var(--teal-500-rgb), .05); }
+  .cmp-choisir { display: block; width: 100%; text-align: left; background: none;
+                 border: none; padding: 14px 16px 8px; font-family: var(--font-main);
+                 cursor: pointer; color: inherit; transition: background .12s; }
+  .cmp-choisir:disabled { cursor: default; }
+  .cmp-choisir:not(:disabled):hover { background: rgba(var(--teal-500-rgb), .14); }
+  .cmp-choisir:not(:disabled):hover .cmp-badge.choisir {
+    background: var(--teal-500); color: #fff; }
+  .cmp-choisir:not(:disabled):hover .cmp-nom { color: var(--accent-text); }
+  .cmp-choisir:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cmp-badge.choisir { color: var(--accent-text); background: rgba(var(--teal-500-rgb), .14);
+                       transition: background .12s, color .12s; }
+  html[data-theme="dark"] .cmp-badge.choisir { color: var(--teal-300);
+                                               background: rgba(var(--teal-500-rgb), .22); }
+
   .cmp-code { display: block; font-family: var(--font-mono); font-size: 11px;
               color: var(--text-muted); font-weight: 400; }
   .cmp-nom { display: block; font-size: 15px; font-weight: 600; color: var(--text);
-             margin-top: 2px; }
+             margin-top: 3px; line-height: 1.25; }
+  .cmp-marques { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+                 margin-top: 7px; min-height: 20px; }
   .cmp-badge { display: inline-block; font-size: 10.5px; font-weight: 700;
-               border-radius: 999px; padding: 1px 8px; margin-top: 5px; }
-  .cmp-badge.gardee { color: var(--accent-text); background: rgba(var(--teal-500-rgb), .18); }
+               border-radius: 999px; padding: 2px 9px; }
+  .cmp-badge.gardee { color: var(--accent-text); background: rgba(var(--teal-500-rgb), .20); }
   .cmp-badge.masquee { color: var(--amber-text); background: rgba(var(--amber-rgb), .18); }
   html[data-theme="dark"] .cmp-badge.masquee { color: #e8b84b; }
-  .cmp-ouvrir { display: block; margin-top: 6px; font-size: 11.5px;
-                color: var(--accent-text); text-decoration: none; font-weight: 600; }
+  .cmp-ouvrir { display: inline-block; margin: 0 16px 13px; font-size: 11.5px;
+                color: var(--accent-text); text-decoration: none;
+                font-weight: 600; white-space: nowrap; }
   .cmp-ouvrir:hover { text-decoration: underline; }
 
   .cmp-section th { background: var(--surface-muted); font-size: 11px !important;
                     text-transform: uppercase; letter-spacing: .4px;
                     color: var(--text-muted) !important; font-weight: 700 !important;
-                    width: auto !important; }
-  .cmp-total th, .cmp-total td { font-weight: 700; color: var(--text); }
+                    width: auto !important; box-shadow: none !important; }
+  .cmp-total th, .cmp-total td { font-weight: 700; color: var(--text);
+                                 background: var(--surface-muted); }
   .cmp-aucune { color: var(--text-faint); font-style: italic; }
 
   .cmp-bandeau { background: rgba(var(--teal-500-rgb), .10); border-radius: var(--radius-sm);
@@ -78,8 +133,10 @@ la décision se prend après avoir lu, pas avant.
 
   /* ── La barre d'actions ──────────────────────────────────────────────────
      Collée en bas : sur un groupe aux champs nombreux, les boutons restaient
-     sinon sous la ligne de flottaison, et il fallait remonter pour agir. */
-  .cmp-barre { position: sticky; bottom: 0; z-index: 180; margin: 16px -32px 0;
+     sinon sous la ligne de flottaison, et il fallait remonter pour agir.
+     À gauche ce qui écarte le groupe, à droite ce qui le traite, la fusion en
+     dernier — c'est l'action qui engage le plus. */
+  .cmp-barre { position: sticky; bottom: 0; z-index: 180; margin: 18px -32px 0;
                padding: 11px 32px; background: var(--surface);
                border-top: 1px solid var(--border);
                box-shadow: 0 -2px 10px rgba(0,0,0,.07);
@@ -87,7 +144,7 @@ la décision se prend après avoir lu, pas avant.
   html[data-theme="dark"] .cmp-barre { box-shadow: 0 -2px 10px rgba(0,0,0,.35); }
   .cmp-barre-droite { margin-left: auto; display: flex; align-items: flex-start;
                       gap: 10px; flex-wrap: wrap; }
-  .cmp-action { display: flex; flex-direction: column; gap: 3px; }
+  .cmp-action { display: flex; flex-direction: column; gap: 3px; min-height: 26px; }
   /* La raison est écrite sous le bouton, pas enfermée dans une infobulle : un
      bouton gris sans explication se lit comme une panne, et le survol
      n'existe pas sur une tablette. */
@@ -96,15 +153,19 @@ la décision se prend après avoir lu, pas avant.
   .cmp-pourquoi.avertit { color: var(--amber-text); }
   html[data-theme="dark"] .cmp-pourquoi.avertit { color: #e8b84b; }
   .cmp-pas-doublon { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .cmp-pas-doublon input { border: none; border-bottom: 1px solid var(--border-strong);
-                           background: transparent; color: var(--text); font-size: 12.5px;
-                           padding: 4px 2px; font-family: var(--font-main); width: 220px; }
-  .cmp-pas-doublon input:focus { outline: none; border-bottom-color: var(--accent); }
+  .cmp-ecarter-saisie { display: flex; align-items: center; gap: 8px; }
+  .cmp-ecarter-saisie[hidden] { display: none; }
+  .cmp-pas-doublon input[type=text] {
+    border: none; border-bottom: 1px solid var(--border-strong);
+    background: transparent; color: var(--text); font-size: 12.5px;
+    padding: 4px 2px; font-family: var(--font-main); width: 220px; }
+  .cmp-pas-doublon input[type=text]:focus { outline: none; border-bottom-color: var(--accent); }
+  .cmp-barre .o-btn-create { padding: 6px 14px; }
 </style>
 {% endblock %}
 
 {% block doublons_contenu %}
-<div class="dbl-contenu cmp-page">
+<div class="cmp-page">
 
 {% if ecartee %}
 <div class="cmp-bandeau">
@@ -118,34 +179,60 @@ la décision se prend après avoir lu, pas avant.
         style="margin-left:auto;">
     {% csrf_token %}
     <input type="hidden" name="retour" value="{{ retour }}">
-    <button type="submit" class="o-btn neutre">Remettre dans la liste</button>
+    <button type="submit" class="o-ctrl-btn">Remettre dans la liste</button>
   </form>
 </div>
 {% endif %}
 
-{% if champs_vides %}
-<div class="cmp-replie">
-  <button type="button" id="cmp-bascule" aria-expanded="false">
-    <i class="bi bi-chevron-down"></i>
-    <span>Afficher les {{ champs_vides }} champs vides</span>
-  </button>
+{% comment %}
+Pourquoi ces fiches sont ensemble, et ce qui a été mesuré sur elles. Rien
+d'autre : ce que la machine en déduit n'est pas écrit ici.
+{% endcomment %}
+<div class="cmp-resume">
+  {% if resume %}
+  <span class="dbl-pastille {{ resume.niveau }}">{{ resume.score }} %</span>
+  {% if resume.raisons %}<span>{{ resume.raisons|join:', ' }}</span>{% endif %}
+  <span class="cmp-resume-sep"></span>
+  {% endif %}
+  <span>
+    {% for carte in cartes %}{% if carte.garder %}
+      {% if carte.choix_humain %}Fiche gardée désignée à la main :{% else %}Fiche gardée proposée :{% endif %}
+      <b class="code">{{ carte.fiche.code_patient }}</b>
+      {% if carte.total %}— c'est elle qui porte les données ({{ carte.total }} ligne{{ carte.total|pluralize }}).
+      {% else %}— aucune des deux ne porte de données.{% endif %}
+    {% endif %}{% endfor %}
+  </span>
 </div>
-{% endif %}
 
 <table class="cmp-table" id="cmp-table">
   <thead>
     <tr>
       <th class="cmp-coin"></th>
       {% for carte in cartes %}
+      {% comment %}
+      La carte de la fiche est le choix lui-même : cliquer dessus désigne la
+      fiche à garder. Un bouton « Garder PAT… » dans la barre du bas disait la
+      même chose, loin de la colonne qu'il désignait.
+      {% endcomment %}
       <th class="cmp-colonne {% if carte.garder %}gardee{% endif %}">
-        <span class="cmp-code">{{ carte.fiche.code_patient }}</span>
-        <span class="cmp-nom">{{ carte.fiche.nom }} {{ carte.fiche.prenoms }}</span>
-        {% if carte.garder %}
-        <span class="cmp-badge gardee">★ {% if carte.choix_humain %}Fiche gardée{% else %}Suggérée{% endif %}</span>
-        {% endif %}
-        {% if carte.fiche.masque %}
-        <span class="cmp-badge masquee">Masquée{% if carte.fiche.doublon_de %} — doublon de {{ carte.fiche.doublon_de.code_patient }}{% endif %}</span>
-        {% endif %}
+        <form method="post" action="{% url 'patients:doublons_garder' cle=cle pk=carte.fiche.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="cmp-choisir"
+                  {% if carte.garder or carte.fiche.masque %}disabled{% endif %}
+                  title="{% if carte.garder %}C'est la fiche gardée{% elif carte.fiche.masque %}Fiche masquée{% else %}Garder cette fiche{% endif %}">
+            <span class="cmp-code">{{ carte.fiche.code_patient }}</span>
+            <span class="cmp-nom">{{ carte.fiche.nom }} {{ carte.fiche.prenoms }}</span>
+            <span class="cmp-marques">
+              {% if carte.garder %}
+              <span class="cmp-badge gardee">★ {% if carte.choix_humain %}Fiche gardée{% else %}Fiche gardée (proposée){% endif %}</span>
+              {% elif carte.fiche.masque %}
+              <span class="cmp-badge masquee">Masquée{% if carte.fiche.doublon_de %} — doublon de {{ carte.fiche.doublon_de.code_patient }}{% endif %}</span>
+              {% else %}
+              <span class="cmp-badge choisir">☆ Garder celle-ci</span>
+              {% endif %}
+            </span>
+          </button>
+        </form>
         <a class="cmp-ouvrir" href="{% url 'patients:detail' carte.fiche.pk %}"
            target="_blank" rel="noopener">Ouvrir la fiche <i class="bi bi-box-arrow-up-right"></i></a>
       </th>
@@ -154,20 +241,38 @@ la décision se prend après avoir lu, pas avant.
   </thead>
 
   <tbody>
+    <tr class="cmp-section">
+      <th colspan="{{ cartes|length|add:1 }}">Identité</th>
+    </tr>
     {% for ligne in comparaison %}
     <tr class="{% if ligne.different %}differe{% endif %}{% if ligne.vide %} cmp-ligne-vide{% endif %}">
       <th>{{ ligne.libelle }}</th>
       {% if ligne.mots %}
         {% for liste in ligne.mots %}
-        <td>{% if liste %}{% for mot in liste %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="marque">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+        <td class="{% if forloop.counter0 == garder_index %}gardee{% endif %}">{% if liste %}{% for mot in liste %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="marque">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
         {% endfor %}
       {% else %}
         {% for valeur in ligne.valeurs %}
-        <td>{% if valeur %}<span class="marque">{{ valeur }}</span>{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+        <td class="{% if forloop.counter0 == garder_index %}gardee{% endif %}">{% if valeur %}<span class="marque">{{ valeur }}</span>{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
         {% endfor %}
       {% endif %}
     </tr>
     {% endfor %}
+    {% if champs_vides %}
+    {% comment %}
+    Les champs vides des deux côtés n'apprennent rien et repoussaient les
+    données rattachées sous la ligne de flottaison. Ils se déplient ici, à
+    leur place dans le tableau, et non depuis un coin de l'écran.
+    {% endcomment %}
+    <tr class="cmp-voir-plus">
+      <td colspan="{{ cartes|length|add:1 }}">
+        <button type="button" id="cmp-bascule" aria-expanded="false">
+          <i class="bi bi-chevron-down"></i>
+          <span>Voir plus — {{ champs_vides }} champs vides des deux côtés</span>
+        </button>
+      </td>
+    </tr>
+    {% endif %}
   </tbody>
 
   <tbody>
@@ -178,7 +283,7 @@ la décision se prend après avoir lu, pas avant.
     <tr>
       <th>{{ ligne.libelle }}</th>
       {% for nombre in ligne.nombres %}
-      <td>{% if nombre %}{{ nombre }}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
+      <td class="{% if forloop.counter0 == garder_index %}gardee{% endif %}">{% if nombre %}{{ nombre }}{% else %}<span class="cmp-vide">—</span>{% endif %}</td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -198,16 +303,26 @@ la décision se prend après avoir lu, pas avant.
 </table>
 
 <div class="cmp-barre">
+  {% comment %}
+  À gauche, le refus ; à droite, les décisions, de la plus légère à la plus
+  engageante. La raison du refus ne s'affiche qu'une fois le refus demandé :
+  un champ de texte posé en permanence dans la barre se lit comme une
+  recherche, et occupait la place de ce qu'on vient faire ici.
+  {% endcomment %}
   {% if not ecartee and cartes|length == 2 %}
   <form method="post" action="{% url 'patients:doublons_ecarter' cle=cle %}"
-        class="cmp-pas-doublon">
+        class="cmp-pas-doublon" id="cmp-ecarter">
     {% csrf_token %}
     <input type="hidden" name="retour" value="{{ retour }}">
-    <input type="text" name="raison" placeholder="Raison (facultative)"
-           aria-label="Raison">
-    <button type="submit" class="o-btn neutre">
+    <button type="button" class="o-ctrl-btn" data-ecarter-demander>
       <i class="bi bi-x-circle"></i> Pas un doublon
     </button>
+    <span class="cmp-ecarter-saisie" hidden>
+      <input type="text" name="raison" placeholder="Pourquoi ? (facultatif)"
+             aria-label="Raison">
+      <button type="submit" class="o-ctrl-btn">Confirmer</button>
+      <button type="button" class="o-lien" data-ecarter-renoncer>Annuler</button>
+    </span>
   </form>
   {% endif %}
 
@@ -218,26 +333,18 @@ la décision se prend après avoir lu, pas avant.
         <form method="post" action="{% url 'patients:doublons_reafficher' carte.fiche.pk %}">
           {% csrf_token %}
           <input type="hidden" name="retour" value="{{ request.get_full_path }}">
-          <button type="submit" class="o-btn neutre">
+          <button type="submit" class="o-ctrl-btn">
             <i class="bi bi-eye"></i> Réafficher {{ carte.fiche.code_patient }}
           </button>
         </form>
       </div>
       {% elif not carte.garder %}
       <div class="cmp-action">
-        <form method="post" action="{% url 'patients:doublons_garder' cle=cle pk=carte.fiche.pk %}">
-          {% csrf_token %}
-          <button type="submit" class="o-btn neutre">
-            <i class="bi bi-star"></i> Garder {{ carte.fiche.code_patient }}
-          </button>
-        </form>
-      </div>
-      <div class="cmp-action">
         <form method="post" action="{% url 'patients:doublons_masquer' cle=cle pk=carte.fiche.pk %}">
           {% csrf_token %}
           <input type="hidden" name="au_profit_de" value="{{ garder_pk }}">
           <input type="hidden" name="retour" value="{{ retour }}">
-          <button type="submit" class="o-btn danger"
+          <button type="submit" class="o-btn-danger"
                   {% if not carte.peut_masquer %}disabled{% endif %}>
             <i class="bi bi-eye-slash"></i> Masquer {{ carte.fiche.code_patient }}
           </button>
@@ -254,12 +361,20 @@ la décision se prend après avoir lu, pas avant.
       {% endif %}
     {% endfor %}
 
-    <div class="cmp-action">
-      <button type="button" class="o-btn neutre" disabled>
-        <i class="bi bi-arrow-left-right"></i> Fusionner
-      </button>
-      <span class="cmp-pourquoi">Pas encore disponible.</span>
-    </div>
+    {% if perms.patients.fusionner_patients %}
+      {% for carte in cartes %}
+        {% if not carte.garder and not carte.fiche.masque %}
+        {% comment %}
+        Le sens de la fusion est écrit dans le bouton même : en légende sous
+        lui, il décalait toute la barre et se lisait après coup.
+        {% endcomment %}
+        <a class="o-btn-create" href="{% url 'patients:fusionner' cle=cle pk=carte.fiche.pk %}?retour={{ retour|urlencode }}">
+          <i class="bi bi-arrow-left-right"></i>
+          Fusionner {{ carte.fiche.code_patient }} dans {{ garder_code }}
+        </a>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
   </div>
 </div>
 </div>
@@ -269,6 +384,23 @@ la décision se prend après avoir lu, pas avant.
 {{ block.super }}
 <script>
 (function () {
+  /* « Pas un doublon » se demande, puis se confirme : la raison n'apparaît
+     qu'à ce moment-là. Même geste que l'action rapide des cartes. */
+  var refus = document.getElementById('cmp-ecarter');
+  if (refus) {
+    var saisie = refus.querySelector('.cmp-ecarter-saisie');
+    var demander = refus.querySelector('[data-ecarter-demander]');
+    demander.addEventListener('click', function () {
+      demander.hidden = true;
+      saisie.hidden = false;
+      saisie.querySelector('input').focus();
+    });
+    refus.querySelector('[data-ecarter-renoncer]').addEventListener('click', function () {
+      saisie.hidden = true;
+      demander.hidden = false;
+    });
+  }
+
   var bascule = document.getElementById('cmp-bascule');
   var tableau = document.getElementById('cmp-table');
   if (!bascule || !tableau) { return; }
@@ -279,8 +411,8 @@ la décision se prend après avoir lu, pas avant.
     bascule.querySelector('i').className = ouvert ? 'bi bi-chevron-up'
                                                   : 'bi bi-chevron-down';
     bascule.querySelector('span').textContent = ouvert
-      ? 'Masquer les champs vides'
-      : 'Afficher les ' + vides + ' champs vides';
+      ? 'Voir moins'
+      : 'Voir plus — ' + vides + ' champs vides des deux côtés';
   });
 })();
 </script>

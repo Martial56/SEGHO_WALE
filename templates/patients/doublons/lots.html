@@ -1,0 +1,68 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Le journal des actions en lot. Chaque lot porte son numéro, ce qu'il a fait,
+ce qu'il a ignoré, et « Annuler ce lot » tant qu'il reste quelque chose à
+défaire. L'annulation une par une reste possible ailleurs : ici on défait
+d'un geste ce qui a été fait d'un geste.
+{% endcomment %}
+
+{% block onglet_lots %}active{% endblock %}
+
+{% block subheader_compte %}<span class="o-page-count">{{ page.paginator.count }}</span>{% endblock %}
+
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Numéro ou utilisateur…" %}
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-tableau">
+<table class="jnl">
+  <thead>
+    <tr>
+      <th>Lot</th><th>Quand</th><th>Qui</th><th>Action</th>
+      <th>Fait</th><th>Ignoré</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for lot in lots %}
+    <tr class="{% if lot.etat == 'annule' %}annulee{% endif %}">
+      <td><span class="code">{{ lot.numero }}</span></td>
+      <td class="quand">{{ lot.execute_le|default:lot.date|date:'d/m/Y H:i' }}</td>
+      <td>{{ lot.utilisateur|default:'—' }}</td>
+      <td>{{ lot.get_action_display }}</td>
+      <td>{{ lot.faits|length }} groupe{{ lot.faits|length|pluralize }}</td>
+      <td>
+        {% with nombre=lot.ignores|length|add:lot.ecartes|length %}
+        {% if nombre %}{{ nombre }}{% else %}—{% endif %}
+        {% endwith %}
+      </td>
+      <td class="fus-actions">
+        {% if lot.etat == 'annule' %}
+          Annulé le {{ lot.annule_le|date:'d/m/Y' }}
+          {% if lot.annule_par %}par {{ lot.annule_par }}{% endif %}
+          {% if lot.annulation_partielle %}
+          <span class="empeche">— sauf {{ lot.annulation_partielle|length }} groupe(s)</span>
+          {% endif %}
+        {% elif lot.annulable %}
+        <form method="post" action="{% url 'patients:doublons_lot_annuler' lot.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="o-ctrl-btn">Annuler ce lot</button>
+        </form>
+        {% else %}
+          <span class="empeche">Rien à défaire.</span>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="o-empty">
+      {% if q %}Aucun lot ne correspond à cette recherche.
+      {% else %}Aucune action en lot pour le moment.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div style="padding:12px 0;">
+  {% include 'patients/doublons/includes/pagination.html' %}
+</div>
+{% endblock %}

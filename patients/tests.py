@@ -17,7 +17,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Patient, RendezVous
+from .models import FusionPatient, Patient, RendezVous
 
 
 ONGLETS = [
@@ -123,6 +123,24 @@ def _avec(username, *codes):
         user.user_permissions.add(Permission.objects.get(
             content_type__app_label=app_label, codename=codename))
     return user
+
+
+def _centre_pour(*utilisateurs, nom='Walé'):
+    """Un centre, et les comptes qui lui sont rattachés.
+
+    Ce que le middleware trouve dans une vraie requête : sans centre actif,
+    la saisie refuse désormais de travailler (voir `PatientForm.clean`), et
+    les écrans ne montrent rien.
+    """
+    from centres.models import Centre
+
+    centre = Centre.objects.create(nom=nom, code=f'C{Centre.objects.count() + 1}')
+    for utilisateur in utilisateurs:
+        profil = utilisateur.profile
+        profil.centres.add(centre)
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+    return centre
 
 
 def _medecin():
@@ -534,6 +552,7 @@ class TestLesChiffresNeSEcriventPasDansUnNom(TestCase):
 
     def setUp(self):
         self.user = _avec('u_chiffre', 'patients.add_patient', 'patients.view_patient')
+        self.centre = _centre_pour(self.user)
 
     def _creer(self, nom, prenoms):
         client = Client()
@@ -546,7 +565,9 @@ class TestLesChiffresNeSEcriventPasDansUnNom(TestCase):
             'nationalite': 'Ivoirienne', 'adresse': 'Assabou',
             'ville': 'Yamoussoukro',
         }, follow=True)
-        return Patient.objects.order_by('-pk').first()
+        # `all_objects` : la fiche est créée dans le centre de la requête, et
+        # hors requête le gestionnaire cloisonné ne la verrait pas.
+        return Patient.all_objects.order_by('-pk').first()
 
     def test_le_chiffre_est_retire_sans_message(self):
         patient = self._creer('KOUASSI2', 'AMA')
@@ -1261,7 +1282,12 @@ class TestDateDeNaissanceFacultative(TestCase):
         from core.taches import Avancement
         self.tache = TacheImport.objects.create(libelle='Test')
         self.avancement = Avancement(self.tache)
+        from centres.models import Centre
         User.objects.create_superuser('su_dn', password='x')
+        # Un centre sans rattachement : les deux tests de formulaire en ont
+        # besoin, les autres (export, import) travaillent sans centre et
+        # doivent continuer de le faire.
+        self.centre = Centre.objects.create(nom='Walé', code='WAL-DN')
         self.client = Client()
         self.client.login(username='su_dn', password='x')
 
@@ -1415,8 +1441,11 @@ class TestDateDeNaissanceFacultative(TestCase):
         """Une fiche importée sans date doit rester modifiable : sinon on ne
         pourrait plus corriger son adresse tant qu'on n'a pas sa date."""
         from .forms import PatientForm
-        patient = Patient.objects.create(
-            nom='Sans', prenoms='Date', sexe='M', telephone='0700000013')
+        patient = Patient.all_objects.create(
+            nom='Sans', prenoms='Date', sexe='M', telephone='0700000013',
+            centre=self.centre)
+        # Pas de `centre=` ici : la fiche porte le sien, et corriger une
+        # adresse ne doit rien redemander.
         form = PatientForm(instance=patient, data={
             'nom': 'Sans', 'prenoms': 'Date', 'sexe': 'M',
             'telephone': '0700000013', 'adresse': 'Nouveau quartier',
@@ -1428,9 +1457,9 @@ class TestDateDeNaissanceFacultative(TestCase):
 
     def test_le_doublon_est_detecte_sans_date_de_naissance(self):
         from .forms import PatientForm
-        Patient.objects.create(nom='Kone', prenoms='Adama', sexe='M',
-                               telephone='0700000001')
-        form = PatientForm(data={
+        Patient.all_objects.create(nom='Kone', prenoms='Adama', sexe='M',
+                                   telephone='0700000001', centre=self.centre)
+        form = PatientForm(centre=self.centre, data={
             'nom': 'Kone', 'prenoms': 'Adama', 'sexe': 'M',
             'telephone': '0700000001', 'adresse': 'Yamoussoukro',
             'nationalite': 'Ivoirienne', 'ville': 'Yamoussoukro',
@@ -1781,9 +1810,14 @@ class TestLeFormulaireNeDecocheQueSurUneVraieSaisie(TestCase):
     pour une saisie effacerait le drapeau au fil des corrections ordinaires."""
 
     def setUp(self):
-        self.patient = Patient.objects.create(
+        from centres.models import Centre
+        # Le formulaire exige un centre connu : ici il vient de la fiche
+        # qu'on modifie, comme dans l'écran de modification.
+        self.centre = Centre.objects.create(nom='Walé', code='WAL-DEC')
+        self.patient = Patient.all_objects.create(
             nom='Kone', prenoms='Adama', sexe='M', telephone='0700000001',
-            date_naissance=date(1992, 10, 1), date_naissance_approx=True)
+            date_naissance=date(1992, 10, 1), date_naissance_approx=True,
+            centre=self.centre)
 
     def _donnees(self, **remplacements):
         donnees = {'nom': 'Kone', 'prenoms': 'Adama', 'sexe': 'M',
@@ -1876,10 +1910,14 @@ class TestPreventionDesDoublonsALaSaisie(TestCase):
     @classmethod
     def setUpTestData(cls):
         from django.contrib.auth.models import Permission
-        cls.existant = Patient.objects.create(
+        from centres.models import Centre
+        # Le centre du formulaire : sans lui, la saisie refuse de travailler
+        # et aucun de ces tests ne dirait plus ce qu'il veut dire.
+        cls.centre = Centre.objects.create(nom='Walé', code='WAL-PRV')
+        cls.existant = Patient.all_objects.create(
             nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
             date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
-            adresse='Habitat', ville='Yamoussoukro')
+            adresse='Habitat', ville='Yamoussoukro', centre=cls.centre)
         cls.simple = User.objects.create_user('dbl_simple', password='x')
         cls.admin = User.objects.create_user('dbl_admin', password='x')
         cls.admin.user_permissions.add(Permission.objects.get(
@@ -1898,7 +1936,8 @@ class TestPreventionDesDoublonsALaSaisie(TestCase):
     def _form(self, utilisateur=None, instance=None, **remplacements):
         from .forms import PatientForm
         return PatientForm(self._donnees(**remplacements),
-                           utilisateur=utilisateur or self.simple, instance=instance)
+                           utilisateur=utilisateur or self.simple,
+                           centre=self.centre, instance=instance)
 
     # ── Blocage ────────────────────────────────────────────────────────────
 
@@ -1958,6 +1997,10 @@ class TestPreventionDesDoublonsALaSaisie(TestCase):
         for code in ('add_patient', 'view_patient'):
             self.admin.user_permissions.add(Permission.objects.get(
                 content_type__app_label='patients', codename=code))
+        profil = self.admin.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
         client.force_login(User.objects.get(pk=self.admin.pk))
         reponse = client.post(reverse('patients:create'), self._donnees(
             forcer_doublon='on', raison_forcage='Deux sœurs'))
@@ -1971,29 +2014,30 @@ class TestPreventionDesDoublonsALaSaisie(TestCase):
     def test_la_modification_n_est_jamais_bloquee(self):
         """Deux fiches déjà en double doivent rester modifiables — sans quoi
         on ne pourrait même plus corriger celle qu'on s'apprête à fusionner."""
-        jumelle = Patient.objects.create(
+        jumelle = Patient.all_objects.create(
             nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
             date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
-            adresse='Habitat', ville='Yamoussoukro')
+            adresse='Habitat', ville='Yamoussoukro', centre=self.centre)
         form = self._form(instance=jumelle, telephone='0709090909',
                           doublon_confirme='on')
         self.assertTrue(form.is_valid(), form.errors.as_text())
 
     def test_la_modification_demande_tout_de_meme_la_confirmation(self):
-        jumelle = Patient.objects.create(
+        jumelle = Patient.all_objects.create(
             nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
             date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
-            adresse='Habitat', ville='Yamoussoukro')
+            adresse='Habitat', ville='Yamoussoukro', centre=self.centre)
         form = self._form(instance=jumelle, telephone='0709090909')
         self.assertFalse(form.is_valid())
 
     # ── Téléphone ──────────────────────────────────────────────────────────
 
     def test_le_numero_partage_est_compte_sans_bloquer(self):
-        Patient.objects.create(nom='KOUASSI', prenoms='KOFFI', sexe='M',
-                               telephone='0701020304', date_naissance=date(1960, 1, 2),
-                               nationalite='Ivoirienne', adresse='Habitat',
-                               ville='Yamoussoukro')
+        Patient.all_objects.create(nom='KOUASSI', prenoms='KOFFI', sexe='M',
+                                   telephone='0701020304',
+                                   date_naissance=date(1960, 1, 2),
+                                   nationalite='Ivoirienne', adresse='Habitat',
+                                   ville='Yamoussoukro', centre=self.centre)
         form = self._form(nom='ZEBOULON', prenoms='EUSTACHE',
                           date_naissance='09/02/1977')
         self.assertTrue(form.is_valid(), form.errors.as_text())
@@ -2012,13 +2056,21 @@ class TestLaFenetreDesDossiersRessemblants(TestCase):
     @classmethod
     def setUpTestData(cls):
         from django.contrib.auth.models import Permission
-        cls.existant = Patient.objects.create(
+        from centres.models import Centre
+        # La fenêtre ne propose que dans le centre actif : sans rattachement,
+        # elle ne proposerait plus rien et ces tests ne diraient plus rien.
+        cls.centre = Centre.objects.create(nom='Walé', code='WAL-FEN')
+        cls.existant = Patient.all_objects.create(
             nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
             date_naissance=date(1992, 5, 14), nationalite='Ivoirienne',
-            adresse='Habitat', ville='Yamoussoukro')
+            adresse='Habitat', ville='Yamoussoukro', centre=cls.centre)
         cls.agent = User.objects.create_user('fen_agent', password='x')
         cls.agent.user_permissions.add(Permission.objects.get(
             content_type__app_label='patients', codename='view_patient'))
+        profil = cls.agent.profile
+        profil.centres.add(cls.centre)
+        profil.centre_actif = cls.centre
+        profil.save(update_fields=['centre_actif'])
 
     def setUp(self):
         self.client = Client()
@@ -2133,7 +2185,7 @@ class TestLaFenetreDesDossiersRessemblants(TestCase):
             'ville': 'Yamoussoukro',
             'doublon_confirme': 'on', 'forcer_doublon': 'on',
             'raison_forcage': 'Je passe outre',
-        }, utilisateur=User.objects.get(pk=self.agent.pk))
+        }, utilisateur=User.objects.get(pk=self.agent.pk), centre=self.centre)
         self.assertFalse(form.is_valid())
         self.assertIn('existe déjà', form.non_field_errors()[0])
 
@@ -2174,12 +2226,20 @@ class TestEndpointDeVerification(TestCase):
     @classmethod
     def setUpTestData(cls):
         from django.contrib.auth.models import Permission
-        cls.patient = Patient.objects.create(
+        from centres.models import Centre
+        cls.centre = Centre.objects.create(nom='Walé', code='WAL-VRF')
+        cls.patient = Patient.all_objects.create(
             nom='KOUASSI', prenoms='AYA MARIE', sexe='F', telephone='0701020304',
-            date_naissance=date(1992, 5, 14))
+            date_naissance=date(1992, 5, 14), centre=cls.centre)
         cls.user = User.objects.create_user('verif', password='x')
         cls.user.user_permissions.add(Permission.objects.get(
             content_type__app_label='patients', codename='view_patient'))
+        # L'endroit ne propose rien sans centre actif : c'est l'objet d'un
+        # test à part (`TestLeCentreEstObligatoirePourCreer`), pas de ceux-ci.
+        profil = cls.user.profile
+        profil.centres.add(cls.centre)
+        profil.centre_actif = cls.centre
+        profil.save(update_fields=['centre_actif'])
 
     def _appeler(self, **params):
         import json
@@ -2807,8 +2867,19 @@ class BaseDoublons(TestCase):
             self.agent.user_permissions.add(Permission.objects.get(
                 content_type__app_label='patients', codename=code))
         self.agent = User.objects.get(pk=self.agent.pk)
+        # Rattaché au centre, comme dans la vie : le menu Doublons ne montre
+        # rien sans centre actif (voir patients/doublons_acces.py).
+        self.rattacher(self.agent, self.centre)
         self.client = Client()
         self.client.force_login(self.agent)
+
+    @staticmethod
+    def rattacher(utilisateur, centre):
+        profil = utilisateur.profile
+        profil.centres.add(centre)
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+        return utilisateur
 
     @property
     def cle(self):
@@ -2829,10 +2900,22 @@ class TestLAccesALEcranDesDoublons(BaseDoublons):
         self.assertEqual(reponse.status_code, 200)
         self.assertContains(reponse, self.gardee.code_patient)
 
-    def test_le_filtre_par_defaut_est_quasi_certain(self):
-        """Les 905 cas sûrs d'abord ; les 7 600 « à vérifier » viennent après."""
+    def test_aucun_filtre_n_est_pose_d_office(self):
+        """Arriver sur la page ne doit allumer aucun filtre.
+
+        Le relevé entier s'affiche, les plus sûrs en tête : un filtre posé
+        sans qu'on l'ait demandé cachait la moitié des groupes tout en
+        peignant « Filtres » comme si l'utilisateur avait choisi.
+        """
         reponse = self.client.get(reverse('patients:doublons_liste'))
-        self.assertEqual(reponse.context['niveau'], 'certain')
+        self.assertEqual(reponse.context['niveau'], 'tous')
+        html = reponse.content.decode()
+        self.assertNotIn('class="o-ctrl-btn active"', html)
+        # Le lien lui-même, pas le sélecteur que le script porte.
+        self.assertNotIn('class="o-ctrl-btn" data-effacer', html)
+        self.assertIn('class="o-ctrl-btn" data-effacer',
+                      self.client.get(reverse('patients:doublons_liste'),
+                                      {'niveau': 'certain'}).content.decode())
 
     def test_la_recherche_porte_sur_le_nom_et_sur_le_code(self):
         url = reverse('patients:doublons_liste')
@@ -3021,6 +3104,8 @@ class TestMasquerUneFiche(BaseDoublons):
         self.assertContains(reponse, self.gardee.code_patient)
 
     def test_elle_est_introuvable_sans_la_permission(self):
+        """Masquée, pas fusionnée : son contenu n'est allé nulle part, et son
+        adresse ne mène donc nulle part non plus."""
         from django.contrib.auth.models import Permission
         self._masquer(self.doublon, self.gardee)
         simple = User.objects.create_user('dbl_lecteur', password='x')
@@ -3284,7 +3369,89 @@ class TestLeMasquageEnAjax(BaseDoublons):
         self.assertFalse(Patient.all_objects.get(pk=self.doublon.pk).masque)
 
 
+class TestLEcranSuitLeGabaritDesListes(BaseDoublons):
+    """Le menu doit avoir la tête des autres listes, et par les mêmes moyens.
+
+    Ces tests vérifient le balisage partagé, pas l'apparence : c'est lui qui
+    garantit que les composants de `includes/listing/composants.html` et le
+    pilotage de `includes/listing/page_js.html` s'appliquent. Un gabarit qui
+    recommencerait à écrire ses propres classes les ferait tomber.
+    """
+
+    AJAX = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}
+
+    def test_la_page_inclut_les_composants_partages(self):
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertIn('id="subheader-controls"', html)
+        self.assertIn('id="dbl-resultats"', html)
+        self.assertIn('class="o-page-count"', html)
+        self.assertIn('class="o-search-bar"', html)
+
+    def test_les_onglets_sont_ceux_du_projet(self):
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertIn('class="tab-nav"', html)
+        self.assertIn('class="tab-btn active"', html)
+
+    def test_le_releve_est_aussi_rendu_en_tableau(self):
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertIn('id="list-view"', html)
+        self.assertIn('<th>Données rattachées</th>', html)
+        # La ligne du groupe mène à la comparaison, comme la carte.
+        self.assertIn(reverse('patients:doublons_comparer', args=[self.cle]), html)
+
+    def test_le_fragment_ajax_porte_les_trois_zones_echangees(self):
+        """`page_js.html` les remplace par identifiant : elles doivent y être."""
+        html = self.client.get(reverse('patients:doublons_liste'),
+                               **self.AJAX).content.decode()
+        self.assertIn('id="subheader-controls"', html)
+        self.assertIn('id="dbl-resultats"', html)
+        self.assertIn('class="o-page-count"', html)
+        self.assertNotIn('<body', html)      # un fragment, pas la page entière
+
+    def test_le_niveau_est_un_menu_de_filtres(self):
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertIn('id="dd-filtres"', html)
+        self.assertIn('class="o-dd-panel lst-menu"', html)
+        self.assertIn('Quasi certain', html)
+
+    def test_l_action_de_la_page_est_a_gauche_sous_le_titre(self):
+        """La place qu'occupe « Créer » sur la liste des patients."""
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        gauche = html.split('id="dbl-gauche"', 1)[1].split('</div>', 1)[0]
+        self.assertIn(reverse('patients:doublons_recalculer'), gauche)
+        self.assertIn('o-btn-create', gauche)
+
+    def test_les_trois_onglets_s_echangent_sans_recharger(self):
+        """Chaque onglet doit rendre les régions que le socle remplace.
+
+        Le changement d'onglet va chercher la page entière et n'en reprend
+        que ces identifiants : un onglet qui n'en porterait pas laisserait
+        la barre de l'onglet précédent en place.
+        """
+        # L'onglet des fusions demande sa propre permission : il est vérifié
+        # de la même façon par `TestLOngletDesFusionsSEchangeAussi`.
+        for route in ('patients:doublons_liste', 'patients:doublons_journal'):
+            with self.subTest(onglet=route):
+                html = self.client.get(reverse(route)).content.decode()
+                for repere in ('id="dbl-recherche"', 'id="dbl-gauche"',
+                               'id="subheader-controls"', 'id="dbl-resultats"',
+                               'id="dbl-onglets"', 'class="o-page-title"'):
+                    self.assertIn(repere, html)
+
+    def test_les_feuilles_des_onglets_sont_communes(self):
+        """Seul le corps est remplacé : les styles doivent être là d'emblée."""
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertIn('.jnl, .fus-journal', html)
+
+
 class TestLaBanderoleDeMasquage(BaseDoublons):
+    """L'annonce passe par le toast du projet, comme partout ailleurs.
+
+    Le serveur ne rend plus un bandeau mais les données du toast ; le script
+    du socle le lève au chargement, avec le même « Annuler » que le masquage
+    en AJAX. Un seul chemin d'annonce, donc un seul texte à tenir.
+    """
+
     def test_elle_annonce_la_fiche_et_propose_d_annuler(self):
         self.client.post(
             reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
@@ -3292,10 +3459,19 @@ class TestLaBanderoleDeMasquage(BaseDoublons):
         reponse = self.client.get(reverse('patients:doublons_liste'),
                                   {'masque': self.doublon.pk})
         self.assertEqual(reponse.context['masquage'].pk, self.doublon.pk)
-        self.assertContains(reponse, 'est masquée')
-        self.assertContains(reponse, 'Annuler')
+        self.assertContains(reponse, 'id="dbl-annonce"')
+        self.assertContains(reponse, f'data-code="{self.doublon.code_patient}"')
+        self.assertContains(reponse, f'data-gardee="{self.gardee.code_patient}"')
         self.assertContains(reponse, reverse('patients:doublons_reafficher',
                                              args=[self.doublon.pk]))
+
+    def test_les_messages_django_ne_sont_plus_doubles(self):
+        """base.html les affiche déjà en toast : un bandeau les redoublait."""
+        reponse = self.client.post(
+            reverse('patients:doublons_reafficher', args=[self.gardee.pk]), {})
+        self.assertEqual(reponse.status_code, 404)   # elle n'est pas masquée
+        html = self.client.get(reverse('patients:doublons_liste')).content.decode()
+        self.assertNotIn('o-alerte', html)
 
     def test_le_masquage_redirige_en_portant_la_fiche(self):
         reponse = self.client.post(
@@ -3376,8 +3552,13 @@ class TestLEcranDeComparaison(BaseDoublons):
         reponse = self._comparer()
         corps = reponse.content.decode()
         barre = corps[corps.index('cmp-barre'):]
-        for attendu in ('Garder ', 'Masquer ', 'Pas un doublon', 'Fusionner'):
+        for attendu in ('Garder ', 'Masquer ', 'Pas un doublon'):
             self.assertIn(attendu, barre)
+
+    def test_fusionner_n_apparait_pas_sans_la_permission(self):
+        """`gerer_doublons` laisse masquer ; déplacer des factures demande
+        `fusionner_patients`."""
+        self.assertNotContains(self._comparer(), 'Fusionner')
 
 
 class TestLeSurlignageMotAMot(BaseDoublons):
@@ -3469,6 +3650,2222 @@ class TestLaRaisonDuRapprochement(BaseDoublons):
                                    Patient(nom='NGUESSAN', prenoms='KONE')))
         self.assertFalse(memes_noms({'nom': 'BALO', 'prenoms': 'RAYAN'},
                                     Patient(nom='BALLO', prenoms='RAYAN')))
+
+    # ── Lequel des deux champs diffère ─────────────────────────────────────
+
+    def test_le_prenom_seul_qui_differe_le_dit(self):
+        """ASSENA ELIAQUIM / ASSENA ELIAKIM : le nom est le même."""
+        self.doublon.prenoms = 'AYA MARIA'
+        self.doublon.save(update_fields=['prenoms'])
+        raisons = self._raisons()
+        self.assertIn('prénom presque identique', raisons)
+        self.assertNotIn('nom presque identique', raisons)
+        self.assertNotIn('même nom', raisons)
+
+    def test_le_nom_seul_qui_differe_le_dit_aussi(self):
+        self.doublon.nom = 'KOUASSY'
+        self.doublon.save(update_fields=['nom'])
+        raisons = self._raisons()
+        self.assertIn('nom presque identique', raisons)
+        self.assertNotIn('prénom presque identique', raisons)
+
+    def test_les_deux_qui_different_se_disent_ensemble(self):
+        self.doublon.nom = 'KOUASSY'
+        self.doublon.prenoms = 'AYA MARIA'
+        self.doublon.save(update_fields=['nom', 'prenoms'])
+        raisons = self._raisons()
+        self.assertIn('nom et prénom presque identiques', raisons)
+        self.assertNotIn('nom presque identique', raisons)
+        self.assertNotIn('prénom presque identique', raisons)
+
+    def test_la_meme_ecriture_des_deux_champs_reste_meme_nom(self):
+        self.assertIn('même nom', self._raisons())
+
+    def test_un_releve_ancien_garde_son_ancienne_phrase(self):
+        """Les paires d'avant ne portent pas le détail par champ : on ne
+        devine pas lequel diffère, on dit ce qu'on sait."""
+        from .doublons import raisons
+        self.assertEqual(raisons({'noms': 0.95}), ['nom presque identique'])
+
+    def test_le_detail_par_champ_est_releve_a_la_mesure(self):
+        """La fenêtre de saisie n'a pas de fiches à relire : c'est `scorer`
+        qui doit ranger le détail."""
+        from .doublons import scorer
+        mesure = scorer({'nom': 'KOUASSI', 'prenoms': 'AYA MARIA',
+                         'sexe': 'F', 'telephone': '0701020304',
+                         'date_naissance': date(1992, 5, 14)},
+                        self.gardee)
+        self.assertTrue(mesure.details['nom_identique'])
+        self.assertFalse(mesure.details['prenoms_identiques'])
+        self.assertIn('prénom presque identique', mesure.raisons)
+
+
+class BaseFusion(BaseDoublons):
+    """Les deux fiches de `BaseDoublons`, et le droit de les fusionner."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+        super().setUp()
+        self.agent.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='fusionner_patients'))
+        self.agent = User.objects.get(pk=self.agent.pk)
+        self.client.force_login(self.agent)
+        # Désignée à la main : sinon la première donnée rattachée au doublon
+        # ferait de lui la fiche gardée, et les écrans changeraient de sens
+        # au milieu d'un test.
+        from .models import ChoixFicheGardee
+        ChoixFicheGardee.all_objects.create(patient=self.gardee,
+                                            centre=self.centre)
+
+    def fusionner(self, **kwargs):
+        from .fusion import Choix, fusionner
+        return fusionner(self.gardee, self.doublon,
+                         Choix(**kwargs), self.agent)
+
+    def rdv(self, fiche, **kwargs):
+        kwargs.setdefault('motif', 'Contrôle')
+        kwargs.setdefault('date_heure', timezone.now())
+        return RendezVous.objects.create(patient=fiche, **kwargs)
+
+
+class TestLaFusionDeplaceLesLignes(BaseFusion):
+    def test_les_rendez_vous_et_factures_changent_de_proprietaire(self):
+        from facturation.models import Facture
+        rdv = self.rdv(self.doublon)
+        facture = Facture.objects.create(patient=self.doublon, montant_total=1000)
+        self.fusionner()
+        self.assertEqual(RendezVous.all_objects.get(pk=rdv.pk).patient_id,
+                         self.gardee.pk)
+        self.assertEqual(Facture.all_objects.get(pk=facture.pk).patient_id,
+                         self.gardee.pk)
+
+    def test_le_journal_retient_exactement_les_lignes_deplacees(self):
+        rdv = self.rdv(self.doublon)
+        fusion = self.fusionner()
+        self.assertEqual(fusion.lignes['patients.RendezVous'], [rdv.pk])
+
+    def test_toutes_les_tables_connues_sont_couvertes(self):
+        """L'introspection donne la liste ; la fusion doit la suivre en entier."""
+        from .fusion import _champs_patient_par_table
+        from .liens_patient import liens
+        attendues = {f'{m._meta.app_label}.{m.__name__}' for m, _c, _l in liens()}
+        self.assertEqual(set(_champs_patient_par_table()), attendues)
+
+    def test_l_historique_generique_suit_la_fiche(self):
+        from core.models import LogActivite
+        from core.views import log_event
+        log_event(self.doublon, self.agent, 'Fiche créée')
+        fusion = self.fusionner()
+        trace = LogActivite.objects.get(pk=fusion.lignes['core.LogActivite'][0])
+        self.assertEqual(trace.object_id, self.gardee.pk)
+
+    def test_un_compte_qui_ne_tombe_pas_juste_fait_tout_retomber(self):
+        from .fusion import FusionIncoherente, _verifier_les_comptes
+        with self.assertRaises(FusionIncoherente):
+            _verifier_les_comptes(
+                self.gardee, self.doublon,
+                {('patients', 'RendezVous'): 2}, {}, (0, 0))
+
+    def test_la_fiche_absorbee_disparait_des_listes(self):
+        from core.middleware import centre_actif
+        self.fusionner()
+        with centre_actif(self.centre):
+            self.assertEqual(Patient.objects.filter(pk=self.doublon.pk).count(), 0)
+        fiche = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertEqual(fiche.fusionne_dans_id, self.gardee.pk)
+        self.assertEqual(fiche.remplacee_par, self.gardee)
+
+    def test_le_groupe_quitte_le_releve_tout_de_suite(self):
+        from .models import DoublonPaire
+        self.assertEqual(DoublonPaire.all_objects.count(), 1)
+        self.fusionner()
+        self.assertEqual(DoublonPaire.all_objects.count(), 0)
+
+
+class TestLeChoixDesChamps(BaseFusion):
+    def test_un_champ_vide_de_la_fiche_gardee_est_complete(self):
+        self.gardee.profession = ''
+        self.gardee.save()
+        self.doublon.profession = 'Couturière'
+        self.doublon.save()
+        from .fusion import propositions
+        proposition = next(p for p in propositions(self.gardee, self.doublon)
+                           if p.champ == 'profession')
+        self.assertEqual(proposition.defaut, 'absorbee')
+        self.fusionner()
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).profession,
+                         'Couturière')
+
+    def test_allergies_et_antecedents_sont_additionnes(self):
+        self.gardee.allergies = 'Pénicilline'
+        self.gardee.save()
+        self.doublon.allergies = 'Arachide\nPénicilline'
+        self.doublon.save()
+        self.fusionner()
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).allergies,
+                         'Pénicilline\nArachide')
+
+    def test_le_sexe_qui_se_contredit_n_a_pas_de_defaut(self):
+        from .fusion import FusionRefusee, propositions
+        self.doublon.sexe = 'M'
+        self.doublon.save()
+        proposition = next(p for p in propositions(self.gardee, self.doublon)
+                           if p.champ == 'sexe')
+        self.assertEqual(proposition.defaut, '')
+        self.assertTrue(proposition.obligatoire)
+        with self.assertRaises(FusionRefusee):
+            self.fusionner()
+
+    def test_le_sexe_choisi_est_ecrit_et_trace(self):
+        self.doublon.sexe = 'M'
+        self.doublon.save()
+        fusion = self.fusionner(champs={'sexe': ('absorbee', '')})
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).sexe, 'M')
+        self.assertEqual(fusion.champs['sexe'],
+                         {'choix': 'absorbee', 'avant': 'F', 'apres': 'M'})
+
+    def test_la_date_de_naissance_emporte_sa_case_approximative(self):
+        """Prendre la date de l'autre fiche sans sa case ferait d'une
+        estimation une date certaine."""
+        self.doublon.date_naissance = date(1992, 1, 1)
+        self.doublon.date_naissance_approx = True
+        self.doublon.save()
+        fusion = self.fusionner(champs={'date_naissance': ('absorbee', '')})
+        gardee = Patient.all_objects.get(pk=self.gardee.pk)
+        self.assertEqual(gardee.date_naissance, date(1992, 1, 1))
+        self.assertTrue(gardee.date_naissance_approx)
+        self.assertIn('date_naissance_approx', fusion.champs)
+
+    def test_la_photo_de_l_autre_fiche_n_est_jamais_supprimee(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        for fiche, nom in ((self.gardee, 'g.gif'), (self.doublon, 'd.gif')):
+            fiche.photo.save(nom, SimpleUploadedFile(nom, b'GIF89a'), save=True)
+        chemin_absorbee = self.doublon.photo.name
+        self.fusionner(champs={'photo': ('absorbee', '')})
+        gardee = Patient.all_objects.get(pk=self.gardee.pk)
+        absorbee = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertEqual(gardee.photo.name, chemin_absorbee)
+        self.assertEqual(absorbee.photo.name, chemin_absorbee)
+        self.assertTrue(absorbee.photo.storage.exists(chemin_absorbee))
+
+    def test_une_correction_a_la_main_est_retenue(self):
+        fusion = self.fusionner(champs={'ville': ('manuel', 'Bouaké')})
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).ville,
+                         'Bouaké')
+        self.assertEqual(fusion.champs['ville']['choix'], 'manuel')
+
+
+class TestLesCasParticuliersDeLaFusion(BaseFusion):
+    def _codes(self, gardee=None, absorbee=None):
+        from .fusion import obstacles
+        return {o.code: o for o in obstacles(gardee or self.gardee,
+                                             absorbee or self.doublon)}
+
+    def test_deux_centres_sont_refuses(self):
+        from centres.models import Centre
+        from .fusion import FusionRefusee
+        autre = Centre.objects.create(nom='Autre', code='AUT')
+        Patient.all_objects.filter(pk=self.doublon.pk).update(centre=autre)
+        self.doublon.refresh_from_db()
+        self.assertEqual(self._codes()['centres'].gravite, 'refus')
+        with self.assertRaises(FusionRefusee):
+            self.fusionner()
+
+    def test_un_deces_demande_une_confirmation(self):
+        from hospitalisation.models import RegistreDeces
+        from .fusion import FusionRefusee
+        RegistreDeces.objects.create(patient=self.doublon, code='DEC1',
+                                     date_deces=timezone.now(),
+                                     raison_deces='Inconnue')
+        self.assertEqual(self._codes()['deces'].gravite, 'confirmation')
+        with self.assertRaises(FusionRefusee):
+            self.fusionner()
+        self.fusionner(deces_confirme=True)
+        self.assertEqual(
+            RegistreDeces.all_objects.get(code='DEC1').patient_id, self.gardee.pk)
+
+    def _hospitaliser(self, fiche, numero, lit='3'):
+        from hospitalisation.models import Chambre, Hospitalisation
+        chambre, _ = Chambre.objects.get_or_create(salle_no='A1')
+        return Hospitalisation.objects.create(
+            patient=fiche, numero=numero, date_admission=timezone.now(),
+            statut='hospitalise', chambre=chambre, numero_lit=lit)
+
+    def test_deux_hospitalisations_en_cours_demandent_un_choix(self):
+        from .fusion import FusionRefusee
+        self._hospitaliser(self.gardee, 'H1', lit='1')
+        self._hospitaliser(self.doublon, 'H2', lit='2')
+        self.assertEqual(self._codes()['hospitalisations'].gravite, 'choix')
+        with self.assertRaises(FusionRefusee):
+            self.fusionner()
+
+    def test_celle_qu_on_ne_garde_pas_est_cloturee_et_son_lit_libere(self):
+        from hospitalisation.models import Hospitalisation
+        gardee_h = self._hospitaliser(self.gardee, 'H1', lit='1')
+        perdue = self._hospitaliser(self.doublon, 'H2', lit='2')
+        fusion = self.fusionner(hospitalisation_active=gardee_h.pk)
+        perdue.refresh_from_db()
+        self.assertEqual(perdue.statut, 'annule')
+        self.assertIn('Annulée (doublon)', perdue.notes)
+        self.assertEqual(
+            Hospitalisation.all_objects.filter(
+                chambre=perdue.chambre, numero_lit='2',
+                statut='hospitalise').count(), 0)
+        self.assertEqual(fusion.effets['hospitalisations'][0]['pk'], perdue.pk)
+
+    def test_les_rdv_du_meme_jour_avec_le_meme_medecin_sont_signales(self):
+        medecin = _medecin()
+        quand = timezone.now()
+        self.rdv(self.gardee, medecin=medecin, date_heure=quand)
+        double = self.rdv(self.doublon, medecin=medecin, date_heure=quand)
+        signal = self._codes()['rdv']
+        self.assertEqual(signal.gravite, 'signal')
+        self.assertEqual(signal.details['paires'][0]['absorbee'].pk, double.pk)
+        self.assertTrue(signal.details['paires'][0]['annulable'])
+
+    def test_un_rdv_qui_porte_une_consultation_ne_peut_pas_etre_annule(self):
+        from consultations.models import Consultation
+        medecin = _medecin()
+        quand = timezone.now()
+        self.rdv(self.gardee, medecin=medecin, date_heure=quand)
+        double = self.rdv(self.doublon, medecin=medecin, date_heure=quand)
+        Consultation.objects.create(patient=self.doublon, rendez_vous=double,
+                                    medecin=medecin, motif='Contrôle')
+        paire = self._codes()['rdv'].details['paires'][0]
+        self.assertFalse(paire['annulable'])
+        self.assertIn('consultation', paire['empeche'])
+        # Même demandée, l'annulation ne passe pas.
+        fusion = self.fusionner(rdv_a_annuler=[double.pk])
+        self.assertEqual(fusion.effets['rdv_annules'], [])
+        self.assertNotEqual(RendezVous.all_objects.get(pk=double.pk).statut,
+                            'annule')
+
+    def test_la_case_cochee_passe_le_rdv_en_annule_sans_le_supprimer(self):
+        medecin = _medecin()
+        quand = timezone.now()
+        self.rdv(self.gardee, medecin=medecin, date_heure=quand)
+        double = self.rdv(self.doublon, medecin=medecin, date_heure=quand)
+        self.fusionner(rdv_a_annuler=[double.pk])
+        rendu = RendezVous.all_objects.get(pk=double.pk)
+        self.assertEqual(rendu.statut, 'annule')
+        self.assertIn('doublon', rendu.notes)
+        self.assertEqual(rendu.patient_id, self.gardee.pk)
+
+    def test_une_paire_ecartee_est_reportee_sur_la_fiche_gardee(self):
+        from .models import PaireEcartee
+        tiers = Patient.all_objects.create(
+            nom='TRAORE', prenoms='MOUSSA', sexe='M', centre=self.centre)
+        a, b = sorted([self.doublon.pk, tiers.pk])
+        PaireEcartee.all_objects.create(patient_a_id=a, patient_b_id=b,
+                                        centre=self.centre, raison='frères')
+        fusion = self.fusionner()
+        x, y = sorted([self.gardee.pk, tiers.pk])
+        self.assertTrue(PaireEcartee.all_objects.filter(
+            patient_a_id=x, patient_b_id=y, raison='frères').exists())
+        self.assertEqual(fusion.effets['paires_reportees'], [[x, y]])
+
+
+class TestAnnulerUneFusion(BaseFusion):
+    def test_tout_revient_a_sa_place(self):
+        from facturation.models import Facture
+        from .fusion import annuler
+        self.gardee.profession = ''
+        self.gardee.save()
+        self.doublon.profession = 'Couturière'
+        self.doublon.save()
+        rdv = self.rdv(self.doublon)
+        facture = Facture.objects.create(patient=self.doublon, montant_total=1000)
+
+        fusion = self.fusionner()
+        self.assertEqual(annuler(fusion, self.agent), [])
+
+        self.assertEqual(RendezVous.all_objects.get(pk=rdv.pk).patient_id,
+                         self.doublon.pk)
+        self.assertEqual(Facture.all_objects.get(pk=facture.pk).patient_id,
+                         self.doublon.pk)
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).profession, '')
+        rendue = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertIsNone(rendue.fusionne_dans_id)
+        self.assertFalse(rendue.retiree)
+        fusion.refresh_from_db()
+        self.assertFalse(fusion.active)
+        self.assertEqual(fusion.annulee_par, self.agent)
+
+    def test_l_historique_repart_avec_la_fiche(self):
+        from core.models import LogActivite
+        from core.views import log_event
+        from .fusion import annuler
+        log_event(self.doublon, self.agent, 'Fiche créée')
+        fusion = self.fusionner()
+        annuler(fusion, self.agent)
+        trace = LogActivite.objects.get(pk=fusion.lignes['core.LogActivite'][0])
+        self.assertEqual(trace.object_id, self.doublon.pk)
+
+    def test_le_rendez_vous_annule_retrouve_son_etat(self):
+        from .fusion import annuler
+        medecin = _medecin()
+        quand = timezone.now()
+        self.rdv(self.gardee, medecin=medecin, date_heure=quand)
+        double = self.rdv(self.doublon, medecin=medecin, date_heure=quand,
+                          statut='confirme', notes='à revoir')
+        fusion = self.fusionner(rdv_a_annuler=[double.pk])
+        annuler(fusion, self.agent)
+        rendu = RendezVous.all_objects.get(pk=double.pk)
+        self.assertEqual(rendu.statut, 'confirme')
+        self.assertEqual(rendu.notes, 'à revoir')
+        self.assertEqual(rendu.patient_id, self.doublon.pk)
+
+    def test_la_paire_ecartee_reportee_est_retiree(self):
+        from .fusion import annuler
+        from .models import PaireEcartee
+        tiers = Patient.all_objects.create(
+            nom='TRAORE', prenoms='MOUSSA', sexe='M', centre=self.centre)
+        a, b = sorted([self.doublon.pk, tiers.pk])
+        PaireEcartee.all_objects.create(patient_a_id=a, patient_b_id=b,
+                                        centre=self.centre)
+        fusion = self.fusionner()
+        annuler(fusion, self.agent)
+        x, y = sorted([self.gardee.pk, tiers.pk])
+        self.assertFalse(PaireEcartee.all_objects.filter(
+            patient_a_id=x, patient_b_id=y).exists())
+        self.assertTrue(PaireEcartee.all_objects.filter(
+            patient_a_id=a, patient_b_id=b).exists())
+
+    def _hospitaliser(self, fiche, numero, lit):
+        from hospitalisation.models import Chambre, Hospitalisation
+        chambre, _ = Chambre.objects.get_or_create(salle_no='A1')
+        return Hospitalisation.objects.create(
+            patient=fiche, numero=numero, date_admission=timezone.now(),
+            statut='hospitalise', chambre=chambre, numero_lit=lit)
+
+    def test_l_hospitalisation_cloturee_est_rouverte(self):
+        from .fusion import annuler
+        active = self._hospitaliser(self.gardee, 'H1', '1')
+        perdue = self._hospitaliser(self.doublon, 'H2', '2')
+        fusion = self.fusionner(hospitalisation_active=active.pk)
+        self.assertEqual(annuler(fusion, self.agent), [])
+        perdue.refresh_from_db()
+        self.assertEqual(perdue.statut, 'hospitalise')
+
+    def test_elle_reste_annulee_si_le_lit_a_ete_repris(self):
+        """L'annulation dit ce qu'elle n'a pas pu rendre, plutôt que de
+        remettre deux personnes dans le même lit."""
+        from .fusion import annuler
+        active = self._hospitaliser(self.gardee, 'H1', '1')
+        perdue = self._hospitaliser(self.doublon, 'H2', '2')
+        fusion = self.fusionner(hospitalisation_active=active.pk)
+        tiers = Patient.all_objects.create(nom='TRAORE', prenoms='M',
+                                           sexe='M', centre=self.centre)
+        self._hospitaliser(tiers, 'H3', '2')
+        retenues = annuler(fusion, self.agent)
+        perdue.refresh_from_db()
+        self.assertEqual(perdue.statut, 'annule')
+        self.assertEqual(len(retenues), 1)
+        self.assertIn('occupé', retenues[0])
+
+    def test_une_ligne_supprimee_depuis_est_signalee(self):
+        from .fusion import annuler
+        rdv = self.rdv(self.doublon)
+        fusion = self.fusionner()
+        RendezVous.all_objects.filter(pk=rdv.pk).delete()
+        retenues = annuler(fusion, self.agent)
+        self.assertEqual(len(retenues), 1)
+        self.assertIn('non rendue', retenues[0])
+
+    def test_une_fusion_plus_recente_bloque_l_annulation(self):
+        from .fusion import Choix, FusionRefusee, annuler, fusionner
+        troisieme = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+            telephone='0701020304', date_naissance=date(1992, 5, 14),
+            centre=self.centre)
+        premiere = self.fusionner()
+        seconde = fusionner(self.gardee, troisieme, Choix(), self.agent)
+        with self.assertRaises(FusionRefusee) as erreur:
+            annuler(premiere, self.agent)
+        self.assertIn(troisieme.code_patient, str(erreur.exception))
+        # La plus récente, elle, se défait.
+        annuler(seconde, self.agent)
+        annuler(premiere, self.agent)
+        premiere.refresh_from_db()
+        self.assertFalse(premiere.active)
+
+    def test_une_fusion_deja_annulee_ne_se_defait_pas_deux_fois(self):
+        from .fusion import FusionRefusee, annuler
+        fusion = self.fusionner()
+        annuler(fusion, self.agent)
+        with self.assertRaises(FusionRefusee):
+            annuler(fusion, self.agent)
+
+
+class TestLeVerrouDeLaFusion(BaseFusion):
+    def test_pas_de_fusion_pendant_un_recalcul_complet(self):
+        """Le verrou partagé, comme le recalcul ciblé : un passage complet
+        réécrirait le relevé par-dessus."""
+        from .doublons_recalcul import verrou
+        from .fusion import FusionRefusee
+        with verrou(exclusif=True):
+            with self.assertRaises(FusionRefusee) as erreur:
+                self.fusionner()
+        self.assertIn('recalcul complet', str(erreur.exception))
+        self.assertIsNone(
+            Patient.all_objects.get(pk=self.doublon.pk).fusionne_dans_id)
+
+
+class TestLEcranDeFusion(BaseFusion):
+    def _url(self):
+        return reverse('patients:fusionner', args=[self.cle, self.doublon.pk])
+
+    def test_l_ecran_est_refuse_sans_la_permission(self):
+        from django.contrib.auth.models import Permission
+        simple = User.objects.create_user('fus_sans', password='x')
+        simple.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='gerer_doublons'))
+        client = Client()
+        client.force_login(User.objects.get(pk=simple.pk))
+        self.assertEqual(client.get(self._url()).status_code, 403)
+
+    def test_l_apercu_annonce_ce_qui_sera_deplace(self):
+        self.rdv(self.doublon)
+        self.rdv(self.doublon)
+        reponse = self.client.get(self._url())
+        self.assertEqual(reponse.context['apercu']['total'], 2)
+        self.assertContains(reponse, 'va transférer')
+        self.assertContains(reponse, '2 rendez-vous')
+
+    def test_les_champs_identiques_sont_replies(self):
+        reponse = self.client.get(self._url())
+        self.assertTrue(reponse.context['identiques'] > 0)
+        self.assertContains(reponse, 'champs identiques')
+
+    def test_la_fusion_passe_par_le_formulaire(self):
+        rdv = self.rdv(self.doublon)
+        reponse = self.client.post(self._url(), {
+            'retour': reverse('patients:doublons_liste')}, follow=True)
+        self.assertEqual(RendezVous.all_objects.get(pk=rdv.pk).patient_id,
+                         self.gardee.pk)
+        self.assertContains(reponse, 'a été fusionnée dans')
+
+    def test_un_refus_reaffiche_l_ecran_avec_la_raison(self):
+        self.doublon.sexe = 'M'
+        self.doublon.save()
+        reponse = self.client.post(self._url(), {})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, "La fusion n'a pas eu lieu")
+        self.assertContains(reponse, 'demande un choix')
+        self.assertIsNone(
+            Patient.all_objects.get(pk=self.doublon.pk).fusionne_dans_id)
+
+    def test_le_journal_liste_la_fusion_et_propose_de_l_annuler(self):
+        fusion = self.fusionner()
+        reponse = self.client.get(reverse('patients:fusions'))
+        self.assertContains(reponse, self.doublon.code_patient)
+        self.assertContains(reponse, 'Annuler la fusion')
+        self.client.post(reverse('patients:fusion_annuler', args=[fusion.pk]))
+        self.assertFalse(FusionPatient.all_objects.get(pk=fusion.pk).active)
+
+    def test_le_journal_dit_quelle_fusion_annuler_d_abord(self):
+        from .fusion import Choix, fusionner
+        troisieme = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+            telephone='0701020304', date_naissance=date(1992, 5, 14),
+            centre=self.centre)
+        premiere = self.fusionner()
+        fusionner(self.gardee, troisieme, Choix(), self.agent)
+        reponse = self.client.get(reverse('patients:fusions'))
+        bloquantes = [l for l in reponse.context['lignes'] if l['bloquante']]
+        self.assertEqual([l['fusion'].pk for l in bloquantes], [premiere.pk])
+        self.assertContains(reponse, "Annulez d'abord")
+
+    def test_l_ancienne_adresse_mene_a_la_fiche_gardee(self):
+        from django.contrib.auth.models import Permission
+        self.fusionner()
+        simple = User.objects.create_user('fus_lecteur', password='x')
+        simple.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='view_patient'))
+        # Rattaché au centre : l'adresse directe d'une fiche retirée ne
+        # traverse plus les centres, même pour rediriger.
+        self.rattacher(User.objects.get(pk=simple.pk), self.centre)
+        client = Client()
+        client.force_login(User.objects.get(pk=simple.pk))
+        reponse = client.get(reverse('patients:detail', args=[self.doublon.pk]))
+        self.assertRedirects(
+            reponse, reverse('patients:detail', args=[self.gardee.pk]),
+            fetch_redirect_response=False)
+
+    def test_qui_traite_les_doublons_voit_le_bandeau(self):
+        self.fusionner()
+        reponse = self.client.get(reverse('patients:detail', args=[self.doublon.pk]))
+        self.assertContains(reponse, 'Fiche fusionnée dans')
+        self.assertContains(reponse, self.gardee.code_patient)
+
+
+class TestLeBoutonFusionnerSurLaComparaison(BaseFusion):
+    def test_il_apparait_avec_la_permission(self):
+        reponse = self.client.get(
+            reverse('patients:doublons_comparer', args=[self.cle]))
+        self.assertContains(reponse, 'Fusionner')
+        self.assertContains(
+            reponse, reverse('patients:fusionner',
+                             args=[self.cle, self.doublon.pk]))
+
+    def test_l_onglet_des_fusions_aussi(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertContains(reponse, reverse('patients:fusions'))
+
+
+class TestLeJournalPendantLaFusion(BaseFusion):
+    """Le journal automatique écrit sur toute sauvegarde faite dans une requête.
+
+    Pendant une fusion, ces traces-là tombaient entre le comptage d'avant et
+    sa vérification : une fusion où un champ changeait était refusée au motif
+    que « l'historique ne se retrouve pas en entier » (constaté sur
+    OUATTARA / OUATTARRA JEANS CHRIST ELI SHAMA). Rien de tout cela ne se voit
+    sans utilisateur connecté : ces tests passent donc par l'écran.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # La fiche absorbée porte ce que l'autre n'a pas : la fusion reprend
+        # le champ, donc enregistre la fiche gardée — le cas qui échouait.
+        self.doublon.profession = 'Couturière'
+        self.doublon.save(update_fields=['profession'])
+
+    def _url(self):
+        return reverse('patients:fusionner', args=[self.cle, self.doublon.pk])
+
+    def _traces(self, fiche):
+        from django.contrib.contenttypes.models import ContentType
+        from core.models import LogActivite
+        from .models import Patient as P
+        return LogActivite.objects.filter(
+            content_type=ContentType.objects.get_for_model(P),
+            object_id=fiche.pk)
+
+    def test_un_champ_repris_ne_fait_plus_echouer_la_fusion(self):
+        reponse = self.client.post(self._url(), {
+            'retour': reverse('patients:doublons_liste')}, follow=True)
+        self.assertNotContains(reponse, 'La fusion n’a pas eu lieu')
+        fiche = Patient.all_objects.get(pk=self.doublon.pk)
+        self.assertEqual(fiche.fusionne_dans_id, self.gardee.pk)
+        self.assertEqual(Patient.all_objects.get(pk=self.gardee.pk).profession,
+                         'Couturière')
+
+    def test_la_fiche_absorbee_ne_garde_aucune_trace(self):
+        """Elle n'est plus consultable : son historique doit être parti."""
+        from core.views import log_event
+        log_event(self.doublon, self.agent, 'Fiche créée')
+        self.client.post(self._url(), {})
+        self.assertEqual(self._traces(self.doublon).count(), 0)
+        self.assertEqual(self._traces(self.gardee).filter(type='note').count(), 1)
+
+    def test_la_fusion_laisse_une_seule_trace_sur_la_fiche_gardee(self):
+        from .fusion import CODE_FUSION
+        self.client.post(self._url(), {})
+        traces = self._traces(self.gardee).filter(code=CODE_FUSION)
+        self.assertEqual(traces.count(), 1)
+        self.assertIn(self.doublon.code_patient, traces.first().message)
+        self.assertIn('Profession', traces.first().message)
+
+    def test_l_annulation_laisse_la_sienne(self):
+        from .fusion import CODE_ANNULATION
+        from .models import FusionPatient
+        self.client.post(self._url(), {})
+        fusion = FusionPatient.all_objects.get()
+        self.client.post(reverse('patients:fusion_annuler', args=[fusion.pk]))
+        traces = self._traces(self.gardee).filter(code=CODE_ANNULATION)
+        self.assertEqual(traces.count(), 1)
+        self.assertIn(self.doublon.code_patient, traces.first().message)
+
+
+class TestLOngletDesFusionsSEchangeAussi(BaseFusion):
+    def test_il_rend_les_regions_echangees(self):
+        html = self.client.get(reverse('patients:fusions')).content.decode()
+        for repere in ('id="dbl-recherche"', 'id="dbl-gauche"',
+                       'id="subheader-controls"', 'id="dbl-resultats"',
+                       'id="dbl-onglets"', 'class="o-page-title"'):
+            self.assertIn(repere, html)
+
+
+class TestRetrouverUneFicheFusionnee(BaseFusion):
+    """Le code et l'ancien identifiant de la fiche absorbée ne mènent plus
+    nulle part : ils doivent ramener la fiche gardée."""
+
+    def setUp(self):
+        super().setUp()
+        # Le centre actif vient de `BaseDoublons` : sans lui, la liste ne
+        # montrerait rien et la recherche ne prouverait rien.
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            ancien_identifiant='ANC-0042')
+        Patient.all_objects.filter(pk=self.gardee.pk).update(
+            ancien_identifiant='ANC-0001')
+        self.doublon.refresh_from_db()
+        self.gardee.refresh_from_db()
+
+    def _chercher(self, terme):
+        reponse = self.client.get(reverse('patients:list'), {'q': terme})
+        return [p.pk for p in reponse.context['page_obj'].object_list]
+
+    def test_le_code_de_la_fiche_absorbee_mene_a_la_gardee(self):
+        self.fusionner()
+        self.assertEqual(self._chercher(self.doublon.code_patient),
+                         [self.gardee.pk])
+
+    def test_son_ancien_identifiant_aussi(self):
+        self.fusionner()
+        self.assertEqual(self._chercher('ANC-0042'), [self.gardee.pk])
+
+    def test_l_ancien_identifiant_de_la_fiche_gardee_se_cherche_aussi(self):
+        """Il n'était pas cherchable du tout avant."""
+        self.assertEqual(self._chercher('ANC-0001'), [self.gardee.pk])
+
+    def test_une_fiche_seulement_masquee_ne_ramene_rien(self):
+        """Son contenu n'est allé nulle part : la faire apparaître sous un
+        autre nom tromperait."""
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.assertEqual(self._chercher(self.doublon.code_patient), [])
+
+    def test_la_chaine_de_fusions_est_remontee(self):
+        from .fusion import Choix, fusionner
+        from .resolution import pks_depuis_un_repere
+        troisieme = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+            telephone='0701020304', date_naissance=date(1992, 5, 14),
+            centre=self.centre)
+        self.fusionner()                                   # doublon → gardee
+        fusionner(troisieme, self.gardee, Choix(), self.agent)  # gardee → 3e
+        self.assertEqual(pks_depuis_un_repere(self.doublon.code_patient),
+                         {troisieme.pk})
+
+    def test_un_terme_inconnu_ne_change_rien(self):
+        from .resolution import condition_reperes
+        self.assertIsNone(condition_reperes('zeboulon'))
+        self.assertEqual(self._chercher('zeboulon'), [])
+
+    def test_le_selecteur_de_patient_suit_la_meme_regle(self):
+        self.fusionner()
+        reponse = self.client.get(reverse('patients:patient_search'),
+                                  {'q': self.doublon.code_patient})
+        self.assertEqual([r['id'] for r in reponse.json()['results']],
+                         [self.gardee.pk])
+
+
+class UnVoisin:
+    """De quoi se glisser dans le menu Doublons depuis un autre centre.
+
+    Le centre voisin n'a aucune fiche : tout ce que l'intrus verrait ou
+    toucherait viendrait donc forcément de Walé.
+    """
+
+    def installer_le_voisin(self, *permissions):
+        from django.contrib.auth.models import Permission
+        from centres.models import Centre
+
+        self.voisin = Centre.objects.create(nom='Toumbokro', code='TBK')
+        intrus = User.objects.create_user('dbl_toumbokro', password='x')
+        for code in ('view_patient', 'gerer_doublons') + permissions:
+            intrus.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.intrus = self.rattacher(User.objects.get(pk=intrus.pk), self.voisin)
+        self.client = Client()
+        self.client.force_login(self.intrus)
+
+    def detacher(self, utilisateur):
+        """Le même compte, plus rattaché à rien : aucun centre actif."""
+        profil = utilisateur.profile
+        profil.centres.clear()
+        profil.centre_actif = None
+        profil.save(update_fields=['centre_actif'])
+        self.client = Client()
+        self.client.force_login(User.objects.get(pk=utilisateur.pk))
+
+
+class TestLeCloisonnementDuMenuDoublons(UnVoisin, BaseDoublons):
+    """Rattaché à Toumbokro, on ne lit ni ne modifie une fiche de Walé.
+
+    L'écran rapproche les fiches deux à deux, en entier : il n'y a pas de
+    demi-fuite possible ici. Chaque chemin est donc essayé, y compris les
+    adresses directes qu'aucun bouton ne propose.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.installer_le_voisin()
+
+    # ── Ce qui se lit ──────────────────────────────────────────────────────
+
+    def test_la_liste_ne_montre_aucun_groupe_de_l_autre_centre(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.context['total'], 0)
+        self.assertNotContains(reponse, self.gardee.code_patient)
+
+    def test_la_comparaison_refuse_une_cle_de_l_autre_centre(self):
+        self.assertEqual(self.client.get(
+            reverse('patients:doublons_comparer', args=[self.cle])
+        ).status_code, 404)
+
+    def test_l_onglet_des_masquees_ne_montre_rien_de_l_autre_centre(self):
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            masque=True, doublon_de=self.gardee)
+        reponse = self.client.get(reverse('patients:doublons_masquees'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+        self.assertNotContains(reponse, self.doublon.code_patient)
+
+    def test_le_journal_ne_montre_aucune_trace_de_l_autre_centre(self):
+        from core.views import log_event
+        from . import journal_doublons
+        log_event(self.gardee, self.agent, 'Forcée à Walé',
+                  type='alerte', code=journal_doublons.FORCAGE)
+        reponse = self.client.get(reverse('patients:doublons_journal'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+    def test_la_recherche_du_journal_ne_ramene_pas_l_autre_centre(self):
+        """Chercher le code d'une fiche de Walé ne doit rien révéler."""
+        from core.views import log_event
+        from . import journal_doublons
+        log_event(self.gardee, self.agent, 'Forcée à Walé',
+                  type='alerte', code=journal_doublons.FORCAGE)
+        reponse = self.client.get(reverse('patients:doublons_journal'),
+                                  {'q': self.gardee.code_patient})
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+    # ── Ce qui se modifie ──────────────────────────────────────────────────
+
+    def test_aucune_decision_ne_passe_sur_une_cle_de_l_autre_centre(self):
+        from .models import ChoixFicheGardee, PaireEcartee
+        adresses = [
+            (reverse('patients:doublons_ecarter', args=[self.cle]), {}),
+            (reverse('patients:doublons_reprendre', args=[self.cle]), {}),
+            (reverse('patients:doublons_garder',
+                     args=[self.cle, self.gardee.pk]), {}),
+            (reverse('patients:doublons_masquer',
+                     args=[self.cle, self.doublon.pk]),
+             {'au_profit_de': self.gardee.pk}),
+        ]
+        for adresse, donnees in adresses:
+            with self.subTest(adresse=adresse):
+                self.assertEqual(
+                    self.client.post(adresse, donnees).status_code, 404)
+        self.assertFalse(PaireEcartee.all_objects.exists())
+        self.assertFalse(ChoixFicheGardee.all_objects.exists())
+        self.doublon.refresh_from_db()
+        self.assertFalse(self.doublon.masque)
+
+    def test_reafficher_refuse_une_fiche_de_l_autre_centre(self):
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            masque=True, doublon_de=self.gardee)
+        self.assertEqual(self.client.post(reverse(
+            'patients:doublons_reafficher', args=[self.doublon.pk])
+        ).status_code, 404)
+        self.doublon.refresh_from_db()
+        self.assertTrue(self.doublon.masque)
+
+    def test_le_recalcul_ne_releve_que_le_centre_actif(self):
+        """La tâche de fond est exécutée ici même : lancée dans un fil, elle
+        ne verrait pas la transaction du test et ne prouverait rien."""
+        from core import taches
+        from core.models import TacheImport
+        from . import doublons_recalcul
+
+        releves = []
+        vrai_recalcul, vrai_lancer = (doublons_recalcul.recalculer_centre,
+                                      taches.lancer)
+        doublons_recalcul.recalculer_centre = (
+            lambda centre_id, avancement=None: releves.append(centre_id) or 0)
+        self.addCleanup(setattr, doublons_recalcul, 'recalculer_centre',
+                        vrai_recalcul)
+
+        def lancer_ici(libelle, utilisateur, centre, travail):
+            travail(None)
+            return TacheImport.objects.create(libelle=libelle,
+                                              utilisateur=utilisateur)
+
+        taches.lancer = lancer_ici
+        self.addCleanup(setattr, taches, 'lancer', vrai_lancer)
+
+        self.client.post(reverse('patients:doublons_recalculer'))
+        self.assertEqual(releves, [self.voisin.pk])
+
+    def test_la_trace_de_saisie_ne_se_pose_pas_sur_l_autre_centre(self):
+        from core.models import LogActivite
+        reponse = self.client.post(reverse('patients:doublons_journaliser'),
+                                   {'pk': self.gardee.pk, 'score': 80,
+                                    'nom': 'KOUASSI', 'prenoms': 'AYA'})
+        self.assertEqual(reponse.status_code, 404)
+        self.assertFalse(LogActivite.objects.filter(
+            object_id=self.gardee.pk, type='alerte').exists())
+
+
+class TestLeMenuDoublonsSansCentreActif(UnVoisin, BaseDoublons):
+    """Sans centre actif, l'écran ne montre rien et le dit.
+
+    C'est le trou qu'on bouche : il retombait sur « le centre de la première
+    paire venue ». Un super-utilisateur ne fait pas exception — il choisit
+    son centre comme tout le monde.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.detacher(self.agent)
+
+    def test_la_liste_affiche_choisissez_un_centre_et_rien_d_autre(self):
+        reponse = self.client.get(reverse('patients:doublons_liste'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertNotContains(reponse, self.gardee.code_patient)
+
+    def test_les_trois_onglets_disent_la_meme_chose(self):
+        for nom in ('doublons_liste', 'doublons_journal'):
+            with self.subTest(onglet=nom):
+                self.assertContains(self.client.get(reverse(f'patients:{nom}')),
+                                    'Choisissez un centre')
+
+    def test_l_onglet_des_masquees_ne_fait_pas_exception(self):
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            masque=True, doublon_de=self.gardee)
+        reponse = self.client.get(reverse('patients:doublons_masquees'))
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertNotContains(reponse, self.doublon.code_patient)
+
+    def test_la_comparaison_ne_s_ouvre_pas_davantage(self):
+        reponse = self.client.get(
+            reverse('patients:doublons_comparer', args=[self.cle]))
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertNotContains(reponse, self.gardee.code_patient)
+
+    def test_aucune_decision_ne_passe(self):
+        reponse = self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.assertEqual(reponse.status_code, 403)
+        self.doublon.refresh_from_db()
+        self.assertFalse(self.doublon.masque)
+
+    def test_le_recalcul_non_plus(self):
+        from core.models import TacheImport
+        self.assertEqual(self.client.post(
+            reverse('patients:doublons_recalculer')).status_code, 403)
+        self.assertFalse(TacheImport.objects.exists())
+
+    def test_un_super_utilisateur_ne_fait_pas_exception(self):
+        patron = User.objects.create_superuser('dbl_patron', password='x')
+        client = Client()
+        client.force_login(patron)
+        reponse = client.get(reverse('patients:doublons_liste'))
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertNotContains(reponse, self.gardee.code_patient)
+
+    def test_le_rafraichissement_ajax_le_dit_aussi(self):
+        """La liste se recharge en AJAX : elle doit refuser là aussi, et
+        avec un message lisible plutôt qu'un gabarit vide."""
+        reponse = self.client.get(reverse('patients:doublons_liste'),
+                                  headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(reponse.status_code, 409)
+        self.assertIn('Choisissez un centre', reponse.json()['message'])
+
+
+class TestLeCloisonnementDeLaFusion(UnVoisin, BaseFusion):
+    """La fusion déplace des factures : le cloisonnement y vaut doublement."""
+
+    def setUp(self):
+        super().setUp()
+        self.fusion = self.fusionner()
+        self.installer_le_voisin('fusionner_patients')
+
+    def test_l_ecran_de_fusion_refuse_une_cle_de_l_autre_centre(self):
+        self.assertEqual(self.client.get(reverse(
+            'patients:fusionner', args=[self.cle, self.doublon.pk])
+        ).status_code, 404)
+
+    def test_l_onglet_des_fusions_ne_montre_pas_celles_de_l_autre_centre(self):
+        reponse = self.client.get(reverse('patients:fusions'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+        self.assertNotContains(reponse, self.doublon.code_patient)
+
+    def test_la_recherche_des_fusions_ne_ramene_pas_l_autre_centre(self):
+        reponse = self.client.get(reverse('patients:fusions'),
+                                  {'q': self.doublon.code_patient})
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+    def test_annuler_une_fusion_de_l_autre_centre_est_refuse(self):
+        reponse = self.client.post(
+            reverse('patients:fusion_annuler', args=[self.fusion.pk]))
+        self.assertEqual(reponse.status_code, 404)
+        self.fusion.refresh_from_db()
+        self.assertTrue(self.fusion.active)
+
+    def test_sans_centre_actif_l_onglet_des_fusions_ne_montre_rien(self):
+        self.detacher(self.agent)
+        reponse = self.client.get(reverse('patients:fusions'))
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertNotContains(reponse, self.doublon.code_patient)
+
+
+class TestLOngletDesFichesMasquees(BaseDoublons):
+    """Le seul endroit où une fiche masquée se voit encore — et se reprend."""
+
+    def setUp(self):
+        super().setUp()
+        self.masquer()
+
+    def masquer(self):
+        reponse = self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.assertIn(reponse.status_code, (200, 302), reponse.content[:200])
+        self.doublon.refresh_from_db()
+
+    def _onglet(self, **params):
+        return self.client.get(reverse('patients:doublons_masquees'), params)
+
+    def test_la_fiche_masquee_y_figure_avec_qui_et_quand(self):
+        reponse = self._onglet()
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual([f.pk for f in reponse.context['fiches']],
+                         [self.doublon.pk])
+        html = reponse.content.decode()
+        self.assertIn(self.doublon.code_patient, html)
+        self.assertIn(self.gardee.code_patient, html)   # de quelle fiche
+        self.assertIn('dbl_agent', html)                 # qui a masqué
+        self.assertIn(self.doublon.masque_le.strftime('%d/%m/%Y'), html)
+
+    def test_le_masquage_enregistre_qui_et_quand(self):
+        self.assertEqual(self.doublon.masque_par_id, self.agent.pk)
+        self.assertIsNotNone(self.doublon.masque_le)
+
+    def test_le_compte_est_celui_des_fiches_masquees(self):
+        self.assertEqual(self._onglet().context['page'].paginator.count, 1)
+
+    def test_reafficher_la_rend_visible_et_vide_l_onglet(self):
+        self.client.post(
+            reverse('patients:doublons_reafficher', args=[self.doublon.pk]),
+            {'retour': reverse('patients:doublons_masquees')})
+        self.doublon.refresh_from_db()
+        self.assertFalse(self.doublon.masque)
+        self.assertIsNone(self.doublon.doublon_de_id)
+        # Qui et quand repartent avec le masquage : les garder laisserait
+        # croire à une décision qui n'a pas été reprise.
+        self.assertIsNone(self.doublon.masque_par_id)
+        self.assertIsNone(self.doublon.masque_le)
+        self.assertEqual(self._onglet().context['page'].paginator.count, 0)
+
+    def test_une_fiche_fusionnee_n_est_pas_une_fiche_masquee(self):
+        """Elle a sa propre page : son contenu est allé quelque part."""
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            masque=False, doublon_de=None, fusionne_dans=self.gardee)
+        self.assertEqual(self._onglet().context['page'].paginator.count, 0)
+
+    # ── La recherche ───────────────────────────────────────────────────────
+
+    def test_la_recherche_par_code(self):
+        self.assertEqual(len(self._onglet(q=self.doublon.code_patient)
+                             .context['fiches']), 1)
+
+    def test_la_recherche_par_nom(self):
+        self.assertEqual(len(self._onglet(q='kouassi').context['fiches']), 1)
+
+    def test_la_recherche_par_ancien_identifiant(self):
+        """C'est lui qui figure sur les cartes imprimées."""
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            ancien_identifiant='ANC-0042')
+        self.assertEqual(len(self._onglet(q='ANC-0042').context['fiches']), 1)
+
+    def test_une_recherche_sans_reponse_le_dit(self):
+        reponse = self._onglet(q='zeboulon')
+        self.assertEqual(len(reponse.context['fiches']), 0)
+        self.assertContains(reponse, 'Aucune fiche masquée ne correspond')
+
+    def test_la_pagination_est_celle_des_autres_journaux(self):
+        from .doublons_vues import PAR_PAGE_MASQUEES
+        self.assertEqual(self._onglet().context['page'].paginator.per_page,
+                         PAR_PAGE_MASQUEES)
+
+    # ── Ailleurs, elle n'existe plus ───────────────────────────────────────
+
+    def test_elle_reste_introuvable_dans_la_liste_des_patients(self):
+        reponse = self.client.get(reverse('patients:list'),
+                                  {'q': self.doublon.code_patient})
+        self.assertEqual([p.pk for p in reponse.context['page_obj'].object_list],
+                         [])
+
+    def test_elle_reste_introuvable_dans_le_selecteur(self):
+        reponse = self.client.get(reverse('patients:patient_search'),
+                                  {'q': self.doublon.code_patient})
+        self.assertEqual([r['id'] for r in reponse.json()['results']], [])
+
+    def test_son_adresse_directe_est_404_sans_la_permission(self):
+        from django.contrib.auth.models import Permission
+        simple = User.objects.create_user('dbl_accueil', password='x')
+        simple.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='view_patient'))
+        self.rattacher(User.objects.get(pk=simple.pk), self.centre)
+        client = Client()
+        client.force_login(User.objects.get(pk=simple.pk))
+        self.assertEqual(client.get(reverse('patients:detail',
+                                            args=[self.doublon.pk])).status_code,
+                         404)
+
+    def test_elle_s_ouvre_pour_qui_traite_les_doublons(self):
+        """L'onglet y mène : le lien ne doit pas tomber sur un 404."""
+        self.assertEqual(self.client.get(
+            reverse('patients:detail', args=[self.doublon.pk])).status_code, 200)
+
+    def test_l_adresse_directe_ne_traverse_pas_les_centres(self):
+        """Même avec la permission : la fiche retirée d'un autre centre reste
+        fermée."""
+        from django.contrib.auth.models import Permission
+        from centres.models import Centre
+        voisin = Centre.objects.create(nom='Toumbokro', code='TBK')
+        intrus = User.objects.create_user('dbl_voisin2', password='x')
+        for code in ('view_patient', 'gerer_doublons'):
+            intrus.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.rattacher(User.objects.get(pk=intrus.pk), voisin)
+        client = Client()
+        client.force_login(User.objects.get(pk=intrus.pk))
+        self.assertEqual(client.get(reverse('patients:detail',
+                                            args=[self.doublon.pk])).status_code,
+                         404)
+
+
+class BaseSuppression(BaseFusion):
+    """Un super-utilisateur du centre, et de quoi supprimer pour de bon."""
+
+    def setUp(self):
+        super().setUp()
+        self.patron = User.objects.create_superuser('dbl_patron', password='x')
+        self.rattacher(self.patron, self.centre)
+        self.client = Client()
+        self.client.force_login(User.objects.get(pk=self.patron.pk))
+
+    def masquer(self, fiche=None):
+        fiche = fiche or self.doublon
+        Patient.all_objects.filter(pk=fiche.pk).update(
+            masque=True, doublon_de=self.gardee, masque_par=self.agent,
+            masque_le=timezone.now())
+        fiche.refresh_from_db()
+        return fiche
+
+    def adresse(self, fiche=None):
+        return reverse('patients:doublons_supprimer',
+                       args=[(fiche or self.doublon).pk])
+
+    def supprimer(self, fiche=None, code=None):
+        fiche = fiche or self.doublon
+        return self.client.post(self.adresse(fiche),
+                                {'code': code or fiche.code_patient})
+
+    def existe(self, fiche):
+        return Patient.all_objects.filter(pk=fiche.pk).exists()
+
+
+class TestQuiPeutSupprimer(BaseSuppression):
+    def test_un_agent_qui_traite_les_doublons_ne_peut_pas(self):
+        """`is_superuser`, pas une permission : un groupe s'élargit."""
+        self.masquer()
+        client = Client()
+        client.force_login(User.objects.get(pk=self.agent.pk))
+        self.assertEqual(client.get(self.adresse()).status_code, 403)
+        self.assertEqual(client.post(
+            self.adresse(), {'code': self.doublon.code_patient}).status_code, 403)
+        self.assertTrue(self.existe(self.doublon))
+
+    def test_un_super_utilisateur_d_un_autre_centre_non_plus(self):
+        from centres.models import Centre
+        self.masquer()
+        voisin = Centre.objects.create(nom='Toumbokro', code='TBK')
+        ailleurs = User.objects.create_superuser('dbl_patron2', password='x')
+        self.rattacher(ailleurs, voisin)
+        client = Client()
+        client.force_login(User.objects.get(pk=ailleurs.pk))
+        self.assertEqual(client.get(self.adresse()).status_code, 404)
+        self.assertTrue(self.existe(self.doublon))
+
+    def test_sans_centre_actif_l_ecran_ne_s_ouvre_pas(self):
+        self.masquer()
+        profil = self.patron.profile
+        profil.centres.clear()
+        profil.centre_actif = None
+        profil.save()
+        self.assertContains(self.client.get(self.adresse()),
+                            'Choisissez un centre')
+        self.assertTrue(self.existe(self.doublon))
+
+
+class TestCeQueLaSuppressionRefuse(BaseSuppression):
+    def test_un_dossier_ouvert_n_est_pas_supprimable(self):
+        reponse = self.client.get(self.adresse())
+        self.assertContains(reponse, 'dossier ouvert')
+        self.assertNotContains(reponse, 'Supprimer définitivement</button>')
+        self.supprimer()
+        self.assertTrue(self.existe(self.doublon))
+
+    def test_une_fiche_qui_porte_des_donnees_non_plus(self):
+        """Revérifié côté serveur : entre l'écran et le clic, quelqu'un a pu
+        rattacher quelque chose."""
+        self.masquer()
+        self.rdv(self.doublon)
+        reponse = self.client.get(self.adresse())
+        self.assertContains(reponse, 'Elle porte encore')
+        self.supprimer()
+        self.assertTrue(self.existe(self.doublon))
+
+    def test_le_code_tape_doit_etre_le_bon(self):
+        self.masquer()
+        reponse = self.supprimer(code='PAT000000')
+        self.assertContains(reponse, 'ne correspond pas')
+        self.assertTrue(self.existe(self.doublon))
+
+    def test_un_code_vide_ne_supprime_rien(self):
+        self.masquer()
+        self.client.post(self.adresse(), {})
+        self.assertTrue(self.existe(self.doublon))
+
+
+class TestLaSuppressionDUneFicheMasquee(BaseSuppression):
+    def setUp(self):
+        super().setUp()
+        from core.views import log_event
+        self.masquer()
+        log_event(self.doublon, self.agent, 'Une trace à conserver',
+                  type='modif')
+
+    def test_la_fiche_disparait_et_la_trace_reste(self):
+        from .models import SuppressionPatient
+        code = self.doublon.code_patient
+        self.supprimer()
+        self.assertFalse(self.existe(self.doublon))
+        trace = SuppressionPatient.all_objects.get()
+        self.assertEqual(trace.code_patient, code)
+        self.assertEqual(trace.etat, 'masquee')
+        self.assertEqual(trace.utilisateur_id, self.patron.pk)
+        self.assertEqual(trace.code_remplacante, self.gardee.code_patient)
+        self.assertEqual(trace.centre_id, self.centre.pk)
+
+    def test_la_copie_est_complete(self):
+        from .models import SuppressionPatient
+        self.supprimer()
+        copie = SuppressionPatient.all_objects.get().copie
+        champs = {f.name for f in Patient._meta.concrete_fields}
+        self.assertEqual(set(copie), champs)
+        self.assertEqual(copie['nom'], 'KOUASSI')
+
+    def test_le_journal_est_recopie_puis_efface(self):
+        """`LogActivite` est générique : rien ne le cascade, personne ne le
+        reverrait."""
+        from core.models import LogActivite
+        from .fusion import _type_patient
+        from .models import SuppressionPatient
+        pk = self.doublon.pk
+        self.supprimer()
+        recopie = SuppressionPatient.all_objects.get().journal
+        self.assertIn('Une trace à conserver',
+                      ' '.join(l['message'] for l in recopie))
+        # Celles d'origine sont parties avec la fiche — sauf la trace de la
+        # suppression elle-même, posée après coup par le journal du projet.
+        restantes = LogActivite.objects.filter(
+            content_type=_type_patient(), object_id=pk)
+        self.assertEqual([t.type for t in restantes], ['suppression'])
+
+    def test_les_lignes_internes_partent_avec_elle(self):
+        from django.db.models import Q
+        from .models import ChoixFicheGardee, ClePhonetique, DoublonPaire
+        pk = self.doublon.pk
+        self.supprimer()
+        self.assertFalse(ClePhonetique.all_objects.filter(patient_id=pk).exists())
+        self.assertFalse(DoublonPaire.all_objects.filter(
+            Q(patient_a_id=pk) | Q(patient_b_id=pk)).exists())
+        self.assertFalse(ChoixFicheGardee.all_objects.filter(patient_id=pk).exists())
+
+    def test_la_fiche_gardee_n_est_pas_touchee(self):
+        self.supprimer()
+        self.assertTrue(self.existe(self.gardee))
+        self.gardee.refresh_from_db()
+        self.assertFalse(self.gardee.masque)
+
+    def test_l_onglet_des_masquees_se_vide(self):
+        self.supprimer()
+        reponse = self.client.get(reverse('patients:doublons_masquees'))
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+    def test_une_fiche_seulement_masquee_ne_redirige_toujours_pas(self):
+        """Son contenu n'est allé nulle part : la faire apparaître sous un
+        autre nom tromperait, supprimée ou non."""
+        from .resolution import pks_depuis_un_repere
+        code = self.doublon.code_patient
+        self.supprimer()
+        self.assertEqual(pks_depuis_un_repere(code), set())
+
+
+class TestLaSuppressionDUneFicheFusionnee(BaseSuppression):
+    def setUp(self):
+        super().setUp()
+        Patient.all_objects.filter(pk=self.doublon.pk).update(
+            ancien_identifiant='ANC-0042')
+        # La fiche gardée a le sien : sans cela la fusion lui recopierait
+        # celui de l'absorbée, et la redirection serait prouvée par la
+        # mauvaise raison.
+        Patient.all_objects.filter(pk=self.gardee.pk).update(
+            ancien_identifiant='ANC-0001')
+        for fiche in (self.doublon, self.gardee):
+            fiche.refresh_from_db()
+        self.fusion = self.fusionner()
+        self.doublon.refresh_from_db()
+
+    def test_l_ecran_previent_que_la_fusion_ne_se_defera_plus(self):
+        reponse = self.client.get(self.adresse())
+        self.assertContains(reponse, 'La fusion ne pourra plus être annulée')
+
+    def test_la_fusion_garde_sa_copie_et_ses_reperes(self):
+        self.supprimer()
+        self.fusion.refresh_from_db()
+        self.assertIsNone(self.fusion.absorbee_id)
+        self.assertEqual(self.fusion.code_absorbee, self.doublon.code_patient)
+        self.assertEqual(self.fusion.ancien_identifiant_absorbee, 'ANC-0042')
+        self.assertEqual(self.fusion.code_gardee, self.gardee.code_patient)
+        self.assertEqual(self.fusion.copie['nom'], 'KOUASSI')
+
+    def test_elle_ne_peut_plus_etre_annulee(self):
+        from .fusion import FusionRefusee, annuler
+        self.supprimer()
+        self.fusion.refresh_from_db()
+        self.assertFalse(self.fusion.annulable)
+        with self.assertRaises(FusionRefusee):
+            annuler(self.fusion, self.patron)
+
+    def test_l_onglet_des_fusions_se_lit_encore(self):
+        self.supprimer()
+        reponse = self.client.get(reverse('patients:fusions'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, self.doublon.code_patient)
+        self.assertContains(reponse, 'fiche supprimée')
+
+    # ── La redirection survit ──────────────────────────────────────────────
+
+    def test_son_code_mene_toujours_a_la_fiche_gardee(self):
+        from .resolution import pks_depuis_un_repere
+        code = self.doublon.code_patient
+        self.supprimer()
+        self.assertFalse(self.existe(self.doublon))
+        self.assertEqual(pks_depuis_un_repere(code), {self.gardee.pk})
+
+    def test_son_ancien_identifiant_aussi(self):
+        from .resolution import pks_depuis_un_repere
+        self.supprimer()
+        self.gardee.refresh_from_db()
+        self.assertEqual(self.gardee.ancien_identifiant, 'ANC-0001')
+        self.assertEqual(pks_depuis_un_repere('ANC-0042'), {self.gardee.pk})
+
+    def test_un_autre_dossier_portant_ce_code_ne_l_efface_pas(self):
+        """Les anciens identifiants ressemblent aux codes : un dossier
+        vivant peut porter comme ancien identifiant le code d'une fiche
+        supprimée. Les deux réponses sont justes, aucune ne doit masquer
+        l'autre."""
+        from .resolution import pks_depuis_un_repere
+        code = self.doublon.code_patient
+        autre = Patient.all_objects.create(
+            nom='TRAORE', prenoms='FATOU', sexe='F', centre=self.centre,
+            date_naissance=date(1980, 1, 1), ancien_identifiant=code)
+        self.supprimer()
+        self.assertEqual(pks_depuis_un_repere(code),
+                         {self.gardee.pk, autre.pk})
+
+    def test_la_recherche_des_patients_y_mene_aussi(self):
+        code = self.doublon.code_patient
+        self.supprimer()
+        reponse = self.client.get(reverse('patients:list'), {'q': code})
+        self.assertEqual([p.pk for p in reponse.context['page_obj'].object_list],
+                         [self.gardee.pk])
+
+
+class TestLaChaineDeFusionsApresSuppression(BaseSuppression):
+    """A versée dans B, B versée dans C, puis B supprimée.
+
+    Les cartes imprimées portent le code de A comme celui de B : les deux
+    doivent mener à C, même quand le maillon du milieu a disparu.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from .fusion import Choix, fusionner
+        self.troisieme = Patient.all_objects.create(
+            nom='KOUASSI', prenoms='AYA MARIE', sexe='F',
+            telephone='0701020304', date_naissance=date(1992, 5, 14),
+            centre=self.centre)
+        self.fusionner()                                            # A → B
+        fusionner(self.troisieme, self.gardee, Choix(), self.agent)  # B → C
+        for fiche in (self.doublon, self.gardee):
+            fiche.refresh_from_db()
+
+    def test_les_deux_anciens_codes_menent_a_la_derniere(self):
+        from .resolution import pks_depuis_un_repere
+        self.assertEqual(pks_depuis_un_repere(self.doublon.code_patient),
+                         {self.troisieme.pk})
+        self.assertEqual(pks_depuis_un_repere(self.gardee.code_patient),
+                         {self.troisieme.pk})
+
+    def test_l_intermediaire_supprimee_ne_coupe_pas_la_chaine(self):
+        from .resolution import pks_depuis_un_repere
+        code_a, code_b = self.doublon.code_patient, self.gardee.code_patient
+        self.supprimer(self.gardee)
+        self.assertFalse(self.existe(self.gardee))
+        # La première fiche a été reportée sur la dernière : elle ne pointe
+        # plus dans le vide.
+        self.doublon.refresh_from_db()
+        self.assertEqual(self.doublon.fusionne_dans_id, self.troisieme.pk)
+        self.assertEqual(pks_depuis_un_repere(code_a), {self.troisieme.pk})
+        self.assertEqual(pks_depuis_un_repere(code_b), {self.troisieme.pk})
+
+    def test_meme_quand_les_deux_premieres_ont_disparu(self):
+        """Plus aucune fiche ne porte ces codes : c'est le journal qui répond."""
+        from .resolution import pks_depuis_un_repere
+        code_a, code_b = self.doublon.code_patient, self.gardee.code_patient
+        self.supprimer(self.gardee)
+        self.doublon.refresh_from_db()
+        self.supprimer(self.doublon)
+        self.assertFalse(self.existe(self.doublon))
+        self.assertEqual(pks_depuis_un_repere(code_a), {self.troisieme.pk})
+        self.assertEqual(pks_depuis_un_repere(code_b), {self.troisieme.pk})
+
+    def test_une_fusion_annulee_ne_redirige_pas(self):
+        """Annuler a rendu son indépendance à la fiche : son code ne doit
+        plus mener ailleurs."""
+        from .fusion import annuler
+        from .models import FusionPatient
+        from .resolution import pks_depuis_un_repere
+        derniere = FusionPatient.all_objects.order_by('-date').first()
+        annuler(derniere, self.agent)
+        self.gardee.refresh_from_db()
+        self.assertEqual(pks_depuis_un_repere(self.gardee.code_patient),
+                         {self.gardee.pk})
+
+
+class TestLeCentreEstObligatoirePourCreer(TestCase):
+    """Sans centre actif, on ne crée pas de fiche — et rien ne se propose.
+
+    Le garde-fou des doublons compare la saisie à un périmètre. Sans centre,
+    ce périmètre était « tous les centres » : la fenêtre de saisie montrait
+    les dossiers d'à côté, et le contrôle à l'enregistrement les comparait.
+    On refuse désormais de travailler, et on le dit. Un super-utilisateur ne
+    fait pas exception.
+
+    Hors requête — import par lots, commandes — le centre est passé
+    explicitement : ce chemin-là ne change pas.
+    """
+
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+        from centres.models import Centre
+        self.centre = Centre.objects.create(nom='Walé', code='WAL')
+        self.agent = User.objects.create_user('crea_agent', password='x')
+        for code in ('view_patient', 'add_patient', 'change_patient'):
+            self.agent.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.agent = User.objects.get(pk=self.agent.pk)
+        self.client = Client()
+        self.client.force_login(self.agent)
+
+    @staticmethod
+    def _donnees(**remplacements):
+        donnees = {'nom': 'ZEBOULON', 'prenoms': 'EUSTACHE', 'sexe': 'M',
+                   'telephone': '0788889999', 'date_naissance': '09/02/1977',
+                   'nationalite': 'Ivoirienne', 'adresse': 'Habitat',
+                   'ville': 'Yamoussoukro'}
+        donnees.update(remplacements)
+        return donnees
+
+    def rattacher(self, utilisateur, centre):
+        profil = utilisateur.profile
+        profil.centres.add(centre)
+        profil.centre_actif = centre
+        profil.save(update_fields=['centre_actif'])
+
+    # ── Le formulaire ──────────────────────────────────────────────────────
+
+    def test_le_formulaire_refuse_sans_centre(self):
+        from .forms import PatientForm
+        form = PatientForm(self._donnees(), utilisateur=self.agent)
+        self.assertFalse(form.is_valid())
+        self.assertIn('Choisissez un centre', form.non_field_errors()[0])
+
+    def test_le_formulaire_passe_avec_le_centre(self):
+        from .forms import PatientForm
+        form = PatientForm(self._donnees(), utilisateur=self.agent,
+                           centre=self.centre)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+
+    def test_modifier_une_fiche_garde_le_centre_de_la_fiche(self):
+        """Le centre vient alors de la fiche : on ne redemande rien."""
+        from .forms import PatientForm
+        fiche = Patient.all_objects.create(
+            nom='ZEBOULON', prenoms='EUSTACHE', sexe='M',
+            telephone='0788889999', date_naissance=date(1977, 2, 9),
+            centre=self.centre)
+        form = PatientForm(self._donnees(adresse='Ailleurs'), instance=fiche,
+                           utilisateur=self.agent)
+        self.assertTrue(form.is_valid(), form.errors.as_text())
+
+    def test_le_perimetre_est_vide_et_non_tous_les_centres(self):
+        """Un périmètre vide ne doit pas pouvoir passer pour « aucun doublon » :
+        le formulaire refuse de toute façon, mais la règle est posée ici."""
+        from .forms import PatientForm
+        Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE',
+                                   sexe='M', centre=self.centre)
+        self.assertFalse(PatientForm(self._donnees())._perimetre().exists())
+
+    # ── La vue de création ─────────────────────────────────────────────────
+
+    def test_la_creation_est_refusee_sans_centre_actif(self):
+        reponse = self.client.post(reverse('patients:create'), self._donnees())
+        self.assertEqual(reponse.status_code, 200)       # le formulaire revient
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertFalse(Patient.all_objects.exists())
+
+    def test_elle_passe_une_fois_le_centre_choisi(self):
+        self.rattacher(self.agent, self.centre)
+        reponse = self.client.post(reverse('patients:create'), self._donnees())
+        self.assertEqual(reponse.status_code, 302)
+        self.assertEqual(Patient.all_objects.get().centre_id, self.centre.pk)
+
+    def test_un_super_utilisateur_ne_fait_pas_exception(self):
+        patron = User.objects.create_superuser('crea_patron', password='x')
+        client = Client()
+        client.force_login(patron)
+        reponse = client.post(reverse('patients:create'), self._donnees())
+        self.assertContains(reponse, 'Choisissez un centre')
+        self.assertFalse(Patient.all_objects.exists())
+
+    # ── La fenêtre de saisie ───────────────────────────────────────────────
+
+    def test_la_fenetre_ne_propose_rien_sans_centre(self):
+        Patient.all_objects.create(nom='ZEBOULON', prenoms='EUSTACHE',
+                                   sexe='M', centre=self.centre)
+        reponse = self.client.get(reverse('patients:doublons_verifier'),
+                                  {'nom': 'ZEBOULON', 'prenoms': 'EUSTACHE'})
+        donnees = reponse.json()
+        self.assertEqual(donnees['doublons'], [])
+        self.assertEqual(donnees['meme_telephone'], 0)
+        self.assertIn('Choisissez un centre', donnees['message'])
+
+    def test_elle_propose_de_nouveau_une_fois_le_centre_choisi(self):
+        Patient.all_objects.create(
+            nom='ZEBOULON', prenoms='EUSTACHE', sexe='M',
+            telephone='0788889999', date_naissance=date(1977, 2, 9),
+            centre=self.centre)
+        self.rattacher(self.agent, self.centre)
+        donnees = self.client.get(
+            reverse('patients:doublons_verifier'),
+            {'nom': 'ZEBOULON', 'prenoms': 'EUSTACHE', 'sexe': 'M',
+             'telephone': '0788889999',
+             'date_naissance': '1977-02-09'}).json()
+        self.assertEqual(len(donnees['doublons']), 1)
+        self.assertNotIn('message', donnees)
+
+    # ── L'import, lui, ne change pas ───────────────────────────────────────
+
+    def test_l_import_par_lots_cree_toujours_sans_centre_actif(self):
+        """Il passe le sien explicitement et ne touche pas au formulaire :
+        exiger un centre actif l'aurait arrêté net."""
+        import json
+        from core.models import TacheImport
+        from core.taches import Avancement
+        from .views import _executer_import_patients
+
+        avancement = Avancement(TacheImport.objects.create(libelle='Test'))
+        _executer_import_patients(
+            avancement, 'fichier.json',
+            json.dumps([{'nom': 'Kone Adama', 'genre': 'M',
+                         'mobile': '0700000001'}]).encode('utf-8'),
+            False, self.centre)
+        fiche = Patient.all_objects.get()
+        self.assertEqual(fiche.centre_id, self.centre.pk)
+
+    def test_l_import_sans_centre_fonctionne_comme_avant(self):
+        """Une commande hors requête n'a pas toujours de centre à donner ;
+        ce chemin n'est pas celui qu'on ferme."""
+        import json
+        from core.models import TacheImport
+        from core.taches import Avancement
+        from .views import _executer_import_patients
+
+        avancement = Avancement(TacheImport.objects.create(libelle='Test'))
+        _executer_import_patients(
+            avancement, 'fichier.json',
+            json.dumps([{'nom': 'Kone Adama', 'genre': 'M',
+                         'mobile': '0700000001'}]).encode('utf-8'),
+            False, None)
+        self.assertEqual(Patient.all_objects.count(), 1)
+
+
+class BaseReleveFourni(BaseDoublons):
+    """Plusieurs groupes, de natures différentes.
+
+    `BaseDoublons` n'en pose qu'un ; les filtres, le regroupement et les lots
+    ne disent rien sur un relevé d'une seule ligne.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from .doublons_recalcul import recalculer_centre
+        self.couples = {}
+        # Même nom et même prénom, écrits pareil : « même nom ».
+        self.couples['jumeaux'] = self._couple('TRAORE', 'AWA', 'TRAORE', 'AWA',
+                                               '0707070707', date(1988, 3, 2))
+        # Le prénom seul diffère : « prénom presque identique ».
+        self.couples['prenom'] = self._couple('SOMDA', 'CHRIST', 'SOMDA', 'CHIRST',
+                                              '0708080808', date(1990, 7, 9))
+        # Le nom seul diffère : « nom presque identique ».
+        self.couples['nom'] = self._couple('BALO', 'RAYAN', 'BALLO', 'RAYAN',
+                                           '0709090909', date(1991, 11, 4))
+        recalculer_centre(self.centre.pk)
+        self.vider_le_cache()
+
+    def _couple(self, nom_a, prenoms_a, nom_b, prenoms_b, telephone, naissance):
+        commun = dict(sexe='F', telephone=telephone, date_naissance=naissance,
+                      centre=self.centre, nationalite='Ivoirienne')
+        return (Patient.all_objects.create(nom=nom_a, prenoms=prenoms_a, **commun),
+                Patient.all_objects.create(nom=nom_b, prenoms=prenoms_b, **commun))
+
+    @staticmethod
+    def vider_le_cache():
+        from django.core.cache import cache
+        cache.clear()
+
+    def cle_de(self, nom):
+        from .doublons_groupes import cle_groupe
+        return cle_groupe([f.pk for f in self.couples[nom]])
+
+    def lignes(self, **params):
+        reponse = self.client.get(reverse('patients:doublons_liste'), params)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse
+
+    def raison_de(self, nom):
+        """La phrase rangée dans l'index pour ce couple."""
+        from .doublons_groupes import index
+        cle = self.cle_de(nom)
+        for ligne in index(self.centre.pk):
+            if ligne['cle'] == cle:
+                return ligne['raison']
+        return None
+
+
+class TestLaPhraseEstRangeeDansLIndex(BaseReleveFourni):
+    def test_chaque_entree_porte_sa_phrase(self):
+        from .doublons_groupes import index
+        for ligne in index(self.centre.pk):
+            self.assertIn('raison', ligne)
+
+    def test_la_phrase_rangee_est_celle_qui_s_affiche(self):
+        """Sinon le filtre montrerait autre chose que les cartes."""
+        reponse = self.lignes()
+        for groupe in reponse.context['groupes']:
+            self.assertEqual(groupe['raison'], ', '.join(groupe['raisons']),
+                             groupe['cle'])
+
+    def test_les_trois_couples_ont_trois_phrases_distinctes(self):
+        self.assertIn('même nom', self.raison_de('jumeaux'))
+        self.assertIn('prénom presque identique', self.raison_de('prenom'))
+        self.assertIn('nom presque identique', self.raison_de('nom'))
+
+
+class TestLeFiltreParRaison(BaseReleveFourni):
+    def test_une_phrase_ne_garde_que_ses_groupes(self):
+        phrase = self.raison_de('prenom')
+        reponse = self.lignes(raison=phrase)
+        cles = {g['cle'] for g in reponse.context['groupes']}
+        self.assertEqual(cles, {self.cle_de('prenom')})
+
+    def test_deux_phrases_se_cumulent(self):
+        reponse = self.lignes(raison=[self.raison_de('prenom'),
+                                      self.raison_de('nom')])
+        cles = {g['cle'] for g in reponse.context['groupes']}
+        self.assertEqual(cles, {self.cle_de('prenom'), self.cle_de('nom')})
+
+    def test_le_menu_porte_les_phrases_et_leur_nombre(self):
+        comptes = dict(self.lignes().context['comptes_raison'])
+        self.assertEqual(comptes[self.raison_de('prenom')], 1)
+        # De la plus fréquente à la moins fréquente.
+        nombres = [n for _p, n in self.lignes().context['comptes_raison']]
+        self.assertEqual(nombres, sorted(nombres, reverse=True))
+
+    def test_le_nombre_annonce_tient_compte_des_autres_filtres(self):
+        """Le nombre doit être celui qu'on obtiendra en cochant, pas un
+        nombre théorique."""
+        comptes = dict(self.lignes(q='SOMDA').context['comptes_raison'])
+        self.assertEqual(list(comptes.values()), [1])
+
+    def test_une_pastille_dit_le_filtre_pose_et_permet_de_l_oter(self):
+        phrase = self.raison_de('nom')
+        reponse = self.lignes(raison=phrase)
+        pastilles = reponse.context['pastilles']
+        self.assertIn(phrase, [p['libelle'] for p in pastilles])
+        self.assertContains(reponse, 'o-filter-tag')
+
+    def test_une_phrase_inconnue_ne_ramene_rien(self):
+        self.assertEqual(len(self.lignes(raison='zeboulon').context['groupes']), 0)
+
+
+class TestLeFiltreParDonneesRattachees(BaseReleveFourni):
+    def test_les_trois_etats_se_distinguent(self):
+        from .doublons_groupes import classer_rattachees
+        a, b = self.couples['nom']
+        ligne = {'membres': [a.pk, b.pk]}
+        self.assertEqual(classer_rattachees(ligne, {}), 'aucune')
+        self.assertEqual(classer_rattachees(ligne, {a.pk: 2}), 'une')
+        self.assertEqual(classer_rattachees(ligne, {a.pk: 2, b.pk: 1}), 'deux')
+
+    def test_le_filtre_ecarte_les_groupes_qui_portent_des_donnees(self):
+        RendezVous.objects.create(patient=self.couples['nom'][0],
+                                  motif='Contrôle', date_heure=timezone.now())
+        self.vider_le_cache()
+        reponse = self.lignes(rattache='aucune')
+        self.assertNotIn(self.cle_de('nom'),
+                         {g['cle'] for g in reponse.context['groupes']})
+        reponse = self.lignes(rattache='une')
+        self.assertEqual({g['cle'] for g in reponse.context['groupes']},
+                         {self.cle_de('nom')})
+
+    def test_les_totaux_sont_oublies_apres_un_masquage(self):
+        """Sinon le filtre continuerait de proposer un groupe déjà traité."""
+        from django.core.cache import cache
+        from .liens_patient import CLE_CACHE_TOTAUX, totaux_rattaches
+        totaux_rattaches([self.gardee.pk, self.doublon.pk])
+        self.assertIsNotNone(cache.get(CLE_CACHE_TOTAUX))
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle, self.doublon.pk]),
+            {'au_profit_de': self.gardee.pk})
+        self.assertIsNone(cache.get(CLE_CACHE_TOTAUX))
+
+
+class TestLeRegroupementDuReleve(BaseReleveFourni):
+    def test_les_sections_portent_la_phrase_et_leur_nombre(self):
+        reponse = self.lignes(grouper='raison')
+        sections = {g['section']: g['section_total']
+                    for g in reponse.context['groupes']}
+        self.assertEqual(sections[self.raison_de('prenom')], 1)
+        self.assertContains(reponse, 'lst-groupe-bande')
+
+    def test_le_nombre_d_une_section_est_celui_de_tout_le_releve(self):
+        """Une section qui déborde de la page doit dire ce qu'elle contient,
+        pas ce qu'on en voit."""
+        from .doublons_groupes import index, sections
+        paquets = sections(index(self.centre.pk), 'raison')
+        total = sum(len(contenu) for _libelle, contenu in paquets)
+        self.assertEqual(total, len(index(self.centre.pk)))
+
+    def test_on_peut_aussi_grouper_par_niveau(self):
+        reponse = self.lignes(grouper='niveau')
+        sections = {g['section'] for g in reponse.context['groupes']}
+        self.assertTrue(sections <= {'Quasi certain', 'À vérifier'}, sections)
+
+    def test_on_peut_grouper_par_donnees_rattachees(self):
+        reponse = self.lignes(grouper='rattachees')
+        self.assertTrue(all(g['section'] for g in reponse.context['groupes']))
+
+    def test_le_tableau_porte_les_mêmes_bandes(self):
+        html = self.lignes(grouper='raison').content.decode()
+        self.assertIn('<tr class="lst-groupe open"', html)
+
+    def test_un_regroupement_inconnu_est_ignore(self):
+        reponse = self.lignes(grouper='zeboulon')
+        self.assertEqual(reponse.context['grouper'], '')
+
+
+class TestLesBandesSeReplientCommeAilleurs(BaseReleveFourni):
+    """Le geste des autres listes, et non un succédané maison.
+
+    Même classe, même chevron, même `lstBasculerGroupe` : ce qui change d'un
+    module à l'autre, c'est ce qu'il y a dans la bande, jamais la façon de la
+    replier.
+    """
+
+    def test_la_bande_porte_le_chevron_et_le_clic(self):
+        reponse = self.lignes(grouper='raison')
+        self.assertContains(reponse, 'lst-chevron')
+        self.assertContains(reponse, 'lstBasculerGroupe(this)')
+        self.assertContains(reponse, 'class="lst-groupe lst-groupe-bande open"')
+
+    def test_le_compteur_est_celui_de_la_brique(self):
+        self.assertContains(self.lignes(grouper='raison'),
+                            '<span class="lst-compte">')
+
+    def test_chaque_carte_designe_sa_section(self):
+        """`data-parent` est tout ce dont le script partagé a besoin pour
+        replier sans rien demander au serveur."""
+        reponse = self.lignes(grouper='raison')
+        for groupe in reponse.context['groupes']:
+            self.assertIn('section_rang', groupe)
+        rangs = {g['section_rang'] for g in reponse.context['groupes']}
+        for rang in rangs:
+            self.assertContains(reponse, f'data-parent="{rang}"')
+
+    def test_sans_regroupement_rien_ne_designe_de_section(self):
+        self.assertNotContains(self.lignes(), 'data-parent=')
+
+    def test_le_script_partage_est_charge_sans_sa_memoire(self):
+        """L'état déplié ne part ni dans l'adresse ni au serveur : un chemin
+        ne désigne rien de stable sur un relevé composé puis paginé."""
+        reponse = self.lignes(grouper='raison')
+        self.assertContains(reponse, 'listing_groupes.js')
+        self.assertContains(reponse, 'window.lstSansMemoire = true;')
+
+    def test_la_case_de_section_ne_replie_pas_la_bande(self):
+        self.assertContains(self.lignes(grouper='raison'),
+                            'onclick="event.stopPropagation();"')
+
+
+class BaseLots(BaseReleveFourni):
+    """Le relevé fourni, et le droit de fusionner."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+        super().setUp()
+        self.agent.user_permissions.add(Permission.objects.get(
+            content_type__app_label='patients', codename='fusionner_patients'))
+        self.agent = User.objects.get(pk=self.agent.pk)
+        self.client.force_login(self.agent)
+
+    def preparer(self, action, cles=None, **extra):
+        donnees = {'action': action, 'cle': cles if cles is not None
+                   else [self.cle_de(n) for n in self.couples]}
+        donnees.update(extra)
+        reponse = self.client.post(reverse('patients:doublons_lot_preparer'),
+                                   donnees)
+        return reponse
+
+    def executer(self, lot):
+        return self.client.post(
+            reverse('patients:doublons_lot_executer', args=[lot.pk]))
+
+    def faire(self, action, cles=None, **extra):
+        """Prépare puis exécute, et rend le lot relu en base."""
+        from .models import LotDoublons
+        reponse = self.preparer(action, cles, **extra)
+        lot = reponse.context['lot']
+        self.executer(lot)
+        return LotDoublons.all_objects.get(pk=lot.pk)
+
+
+class TestCeQuUnLotRetientEtCeQuIlEcarte(BaseLots):
+    def test_les_groupes_vides_sont_tous_retenus(self):
+        reponse = self.preparer('masquer')
+        self.assertEqual(len(reponse.context['prevus']), 3)
+        self.assertEqual(reponse.context['ignores'], [])
+
+    def test_chaque_groupe_dit_qui_est_gardé_et_qui_est_visé(self):
+        """L'écran confirme une décision, pas un nombre."""
+        prevu = self.preparer('masquer').context['prevus'][0]
+        self.assertNotEqual(prevu.gardee.pk, prevu.visee.pk)
+        self.assertIn(prevu.gardee.pk, [f.pk for f in prevu.membres])
+
+    def test_un_groupe_qui_porte_des_donnees_est_ecarte_avec_sa_raison(self):
+        """Des deux côtés : si une seule fiche porte quelque chose, c'est
+        elle qu'on garde et l'autre reste masquable."""
+        for fiche in self.couples['nom']:
+            RendezVous.objects.create(patient=fiche, motif='Contrôle',
+                                      date_heure=timezone.now())
+        reponse = self.preparer('masquer')
+        ignores = dict(reponse.context['ignores'])
+        self.assertIn(self.cle_de('nom'), ignores)
+        self.assertIn('porte des données', ignores[self.cle_de('nom')])
+
+    def test_un_champ_en_plus_empeche_le_masquage(self):
+        """« Vide » ne suffit pas : une allergie se perdrait en silence."""
+        from .doublons_groupes import fiche_a_garder
+        from .liens_patient import comptes_par_table
+        fiches = list(self.couples['prenom'])
+        garder, _ = fiche_a_garder(fiches, comptes_par_table([f.pk for f in fiches]))
+        autre = next(f for f in fiches if f.pk != garder)
+        autre.allergies = 'Pénicilline'
+        autre.save(update_fields=['allergies'])
+        ignores = dict(self.preparer('masquer').context['ignores'])
+        self.assertIn('informations', ignores[self.cle_de('prenom')])
+
+    def test_la_fusion_ecarte_les_groupes_ou_il_reste_a_choisir(self):
+        """Deux sexes qui se contredisent : personne d'autre que l'agent ne
+        peut trancher, le lot ne le fait pas à sa place."""
+        a, b = self.couples['nom']
+        Patient.all_objects.filter(pk=b.pk).update(sexe='M')
+        ignores = dict(self.preparer('fusionner').context['ignores'])
+        self.assertIn(self.cle_de('nom'), ignores)
+        self.assertIn('sexe', ignores[self.cle_de('nom')].lower())
+
+    def test_un_groupe_de_plus_de_deux_fiches_se_traite_a_la_main(self):
+        from .doublons_groupes import cle_groupe
+        troisieme = Patient.all_objects.create(
+            nom='TRAORE', prenoms='AWA', sexe='F', telephone='0707070707',
+            date_naissance=date(1988, 3, 2), centre=self.centre)
+        cle = cle_groupe([f.pk for f in self.couples['jumeaux']] + [troisieme.pk])
+        ignores = dict(self.preparer('masquer', cles=[cle]).context['ignores'])
+        self.assertIn('une par une', ignores[cle])
+
+
+class TestCeQuUnLotExecute(BaseLots):
+    def test_le_masquage_en_lot_retire_les_fiches(self):
+        lot = self.faire('masquer')
+        self.assertEqual(len(lot.faits), 3)
+        self.assertEqual(lot.etat, 'execute')
+        masquees = Patient.all_objects.filter(masque=True).count()
+        self.assertEqual(masquees, 3)
+
+    def test_la_liste_figee_est_celle_qui_s_execute(self):
+        """Un groupe traité entre la confirmation et le clic passe dans les
+        écartés, avec sa raison — il n'est ni refait ni passé sous silence."""
+        from .models import LotDoublons
+        reponse = self.preparer('masquer')
+        lot = reponse.context['lot']
+        # Quelqu'un masque ce groupe depuis un autre poste.
+        a, b = self.couples['nom']
+        Patient.all_objects.filter(pk=b.pk).update(masque=True, doublon_de=a)
+        self.executer(lot)
+
+        lot = LotDoublons.all_objects.get(pk=lot.pk)
+        self.assertEqual(len(lot.faits), 2)
+        self.assertEqual(len(lot.ignores), 1)
+        self.assertIn('déjà été traitée', lot.ignores[0][1])
+
+    def test_l_ecartement_en_lot_pose_la_raison_commune(self):
+        from .models import PaireEcartee
+        lot = self.faire('ecarter', raison_commune='Deux sœurs')
+        self.assertEqual(len(lot.faits), 3)
+        self.assertEqual(PaireEcartee.all_objects.count(), 3)
+        self.assertEqual(
+            set(PaireEcartee.all_objects.values_list('raison', flat=True)),
+            {'Deux sœurs'})
+
+    def test_la_fusion_en_lot_ecrit_un_journal_par_groupe(self):
+        from .models import FusionPatient
+        lot = self.faire('fusionner')
+        self.assertEqual(len(lot.faits), 3)
+        self.assertEqual(FusionPatient.all_objects.count(), 3)
+
+    def test_le_releve_des_fiches_traitees_est_repris(self):
+        """Les paires qui citent une fiche traitée s'en vont d'un coup : une
+        par une, le relevé coûterait deux dixièmes de seconde par fiche."""
+        from django.db.models import Q
+        from .models import DoublonPaire
+        pks = [f.pk for f in self.couples['nom']]
+        self.faire('masquer', cles=[self.cle_de('nom')])
+        self.assertFalse(DoublonPaire.all_objects.filter(
+            Q(patient_a_id__in=pks) | Q(patient_b_id__in=pks)).exists())
+
+    def test_le_bilan_dit_ce_qui_a_ete_fait_et_ce_qui_reste(self):
+        a, b = self.couples['nom']
+        Patient.all_objects.filter(pk=b.pk).update(sexe='M')
+        reponse = self.preparer('fusionner')
+        lot = reponse.context['lot']
+        bilan = self.executer(lot)
+        self.assertContains(bilan, 'fusionné')
+        self.assertContains(bilan, 'ignoré')
+
+
+class TestQuiPeutLancerUnLot(BaseLots):
+    def test_fusionner_exige_sa_permission(self):
+        from django.contrib.auth.models import Permission
+        simple = User.objects.create_user('lot_simple', password='x')
+        for code in ('view_patient', 'gerer_doublons'):
+            simple.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.rattacher(User.objects.get(pk=simple.pk), self.centre)
+        client = Client()
+        client.force_login(User.objects.get(pk=simple.pk))
+        reponse = client.post(reverse('patients:doublons_lot_preparer'),
+                              {'action': 'fusionner', 'cle': [self.cle_de('nom')]})
+        self.assertEqual(reponse.status_code, 403)
+
+    def test_sans_centre_actif_rien_ne_part(self):
+        profil = self.agent.profile
+        profil.centres.clear()
+        profil.centre_actif = None
+        profil.save()
+        reponse = self.client.post(reverse('patients:doublons_lot_preparer'),
+                                   {'action': 'masquer', 'cle': [self.cle_de('nom')]})
+        self.assertEqual(reponse.status_code, 403)
+        self.assertFalse(Patient.all_objects.filter(masque=True).exists())
+
+    def test_tout_le_filtre_ne_prend_que_le_centre_actif(self):
+        from django.contrib.auth.models import Permission
+        from centres.models import Centre
+        voisin = Centre.objects.create(nom='Toumbokro', code='TBK')
+        intrus = User.objects.create_user('lot_voisin', password='x')
+        for code in ('view_patient', 'gerer_doublons'):
+            intrus.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.rattacher(User.objects.get(pk=intrus.pk), voisin)
+        client = Client()
+        client.force_login(User.objects.get(pk=intrus.pk))
+        reponse = client.post(reverse('patients:doublons_lot_preparer'),
+                              {'action': 'masquer', 'tout': '1'}, follow=True)
+        self.assertFalse(Patient.all_objects.filter(masque=True).exists())
+        self.assertIn("Aucun groupe n'était sélectionné.",
+                      [str(m) for m in reponse.context['messages']])
+
+    def test_tout_le_filtre_prend_tout_le_releve(self):
+        from .doublons_groupes import index
+        reponse = self.client.post(reverse('patients:doublons_lot_preparer'),
+                                   {'action': 'masquer', 'tout': '1'})
+        self.assertEqual(sorted(reponse.context['lot'].cles),
+                         sorted(l['cle'] for l in index(self.centre.pk)))
+
+    def test_tout_le_filtre_reprend_le_filtre_pose(self):
+        """Ce qu'on confirme est ce que le filtre montrait, pas tout le
+        relevé."""
+        from .doublons_groupes import index
+        phrase = self.raison_de('jumeaux')
+        attendues = sorted(l['cle'] for l in index(self.centre.pk)
+                           if l['raison'] == phrase)
+        reponse = self.client.post(reverse('patients:doublons_lot_preparer'),
+                                   {'action': 'ecarter', 'tout': '1',
+                                    'raison': phrase})
+        self.assertEqual(sorted(reponse.context['lot'].cles), attendues)
+        self.assertIn(self.cle_de('jumeaux'), attendues)
+        self.assertNotIn(self.cle_de('nom'), attendues)
+
+
+class TestAnnulerUnLot(BaseLots):
+    def test_un_lot_de_masquage_se_defait_entierement(self):
+        from .models import LotDoublons
+        lot = self.faire('masquer')
+        reponse = self.client.post(
+            reverse('patients:doublons_lot_annuler', args=[lot.pk]), follow=True)
+        lot = LotDoublons.all_objects.get(pk=lot.pk)
+        self.assertEqual(lot.etat, 'annule')
+        self.assertEqual(lot.annulation_partielle, [])
+        self.assertFalse(Patient.all_objects.filter(masque=True).exists())
+        self.assertContains(reponse, 'entièrement annulé')
+
+    def test_un_lot_d_ecartement_aussi(self):
+        from .models import PaireEcartee
+        lot = self.faire('ecarter')
+        self.client.post(reverse('patients:doublons_lot_annuler', args=[lot.pk]))
+        self.assertFalse(PaireEcartee.all_objects.exists())
+
+    def test_un_lot_de_fusion_aussi(self):
+        from .models import FusionPatient
+        lot = self.faire('fusionner')
+        self.client.post(reverse('patients:doublons_lot_annuler', args=[lot.pk]))
+        self.assertFalse(FusionPatient.all_objects.filter(
+            annulee_le__isnull=True).exists())
+
+    def test_une_fusion_plus_recente_bloque_l_annulation_du_lot(self):
+        """La règle de l'ordre vaut aussi en lot : ce qui ne peut plus être
+        défait est dit, et le reste l'est quand même."""
+        from .fusion import Choix, fusionner
+        from .models import FusionPatient, LotDoublons
+        lot = self.faire('fusionner')
+        gardees = [FusionPatient.all_objects.get(pk=fait['fusion']).gardee
+                   for fait in lot.faits]
+        # Une fusion faite après le lot, par-dessus deux de ses fiches.
+        fusionner(gardees[0], gardees[1], Choix(), self.agent)
+
+        reponse = self.client.post(
+            reverse('patients:doublons_lot_annuler', args=[lot.pk]), follow=True)
+        lot = LotDoublons.all_objects.get(pk=lot.pk)
+        self.assertEqual(len(lot.annulation_partielle), 2)
+        for _cle, raison in lot.annulation_partielle:
+            self.assertIn('plus récente', raison)
+        self.assertContains(reponse, 'sauf 2 groupe')
+        # Le troisième, que la fusion récente ne touche pas, est bien revenu.
+        self.assertEqual(FusionPatient.all_objects
+                         .filter(annulee_le__isnull=True).count(), 3)
+
+    def test_un_lot_se_defait_de_la_plus_recente_a_la_plus_ancienne(self):
+        """Une chaîne se défait à l'envers : la défaire dans l'ordre
+        buterait sur cette même règle de la fusion plus récente."""
+        from .fusion import Choix, fusionner
+        from .models import FusionPatient, LotDoublons
+        lot = self.faire('fusionner', cles=[self.cle_de('jumeaux')])
+        premiere = FusionPatient.all_objects.get(pk=lot.faits[0]['fusion'])
+        # Une seconde fusion par-dessus la première, rangée dans le même lot.
+        seconde = fusionner(self.couples['nom'][0], premiere.gardee, Choix(),
+                            self.agent)
+        lot.faits = lot.faits + [{'cle': 'chaine', 'fusion': seconde.pk,
+                                  'code': premiere.gardee.code_patient}]
+        lot.save(update_fields=['faits'])
+
+        self.client.post(reverse('patients:doublons_lot_annuler', args=[lot.pk]))
+        lot = LotDoublons.all_objects.get(pk=lot.pk)
+        self.assertEqual(lot.annulation_partielle, [])
+        self.assertFalse(FusionPatient.all_objects
+                         .filter(annulee_le__isnull=True).exists())
+
+    def test_ce_qui_ne_peut_plus_etre_defait_est_dit(self):
+        """Une fiche réaffichée entre-temps : le reste se défait quand même."""
+        from .models import LotDoublons
+        lot = self.faire('masquer')
+        rendue = lot.faits[0]['masquee']
+        Patient.all_objects.filter(pk=rendue).update(masque=False, doublon_de=None)
+        reponse = self.client.post(
+            reverse('patients:doublons_lot_annuler', args=[lot.pk]), follow=True)
+        lot = LotDoublons.all_objects.get(pk=lot.pk)
+        self.assertEqual(len(lot.annulation_partielle), 1)
+        self.assertContains(reponse, 'sauf 1 groupe')
+
+    def test_l_onglet_des_lots_montre_ce_qui_a_ete_fait(self):
+        lot = self.faire('masquer')
+        reponse = self.client.get(reverse('patients:doublons_lots'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertContains(reponse, lot.numero)
+        self.assertContains(reponse, 'Annuler ce lot')
+
+    def test_un_lot_prepare_mais_non_execute_ne_s_affiche_pas(self):
+        self.preparer('masquer')
+        reponse = self.client.get(reverse('patients:doublons_lots'))
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+    def test_l_onglet_est_cloisonne(self):
+        from centres.models import Centre
+        from django.contrib.auth.models import Permission
+        self.faire('masquer')
+        voisin = Centre.objects.create(nom='Toumbokro', code='TBK')
+        intrus = User.objects.create_user('lot_voisin2', password='x')
+        for code in ('view_patient', 'gerer_doublons'):
+            intrus.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        self.rattacher(User.objects.get(pk=intrus.pk), voisin)
+        client = Client()
+        client.force_login(User.objects.get(pk=intrus.pk))
+        reponse = client.get(reverse('patients:doublons_lots'))
+        self.assertEqual(reponse.context['page'].paginator.count, 0)
+
+
+class BaseDeuxSoeurs(BaseLots):
+    """Un groupe « à vérifier », celui qu'on voit en vrai.
+
+    KONATE FATIMATA ZAHARA et KONATE FATOUMATA ZARA : même nom, prénom
+    voisin, même numéro — et deux dates de naissance qui ne concordent pas.
+    Le relevé les rapproche à juste titre, mais ce sont deux personnes.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from .doublons_groupes import cle_groupe
+        from .doublons_recalcul import recalculer_centre
+        commun = dict(sexe='F', telephone='0711112222', centre=self.centre,
+                      nationalite='Ivoirienne')
+        self.soeurs = (
+            Patient.all_objects.create(nom='KONATE', prenoms='FATIMATA ZAHARA',
+                                       date_naissance=date(1990, 1, 1), **commun),
+            Patient.all_objects.create(nom='KONATE', prenoms='FATOUMATA ZARA',
+                                       date_naissance=date(1991, 6, 3), **commun))
+        recalculer_centre(self.centre.pk)
+        self.vider_le_cache()
+        self.cle_soeurs = cle_groupe([f.pk for f in self.soeurs])
+
+    def ligne_des_soeurs(self):
+        from .doublons_groupes import index
+        return next(ligne for ligne in index(self.centre.pk)
+                    if ligne['cle'] == self.cle_soeurs)
+
+    def couple_des_soeurs(self):
+        """(gardée, l'autre), comme l'écran de comparaison le propose."""
+        from .doublons_groupes import fiche_a_garder
+        from .liens_patient import comptes_par_table
+        fiches = list(self.soeurs)
+        garder, _choisis = fiche_a_garder(
+            fiches, comptes_par_table([f.pk for f in fiches]))
+        return (next(f for f in fiches if f.pk == garder),
+                next(f for f in fiches if f.pk != garder))
+
+
+class TestPasDActionRapideSurUnAVerifier(BaseDeuxSoeurs):
+    def test_le_couple_temoin_est_bien_a_verifier(self):
+        self.assertEqual(self.ligne_des_soeurs()['niveau'], 'avertissement')
+
+    def test_aucune_carte_a_verifier_ne_propose_de_masquer(self):
+        groupes = self.lignes(niveau='avertissement').context['groupes']
+        self.assertTrue(groupes)
+        for groupe in groupes:
+            self.assertIsNone(groupe['masquable'], groupe['cle'])
+
+    def test_l_ecran_n_affiche_alors_aucun_bouton_de_masquage(self):
+        self.assertNotContains(self.lignes(niveau='avertissement'),
+                               'Masquer le doublon')
+
+    def test_un_groupe_quasi_certain_le_propose_toujours(self):
+        reponse = self.lignes(niveau='certain')
+        self.assertTrue(any(g['masquable'] for g in reponse.context['groupes']))
+        self.assertContains(reponse, 'Masquer le doublon')
+
+    def test_a_l_unite_le_masquage_reste_possible(self):
+        """Depuis l'écran de comparaison, les deux fiches sous les yeux."""
+        gardee, autre = self.couple_des_soeurs()
+        self.client.post(
+            reverse('patients:doublons_masquer', args=[self.cle_soeurs, autre.pk]),
+            {'au_profit_de': gardee.pk})
+        self.assertTrue(Patient.all_objects.get(pk=autre.pk).masque)
+
+    def test_a_l_unite_la_fusion_reste_possible(self):
+        gardee, autre = self.couple_des_soeurs()
+        self.client.post(
+            reverse('patients:fusionner', args=[self.cle_soeurs, autre.pk]),
+            {'retour': reverse('patients:doublons_liste')})
+        self.assertEqual(Patient.all_objects.get(pk=autre.pk).fusionne_dans_id,
+                         gardee.pk)
+
+
+class TestUnLotNeMasqueEtNeFusionnePasLesAVerifier(BaseDeuxSoeurs):
+    def test_le_masquage_les_range_dans_les_ignores(self):
+        reponse = self.preparer('masquer', cles=[self.cle_soeurs])
+        self.assertEqual(reponse.context['prevus'], [])
+        self.assertEqual(dict(reponse.context['ignores'])[self.cle_soeurs],
+                         'à vérifier : à traiter un par un')
+
+    def test_la_fusion_aussi(self):
+        reponse = self.preparer('fusionner', cles=[self.cle_soeurs])
+        self.assertEqual(reponse.context['prevus'], [])
+        self.assertIn('à vérifier',
+                      dict(reponse.context['ignores'])[self.cle_soeurs])
+
+    def test_l_ecran_de_confirmation_dit_pourquoi(self):
+        self.assertContains(self.preparer('masquer', cles=[self.cle_soeurs]),
+                            'à traiter un par un')
+
+    def test_pas_un_doublon_les_accepte(self):
+        """La seule action de lot qui leur reste, et elle marche."""
+        from .models import PaireEcartee
+        lot = self.faire('ecarter', cles=[self.cle_soeurs],
+                         raison_commune='Deux sœurs')
+        self.assertEqual(len(lot.faits), 1)
+        self.assertEqual(lot.ignores, [])
+        self.assertTrue(PaireEcartee.all_objects.filter(raison='Deux sœurs')
+                        .exists())
+
+    def test_un_lot_mele_fait_les_certains_et_laisse_les_autres(self):
+        lot = self.faire('masquer',
+                         cles=[self.cle_de('jumeaux'), self.cle_soeurs])
+        self.assertEqual(len(lot.faits), 1)
+        self.assertEqual([cle for cle, _raison in lot.ignores],
+                         [self.cle_soeurs])
+        for fiche in self.soeurs:
+            self.assertFalse(Patient.all_objects.get(pk=fiche.pk).masque)
+
+    def test_tout_le_filtre_ne_masque_que_les_quasi_certains(self):
+        """C'est là que la règle compte : « tout sélectionner » prend le
+        relevé entier, les « à vérifier » compris."""
+        from .doublons_groupes import index
+        certains = sorted(ligne['cle'] for ligne in index(self.centre.pk)
+                          if ligne['niveau'] == 'certain')
+        lot = self.faire('masquer', cles=[], tout='1')
+        self.assertEqual(sorted(fait['cle'] for fait in lot.faits), certains)
+        self.assertEqual([cle for cle, _raison in lot.ignores],
+                         [self.cle_soeurs])
+        for fiche in self.soeurs:
+            self.assertFalse(Patient.all_objects.get(pk=fiche.pk).masque)
+
+    def test_la_barre_annonce_la_regle(self):
+        self.assertContains(self.lignes(), 'id="dbl-lot-avertis"')
+
+    def test_le_niveau_voyage_jusqu_a_la_carte(self):
+        """Sans lui, la barre ne saurait pas ce qu'elle tient."""
+        self.assertContains(self.lignes(), 'data-niveau="avertissement"')
+
 
 class TestLaRechercheDesRdvLitLeTelephone(TestCase):
     """La recherche des listes de RDV ne portait que sur le nom, les prénoms et

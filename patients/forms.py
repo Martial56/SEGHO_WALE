@@ -2,6 +2,7 @@ import re
 from datetime import date
 
 from django import forms
+from .doublons_acces import CHOISIR
 from .models import Patient, Assurance, RendezVous, Pathologie, TypeVisiteCurative
 from gynecologie.models import TypeVisite
 
@@ -216,6 +217,12 @@ class PatientForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        # Sans centre connu, on ne sait ni où ranger la fiche ni à quoi la
+        # comparer : le garde-fou des doublons tournerait à vide et le
+        # dossier atterrirait nulle part. Un super-utilisateur ne fait pas
+        # exception — il choisit son centre comme tout le monde.
+        if self._centre_connu() is None:
+            raise forms.ValidationError(CHOISIR)
         nom            = (cleaned.get('nom') or '').strip()
         prenoms        = (cleaned.get('prenoms') or '').strip()
         date_naissance = cleaned.get('date_naissance')
@@ -232,14 +239,27 @@ class PatientForm(forms.ModelForm):
 
     # ── Doublons ───────────────────────────────────────────────────────────
 
-    def _perimetre(self):
-        """Toujours un périmètre explicite : `Patient.objects` s'appuie sur le
-        centre actif, qui n'existe pas hors requête (commande, tâche de fond)."""
+    def _centre_connu(self):
+        """Le centre de ce formulaire : celui qu'on lui a passé, ou celui de
+        la fiche qu'il modifie. Jamais deviné."""
         if self.centre is not None:
-            return Patient.all_objects.filter(centre=self.centre)
+            return self.centre.pk if hasattr(self.centre, 'pk') else self.centre
         if self.instance and self.instance.centre_id:
-            return Patient.all_objects.filter(centre_id=self.instance.centre_id)
-        return Patient.all_objects.all()
+            return self.instance.centre_id
+        return None
+
+    def _perimetre(self):
+        """Toujours un périmètre explicite, et jamais « tous les centres ».
+
+        `Patient.objects` s'appuie sur le centre actif, qui n'existe pas hors
+        requête (commande, tâche de fond) : ceux-là passent le leur. Sans
+        centre du tout, le périmètre est vide — et `clean` a déjà refusé le
+        formulaire, pour que ce vide ne passe jamais pour « aucun doublon ».
+        """
+        centre_id = self._centre_connu()
+        if centre_id is None:
+            return Patient.all_objects.none()
+        return Patient.all_objects.filter(centre_id=centre_id)
 
     def _chercher_doublons(self, nom, prenoms, date_naissance, telephone):
         if not (nom or prenoms):

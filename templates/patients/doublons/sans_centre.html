@@ -1,0 +1,21 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Ce que montre le menu Doublons quand aucun centre n'est actif : rien, et la
+raison. Mieux vaut un écran vide qui s'explique qu'un relevé emprunté au
+centre d'à côté — voir patients/doublons_acces.py.
+
+L'onglet reste allumé là où l'on est : l'écran est vide, on n'a pas pour
+autant quitté la page qu'on demandait. Le nom de la vue est relu dans chaque
+bloc ; un {% templatetag openblock %} with {% templatetag closeblock %} autour
+d'eux ne les atteindrait pas, ils sont rendus dans le contexte du parent.
+{% endcomment %}
+
+{% block onglet_liste %}{% if request.resolver_match.url_name == 'doublons_liste' or request.resolver_match.url_name == 'doublons_comparer' %}active{% endif %}{% endblock %}
+{% block onglet_journal %}{% if request.resolver_match.url_name == 'doublons_journal' %}active{% endif %}{% endblock %}
+{% block onglet_masquees %}{% if request.resolver_match.url_name == 'doublons_masquees' %}active{% endif %}{% endblock %}
+{% block onglet_lots %}{% if request.resolver_match.url_name == 'doublons_lots' %}active{% endif %}{% endblock %}
+{% block onglet_fusions %}{% if request.resolver_match.url_name == 'fusions' or request.resolver_match.url_name == 'fusionner' %}active{% endif %}{% endblock %}
+
+{% block doublons_contenu %}
+<p class="o-empty">{{ message }}</p>
+{% endblock %}

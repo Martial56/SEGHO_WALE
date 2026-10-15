@@ -1,246 +1,35 @@
 {% extends 'patients/doublons/base_doublons.html' %}
 {% comment %}
-La liste des groupes. « Quasi certain » est le filtre par défaut : ce sont les
-cas où il n'y a presque rien à décider. Les « à vérifier », bien plus nombreux,
-viennent ensuite.
+La liste des groupes, du plus ressemblant au moins. Aucun filtre n'est posé
+d'office : la page s'ouvre sur tout le relevé, et « Filtres » ne s'allume que
+sur un choix.
 
-Filtres, recherche, pagination et masquage passent par AJAX : seule la zone des
-cartes est redemandée, et l'adresse suit par `pushState` pour que le bouton
-Retour du navigateur fasse ce qu'on attend.
+La page ne remplit que des blocs : les composants, l'échange AJAX et le
+pilotage vivent dans le socle, parce que les onglets s'échangent sans
+recharger — un script écrit ici disparaîtrait au premier changement d'onglet.
 {% endcomment %}
 
-{% block onglet_liste %}actif{% endblock %}
+{% block onglet_liste %}active{% endblock %}
+{% block subheader_compte %}<span class="o-page-count">{{ total }}</span>{% endblock %}
 
-{% block subheader_droite %}
-  <form method="get" class="o-search-bar" id="dbl-recherche">
-    <input type="hidden" name="niveau" value="{{ niveau }}">
-    <input type="search" name="q" value="{{ q }}" class="o-search-input"
-           placeholder="Nom ou code patient…" autocomplete="off">
-    <button type="submit" class="o-search-btn" aria-label="Chercher">
-      <i class="bi bi-search"></i>
-    </button>
-  </form>
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Nom ou code patient…" %}
+{% endblock %}
+
+{% block subheader_gauche %}
   <form method="post" action="{% url 'patients:doublons_recalculer' %}">
     {% csrf_token %}
-    <button type="submit" class="o-btn neutre"
-            title="Reprend tout le relevé (environ dix minutes)">
-      <i class="bi bi-arrow-clockwise"></i> Recalculer maintenant
+    <button type="submit" class="o-btn-create"
+            title="Reprend tout le relevé, sur toute la base : environ dix minutes.">
+      <i class="bi bi-arrow-clockwise" style="font-size:14px;margin-right:5px;"></i> Recalculer
     </button>
   </form>
+{% endblock %}
+
+{% block subheader_controles %}
+  {% include 'patients/doublons/includes/controles.html' %}
 {% endblock %}
 
 {% block doublons_contenu %}
-<div id="dbl-zone">
-  {% include 'patients/doublons/includes/zone.html' %}
-</div>
-{% endblock %}
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function () {
-  var zone = document.getElementById('dbl-zone');
-  var bandeau = document.getElementById('dbl-bandeau');
-  var recherche = document.getElementById('dbl-recherche');
-  if (!zone) { return; }
-  var enCours = null, minuteur = null;
-
-  function charger(adresse, empiler) {
-    if (enCours) { enCours.abort(); }
-    enCours = new AbortController();
-    zone.style.opacity = '.5';
-    fetch(adresse, { headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                     signal: enCours.signal })
-      .then(function (r) { return r.ok ? r.text() : null; })
-      .then(function (html) {
-        if (html === null) { window.location = adresse; return; }
-        zone.innerHTML = html;
-        zone.style.opacity = '';
-        // Une annonce porte sur l'écran qu'on vient de quitter : la garder
-        // au-dessus d'une autre page la ferait mentir.
-        if (empiler) {
-          if (bandeau) { bandeau.textContent = ''; }
-          history.pushState({ doublons: adresse }, '', adresse);
-        }
-      })
-      .catch(function (e) {
-        zone.style.opacity = '';
-        // Une requête annulée est normale : seule une vraie panne mérite de
-        // retomber sur un chargement complet.
-        if (e.name !== 'AbortError') { window.location = adresse; }
-      });
-  }
-
-  // ── Le masquage depuis une carte ───────────────────────────────────────
-
-  function adresseSansMasque() {
-    var u = new URL(window.location.href);
-    u.searchParams.delete('masque');
-    return u.pathname + (u.search || '');
-  }
-
-  function envoyer(formulaire) {
-    return fetch(formulaire.action, {
-      method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' },
-      body: new FormData(formulaire)
-    })
-      .then(function (r) { return r.json().then(function (d) { return d; },
-                                                function () { return null; }); })
-      .then(function (d) {
-        if (d && d.ok) { return d; }
-        // Refus du serveur — une fiche qui porte des données, un relevé qui a
-        // bougé : la page complète le dira mieux qu'un message inventé ici.
-        window.location.reload();
-        return null;
-      })
-      .catch(function () { window.location.reload(); return null; });
-  }
-
-  function csrf() {
-    var champ = document.querySelector('[name=csrfmiddlewaretoken]');
-    return champ ? champ.value : '';
-  }
-
-  // Même balisage que includes/bandeau_masquage.html : le modifier là-bas
-  // demande de le modifier ici aussi.
-  function banderole(d) {
-    if (!bandeau) { return; }
-    bandeau.textContent = '';
-    var boite = document.createElement('div');
-    boite.className = 'o-alerte succes';
-    boite.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
-    boite.setAttribute('data-bandeau-masquage', '');
-
-    var texte = document.createElement('span');
-    texte.className = 'o-alerte-texte';
-    var masquee = document.createElement('b');
-    masquee.textContent = d.code;
-    var gardee = document.createElement('b');
-    gardee.textContent = d.code_gardee;
-    texte.appendChild(masquee);
-    texte.appendChild(document.createTextNode(' est masquée, doublon de '));
-    texte.appendChild(gardee);
-    texte.appendChild(document.createTextNode('.'));
-    boite.appendChild(texte);
-
-    var formulaire = document.createElement('form');
-    formulaire.method = 'post';
-    formulaire.action = d.annuler;
-    formulaire.setAttribute('data-annuler-masquage', '');
-    var jeton = document.createElement('input');
-    jeton.type = 'hidden';
-    jeton.name = 'csrfmiddlewaretoken';
-    jeton.value = csrf();
-    var bouton = document.createElement('button');
-    bouton.type = 'submit';
-    bouton.className = 'o-lien';
-    bouton.textContent = 'Annuler';
-    formulaire.appendChild(jeton);
-    formulaire.appendChild(bouton);
-    boite.appendChild(formulaire);
-    bandeau.appendChild(boite);
-  }
-
-  function retirerUn(element) {
-    if (!element) { return; }
-    var n = parseInt(element.textContent, 10);
-    if (!isNaN(n) && n > 0) { element.textContent = n - 1; }
-  }
-
-  function decompter() {
-    var compte = zone.querySelector('.o-count');
-    if (compte) {
-      var n = parseInt(compte.textContent, 10);
-      if (!isNaN(n) && n > 0) {
-        n -= 1;
-        compte.textContent = n + ' groupe' + (n > 1 ? 's' : '');
-      }
-    }
-    // « 1–48 sur 903 » devient « 1–47 sur 902 » : le total parce qu'un groupe
-    // est traité, la fin parce qu'une carte de moins est à l'écran.
-    retirerUn(zone.querySelector('[data-fin]'));
-    retirerUn(zone.querySelector('[data-total]'));
-  }
-
-  // Un seul écouteur, posé sur la zone : son contenu est remplacé à chaque
-  // fois, des écouteurs posés sur les cartes disparaîtraient avec elles.
-  zone.addEventListener('click', function (e) {
-    var demande = e.target.closest('[data-demander]');
-    if (demande) {
-      demande.hidden = true;
-      demande.parentNode.querySelector('.dbl-confirme').hidden = false;
-      return;
-    }
-    var renonce = e.target.closest('[data-renoncer]');
-    if (renonce) {
-      var rapide = renonce.closest('.dbl-rapide');
-      rapide.querySelector('.dbl-confirme').hidden = true;
-      rapide.querySelector('[data-demander]').hidden = false;
-      return;
-    }
-    var lien = e.target.closest('.dbl-filtre, .o-pag-btn');
-    if (!lien || !lien.getAttribute('href')) { return; }
-    e.preventDefault();
-    charger(lien.href, true);
-  });
-
-  zone.addEventListener('submit', function (e) {
-    var formulaire = e.target.closest('.dbl-rapide');
-    if (!formulaire) { return; }
-    e.preventDefault();
-    var carte = formulaire.closest('.dbl-carte-groupe');
-    envoyer(formulaire).then(function (d) {
-      if (!d) { return; }
-      banderole(d);
-      // La carte s'efface sur place : recharger la zone entière ferait sauter
-      // la lecture d'une page qu'on est en train de traiter carte par carte.
-      carte.classList.add('partie');
-      setTimeout(function () { carte.remove(); decompter(); }, 260);
-    });
-  });
-
-  if (bandeau) {
-    bandeau.addEventListener('submit', function (e) {
-      var formulaire = e.target.closest('[data-annuler-masquage]');
-      if (!formulaire) { return; }
-      e.preventDefault();
-      fetch(formulaire.action, {
-        method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        body: new FormData(formulaire)
-      })
-        .then(function (r) { if (!r.ok) { throw new Error('refus'); } })
-        .then(function () {
-          bandeau.textContent = '';
-          // Le groupe revient dans la liste, mais à sa place : seul le serveur
-          // sait laquelle.
-          var adresse = adresseSansMasque();
-          history.replaceState({ doublons: adresse }, '', adresse);
-          charger(adresse, false);
-        })
-        .catch(function () { window.location.reload(); });
-    });
-  }
-
-  if (recherche) {
-    recherche.addEventListener('submit', function (e) {
-      e.preventDefault();
-      charger(recherche.action.split('?')[0] + '?' +
-              new URLSearchParams(new FormData(recherche)).toString(), true);
-    });
-    recherche.querySelector('[name=q]').addEventListener('input', function () {
-      // Une demi-seconde après la dernière touche : « KOUASSI » partirait
-      // sinon en sept requêtes.
-      clearTimeout(minuteur);
-      minuteur = setTimeout(function () {
-        recherche.dispatchEvent(new Event('submit', { cancelable: true }));
-      }, 500);
-    });
-  }
-
-  window.addEventListener('popstate', function (e) {
-    if (e.state && e.state.doublons) { charger(e.state.doublons, false); }
-    else { window.location.reload(); }
-  });
-})();
-</script>
+  {% include 'patients/doublons/includes/resultats.html' %}
 {% endblock %}

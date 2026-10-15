@@ -451,13 +451,22 @@
             flex-shrink: 0; margin-top: 1px;
         }
         .toast-close:hover { color: var(--teal-900); }
+        /* Le geste qui défait l'annonce : dans le toast, là où l'œil arrive. */
+        .toast-action {
+            background: none; border: none; cursor: pointer; padding: 0;
+            font-family: inherit; font-size: 13px; font-weight: 700;
+            color: var(--accent-text); text-decoration: underline;
+            flex-shrink: 0; margin-top: 1px; white-space: nowrap;
+        }
+        .toast-action:hover { color: var(--accent); }
+        html[data-theme="dark"] .toast-action { color: var(--teal-300); }
         .toast-progress {
             position: absolute;
             bottom: 0; left: 0;
             height: 3px;
             width: 100%;
             transform-origin: left;
-            animation: toast-shrink 4s linear forwards;
+            animation: toast-shrink var(--toast-duree, 4s) linear forwards;
         }
         .toast-success .toast-progress { background: var(--green); }
         .toast-error   .toast-progress { background: var(--rose); }
@@ -1686,10 +1695,16 @@
         ];
         var container = document.getElementById('toast-container');
 
-        function showToast(text, tag) {
+        /* `options` est facultatif : `{action: {libelle, faire}, duree}`.
+           Une action se défait souvent — masquer une fiche, par exemple — et
+           l'annulation doit se trouver là où l'annonce s'affiche, pas dans un
+           bandeau à part. Le texte reste posé par `textContent` : un message
+           peut contenir un nom de patient, jamais du balisage. */
+        function showToast(text, tag, options) {
             var validTags = ['success','error','warning','info'];
             var safeTag = validTags.indexOf(tag) !== -1 ? tag : 'info';
             var icon = icons[safeTag] || icons.info;
+            options = options || {};
 
             var toast = document.createElement('div');
             toast.className = 'toast toast-' + safeTag;
@@ -1699,14 +1714,31 @@
                 '<button class="toast-close" aria-label="Fermer">&#x2715;</button>' +
                 '<span class="toast-progress"></span>';
             toast.querySelector('.toast-body').textContent = text;
+
+            if (options.action) {
+                var lien = document.createElement('button');
+                lien.type = 'button';
+                lien.className = 'toast-action';
+                lien.textContent = options.action.libelle;
+                lien.addEventListener('click', function () {
+                    dismissToast(toast);
+                    options.action.faire();
+                });
+                toast.insertBefore(lien, toast.querySelector('.toast-close'));
+            }
             container.appendChild(toast);
 
-            var timer = setTimeout(function(){ dismissToast(toast); }, 4000);
+            // Une annonce qu'on peut défaire doit laisser le temps de lire,
+            // de comprendre, et de changer d'avis.
+            var delai = options.duree || (options.action ? 9000 : 4000);
+            var timer = setTimeout(function(){ dismissToast(toast); }, delai);
+            toast.style.setProperty('--toast-duree', delai + 'ms');
 
             toast.querySelector('.toast-close').addEventListener('click', function(){
                 clearTimeout(timer);
                 dismissToast(toast);
             });
+            return toast;
         }
         // Exposé globalement : les pages qui se rafraîchissent en AJAX n'ont
         // pas de cycle de messages Django pour signaler une erreur réseau.
