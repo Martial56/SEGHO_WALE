@@ -160,6 +160,15 @@ class Patient(ModeleCentre):
             months += 12
         return f'{years}Ans{months}Mois{days}Jours'
 
+    @property
+    def age_affiche(self):
+        """Âge pour les formulaires : détaillé ('XAnsYMoisZJours') avant 5 ans,
+        sinon 'N ans'."""
+        age = self.age
+        if age is None:
+            return None
+        return self.age_detail if age < 5 else f'{age} ans'
+
     # ── Fusion et masquage (posés par l'étape 4, lus dès maintenant) ──────
     # La détection de doublons doit déjà les ignorer : les ajouter plus tard
     # obligerait à relancer le recalcul complet sur toute la base.

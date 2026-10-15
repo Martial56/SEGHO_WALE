@@ -3469,3 +3469,41 @@ class TestLaRaisonDuRapprochement(BaseDoublons):
                                    Patient(nom='NGUESSAN', prenoms='KONE')))
         self.assertFalse(memes_noms({'nom': 'BALO', 'prenoms': 'RAYAN'},
                                     Patient(nom='BALLO', prenoms='RAYAN')))
+
+class TestLaRechercheDesRdvLitLeTelephone(TestCase):
+    """La recherche des listes de RDV ne portait que sur le nom, les prénoms et
+    le code patient : « 07 » semblait marcher parce que ces deux chiffres se
+    trouvaient dans des codes patients, puis tout disparaissait au troisième."""
+
+    def setUp(self):
+        self.patient = Patient.objects.create(
+            nom='Kouassi', prenoms='Ama', date_naissance='1990-06-01', sexe='F',
+            telephone='+2250707123456')
+        self.autre = Patient.objects.create(
+            nom='Yao', prenoms='Koffi', date_naissance='1985-01-01', sexe='M',
+            telephone='+2250501987654')
+        # Département gynécologie : la liste de gynécologie ne montre que ceux-là,
+        # celle des patients les montre tous.
+        from medecins.models import Departement
+        gyn, _ = Departement.objects.get_or_create(code='GYN', defaults={'nom': 'Gynécologie'})
+        for p in (self.patient, self.autre):
+            RendezVous.objects.create(patient=p, date_heure=timezone.now(),
+                                      statut='confirme', departement=gyn)
+        User.objects.create_superuser('su_rdv_tel', password='x')
+        self.client = Client()
+        self.client.login(username='su_rdv_tel', password='x')
+
+    def _html(self, nom, q):
+        reponse = self.client.get(reverse(nom), {'q': q, 'filter': ''})
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_chaque_chiffre_saisi_affine_la_recherche(self):
+        for nom in ('patients:rdv_global', 'gynecologie_rdv'):
+            for saisie in ('0707', '07071234', '0707123456', '+2250707123456'):
+                with self.subTest(liste=nom, saisie=saisie):
+                    # Sur les lignes seulement : les menus de filtre
+                    # nomment tous les patients, quelle que soit la recherche.
+                    html = self._html(nom, saisie)
+                    self.assertIn('<td class="td-name">KOUASSI Ama</td>', html)
+                    self.assertNotIn('<td class="td-name">YAO Koffi</td>', html)

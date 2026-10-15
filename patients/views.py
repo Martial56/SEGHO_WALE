@@ -1178,7 +1178,8 @@ def rdv_global_list(request):
 @permission_required('patients.view_patient', raise_exception=True)
 def patient_info_json(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
-    return JsonResponse({'age': patient.age, 'telephone': patient.telephone})
+    return JsonResponse({'age': patient.age, 'age_affiche': patient.age_affiche,
+                         'telephone': patient.telephone})
 
 
 @login_required

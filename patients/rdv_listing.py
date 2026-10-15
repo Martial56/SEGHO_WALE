@@ -694,7 +694,12 @@ def listing_rdv(aujourdhui, contexte_gyneco=False):
     declarees = construire_dimensions(aujourdhui)
     perso = dimensions_personnalisees(champs)
     listing = Listing(
-        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+        # Le téléphone est cherché comme le nom : taper « 0707… » dans une
+        # liste de rendez-vous doit trouver la personne. Posé ici, et non
+        # dans chaque vue, pour que les trois listes et leurs exports
+        # cherchent la même chose.
+        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                   'patient__telephone'),
         familles=familles_rdv(contexte_gyneco),
         dimensions=list(declarees.values()) + perso,
         par_page=100,
