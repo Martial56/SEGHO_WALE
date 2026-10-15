@@ -79,7 +79,7 @@
                  text-align:left; cursor:pointer;
                  border:1px solid var(--border); border-radius:var(--radius-sm);
                  background:var(--surface-muted); color:var(--text);
-                 padding:12px 14px; font-family:var(--font-main); font-size:13px; }
+                 padding:14px 16px; font-family:var(--font-main); font-size:13px; }
     /* Survol et sélection ne doivent pas se confondre : le survol se contente
        d'épaissir la couleur du trait, la sélection pose un liseré vert et une
        coche. Changer le fond au survol faisait passer pour choisie la carte
@@ -97,23 +97,53 @@
                  border-radius:50%; background:var(--accent); color:#fff;
                  font-size:11px; font-weight:700; line-height:1; }
     .dbl-carte.choisie .dbl-coche { visibility:visible; }
-    .dbl-carte-tete { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-    .dbl-code { font-family:var(--font-mono); font-size:12px; color:var(--text-muted); }
-    .dbl-score { font-weight:700; font-size:14px; margin-left:auto; }
-    .dbl-score.blocage { color:#b02a37; }
-    .dbl-score.avertissement { color:#8a6100; }
-    html[data-theme="dark"] .dbl-score.blocage { color:#f09aa3; }
-    html[data-theme="dark"] .dbl-score.avertissement { color:#e8b84b; }
-    .dbl-ligne { display:flex; gap:6px; padding:2px 0; }
-    .dbl-cle { flex:0 0 76px; color:var(--text-muted); font-size:12px; }
-    .dbl-val { flex:1; word-break:break-word; }
+    /* `align-items:baseline` aligne le nom et le score sur la même assise ;
+       centrés, le score flottait au-dessus d'un nom sur deux lignes. */
+    .dbl-carte-tete { display:flex; align-items:baseline; gap:8px; }
+    /* Le nom porte la carte : c'est lui qu'on compare, et rien d'autre ne
+       doit lui disputer le regard. */
+    .dbl-ident { flex:1; min-width:0; font-size:15px; font-weight:650;
+                 line-height:1.25; color:var(--text-strong);
+                 letter-spacing:-.01em; overflow-wrap:anywhere; }
+    .dbl-code { display:block; margin:2px 0 10px;
+                font-family:var(--font-mono); font-size:11.5px;
+                letter-spacing:.02em; color:var(--text-faint); }
+    .dbl-score { flex:0 0 auto; font-weight:700; font-size:13px;
+                 padding:1px 7px; border-radius:999px; line-height:1.5; }
+    .dbl-score.blocage { color:#b02a37; background:rgba(176,42,55,.10); }
+    .dbl-score.avertissement { color:#8a6100; background:rgba(var(--amber-rgb), .16); }
+    html[data-theme="dark"] .dbl-score.blocage { color:#f09aa3;
+                                                 background:rgba(240,154,163,.14); }
+    html[data-theme="dark"] .dbl-score.avertissement { color:#e8b84b;
+                                                       background:rgba(232,184,75,.14); }
+    /* Une grille plutôt que six lignes indépendantes : les intitulés
+       s'alignent sur le plus long (« Dernière visite ») au lieu d'être
+       repliés sur deux lignes par une colonne fixe de 76 px. */
+    .dbl-faits { display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
+                 align-items:baseline; }
+    .dbl-ligne { display:contents; }
+    .dbl-cle { color:var(--text-muted); font-size:11.5px; white-space:nowrap;
+               text-transform:uppercase; letter-spacing:.04em; }
+    .dbl-val { min-width:0; word-break:break-word; }
     /* Ce qui diffère de la saisie est surligné : c'est la seule chose que la
        personne doit lire pour trancher. Le surlignage est porté par un span
-       intérieur, sinon il s'étirerait sur toute la largeur de la colonne. */
-    .dbl-val .diff { background:rgba(var(--amber-rgb), .22); border-radius:3px;
-                     padding:0 3px; font-weight:600; }
-    .dbl-raisons { margin-top:8px; padding-top:8px; border-top:1px solid var(--border);
-                   font-size:12px; color:var(--text-muted); }
+       intérieur, sinon il s'étirerait sur toute la largeur de la colonne.
+       Le titre y a droit comme les autres champs : c'est même là qu'il sert
+       le plus, puisque le nom est ce qu'on compare en premier. */
+    .dbl-ident .diff, .dbl-val .diff {
+        background:rgba(var(--amber-rgb), .22); border-radius:3px;
+        padding:0 3px; font-weight:600; }
+    /* Le nom est déjà gras : un fond un peu plus franc pour qu'il se
+       détache quand même. */
+    .dbl-ident .diff { background:rgba(var(--amber-rgb), .34);
+                       box-decoration-break:clone;
+                       -webkit-box-decoration-break:clone; }
+    /* La raison ferme la carte, et elle est poussée en bas : deux cartes
+       côte à côte alignent ainsi leur dernière ligne même si l'une a un nom
+       sur deux lignes. */
+    .dbl-raisons { margin-top:auto; padding-top:10px;
+                   border-top:1px solid var(--border);
+                   font-size:12px; color:var(--text-muted); line-height:1.45; }
 
     .dbl-pied { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
                 padding:14px 20px; border-top:1px solid var(--border);
@@ -1203,6 +1233,16 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
 
     // ── Contenu de la fenêtre ──────────────────────────────────────────────
 
+    /* Un mot, surligné s'il diffère de la saisie. Le surlignage est porté
+       par un span intérieur : posé sur la cellule, il s'étirerait sur toute
+       la largeur de la colonne. */
+    function morceau(texte, different) {
+        var el = document.createElement('span');
+        if (different) { el.className = 'diff'; }
+        el.textContent = texte || '—';
+        return el;
+    }
+
     function ligne(cle, val, different) {
         var l = document.createElement('div');
         l.className = 'dbl-ligne';
@@ -1266,6 +1306,12 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
         c.className = 'dbl-carte';
         c.setAttribute('aria-pressed', 'false');
 
+        var nomSaisi = valeur('nom'), prenomsSaisis = valeur('prenoms');
+        var dateSaisie = naissanceSaisie(), sexe = sexeSaisi(), tel = valeur('telephone');
+
+        /* Le nom tient lieu de titre : c'est la ligne qu'on lit pour
+           trancher. Rangé en « Nom / Prénoms » parmi quatre autres champs de
+           même poids, il fallait le chercher. */
         var tete = document.createElement('div');
         tete.className = 'dbl-carte-tete';
         var coche = document.createElement('span');
@@ -1273,26 +1319,36 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
         coche.setAttribute('aria-hidden', 'true');
         coche.textContent = '\u2713';
         tete.appendChild(coche);
-        var code = document.createElement('span');
-        code.className = 'dbl-code';
-        code.textContent = f.code;
+        var ident = document.createElement('span');
+        ident.className = 'dbl-ident';
+        ident.appendChild(morceau(f.nom, nomSaisi && pareil(f.nom) !== pareil(nomSaisi)));
+        ident.appendChild(document.createTextNode(' '));
+        ident.appendChild(morceau(
+            f.prenoms, prenomsSaisis && pareil(f.prenoms) !== pareil(prenomsSaisis)));
+        tete.appendChild(ident);
         var score = document.createElement('span');
         score.className = 'dbl-score ' + f.niveau;
         score.textContent = f.score + ' %';
-        tete.appendChild(code); tete.appendChild(score);
+        tete.appendChild(score);
         c.appendChild(tete);
 
-        var nomSaisi = valeur('nom'), prenomsSaisis = valeur('prenoms');
-        var dateSaisie = naissanceSaisie(), sexe = sexeSaisi(), tel = valeur('telephone');
-        c.appendChild(ligne('Nom', f.nom, nomSaisi && pareil(f.nom) !== pareil(nomSaisi)));
-        c.appendChild(ligne('Prénoms', f.prenoms,
-                            prenomsSaisis && pareil(f.prenoms) !== pareil(prenomsSaisis)));
-        c.appendChild(ligne('Naissance', naissance(f),
-                            !memeNaissance(naissance(f), dateSaisie)));
-        c.appendChild(ligne('Sexe', f.sexe, sexe && pareil(f.sexe) !== pareil(sexe)));
-        c.appendChild(ligne('Téléphone', f.telephone,
-                            tel && chiffres(f.telephone) !== chiffres(tel)));
-        c.appendChild(ligne('Dernière visite', f.derniere_visite || 'aucune visite', false));
+        var code = document.createElement('span');
+        code.className = 'dbl-code';
+        code.textContent = f.code;
+        c.appendChild(code);
+
+        /* Les quatre autres champs en grille : les intitulés s'alignent sur
+           le plus long au lieu d'être coupés dans une colonne fixe. */
+        var faits = document.createElement('div');
+        faits.className = 'dbl-faits';
+        faits.appendChild(ligne('Naissance', naissance(f),
+                                !memeNaissance(naissance(f), dateSaisie)));
+        faits.appendChild(ligne('Sexe', f.sexe, sexe && pareil(f.sexe) !== pareil(sexe)));
+        faits.appendChild(ligne('Téléphone', f.telephone,
+                                tel && chiffres(f.telephone) !== chiffres(tel)));
+        faits.appendChild(ligne('Dernière visite',
+                                f.derniere_visite || 'aucune visite', false));
+        c.appendChild(faits);
 
         if (f.raisons && f.raisons.length) {
             var r = document.createElement('div');
@@ -1381,7 +1437,11 @@ dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
     btnSuite.addEventListener('click', continuer);
     btnOuvrir.addEventListener('click', function () {
         if (choisi === null) { return; }
-        window.open(fiches[choisi].url, '_blank', 'noopener');
+        // Dans l'onglet courant, et non dans un second : ouvrir la fiche
+        // existante, c'est renoncer à la création. Il n'y a rien à garder
+        // derrière soi, et le nouvel onglet laissait un formulaire à demi
+        // rempli dans celui d'avant — qu'on finissait par enregistrer.
+        window.location.assign(fiches[choisi].url);
     });
     // Rien à ouvrir quand le rappel ne porte qu'un message.
     rappel.addEventListener('click', function () { if (fiches.length) { ouvrir(); } });

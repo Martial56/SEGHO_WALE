@@ -2189,6 +2189,37 @@ class TestLaFenetreDesDossiersRessemblants(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('existe déjà', form.non_field_errors()[0])
 
+    def _page_de_saisie(self):
+        """Le formulaire de création, vu par quelqu'un qui a le droit de
+        créer — `cls.agent` ne l'a pas, il ne fait que consulter."""
+        from django.contrib.auth.models import Permission
+        saisie = User.objects.create_user('fen_saisie', password='x')
+        for code in ('view_patient', 'add_patient'):
+            saisie.user_permissions.add(Permission.objects.get(
+                content_type__app_label='patients', codename=code))
+        profil = saisie.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+        client = Client()
+        client.force_login(User.objects.get(pk=saisie.pk))
+        return client.get(reverse('patients:create')).content.decode()
+
+    def test_ouvrir_la_fiche_reste_dans_l_onglet(self):
+        """Ouvrir le dossier existant, c'est renoncer à la création : il n'y
+        a rien à garder derrière soi. Le second onglet laissait un formulaire
+        à demi rempli dans celui d'avant, qu'on finissait par enregistrer."""
+        html = self._page_de_saisie()
+        self.assertIn('window.location.assign(fiches[choisi].url)', html)
+        self.assertNotIn('window.open(', html)
+
+    def test_le_nom_de_la_carte_peut_etre_surligne(self):
+        """Le nom est devenu le titre de la carte ; la règle de surlignage
+        ne visait que `.dbl-val` et ne l'atteignait plus. Rien ne se voyait :
+        le span était bien posé, simplement sans couleur. D'où ce test sur la
+        feuille elle-même — c'est le seul endroit où l'oubli se lit."""
+        self.assertIn('.dbl-ident .diff', self._page_de_saisie())
+
 
 class TestLaReglePrenomsDifferents(TestCase):
     """Deux frères nés le même jour, déclarés sous le même téléphone, montaient

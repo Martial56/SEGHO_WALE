@@ -930,6 +930,33 @@ queryset — pas sur 8 512 groupes composés en mémoire.
 
 Captures : `docs/captures/doublons/bande-{cartes,repliee,sections,sections-repliee,tableau}-{clair,sombre}.png`.
 
+### Retouches — la fenêtre des dossiers ressemblants *(15/10/2026)*
+
+**« Ouvrir la fiche » ouvrait un second onglet.** Elle ouvre maintenant la
+fiche dans l'onglet courant (`window.location.assign`). Ouvrir le dossier
+existant, c'est renoncer à la création : il n'y a rien à garder derrière soi,
+et le second onglet laissait un formulaire à demi rempli dans le premier —
+qu'on finissait par enregistrer.
+
+**Les cartes se lisaient comme un relevé de champs.** Six lignes
+intitulé/valeur de même poids, dans une colonne fixe de 76 px où « Dernière
+visite » se repliait sur deux lignes. Le nom, qui est pourtant la seule chose
+qu'on compare, était rangé en « Nom » et « Prénoms » au milieu du reste.
+
+* le nom devient le **titre** de la carte, le code passe dessous en discret ;
+* le score devient une pastille, au lieu d'un nombre nu ;
+* les quatre champs restants passent en **grille** : les intitulés s'alignent
+  sur le plus long au lieu d'être coupés ;
+* la raison est poussée en bas de carte, pour que des cartes voisines
+  alignent leur dernière ligne ;
+* **le surlignage ambre atteint aussi le titre.** Déplacer le nom l'avait
+  sorti de la portée de `.dbl-val .diff` : le span était bien posé, mais sans
+  couleur, et rien ne se voyait. Un test tient la règle (`.dbl-ident .diff`),
+  parce que cet oubli-là est invisible à l'écran comme au test de balisage.
+
+Captures : `docs/captures/doublons/saisie-fenetre{,-plusieurs}-{clair,sombre}.png`
+et `saisie-cartes-zoom-{clair,sombre}.png`.
+
 ### Étape 5 — Nettoyage de la base
 D'abord en simulation, puis un lot de 20 groupes vérifiés, puis le reste par lots.
 
