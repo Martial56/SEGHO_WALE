@@ -613,20 +613,41 @@ VIH_PROPOSITION_LABELS = {'oui': 'OUI', 'non': 'NON', 'na': 'NA'}
 VIH_RESULTAT_LABELS = {'negatif': 'Négatif', 'positif': 'Positif', 'na': 'NA'}
 
 
+#: Valeurs du « Type de visite » du registre CPN de la fiche patients ; la fiche
+#: gynécologie, elle, poste l'identifiant d'un `gynecologie.TypeVisite`.
+CPN_TYPE_VISITE_LABELS = {'1ere': '1ère visite', 'suivi': 'Visite de suivi'}
+
+
+def _type_visite_cpn(rdv, donnees, types_visite):
+    """Type de visite choisi dans le registre CPN : la clé étrangère du RDV
+    (fiche gynécologie), sinon la valeur gardée dans le registre."""
+    if rdv.cpn_type_visite:
+        return rdv.cpn_type_visite.nom
+    valeur = str(donnees.get('cpn_type_visite') or '').strip()
+    if valeur in CPN_TYPE_VISITE_LABELS:
+        return CPN_TYPE_VISITE_LABELS[valeur]
+    if valeur.isdigit() and int(valeur) in types_visite:
+        return types_visite[int(valeur)]
+    return 'Non renseigné'
+
+
 def _depistage_vih_cpn(periode_debut, periode_fin):
+    from gynecologie.models import TypeVisite
     from patients.models import RegistreCPN
-    qs = RegistreCPN.objects.select_related('rdv', 'rdv__patient')
+    types_visite = dict(TypeVisite.objects.values_list('pk', 'nom'))
+    qs = RegistreCPN.objects.select_related('rdv', 'rdv__patient', 'rdv__cpn_type_visite')
     if periode_debut:
         qs = qs.filter(rdv__date_heure__date__gte=periode_debut)
     qs = qs.filter(rdv__date_heure__date__lte=periode_fin).order_by('rdv__date_heure')
     columns = ['Code patient', 'Nom', 'Prénoms', 'Âge', 'Date de consultation',
-               "Statut VIH à l'accueil", 'Proposition de test VIH', 'Résultat du test VIH']
+               'Type de visite CPN', "Statut VIH à l'accueil", 'Proposition de test VIH', 'Résultat du test VIH']
     rows = []
     for reg in qs:
         rdv, patient, d = reg.rdv, reg.rdv.patient, reg.donnees
         rows.append([
             patient.code_patient, patient.nom, patient.prenoms, patient.age,
             rdv.date_heure.strftime('%d/%m/%Y %H:%M'),
+            _type_visite_cpn(rdv, d, types_visite),
             VIH_STATUT_ACCUEIL_LABELS.get(d.get('cpn_statut_vih_accueil'), 'Non renseigné'),
             VIH_PROPOSITION_LABELS.get(d.get('cpn_proposition_test_vih'), 'Non renseigné'),
             VIH_RESULTAT_LABELS.get(d.get('cpn_resultat_vih'), 'Non renseigné'),
@@ -667,7 +688,7 @@ REPORT_CATALOGUE = [
              'description': "CDIP proposé et CDIP réalisé pour les consultations du département gynécologie.",
              'fn': _cdip_gynecologie},
             {'slug': 'depistage_vih_cpn', 'nom': 'Dépistage VIH en CPN', 'icone': 'bi-virus2',
-             'description': "Statut VIH à l'accueil, proposition et résultat du test VIH pour les consultations prénatales.",
+             'description': "Type de visite CPN, statut VIH à l'accueil, proposition et résultat du test VIH pour les consultations prénatales.",
              'fn': _depistage_vih_cpn},
         ],
     },

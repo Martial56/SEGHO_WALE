@@ -781,7 +781,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             <div class="field-row">
                 <label>Âge</label>
                 <div class="field-display {% if not rdv %}placeholder{% endif %}" id="patient-age">
-                    {% if rdv %}{{ rdv.patient.age }} ans{% else %}—{% endif %}
+                    {% if rdv %}{{ rdv.patient.age_affiche|default:"—" }}{% else %}—{% endif %}
                 </div>
             </div>
 
@@ -859,6 +859,9 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
                 </label>
                 {{ form.type_consultation }}
             </div>
+            {% if form.type_consultation.errors %}
+            <div class="field-row"><span></span><div class="field-error">{{ form.type_consultation.errors.0 }}</div></div>
+            {% endif %}
             <div class="field-row">
                 <span></span>
                 <div class="f-hint">
@@ -964,7 +967,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
             {% elif rdv %}Aucune évaluation pour ce rendez-vous.
             {% else %}Sauvegardez d'abord le rendez-vous pour créer une évaluation.{% endif %}
           </span>
-          {% if rdv and peut_modifier %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
+          {% if rdv and droits_rdv.evaluer %}<button type="button" class="btn-eval" id="btn-eval-toggle">{% if consultation %}Modifier l'évaluation{% else %}Créer une évaluation{% endif %}</button>{% endif %}
         </div>
 
         <!-- Résumé lecture seule -->
@@ -1029,7 +1032,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
           <!-- ══ COLONNE GAUCHE ══ -->
           <div class="cpn-col">
             <div class="cpn-section">Données administratives</div>
-            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option><option value="1ere">1ère visite</option><option value="suivi">Visite de suivi</option></select></div>
+            <div class="cpn-row"><span class="cpn-lbl">Type de visite</span><select name="cpn_type_visite" class="cpn-sel editable"><option value=""></option>{% for tv in types_visite %}<option value="{{ tv.pk }}" {% if rdv and rdv.cpn_type_visite_id == tv.pk %}selected{% endif %}>{{ tv.nom }}</option>{% endfor %}</select></div>
             <div class="cpn-row"><span class="cpn-lbl">Mode d'entrée</span><select name="cpn_mode_entree" class="cpn-sel editable"><option value=""></option><option value="spontane">Spontané</option><option value="refere">Référé</option><option value="transfere">Transféré</option></select></div>
             <div class="cpn-row"><span class="cpn-lbl">Report numéro gestante précédent</span><input type="text" name="cpn_report_numero" class="cpn-inp editable"></div>
             <div class="cpn-row"><span class="cpn-lbl">Numéro gestante de la visite</span><input type="text" name="cpn_numero_gestante" class="cpn-inp editable"></div>
@@ -1958,6 +1961,17 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
     }
     if (typeConsult) typeConsult.addEventListener('change', majTypeVisiteRequis);
     majTypeVisiteRequis();
+    // Nouveau RDV : « Sauvegarder et facturer » exige un type de consultation
+    // (désignation de la facture). La vue refuse aussi, ceci évite l'aller-retour.
+    rdvForm.addEventListener('submit', function(e) {
+        if (!isNew || !typeConsult || typeConsult.value) return;
+        var sub = e.submitter;
+        if (sub && sub.name === '_action' && sub.value === 'annuler') return;
+        e.preventDefault();
+        typeConsult.style.borderBottomColor = 'var(--rose)';
+        typeConsult.focus();
+        alert('Choisissez un type de consultation avant de facturer.');
+    });
     rdvForm.addEventListener('submit', function(e) {
         if (!typeVisiteObligatoire()) return;
         var sub = e.submitter;
@@ -2223,7 +2237,7 @@ html[data-theme="dark"] .am-footer{border-top-color:var(--border);}
         </div>
         <div class="em-pgrid">
           <div class="em-prow"><span class="em-plbl">Patient</span><span class="em-pval">{{ rdv.patient.nom }} {{ rdv.patient.prenoms }}</span><span class="em-plbl">Médecin <span style="color:#e53935;">*</span></span><span class="em-pval"><select name="eval_medecin" id="id_eval_medecin" class="em-inp" style="min-width:140px;"><option value="">— Sélectionner —</option>{% for m in medecins %}<option value="{{ m.pk }}" data-departement-id="{{ m.departement_id }}"{% if rdv.medecin_id == m.pk %} selected{% endif %}>{{ m }}</option>{% endfor %}</select></span></div>
-          <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
+          <div class="em-prow"><span class="em-plbl">Âge</span><span class="em-pval">{{ rdv.patient.age_affiche|default:"—" }}</span><span class="em-plbl">Date</span><span class="em-pval">{{ rdv.date_heure|date:"d/m/Y H:i:s" }}</span></div>
           <div class="em-prow"><span class="em-plbl"></span><span class="em-pval"></span><span class="em-plbl">Rendez-vous</span><span class="em-pval">{{ rdv.code_rdv }}</span></div>
         </div>
       </div>
@@ -2627,5 +2641,8 @@ html[data-theme="dark"] .em-btn-link{color:var(--teal-300);}
 
 {# Enregistrement automatique des registres pendant la consultation. #}
 {% if rdv and peut_modifier %}{% include 'includes/_autosave_registres.html' %}{% endif %}
+
+{# Effacer un choix Oui/Non des registres : un second clic le décoche. #}
+{% include 'includes/_registres_decocher.html' %}
 
 {% endblock %}

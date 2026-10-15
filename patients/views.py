@@ -90,7 +90,7 @@ def patient_list(request):
         recherche=CHAMPS_RECHERCHE,
         familles=familles_patients(),
         dimensions=list(declarees.values()) + dims_perso,
-        par_page=40,
+        par_page=100,
         tri_defaut=('nom', 'prenoms'),
     )
 
@@ -561,7 +561,8 @@ def _rdv_listing(request, base_qs, template_page, rdv_url_name,
     champs = champs_rdv()
     dims_perso = dimensions_personnalisees(champs)
     listing = Listing(
-        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                   'patient__telephone'),
         familles=familles_rdv(contexte_gyneco),
         dimensions=list(construire_dimensions(today).values()) + dims_perso,
         par_page=100,
@@ -676,7 +677,8 @@ def rdv_global_list(request):
 @permission_required('patients.view_patient', raise_exception=True)
 def patient_info_json(request, pk):
     patient = get_object_or_404(Patient, pk=pk)
-    return JsonResponse({'age': patient.age, 'telephone': patient.telephone})
+    return JsonResponse({'age': patient.age, 'age_affiche': patient.age_affiche,
+                         'telephone': patient.telephone})
 
 
 @login_required
@@ -723,6 +725,8 @@ def rdv_create(request):
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
         patient_obj = None
+        if request.POST.get('_action', '') != 'annuler':
+            form.exiger_type_consultation()
         if form.is_valid():
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
@@ -762,6 +766,8 @@ def rdv_create(request):
         # Types de visite curative, configurables depuis le menu Configurations
         # des rendez-vous (remplace trois valeurs autrefois écrites en dur).
         'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
+        # Types de visite CPN : même liste configurable que la fiche gynécologie.
+        'types_visite':  TypeVisite.objects.filter(actif=True).order_by('nom'),
         'medecins':        Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
     })
 
@@ -818,6 +824,9 @@ def rdv_edit(request, pk):
         if rdv_droits.est_un_changement_d_etat(action):
             if rdv.statut == 'annule' or not rdv_droits.peut_faire(request.user, action):
                 raise PermissionDenied
+        elif action == 'save_eval':
+            if not rdv_droits.peut_evaluer(request.user, rdv):
+                raise PermissionDenied
         elif not peut_modifier:
             if action == 'autosave_registres':
                 return JsonResponse({'ok': False}, status=403)
@@ -865,13 +874,16 @@ def rdv_edit(request, pk):
             except Exception:
                 consult_obj = None
             if consult_obj is None:
-                consult_obj = Consult.objects.create(
+                consult_obj = Consult(
                     patient=rdv.patient,
                     medecin=rdv.medecin,
                     rendez_vous=rdv,
                     motif=rdv.motif or 'Évaluation clinique',
                     cree_par=request.user,
                 )
+                # Cf. consultations/signals.py : ne pas passer « En consultation ».
+                consult_obj._evaluation_seule = True
+                consult_obj.save()
             const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
             for post_key, model_field in _eval_map.items():
                 val = request.POST.get(post_key, '').strip()
@@ -897,6 +909,11 @@ def rdv_edit(request, pk):
                 return redirect('patients:rdv_global')
 
         if action == 'en_attente':
+            # Le bouton est masqué sans évaluation ni médecin ; le POST aussi
+            # doit être refusé, sinon le RDV attend sans évaluation.
+            if consultation is None or not (request.POST.get('medecin', '').strip() or rdv.medecin_id):
+                messages.error(request, "Enregistrez l'évaluation clinique et choisissez un médecin avant de mettre en attente.")
+                return redirect('patients:rdv_edit', pk=rdv.pk)
             from django.utils import timezone as tz
             now = tz.now()
             rdv.statut = 'en_attente'
@@ -1076,6 +1093,8 @@ def rdv_edit(request, pk):
         'constante':     constante,
         'departements_medg_ids': departements_medecine_generale_ids(),
         'types_visite_curative': TypeVisiteCurative.objects.filter(actif=True).order_by('nom'),
+        # Types de visite CPN : même liste configurable que la fiche gynécologie.
+        'types_visite':  TypeVisite.objects.filter(actif=True).order_by('nom'),
         'pathologies':   Pathologie.objects.filter(actif=True, departement__code__in=('medg', 'MEDGEN')).order_by('nom'),
         'medecins':      Medecin.objects.filter(actif=True).select_related('employe').order_by('employe__nom', 'employe__prenoms'),
         'registre_cpn':          _get_reg(RegistreCPN),

@@ -17,7 +17,9 @@ def sync_rdv_statut(sender, instance, created, **kwargs):
     TERMINAL = ('termine', 'annule', 'absent')
 
     if created:
-        if rdv.statut == 'en_attente':
+        # L'évaluation clinique (infirmier) crée aussi une consultation : elle
+        # ne doit pas démarrer la consultation à la place du médecin.
+        if rdv.statut == 'en_attente' and not getattr(instance, '_evaluation_seule', False):
             rdv.statut = 'en_consultation'
             rdv.save(update_fields=['statut'])
     else:

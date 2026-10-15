@@ -1118,24 +1118,88 @@ def _est_ajax(request):
 @login_required(login_url='login')
 @permission_required('facturation.view_caisse', raise_exception=True)
 def caisses_list(request):
+    """Caisses et ce que chacune a encaissé sur la période retenue.
+
+    Le tableau ne porte plus de colonne « Total encaissé » : une carte par
+    caisse la remplace, et le chiffre y est borné à la période plutôt que cumulé
+    depuis l'ouverture du centre. Le menu « Filtres » et son intervalle de dates
+    viennent de core.listing, comme sur la liste des factures.
+    """
+    from core.listing import Listing, menu_filtres
+    from .caisse_listing import FILTRES_DEFAUT, condition_periode, familles_caisses
+    from .facture_listing import libelle_periode
+
+    today = date.today()
     q = request.GET.get('q', '').strip()
-    # `total` annoté ici plutôt que via la propriété `Caisse.total_encaisse` :
-    # celle-ci ferait une requête par ligne du tableau. Le `filter` reprend sa
-    # règle — une facture annulée a été remboursée, son encaissement ne pèse
-    # plus dans la caisse — et les deux chiffres doivent rester d'accord.
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    listing = Listing(
+        recherche=('nom', 'code'),
+        familles=familles_caisses(),
+        par_page=100,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('nom',),
+    )
+
+    # Revenir sans paramètres après avoir filtré : on remet la sélection retenue
+    # dans l'URL, comme la liste des factures (voir core.memoire_listing). Elle
+    # tombe en quittant la facturation.
+    redirection = memoire_listing.selection_memorisee(request)
+    if redirection:
+        return redirection
+
+    filtres = listing.filtres_demandes(request)
+
+    # La période borne l'agrégat, pas le queryset : une caisse qui n'a rien
+    # encaissé sur l'intervalle s'affiche à 0 F au lieu de disparaître de la
+    # liste (cf. caisse_listing.condition_periode).
+    #
+    # `total` annoté plutôt que lu via la propriété `Caisse.total_encaisse` :
+    # celle-ci ferait une requête par ligne. Le `filter` reprend sa règle — une
+    # facture annulée a été remboursée, son encaissement ne pèse plus dans la
+    # caisse — et les deux chiffres doivent rester d'accord.
+    encaisse = condition_periode(filtres, today, date_from, date_to) \
+        & ~Q(paiements__facture__statut='annulee')
     # `order_by` explicite : le GROUP BY ajouté par l'annotation fait tomber
     # l'ordre déclaré dans Meta, et la pagination avertit alors sur une liste
     # non triée.
     qs = Caisse.objects.annotate(
-        total=Sum('paiements__montant',
-                  filter=~Q(paiements__facture__statut='annulee'))
+        total=Sum('paiements__montant', filter=encaisse),
+        nb_paiements=Count('paiements', filter=encaisse),
     ).order_by('nom')
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    page_obj = Paginator(qs, 25).get_page(request.GET.get('page', 1))
+
+    qs = listing.appliquer_recherche(qs, q)
+    qs = listing.appliquer_filtres(qs, filtres, {
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+
+    page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page', 1))
+    # Les cartes portent sur la sélection entière et non sur la page : elles
+    # résument la période, et ce résumé ne doit pas changer en feuilletant.
+    # `int` ici plutôt qu'un filtre de gabarit : `floatformat` localise déjà le
+    # nombre, et `intcomma` appliqué par-dessus regrouperait une chaîne déjà
+    # ponctuée. La liste des factures passe ses montants de la même façon.
+    cartes = [{
+        'nom':   caisse.nom,
+        'code':  caisse.code,
+        'actif': caisse.actif,
+        'total': int(caisse.total or 0),
+        'nb':    caisse.nb_paiements,
+    } for caisse in qs]
+
     return render(request, 'facturation/config/caisses/list.html', {
-        'page_obj': page_obj,
-        'q': q,
+        'page_obj':          page_obj,
+        'cartes':            cartes,
+        'q':                 q,
+        'filters':           filtres,
+        'date_from':         date_from,
+        'date_to':           date_to,
+        'filtre_pose':       bool(filtres),
+        'selection_active':  bool(q or date_from or date_to
+                                  or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle':   libelle_periode(filtres, date_from, date_to),
+        'listing_filtres':   menu_filtres(listing.familles, filtres, date_from, date_to),
     })
 
 

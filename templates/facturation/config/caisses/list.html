@@ -1,8 +1,15 @@
 {% extends 'facturation/base.html' %}
+{% load humanize %}
 {% comment %}
 Configuration → Caisses. Reprend la mise en page des écrans de configuration de
 l'hospitalisation et des médecins : sous-bandeau fixe, tableau à lignes
 cliquables, création et modification dans la modale partagée.
+
+La colonne « Total encaissé » a été retirée au profit d'une carte par caisse :
+elle affichait le cumul depuis l'ouverture du centre, un chiffre qui ne se
+rapportait à aucune journée de travail. Les cartes portent sur la période
+retenue — la journée en cours par défaut — et se recalculent à chaque
+changement de filtre, comme les compteurs de la liste des factures.
 {% endcomment %}
 {% block extra_css %}
 {{ block.super }}
@@ -15,6 +22,105 @@ cliquables, création et modification dans la modale partagée.
 .o-subheader-row-right { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .o-page-title { font-size: 15px; font-weight: 600; color: var(--text); }
 .o-page-count { color: var(--text-muted); font-weight: 500; }
+
+/* La boîte du menu déroulant et ses lignes. `includes/listing/styles.html`
+   n'apporte que les sous-menus, l'intervalle de dates et `o-dd-hint` : chaque
+   liste pose elle-même le panneau qui les contient. Sans ces règles, le menu
+   « Filtres » n'est plus masqué au repos et ses entrées s'étalent en clair
+   par-dessus la pagination. `o-ctrl-btn` et `o-pag-btn`, eux, sont globaux. */
+.o-dd-wrap { position: relative; }
+.o-dd-panel {
+  display: none; position: fixed; z-index: 9999; min-width: 210px;
+  background: #fff; border: 1px solid #dde3ec; border-radius: 7px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 5px 0;
+}
+.o-dd-panel.open { display: block; animation: ddFadeIn .12s ease; }
+@keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.o-dd-section {
+  padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+}
+.o-dd-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 7px 14px; font-size: 12px; color: var(--text); position: relative;
+  text-decoration: none; cursor: pointer; transition: background .1s;
+}
+.o-dd-item:hover  { background: var(--teal-50); color: var(--accent-text-soft); }
+.o-dd-item.active { color: var(--accent-text-soft); font-weight: 600; }
+.o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+.o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+.o-ctrl-btn.active {
+  background: rgba(var(--teal-700-rgb), .08); color: var(--accent-text);
+  border-color: rgba(var(--teal-700-rgb), .18); font-weight: 600;
+}
+.o-pagination {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-muted); white-space: nowrap;
+}
+
+/* ── Cartes : une par caisse ──
+   `auto-fit` plutôt qu'un nombre de colonnes figé : il y a autant de cartes que
+   de caisses configurées, et ce nombre change en configuration. */
+.cai-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+  background: #fff; border-bottom: 1px solid var(--border);
+}
+.cai-card {
+  padding: 18px 20px; display: flex; align-items: center; gap: 13px;
+  position: relative; transition: background .15s; min-width: 0;
+}
+.cai-card:not(:last-child)::after {
+  content: ''; position: absolute; right: 0; top: 20%; bottom: 20%;
+  width: 1px; background: var(--border);
+}
+.cai-card::before {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--cai-a), var(--cai-b));
+}
+.cai-card:hover { background: #fafcfd; }
+
+.cai-icon {
+  width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  background: var(--cai-soft); color: var(--cai-ink);
+}
+
+/* ── Palette ──
+   La teinte vient du rang de la carte, pas d'une classe que poserait la vue :
+   il y a autant de cartes que de caisses configurées, et ce nombre change. Les
+   cartes de la liste des factures peuvent se nommer (total, reçu, attente,
+   annulé) parce qu'elles sont quatre et le resteront ; ici il en faut une par
+   caisse, donc un cycle. Au-delà de cinq, les teintes se répètent — mieux vaut
+   deux caisses de même couleur qu'une couleur tirée au hasard, qui changerait
+   de caisse d'un affichage à l'autre.
+
+   Le rouge est tenu à l'écart du cycle : il dit « caisse désactivée », et ne
+   doit pas tomber sur une caisse en service par le seul effet de son rang. */
+.cai-card:nth-child(5n+1) { --cai-a: var(--teal-500); --cai-b: var(--teal-400); --cai-soft: var(--teal-50); --cai-ink: var(--accent-text-soft); }
+.cai-card:nth-child(5n+2) { --cai-a: #16a96b; --cai-b: #34d399; --cai-soft: #eafaf3; --cai-ink: #0f8f59; }
+.cai-card:nth-child(5n+3) { --cai-a: #2f7fd6; --cai-b: #68b0f0; --cai-soft: #eaf3fd; --cai-ink: #2069b8; }
+.cai-card:nth-child(5n+4) { --cai-a: #7a5cd0; --cai-b: #a98ae8; --cai-soft: #f1ecfc; --cai-ink: #6246b4; }
+.cai-card:nth-child(5n+5) { --cai-a: #d9930f; --cai-b: #fbbf24; --cai-soft: #fff8eb; --cai-ink: #a8710a; }
+
+/* Une caisse désactivée reste affichée — son encaissement de la période compte
+   toujours — mais hors palette : on doit voir d'un coup d'œil qu'elle n'est
+   plus proposée au guichet. Après le cycle, à spécificité égale : c'est l'ordre
+   qui la fait gagner. */
+.cai-card.off {
+  --cai-a: var(--border); --cai-b: var(--border);
+  --cai-soft: rgba(var(--rose-rgb),.09); --cai-ink: var(--rose-text);
+}
+
+.cai-body { display: flex; flex-direction: column; min-width: 0; }
+.cai-label {
+  font-size: 10px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: .7px; margin-bottom: 5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cai-value { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1; white-space: nowrap; }
+.cai-card.off .cai-value { color: var(--text-muted); }
+.cai-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+.cai-stats-empty { padding: 22px 20px; font-size: 13px; color: var(--text-muted); }
 
 .cfg-table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface); }
 .cfg-table thead th {
@@ -34,7 +140,6 @@ cliquables, création et modification dans la modale partagée.
   color: var(--accent-text-soft); background: rgba(var(--teal-500-rgb),.09);
   padding: 2px 7px; border-radius: 4px;
 }
-.cfg-solde { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cfg-etat {
   display: inline-block; font-size: 11px; font-weight: 700;
   padding: 2px 9px; border-radius: 20px;
@@ -45,58 +150,135 @@ cliquables, création et modification dans la modale partagée.
 .cfg-empty   { text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px; }
 .cfg-empty i { font-size: 38px; display: block; margin-bottom: 12px; opacity: .3; }
 
+html[data-theme="dark"] .cai-stats { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .cai-card:hover { background: rgba(255,255,255,.03); }
+html[data-theme="dark"] .cai-card::after { background: var(--border) !important; }
+/* Les fonds clairs de la palette brûlent sur un thème sombre : chaque teinte y
+   repasse en voile translucide, et son encre s'éclaircit pour rester lisible.
+   La caisse désactivée vient après, sinon le cycle — plus spécifique d'un
+   cran ici — la reprendrait. */
+html[data-theme="dark"] .cai-card:nth-child(5n+1) { --cai-soft: rgba(var(--teal-500-rgb),.15); --cai-ink: var(--teal-300); }
+html[data-theme="dark"] .cai-card:nth-child(5n+2) { --cai-soft: rgba(22,169,107,.14);  --cai-ink: #4cde9a; }
+html[data-theme="dark"] .cai-card:nth-child(5n+3) { --cai-soft: rgba(47,127,214,.16);  --cai-ink: #7cbcf7; }
+html[data-theme="dark"] .cai-card:nth-child(5n+4) { --cai-soft: rgba(122,92,208,.18);  --cai-ink: #b49ff0; }
+html[data-theme="dark"] .cai-card:nth-child(5n+5) { --cai-soft: rgba(217,147,15,.14);  --cai-ink: #f6c05a; }
+html[data-theme="dark"] .cai-card.off {
+  --cai-soft: rgba(var(--rose-rgb),.12); --cai-ink: var(--rose-text);
+}
 html[data-theme="dark"] .cfg-table thead th { background: var(--surface); }
 html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-500-rgb), .10); }
+html[data-theme="dark"] .o-subheader      { background: var(--surface); border-bottom-color: var(--border); }
+html[data-theme="dark"] .o-ctrl-btn       { color: rgba(255,255,255,.4); }
+html[data-theme="dark"] .o-ctrl-btn:hover { background: rgba(var(--teal-500-rgb), 0.12); color: var(--text); border-color: var(--border); }
+html[data-theme="dark"] .o-ctrl-btn.active{ background: rgba(var(--teal-500-rgb), 0.18); color: var(--teal-300); border-color: var(--teal-600); }
+html[data-theme="dark"] .o-dd-panel       { background: var(--surface); border-color: var(--border); }
+html[data-theme="dark"] .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.15); color: var(--text); }
+html[data-theme="dark"] .o-dd-item.active { color: var(--teal-300); }
 </style>
 {% endblock %}
 
 {% block content %}
 
+{% comment %}Styles de la brique : menus à sous-menus et intervalle de dates.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
+{% comment %}`list-stats` est la zone que includes/listing/page_js.html échange
+avec les résultats : sans elle, les montants resteraient ceux de l'affichage
+précédent après un changement de période.{% endcomment %}
+<div id="list-stats">
+<div class="cai-stats">
+  {% for carte in cartes %}
+  <div class="cai-card {% if not carte.actif %}off{% endif %}">
+    <div class="cai-icon"><i class="bi bi-cash-stack"></i></div>
+    <div class="cai-body">
+      <div class="cai-label" title="{{ carte.nom }}">{{ carte.nom }}</div>
+      <div class="cai-value">{{ carte.total|intcomma }} F</div>
+      <div class="cai-sub">{{ carte.nb }} encaissement{{ carte.nb|pluralize }}</div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="cai-stats-empty">Aucune caisse à totaliser.</div>
+  {% endfor %}
+</div>
+</div>
+
 <div class="o-subheader">
+
+  {% comment %}Ligne 1 : titre et recherche, jamais remplacés en AJAX pour ne
+  pas perdre le focus de saisie.{% endcomment %}
   <div class="o-subheader-row">
     <span class="o-page-title">Caisses <span class="o-page-count">{{ page_obj.paginator.count }}</span></span>
+    <span class="o-page-scope" style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     <div class="o-subheader-row-right">
-      <form method="get" style="display:flex;align-items:center;">
-        <div class="o-search-bar">
-          <input class="o-search-input" type="text" name="q" value="{{ q }}" placeholder="Rechercher…">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-          {% if q %}<a href="?" class="o-search-btn"><i class="bi bi-x"></i></a>{% endif %}
-        </div>
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text"
+               value="{{ q }}" placeholder="Nom, code…" autocomplete="off">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()" title="Rechercher">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
     </div>
   </div>
 
-  <div class="o-subheader-row">
+  {% comment %}Ligne 2 : contrôles, échangés en bloc à chaque rafraîchissement.
+  `data-groups` reste vide — la page ne regroupe pas — mais l'attribut doit
+  exister : page_js.html y lit l'état réellement appliqué.{% endcomment %}
+  <div class="o-subheader-row" id="subheader-controls"
+       data-filters="{{ filters|join:"," }}" data-groups="">
     {% if perms.facturation.add_caisse %}
     <a href="{% url 'facturation:caisse_create' %}" class="o-btn-create"
        onclick="return mdOpenConfigModal(event, this.href, 'Nouvelle caisse', 'bi-cash-stack');">
       <i class="bi bi-plus-lg"></i> Créer
     </a>
     {% endif %}
+
     <div class="o-subheader-row-right">
+
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Revenir à la journée en cours">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      <div class="o-dd-wrap">
+        <button type="button" class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
+        </button>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
+        </div>
+      </div>
+
       <div class="o-ctrl-sep"></div>
-      <div class="o-pagination-top">
-        {% if page_obj.paginator.count > 0 %}
-        <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
-        {% else %}<span>0 / 0</span>{% endif %}
+
+      <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-left"></i></a>
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        {% if page_obj.paginator.count > 0 %}
+        <span>{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}<span>0 / 0</span>{% endif %}
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% else %}#{% endif %}">
-          <i class="bi bi-chevron-right"></i></a>
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
+          <i class="bi bi-chevron-right"></i>
+        </a>
       </div>
     </div>
   </div>
 </div>
 
+<div id="list-result">
 <div class="o-list-wrap">
   <table class="cfg-table">
     <thead>
       <tr>
         <th>Nom</th>
         <th>Code</th>
-        <th style="text-align:right;">Total encaissé</th>
+        <th>Modes acceptés</th>
         <th>État</th>
         <th class="col-actions"></th>
       </tr>
@@ -106,7 +288,7 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
       <tr {% if perms.facturation.change_caisse %}onclick="mdOpenConfigModal(event, '{% url 'facturation:caisse_edit' caisse.pk %}', 'Modifier — {{ caisse.nom|escapejs }}', 'bi-cash-stack')"{% else %}style="cursor:default;"{% endif %}>
         <td style="font-weight:600;">{{ caisse.nom }}</td>
         <td><span class="cfg-code">{{ caisse.code }}</span></td>
-        <td class="cfg-solde">{{ caisse.total|default:0|floatformat:0 }} F</td>
+        <td style="color:var(--text-muted);">{{ caisse.modes_libelles|join:", " }}</td>
         <td>
           {% if caisse.actif %}<span class="cfg-etat on">Active</span>
           {% else %}<span class="cfg-etat off">Inactive</span>{% endif %}
@@ -134,6 +316,7 @@ html[data-theme="dark"] .cfg-table tbody tr:hover { background: rgba(var(--teal-
       {% endfor %}
     </tbody>
   </table>
+</div>
 </div>
 
 {% include 'medecins/config/includes/_config_modal.html' %}
@@ -173,6 +356,9 @@ configuration, plutôt que le confirm() du navigateur.{% endcomment %}
 
 {% block extra_js %}
 {{ block.super }}
+{% comment %}Filtres, période et pagination en AJAX : le même pilotage que les
+autres listes du module, et les cartes se recalculent sans recharger la page.{% endcomment %}
+{% include 'includes/listing/page_js.html' %}
 <script>
 var deleteModalUrl = null;
 function openDeleteModal(url, nom) {

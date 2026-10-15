@@ -9,7 +9,8 @@ from facturation.models import Facture
 from patients.models import Patient
 
 from .models import ProcedureSoin, Soin
-from .regles import cloturer_si_procedures_terminees, demarrer_soin_de_facture
+from .regles import (annuler_soin, cloturer_selon_procedures,
+                     demarrer_soin_de_facture)
 from .views import (_has_at_least_one_ligne, _parse_prix,
                     _save_procedures_from_lignes, _statut_apres_enregistrement,
                     _sync_procedures)
@@ -497,20 +498,48 @@ class TestClotureAutomatiqueDuSoin(TestCase):
         self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[1].pk}))
         self.assertEqual(self._statut(soin), 'termine')
 
-    def test_un_dossier_tout_annule_ne_se_ferme_pas(self):
+    def test_un_dossier_tout_annule_sannule(self):
+        """Rien n'a été fait : le soin suit ses lignes plutôt que de rester ouvert."""
         soin, procs = self._dossier(['annule', 'en_cours'])
         self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[1].pk}))
-        self.assertEqual(self._statut(soin), 'en_cours')
+        self.assertEqual(self._statut(soin), 'annule')
+
+    def test_un_soin_annule_automatiquement_nest_pas_termine(self):
+        """« Annulé » n'est pas « Terminé » : il n'en porte pas les champs."""
+        soin, procs = self._dossier(['en_cours'])
+        self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[0].pk}))
+        soin.refresh_from_db()
+        self.assertEqual(soin.statut, 'annule')
+        self.assertIsNone(soin.termine_par)
+        self.assertIsNone(soin.date_termine)
+        self.assertEqual(soin.modifie_par, self.user)
+
+    def test_une_ligne_terminee_lemporte_sur_les_annulees(self):
+        soin, procs = self._dossier(['termine', 'annule', 'en_cours'])
+        self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[2].pk}))
+        self.assertEqual(self._statut(soin), 'termine')
 
     def test_un_soin_sans_ligne_ne_se_ferme_pas(self):
         soin, _ = self._dossier([])
-        self.assertIsNone(cloturer_si_procedures_terminees(soin, self.user))
+        self.assertIsNone(cloturer_selon_procedures(soin, self.user))
         self.assertEqual(self._statut(soin), 'en_cours')
 
     def test_un_soin_pas_encore_paye_ne_se_ferme_pas(self):
         soin, procs = self._dossier(['termine'], statut_soin='en_attente_de_paiement')
-        self.assertIsNone(cloturer_si_procedures_terminees(soin, self.user))
+        self.assertIsNone(cloturer_selon_procedures(soin, self.user))
         self.assertEqual(self._statut(soin), 'en_attente_de_paiement')
+
+    def test_un_soin_pas_encore_paye_sannule_si_tout_est_annule(self):
+        """Avant le règlement il n'y a rien à encaisser : le dossier peut tomber."""
+        soin, procs = self._dossier(['annule', 'brouillon'],
+                                    statut_soin='en_attente_de_paiement')
+        self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[1].pk}))
+        self.assertEqual(self._statut(soin), 'annule')
+
+    def test_un_soin_en_brouillon_tout_annule_sannule(self):
+        soin, procs = self._dossier(['annule', 'brouillon'], statut_soin='brouillon')
+        self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': procs[1].pk}))
+        self.assertEqual(self._statut(soin), 'annule')
 
     def test_un_dossier_dhospitalisation_reste_ouvert(self):
         """Il reçoit ses procédures visite après visite : le fermer le gèlerait."""
@@ -535,6 +564,68 @@ class TestClotureAutomatiqueDuSoin(TestCase):
         self.assertEqual(self._statut(soin), 'termine')
         procs[0].refresh_from_db()
         self.assertEqual(procs[0].statut, 'annule')
+
+
+# ─── Un soin annulé emporte sa facturation ────────────────────────────────────
+
+class TestAnnulationEmporteLesFactures(TestCase):
+    """La facture suit le dossier, comme pour un rendez-vous annulé.
+
+    Sans cela un soin annulé laissait de quoi encaisser un acte qui n'aurait
+    pas lieu — et la caisse n'avait aucun moyen de le deviner.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Fac')
+        self.user = _soins_user('u_fac', perms=('change_soin', 'change_proceduresoin'))
+        self.client = Client()
+        self.client.login(username='u_fac', password='x')
+
+    def test_le_bouton_annuler_annule_la_facture_du_soin(self):
+        facture = _facture(self.patient)
+        soin = _soin(self.patient, statut='en_attente_de_paiement', facture=facture)
+        _procedure(soin=soin)
+        self.client.post(reverse('soins:annuler', kwargs={'pk': soin.pk}))
+        soin.refresh_from_db()
+        facture.refresh_from_db()
+        self.assertEqual(soin.statut, 'annule')
+        self.assertEqual(facture.statut, 'annulee')
+
+    def test_la_facture_dune_ligne_est_annulee_aussi(self):
+        """Une procédure engagée seule porte sa propre facture."""
+        soin = _soin(self.patient, statut='en_attente_de_paiement')
+        proc = _procedure(soin=soin)
+        proc.facture = _facture(self.patient)
+        proc.save(update_fields=['facture'])
+        self.client.post(reverse('soins:annuler', kwargs={'pk': soin.pk}))
+        proc.facture.refresh_from_db()
+        self.assertEqual(proc.facture.statut, 'annulee')
+
+    def test_tout_annuler_les_lignes_annule_la_facture(self):
+        """Le chemin automatique vaut le bouton : même geste, mêmes effets."""
+        facture = _facture(self.patient)
+        soin = _soin(self.patient, statut='en_attente_de_paiement', facture=facture)
+        proc = _procedure(soin=soin)
+        self.client.post(reverse('soins:procedure_annuler', kwargs={'pk': proc.pk}))
+        soin.refresh_from_db()
+        facture.refresh_from_db()
+        self.assertEqual(soin.statut, 'annule')
+        self.assertEqual(facture.statut, 'annulee')
+
+    def test_une_facture_deja_annulee_nest_pas_retouchee(self):
+        facture = _facture(self.patient, statut='annulee')
+        soin = _soin(self.patient, statut='en_attente_de_paiement', facture=facture)
+        _procedure(soin=soin)
+        annuler_soin(soin, self.user)
+        facture.refresh_from_db()
+        self.assertEqual(facture.statut, 'annulee')
+
+    def test_un_soin_sans_facture_ne_casse_rien(self):
+        soin = _soin(self.patient, statut='en_attente_de_paiement')
+        _procedure(soin=soin)
+        annuler_soin(soin, self.user)
+        soin.refresh_from_db()
+        self.assertEqual(soin.statut, 'annule')
 
 
 # ─── Le formulaire ne fait plus redescendre un dossier ────────────────────────

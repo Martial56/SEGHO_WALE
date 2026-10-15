@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from .models import Soin, ProcedureSoin
 from .forms import SoinForm, ProcedureSoinForm
-from .regles import cloturer_si_procedures_terminees
+from .regles import annuler_soin, cloturer_selon_procedures
 from patients.models import RendezVous, Patient
 from patients.models import Pathologie
 from laboratoire.models import AnalyseLaboratoire, ExamenImagerie
@@ -692,12 +692,9 @@ def soins_annuler(request, pk):
     if soin.statut == 'en_cours' and not request.user.is_superuser:
         messages.error(request, "Ce soin est déjà payé : son annulation relève de l'administration.")
         return redirect('soins:detail', pk=pk)
-    soin.statut = 'annule'
-    soin.modifie_par = request.user
-    soin.date_modification = timezone.now()
-    soin.save(update_fields=['statut', 'modifie_par', 'date_modification'])
-    log_event(soin, request.user, 'Soin annulé.', type='statut')
-    soin.procedures.exclude(statut__in=('termine', 'annule')).update(statut='annule')
+    # Statut, lignes encore ouvertes et factures : le même geste que celui
+    # déclenché par l'annulation de la dernière ligne (soins.regles).
+    annuler_soin(soin, request.user, motif=request.POST.get('motif_annulation', '').strip())
     messages.success(request, f"Soin de {soin.patient} annulé.")
     return redirect('soins:detail', pk=pk)
 
@@ -1042,7 +1039,7 @@ def procedure_edit(request, pk):
                     _auto_creer_facture(proc, request.user)
                 else:
                     proc.save()
-            cloturer_si_procedures_terminees(proc.soin, request.user)
+            cloturer_selon_procedures(proc.soin, request.user)
             return redirect('soins:procedure_detail', pk=proc.pk)
     else:
         form = ProcedureSoinForm(instance=proc, peut_tout_modifier=peut_tout_modifier)
@@ -1079,7 +1076,7 @@ def procedure_terminer(request, pk):
         proc.date_modification = timezone.now()
         proc.save()
         log_event(proc, request.user, 'Procédure terminée.', type='statut')
-        cloturer_si_procedures_terminees(proc.soin, request.user)
+        cloturer_selon_procedures(proc.soin, request.user)
     return redirect('soins:procedure_detail', pk=pk)
 
 
@@ -1093,7 +1090,7 @@ def procedure_annuler(request, pk):
         proc.statut = 'annule'
         proc.save()
         log_event(proc, request.user, 'Procédure annulée.', type='statut')
-        cloturer_si_procedures_terminees(proc.soin, request.user)
+        cloturer_selon_procedures(proc.soin, request.user)
     return redirect('soins:procedure_detail', pk=pk)
 
 

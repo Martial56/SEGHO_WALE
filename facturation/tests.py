@@ -1,9 +1,11 @@
 import re
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
 
 from patients.models import Patient
 
@@ -776,14 +778,15 @@ class TestTotalEncaisse(TestCase):
         self.assertEqual(self.caisse.total_encaisse, 0)
         self.assertEqual(self.autre.total_encaisse, 0)
 
-    def test_le_tableau_affiche_le_total_et_non_un_solde(self):
+    def test_la_carte_affiche_le_total_et_non_un_solde(self):
+        """Le tableau n'a plus de colonne de total : une carte par caisse la porte."""
         self._encaisser(3000, self.caisse)
         client = Client()
         client.login(username='u_tot_caisse', password='x')
         client.force_login(User.objects.create_superuser('su_tot', password='x'))
         contenu = client.get(reverse('facturation:caisses_list')).content.decode()
-        self.assertIn('Total encaissé', contenu)
-        self.assertIn('<td class="cfg-solde">3000 F</td>', contenu)
+        self.assertIn('<div class="cai-value">3\xa0000 F</div>', contenu)
+        self.assertNotIn('cfg-solde', contenu)
 
     def test_le_tableau_reste_trie_par_nom(self):
         # L'annotation ajoute un GROUP BY, qui fait tomber l'ordre du Meta.
@@ -823,8 +826,8 @@ class TestTotalEncaisse(TestCase):
         client = Client()
         client.force_login(User.objects.create_superuser('su_tot_ann', password='x'))
         contenu = client.get(reverse('facturation:caisses_list')).content.decode()
-        self.assertIn('<td class="cfg-solde">3000 F</td>', contenu)
-        self.assertNotIn('<td class="cfg-solde">5000 F</td>', contenu)
+        self.assertIn('<div class="cai-value">3\xa0000 F</div>', contenu)
+        self.assertNotIn('<div class="cai-value">5\xa0000 F</div>', contenu)
 
     def test_une_caisse_dont_tout_est_annule_retombe_a_zero(self):
         """`Sum` rend None quand le filtre ne laisse rien : sans le `or 0`,
@@ -838,6 +841,157 @@ class TestTotalEncaisse(TestCase):
         client.force_login(User.objects.create_superuser('su_tot_zero', password='x'))
         contenu = client.get(reverse('facturation:caisses_list')).content.decode()
         self.assertNotIn('None', contenu)
+
+
+# ─── Période des cartes de caisse ──────────────────────────────────────────────
+
+class TestPeriodeDesCaisses(TestCase):
+    """Les cartes portent sur une période, pas sur le cumul depuis l'ouverture.
+
+    Le total affiché était celui de tous les encaissements jamais passés par la
+    caisse : un caissier ne pouvait le rapprocher de rien. Il se borne désormais
+    à la période retenue, la journée en cours par défaut, et se change depuis le
+    menu « Filtres » comme sur la liste des factures.
+    """
+
+    def setUp(self):
+        self.patient = _patient('PER')
+        self.caisse = Caisse.objects.create(nom='Caisse accueil', code='CAC1')
+        self.dormante = Caisse.objects.create(nom='Caisse pharmacie', code='CPH2')
+        _caisse_user('u_per_caisse')
+        self.client = Client()
+        self.client.force_login(User.objects.create_superuser('su_per', password='x'))
+
+    def _encaisser(self, montant, caisse, il_y_a_jours=0):
+        """Encaisse par la vue, puis recule la date du paiement si demandé.
+
+        `date_paiement` est en `auto_now_add` : il se repousse par `update`, que
+        le modèle ne retouche pas, et non par `save`.
+        """
+        facture = _facture(self.patient, statut='emise', montant_total=Decimal(montant))
+        client = Client()
+        client.login(username='u_per_caisse', password='x')
+        client.post(reverse('facturation:payer', args=[facture.pk]),
+                    {'pay_journal': str(caisse.pk), 'pay_montant': str(montant),
+                     'pay_mode': 'especes'})
+        if il_y_a_jours:
+            quand = timezone.now() - timedelta(days=il_y_a_jours)
+            Paiement.objects.filter(facture=facture).update(date_paiement=quand)
+        return facture
+
+    def _cartes(self, **params):
+        """{nom de caisse: montant affiché} lus sur la page rendue."""
+        contenu = self.client.get(reverse('facturation:caisses_list'),
+                                  params).content.decode()
+        trouves = re.findall(
+            r'<div class="cai-label"[^>]*>([^<]+)</div>\s*'
+            r'<div class="cai-value">([^<]+) F</div>',
+            contenu)
+        return {nom.strip(): montant.replace('\xa0', '') for nom, montant in trouves}
+
+    def test_par_defaut_seule_la_journee_compte(self):
+        self._encaisser(3000, self.caisse)
+        self._encaisser(2000, self.caisse, il_y_a_jours=3)
+        self.assertEqual(self._cartes()['Caisse accueil'], '3000')
+
+    def test_une_periode_plus_large_rattrape_les_jours_precedents(self):
+        self._encaisser(3000, self.caisse)
+        self._encaisser(2000, self.caisse, il_y_a_jours=3)
+        self.assertEqual(self._cartes(filter='semaine')['Caisse accueil'], '5000')
+
+    def test_un_intervalle_explicite_borne_le_total(self):
+        self._encaisser(3000, self.caisse)
+        self._encaisser(2000, self.caisse, il_y_a_jours=3)
+        avant_hier = (timezone.localdate() - timedelta(days=4)).isoformat()
+        hier = (timezone.localdate() - timedelta(days=1)).isoformat()
+        cartes = self._cartes(date_from=avant_hier, date_to=hier)
+        self.assertEqual(cartes['Caisse accueil'], '2000')
+
+    def test_une_caisse_sans_encaissement_reste_affichee_a_zero(self):
+        """Elle ne doit pas disparaître : on la croirait supprimée.
+
+        C'est tout l'intérêt de borner l'agrégat plutôt que le queryset — un
+        `filter` sur la date des paiements aurait retiré la ligne entière.
+        """
+        self._encaisser(3000, self.caisse)
+        cartes = self._cartes()
+        self.assertEqual(cartes['Caisse pharmacie'], '0')
+        self.assertIn('Caisse pharmacie', self.client.get(
+            reverse('facturation:caisses_list')).content.decode())
+
+    def test_une_facture_annulee_sort_aussi_du_total_de_la_periode(self):
+        self._encaisser(3000, self.caisse)
+        annulee = self._encaisser(2000, self.caisse)
+        annulee.statut = 'annulee'
+        annulee.save(update_fields=['statut'])
+        self.assertEqual(self._cartes()['Caisse accueil'], '3000')
+
+    def test_il_y_a_autant_de_cartes_que_de_caisses(self):
+        """Les cartes sont engendrées, pas écrites : en ajouter une se voit.
+
+        La grille est en `auto-fit` et le gabarit boucle sur la sélection — rien
+        ne fixe leur nombre à trois ni à aucun autre.
+        """
+        self.assertEqual(len(self._cartes()), 2)       # les deux du setUp
+
+        Caisse.objects.create(nom='Caisse nuit', code='CNU1')
+        Caisse.objects.create(nom='Caisse bloc', code='CBL1')
+        cartes = self._cartes()
+        self.assertEqual(len(cartes), 4)
+        self.assertEqual(sorted(cartes), ['Caisse accueil', 'Caisse bloc',
+                                          'Caisse nuit', 'Caisse pharmacie'])
+
+    def test_sans_aucune_caisse_la_bande_le_dit(self):
+        """Zéro caisse ne doit pas laisser une bande vide sans explication."""
+        Caisse.objects.all().delete()
+        contenu = self.client.get(reverse('facturation:caisses_list')).content.decode()
+        self.assertEqual(self._cartes(), {})
+        self.assertIn('Aucune caisse à totaliser', contenu)
+
+    def test_une_caisse_filtree_sort_aussi_des_cartes(self):
+        """Cartes et tableau montrent la même sélection, jamais deux listes."""
+        self.dormante.actif = False
+        self.dormante.save(update_fields=['actif'])
+        cartes = self._cartes(filter='etat_actif')
+        self.assertEqual(sorted(cartes), ['Caisse accueil'])
+
+    # ── La sélection retenue, comme sur les autres listes ──────────────────
+
+    def test_revenir_sans_parametres_restaure_la_periode(self):
+        """Passer à une autre page de la facturation et revenir : la période tient."""
+        self.client.get(reverse('facturation:caisses_list') + '?filter=mois')
+        reponse = self.client.get(reverse('facturation:caisses_list'))
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('filter=mois', reponse.url)
+
+    def test_quitter_la_facturation_oublie_la_periode(self):
+        """La sélection ne traverse pas un passage par un autre module."""
+        self.client.get(reverse('facturation:caisses_list') + '?filter=mois')
+        self.client.get(reverse('patients:list'))
+        reponse = self.client.get(reverse('facturation:caisses_list'))
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn('aujourd&#x27;hui', reponse.content.decode())
+
+    def test_effacer_oublie_la_periode(self):
+        """« Effacer » rafraîchit la liste en AJAX, sans aucun paramètre."""
+        self.client.get(reverse('facturation:caisses_list') + '?filter=mois')
+        self.client.get(reverse('facturation:caisses_list'),
+                        headers={'x-requested-with': 'XMLHttpRequest'})
+        self.assertEqual(
+            self.client.get(reverse('facturation:caisses_list')).status_code, 200,
+            'la sélection effacée a été restaurée')
+
+    def test_la_periode_affichee_est_annoncee(self):
+        """La mention à côté du titre dit sur quoi portent les cartes.
+
+        L'apostrophe est échappée par le gabarit : c'est la forme rendue qu'on
+        cherche, pas celle du code.
+        """
+        contenu = self.client.get(reverse('facturation:caisses_list')).content.decode()
+        self.assertIn('aujourd&#x27;hui', contenu)
+        contenu = self.client.get(reverse('facturation:caisses_list'),
+                                  {'filter': 'mois'}).content.decode()
+        self.assertIn('mois en cours', contenu)
 
 
 # ─── Modes de paiement acceptés par caisse ─────────────────────────────────────

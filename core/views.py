@@ -1305,6 +1305,8 @@ def gynecologie_rdv_create(request):
 
     if request.method == 'POST':
         form = RendezVousForm(request.POST)
+        if request.POST.get('_action', '') != 'annuler':
+            form.exiger_type_consultation()
         if form.is_valid():
             rdv = form.save(commit=False)
             code = request.POST.get('code_confirmation', '').strip()
@@ -1452,6 +1454,9 @@ def gynecologie_rdv_detail(request, pk):
         if rdv_droits.est_un_changement_d_etat(action):
             if rdv.statut == 'annule' or not rdv_droits.peut_faire(request.user, action):
                 raise PermissionDenied
+        elif action == 'save_eval':
+            if not rdv_droits.peut_evaluer(request.user, rdv):
+                raise PermissionDenied
         elif not peut_modifier:
             if action == 'autosave_registres':
                 return JsonResponse({'ok': False}, status=403)
@@ -1494,10 +1499,13 @@ def gynecologie_rdv_detail(request, pk):
             except Exception:
                 consult_obj = None
             if consult_obj is None:
-                consult_obj = Consult.objects.create(
+                consult_obj = Consult(
                     patient=rdv.patient, medecin=rdv.medecin, rendez_vous=rdv,
                     motif=rdv.motif or 'Évaluation clinique', cree_par=request.user,
                 )
+                # Cf. consultations/signals.py : ne pas passer « En consultation ».
+                consult_obj._evaluation_seule = True
+                consult_obj.save()
             const_obj, _ = Const.objects.get_or_create(consultation=consult_obj)
             for post_key, model_field in _eval_map.items():
                 val = request.POST.get(post_key, '').strip()
@@ -1520,6 +1528,11 @@ def gynecologie_rdv_detail(request, pk):
             return redirect('gynecologie_rdv')
 
         if action == 'en_attente':
+            # Le bouton est désactivé sans évaluation ni médecin ; le POST aussi
+            # doit être refusé, sinon le RDV attend sans évaluation.
+            if consultation is None or not rdv.medecin_id:
+                messages.error(request, "Enregistrez l'évaluation clinique et choisissez un médecin avant de mettre en attente.")
+                return redirect('gynecologie_rdv_detail', pk=rdv.pk)
             now = timezone.now()
             rdv.statut = 'en_attente'
             rdv.date_en_attente = now
@@ -1741,7 +1754,8 @@ def gynecologie_rdv(request):
         from patients.rdv_listing import FILTRES_PAR_DEFAUT, familles_rdv
         from datetime import date as _dexp
         _listing = Listing(
-            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient'),
+            recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                       'patient__telephone'),
             familles=familles_rdv(contexte_gyneco=True),
             filtres_defaut=FILTRES_PAR_DEFAUT,
         )
@@ -1866,7 +1880,7 @@ def gynecologie_list(request):
         recherche=CHAMPS_RECHERCHE,
         familles=familles_patients(),
         dimensions=list(declarees.values()) + dims_perso,
-        par_page=25,
+        par_page=100,
         tri_defaut=('nom', 'prenoms'),
     )
 

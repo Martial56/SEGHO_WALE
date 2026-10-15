@@ -50,6 +50,9 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.middleware.CurrentUserMiddleware',
+    # Après SessionMiddleware : vide la sélection des listes des autres
+    # modules, et avant la vue, pour qu'une liste lise une session nette.
+    'core.middleware.MemoireListingMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'core.middleware.SessionTimeoutMiddleware',
     'core.middleware.ActivityLogMiddleware',

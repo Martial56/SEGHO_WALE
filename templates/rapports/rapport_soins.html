@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fiche d'activité de soins — {{ mois_nom }} {{ annee }}</title>
 <style>
-:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; --brand: #1a5c4a; }
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace; --brand: #1a5c4a; --logo-vert: #4a8a3a; }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
 
@@ -33,22 +33,29 @@ body { font-family: var(--font-print); background: #e5e7eb; color: #1a1a2e; font
 
 /* ── Page A4 ── */
 .rm-page {
-  max-width: 900px; margin: 24px auto; background: #fff;
+  position: relative; max-width: 900px; margin: 24px auto; background: #fff;
   border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
   padding: 34px 42px 40px;
 }
-.rm-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.rm-logo { display: flex; align-items: center; gap: 10px; }
-.rm-logo-circle {
-  width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--brand);
-  display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; flex-shrink: 0;
+/* En-tete, titre et lignes d'information : ceux de rapport_gynecologie.html,
+   au mot pres. Les deux fiches partent sur le bureau du meme directeur, et une
+   feuille qui se presente autrement se lit comme un document d'une autre
+   maison. Le gabarit du logo est partage (_rmg_entete.html) ; ces regles sont
+   ce qui lui donne sa forme. */
+.rm-header {
+  display: flex; align-items: flex-end; justify-content: center; gap: 8px;
+  width: 75%; margin: 0 auto 12px; padding-bottom: 3px; border-bottom: 1.5px solid var(--logo-vert);
 }
-.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
-.rm-logo-name { font-size: 14px; font-weight: 800; color: var(--brand); letter-spacing: .3px; }
-.rm-page-num { font-size: 11px; color: #9ca3af; }
-.rm-title { text-align: center; font-size: 16px; font-weight: 800; color: var(--brand); margin: 10px 0 4px; text-transform: uppercase; }
-.rm-subtitle { text-align: center; font-size: 12.5px; color: #374151; margin-bottom: 20px; }
-.rm-subtitle strong { color: var(--brand); }
+.rm-logo-circle { width: 40px; height: 40px; flex-shrink: 0; }
+.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; }
+.rm-logo-name { font-size: 24px; color: var(--brand); letter-spacing: .3px; line-height: 1.1; }
+.rm-page-num {
+  position: absolute; right: 30px; bottom: 14px; font-size: 9px;
+  border: 1px solid #555; padding: 3px 8px 6px; border-radius: 0 0 6px 0;
+}
+.rm-title { text-align: center; font-size: 13px; font-weight: 800; text-decoration: underline; margin: 4px 0 14px; }
+.rm-ligne-info { font-size: 12px; font-weight: 700; margin: 0 0 14px 40px; }
+.rm-ligne-info strong { color: var(--brand); }
 
 .rm-section-title {
   font-size: 12.5px; font-weight: 800; text-transform: uppercase; color: var(--brand);
@@ -79,6 +86,7 @@ table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 80
   .rm-page {
     margin: 0; padding: 12mm 14mm 16mm; box-shadow: none; border-radius: 0; max-width: 100%;
   }
+  .rm-page-num { right: 8mm; bottom: 4mm; }
 }
 @page { size: A4; margin: 0; }
 </style>
@@ -123,15 +131,10 @@ table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 80
 
 <!-- ══════════════════════ PAGE : Fiche d'activité de soins ══════════════════════ -->
 <div class="rm-page">
-  <div class="rm-header">
-    <div class="rm-logo">
-      <div class="rm-logo-circle"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
-      <div class="rm-logo-name">CENTRE MEDICO SOCIAL WALE</div>
-    </div>
-    <div class="rm-page-num">1</div>
-  </div>
-  <div class="rm-title">Fiche d'activité de soins</div>
-  <div class="rm-subtitle">ANNÉE : <strong>{{ annee }}</strong> &nbsp;—&nbsp; MOIS : <strong>{{ mois_nom }}</strong> &nbsp;—&nbsp; Renseigné par : <span class="rm-blank" style="min-width:140px;"></span></div>
+  {% include "rapports/_rmg_entete.html" with nom_centre="CENTRE MEDICO SOCIAL WALE" %}
+  <div class="rm-title">FICHE DE RAPPORT MENSUEL D'ACTIVITÉ DE SOINS</div>
+  <div class="rm-ligne-info">DATE (mois/ année) : <strong>{{ mois_nom }}</strong> / <strong>{{ annee }}</strong></div>
+  <div class="rm-ligne-info">RENSEIGNÉ PAR : M./ Mme/Mlle ……………………….……………………………………………</div>
 
   <div class="rm-sub-title">Mise en Observation (MO)</div>
   <table class="rm-table">
@@ -211,6 +214,7 @@ table.rm-table tr.total-row td, table.rm-table tr.total-row th { font-weight: 80
     Les cases vides sont à compléter manuellement.
     {% if configuration %}<br>Composition : <strong>{{ configuration.nom }}</strong> ({{ configuration.auteur }}).{% endif %}
   </div>
+  <div class="rm-page-num">1</div>
 </div>
 
 <script>

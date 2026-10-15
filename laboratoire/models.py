@@ -33,8 +33,9 @@ class AnalyseLaboratoire(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = AnalyseLaboratoire.objects.filter(date_prelevement__year=annee).count() + 1
-            self.numero = f"LAB{annee}{count:06d}"
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(
+                AnalyseLaboratoire.objects, 'numero', f'LAB{annee}', 6)
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Analyse {self.numero} - {self.patient}"
@@ -93,9 +94,10 @@ class DemandeExamen(ModeleCentre):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
+            from core.numerotation import prochain_code
             # all_objects : numero est unique tous centres confondus.
-            count = DemandeExamen.all_objects.filter(date_creation__year=annee).count() + 1
-            self.numero = f"DEM{annee}{count:06d}"
+            self.numero = prochain_code(
+                DemandeExamen.all_objects, 'numero', f'DEM{annee}', 6)
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Demande {self.numero} - {self.patient}"
@@ -154,8 +156,9 @@ class ExamenImagerie(models.Model):
         if not self.numero:
             from django.utils import timezone
             annee = timezone.now().year
-            count = ExamenImagerie.objects.filter(date_examen__year=annee).count() + 1
-            self.numero = f"IMG{annee}{count:06d}"
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(
+                ExamenImagerie.objects, 'numero', f'IMG{annee}', 6)
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Imagerie {self.numero} - {self.patient}"

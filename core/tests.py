@@ -534,7 +534,7 @@ class TestMemoireDesListes(TestCase):
     def test_sans_rien_de_retenu_la_liste_s_affiche_normalement(self):
         self.assertEqual(self.client.get(self.url).status_code, 200)
 
-    # ── Les trois façons d'oublier ─────────────────────────────────────────
+    # ── Les quatre façons d'oublier ────────────────────────────────────────
 
     def test_effacer_oublie_la_selection(self):
         """« Effacer » rafraîchit la liste en AJAX, sans aucun paramètre."""
@@ -556,6 +556,69 @@ class TestMemoireDesListes(TestCase):
         self.client.get(reverse('dashboard'))
         self.assertEqual(self.client.get(self.url).status_code, 200)
         self.assertEqual(self.client.get(reverse('patients:list')).status_code, 200)
+
+    def test_sortir_du_module_oublie_la_selection(self):
+        """Une liste filtrée hier ne doit pas se rouvrir filtrée aujourd'hui.
+
+        L'accueil n'était pas le seul chemin pour quitter une liste : on y
+        revenait depuis n'importe quel module, et le filtre y était encore.
+        """
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.client.get(reverse('facturation:list'))
+        self.assertEqual(self.client.get(self.url).status_code, 200,
+                         'la sélection a survécu au départ vers un autre module')
+
+    def test_se_deplacer_dans_le_module_garde_la_selection(self):
+        """C'est à cela qu'elle sert : passer à une liste sœur et revenir.
+
+        Le pendant du test précédent : sans lui, on ne verrait pas la différence
+        entre « oublier en sortant » et « ne jamais rien retenir ».
+        """
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.client.get(reverse('patients:list'))
+        reponse = self.client.get(self.url)
+        self.assertEqual(reponse.status_code, 302)
+        self.assertIn('filter=aujourdhui', reponse.url)
+
+    def test_sortir_n_emporte_que_les_listes_du_module_quitte(self):
+        """Seules les listes du module qu'on vient de quitter sont oubliées.
+
+        La session est lue directement plutôt qu'interrogée par une requête :
+        aller voir si la facturation a oublié la sienne nous ferait sortir du
+        module patients, et emporterait au passage ce que le test veut y
+        trouver. La mesure changerait ce qu'elle mesure.
+        """
+        from core.memoire_listing import PREFIXE_CLE
+        self.client.get(reverse('facturation:list') + '?filter=today')
+        self.client.get(self.url + '?filter=aujourdhui')   # on passe aux patients
+
+        retenues = sorted(c for c in self.client.session.keys()
+                          if c.startswith(PREFIXE_CLE))
+        self.assertEqual(retenues, [PREFIXE_CLE + self.url])
+
+    def test_un_fichier_n_est_pas_un_deplacement(self):
+        """Charger un script ou une image ne fait pas quitter le module.
+
+        Sans cette exclusion, la moindre ressource demandée depuis une page
+        d'un autre préfixe effacerait la sélection qu'on vient de poser.
+        """
+        self.client.get(self.url + '?filter=aujourdhui')
+        self.client.get('/static/css/global.css')
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    def test_un_appel_ajax_ailleurs_n_est_pas_un_deplacement(self):
+        """Une page peut interroger un autre module sans qu'on y soit allé."""
+        self.client.get(self.url + '?filter=aujourdhui')
+        self._ajax(reverse('facturation:list'))
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+
+    def test_le_module_est_le_premier_segment_de_l_adresse(self):
+        from core.memoire_listing import _module
+        self.assertEqual(_module('/patients/rendez-vous/'), 'patients')
+        self.assertEqual(_module('/patients/252/'), 'patients')
+        self.assertEqual(_module('/facturation/configuration/caisses/'), 'facturation')
+        # Le tableau de bord ne relève d'aucun module : y passer vide tout.
+        self.assertEqual(_module('/'), '')
 
     # ── L'état déplié, qui ne recharge rien ────────────────────────────────
 

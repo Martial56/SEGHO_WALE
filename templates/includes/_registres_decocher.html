@@ -1,0 +1,90 @@
+{% comment %}
+Effacer un choix Oui/Non des registres.
+
+Un bouton radio ne se décoche pas : le navigateur ne lui prévoit aucun geste
+pour revenir à « rien de coché ». Sur le papier on raye ; ici on ne pouvait que
+basculer sur l'autre réponse, et inscrire « Non » là où « Oui » avait été coché
+par erreur n'est pas moins faux — sur un antécédent de diabète, c'est même la
+même faute à l'envers.
+
+Un second clic sur un choix déjà coché l'efface donc. Le geste se branche sur le
+préfixe du nom et non sur une liste de champs : il vaut pour les 86 groupes des
+quatre registres (CPN, accouchement, postnatale, curatif) et pour ceux qu'on y
+ajoutera.
+
+Fragment partagé, parce que patients/rendez_vous_form.html et
+gynecologie/rdv_form.html sont deux copies du même formulaire et que ce qui
+n'est posé que d'un côté finit par diverger. La mention d'aide est posée par le
+script plutôt qu'écrite dans les deux gabarits, pour cette raison — et parce
+qu'une mention qui annonce un geste de JavaScript n'aurait rien à faire sur une
+page dont le JavaScript n'a pas tourné.
+{% endcomment %}
+<style>
+  .reg-aide {
+    font-size: 11.5px; color: var(--text-muted, rgba(0,0,0,0.5));
+    font-style: italic; padding: 0 0 10px;
+  }
+</style>
+<script>
+(function () {
+  /* Les mêmes préfixes que l'enregistrement automatique des registres
+     (includes/_autosave_registres.html) : ce sont eux qui disent, dans ce
+     formulaire, qu'un champ appartient à un registre. */
+  var PREFIXES = /^(cpn_|acc_|cposo_|cur_)/;
+  var PANNEAUX = ['tab-cpn', 'tab-accouchement', 'tab-postnatale', 'tab-curative'];
+
+  PANNEAUX.forEach(function (id) {
+    var panneau = document.getElementById(id);
+    if (!panneau || panneau.querySelector('.reg-aide')) return;
+    var aide = document.createElement('div');
+    aide.className = 'reg-aide';
+    aide.textContent = 'Recliquez sur un choix déjà coché pour l’effacer.';
+    panneau.insertBefore(aide, panneau.firstChild);
+  });
+
+  function radioVise(cible) {
+    if (!cible || !cible.closest) return null;
+    var radio = cible.closest('input[type="radio"]');
+    if (!radio) {
+      var etiquette = cible.closest('label');
+      if (etiquette) radio = etiquette.querySelector('input[type="radio"]');
+    }
+    if (!radio || !radio.name || !PREFIXES.test(radio.name)) return null;
+    /* Un rendez-vous annulé se lit, ne se corrige plus. Le verrou passe par
+       `pointer-events` sur le bouton lui-même, qu'un clic sur l'étiquette
+       contourne : sans ce test, décocher resterait possible là où plus rien
+       ne doit bouger. */
+    if (radio.disabled || radio.closest('.rdv-locked')) return null;
+    return radio;
+  }
+
+  /* L'état coché se lit avant que le navigateur ne le change. Au moment du
+     clic il a déjà coché, et on ne saurait plus distinguer un premier clic
+     d'un second sur un choix qui l'était déjà. */
+  var dejaCoche = null;
+  document.addEventListener('pointerdown', function (e) {
+    var radio = radioVise(e.target);
+    dejaCoche = (radio && radio.checked) ? radio : null;
+  }, true);
+
+  /* Effacer pendant le clic ne suffit pas : le navigateur coche *après*.
+     Cliquer l'étiquette lui fait relayer un clic au bouton, et cliquer le
+     bouton directement passe par des étapes d'activation qui rétablissent
+     l'état coché si l'on annule l'événement. On l'empêche donc d'agir, puis on
+     efface une fois le clic entièrement traité — le dernier mot nous revient
+     quoi qu'il ait fait entre-temps. */
+  document.addEventListener('click', function (e) {
+    var radio = radioVise(e.target);
+    if (!radio || radio !== dejaCoche) return;
+    dejaCoche = null;
+    e.preventDefault();
+    setTimeout(function () {
+      radio.checked = false;
+      /* Les champs qui dépendent d'un choix (« Gestion du risque » sous le
+         résultat de CPN) et l'enregistrement automatique écoutent `change` :
+         effacer sans l'émettre les laisserait sur l'ancienne réponse. */
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    }, 0);
+  }, true);
+})();
+</script>

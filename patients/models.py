@@ -52,11 +52,12 @@ class Patient(ModeleCentre):
 
     def save(self, *args, **kwargs):
         if not self.code_patient:
+            from core.numerotation import prochain_code
             annee = timezone.now().year
             # all_objects : code_patient est unique tous centres confondus, la
             # numérotation ne doit donc jamais être filtrée par centre actif.
-            count = Patient.all_objects.filter(date_creation__year=annee).count() + 1
-            self.code_patient = f"PAT{annee}{count:05d}"
+            self.code_patient = prochain_code(
+                Patient.all_objects, 'code_patient', f'PAT{annee}', 5)
         super().save(*args, **kwargs)
 
     @property
@@ -88,6 +89,15 @@ class Patient(ModeleCentre):
             years -= 1
             months += 12
         return f'{years}Ans{months}Mois{days}Jours'
+
+    @property
+    def age_affiche(self):
+        """Âge pour les formulaires : détaillé ('XAnsYMoisZJours') avant 5 ans,
+        sinon 'N ans'."""
+        age = self.age
+        if age is None:
+            return None
+        return self.age_detail if age < 5 else f'{age} ans'
 
     def __str__(self): return f"{self.nom} {self.prenoms} ({self.code_patient})"
     class Meta(ModeleCentre.Meta):
@@ -351,9 +361,10 @@ class Naissance(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.numero:
+            from core.numerotation import prochain_code
             annee = timezone.now().year
-            count = Naissance.objects.filter(date_creation__year=annee).count() + 1
-            self.numero = f"NAISS{annee}{count:04d}"
+            self.numero = prochain_code(
+                Naissance.objects, 'numero', f'NAISS{annee}', 4)
         super().save(*args, **kwargs)
 
     def __str__(self): return f"{self.numero} - {self.mere}"
