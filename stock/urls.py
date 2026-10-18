@@ -57,7 +57,6 @@ urlpatterns = [
     path('fiches/<int:pk>/soumettre/', views.fiche_soumettre,  name='stock_fiche_soumettre'),
     path('fiches/<int:pk>/valider/',   views.fiche_valider,    name='stock_fiche_valider'),
     path('fiches/<int:pk>/imprimer/',       views.fiche_print,           name='stock_fiche_print'),
-    path('fiches/<int:pk>/envoyer-achats/', views.fiche_envoyer_achats,  name='stock_fiche_envoyer_achats'),
     path('rapports/indicateurs/',     views.rapports_indicateurs,  name='stock_rapports_indicateurs'),
 
     # Fournisseurs
@@ -83,10 +82,6 @@ urlpatterns = [
     path('config/categories/<int:pk>/supprimer/', views.stock_categorie_delete, name='stock_categorie_delete'),
     path('config/categories/export/',   views.stock_export_categories_produit, name='stock_export_categories_produit'),
     path('config/categories/importer/', views.stock_import_categories_produit, name='stock_import_categories_produit'),
-
-    # Réceptions achats à intégrer dans le stock
-    path('receptions-achats/',                   views.receptions_a_integrer, name='stock_receptions_a_integrer'),
-    path('receptions-achats/<int:pk>/integrer/', views.integrer_reception,    name='stock_integrer_reception'),
 
     # Réception directe (manuelle, hors commande d'achat)
     path('receptions/nouvelle/', views.reception_directe_create, name='stock_reception_directe_create'),

@@ -874,8 +874,13 @@ class TestLesLignesArriventAuDepliage(TestCase):
         lié pour en proposer les valeurs. Ces requêtes-là sont les mêmes qu'on
         déplie un parent ou une feuille, elles ne disent donc rien du balayage
         que ce test surveille — seul l'écart compte, et il reste nul.
+
+        Repassé de 25 à 24 quand le contexte global du Stock a perdu sa
+        requête de comptage des réceptions d'achats à intégrer (module
+        Achats rendu indépendant de Stock) — une requête en moins sur
+        chaque page, sans rapport avec le balayage surveillé ici.
         """
-        with self.assertNumQueries(25):
+        with self.assertNumQueries(24):
             self.client.get(self.url + '&group=type&_groupe=0')
 
     def test_un_sous_groupe_rend_bien_les_siennes(self):

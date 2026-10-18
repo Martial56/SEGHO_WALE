@@ -12,7 +12,9 @@
   position:sticky; top:var(--topbar-h); z-index:100;
 }
 .badge-brouillon { background:rgba(var(--amber-rgb),.1); color:var(--amber-text);        border:1px solid rgba(var(--amber-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-soumis    { background:rgba(var(--amber-rgb),.1); color:var(--amber-text);        border:1px solid rgba(var(--amber-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .badge-valide    { background:rgba(var(--st-600-rgb),.1); color:var(--accent-text-soft);        border:1px solid rgba(var(--st-600-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.badge-rejete    { background:rgba(var(--rose-rgb),.1); color:var(--rose-btn);        border:1px solid rgba(var(--rose-rgb),.25); padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
 .info-row { padding:8px 0; border-bottom:1px solid var(--st-border); display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; }
 .info-row:last-child { border-bottom:none; }
 .info-lbl { color:var(--st-muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.3px; }
@@ -29,9 +31,13 @@
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-size:15px;font-weight:800;color:var(--st-900);font-family: var(--font-mono);">{{ fiche.numero }}</span>
         {% if fiche.statut == 'brouillon' %}
-          <span class="badge-brouillon"><i class="bi bi-pencil"></i> Non envoyée</span>
+          <span class="badge-brouillon"><i class="bi bi-pencil"></i> Brouillon</span>
+        {% elif fiche.statut == 'soumis' %}
+          <span class="badge-soumis"><i class="bi bi-hourglass-split"></i> Soumise pour validation</span>
+        {% elif fiche.statut == 'valide' %}
+          <span class="badge-valide"><i class="bi bi-check-circle-fill"></i> Validée</span>
         {% else %}
-          <span class="badge-valide"><i class="bi bi-send-check"></i> Transmis aux achats</span>
+          <span class="badge-rejete"><i class="bi bi-x-circle-fill"></i> Rejetée</span>
         {% endif %}
       </div>
       <div style="font-size:11.5px;color:var(--st-muted);margin-top:2px;">
@@ -46,22 +52,20 @@
       <a href="{% url 'stock_fiche_edit' fiche.pk %}" class="btn-st-outline">
         <i class="bi bi-pencil"></i> Modifier
       </a>
-      <form method="post" action="{% url 'stock_fiche_envoyer_achats' fiche.pk %}" style="display:inline;">
+      <form method="post" action="{% url 'stock_fiche_soumettre' fiche.pk %}" style="display:inline;">
         {% csrf_token %}
         <button type="submit" class="btn-st"
-          onclick="return confirm('Envoyer cette fiche aux achats ? Elle ne sera plus modifiable.')">
-          <i class="bi bi-send-arrow-up"></i> Envoyer aux achats
+          onclick="return confirm('Soumettre cette fiche pour validation ? Elle ne sera plus modifiable.')">
+          <i class="bi bi-send-arrow-up"></i> Soumettre pour validation
         </button>
       </form>
       {% endif %}
-    {% else %}
-      {% with besoin=fiche.besoins_achats.first %}
-      {% if besoin and perms.achats.view_besoinachat %}
-        <a href="{% url 'achats:besoin_detail' besoin.pk %}" class="btn-st">
-          <i class="bi bi-send-check"></i> Voir dans Achats — {{ besoin.numero }}
-        </a>
+    {% elif fiche.statut == 'soumis' %}
+      {% if peut_gerer_stock and perms.stock.change_fichebesoins %}
+      <a href="{% url 'stock_fiche_valider' fiche.pk %}" class="btn-st">
+        <i class="bi bi-check-circle"></i> Examiner / Valider
+      </a>
       {% endif %}
-      {% endwith %}
     {% endif %}
     {% if perms.stock.view_fichebesoins %}
     <a href="{% url 'stock_fiche_print' fiche.pk %}" class="btn-st-outline" title="Imprimer">

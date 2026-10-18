@@ -153,18 +153,9 @@ html[data-theme="dark"] .ac-repart-track { background:var(--surface-muted); }
       </div>
     </a>
     {% endif %}
-    <a href="{% url 'achats:besoins_list' %}" class="ac-kpi" style="{% if nb_fiches_stock %}border-color:#fcd34d;background:#fffbeb;{% endif %}">
-      <div class="ac-kpi-icon" style="background:{% if nb_fiches_stock %}#fef3c7{% else %}#f3f4f6{% endif %};">
-        <i class="bi bi-arrow-down-circle-fill" style="color:{% if nb_fiches_stock %}#d97706{% else %}#9ca3af{% endif %};"></i>
-      </div>
-      <div class="ac-kpi-info">
-        <span class="ac-kpi-val" style="color:{% if nb_fiches_stock %}#92400e{% else %}#6b7280{% endif %};">{{ nb_fiches_stock }}</span>
-        <span class="ac-kpi-label">Besoin{{ nb_fiches_stock|pluralize }} du stock</span>
-      </div>
-    </a>
   </div>
 
-  {% if alertes.nb_proformas_stagnantes or alertes.nb_besoins_sans_proforma or alertes.nb_receptions_non_integrees %}
+  {% if alertes.nb_proformas_stagnantes or alertes.nb_besoins_sans_proforma %}
   <!-- Alertes opérationnelles -->
   <div class="ac-section">
     <div class="ac-card">
@@ -196,22 +187,6 @@ html[data-theme="dark"] .ac-repart-track { background:var(--surface-muted); }
           </ul>
           {% else %}
           <div class="ac-alert-ok"><i class="bi bi-check-circle"></i> Aucun</div>
-          {% endif %}
-        </div>
-        <div class="ac-alert-col">
-          <div class="ac-alert-label"><i class="bi bi-box-seam"></i> Réceptions non intégrées en stock</div>
-          {% if alertes.nb_receptions_non_integrees %}
-          <div class="ac-alert-count">{{ alertes.nb_receptions_non_integrees }}</div>
-          <ul class="ac-alert-list">
-            {% for r in alertes.receptions_non_integrees %}
-            <li style="margin-bottom:3px;"><a href="{% url 'achats:reception_detail' r.pk %}" style="color:var(--accent-text);text-decoration:none;font-weight:600;">{{ r.numero }}</a> — {{ r.commande.fournisseur.nom|truncatechars:18 }}</li>
-            {% endfor %}
-          </ul>
-          {% if user.is_staff or perms.stock.can_gerer_stock %}
-          <a href="{% url 'stock_receptions_a_integrer' %}" style="font-size:12px;color:var(--accent-text-soft);font-weight:600;text-decoration:none;">Aller intégrer →</a>
-          {% endif %}
-          {% else %}
-          <div class="ac-alert-ok"><i class="bi bi-check-circle"></i> Aucune</div>
           {% endif %}
         </div>
       </div>

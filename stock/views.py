@@ -8,8 +8,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
-from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure
-from achats.models import Fournisseur
+from .models import Produit, CategorieStock, LotProduit, MouvementStock, CommandeStock, LigneCommande, Inventaire, LigneInventaire, DemandePharmacie, LigneDemande, PHARMACIES, FicheBesoins, LigneFicheBesoins, UniteMesure, Fournisseur
 
 def can_manage_stock(user):
     return user.is_staff or user.has_perm('stock.can_gerer_stock')
@@ -1809,8 +1808,7 @@ def rapports_fournisseurs_prix(request):
         })
     produits_data.sort(key=lambda x: x['variation'], reverse=True)
 
-    from achats.models import Fournisseur as FournisseurAchat
-    fournisseurs = FournisseurAchat.objects.filter(actif=True).order_by('nom')
+    fournisseurs = Fournisseur.objects.filter(actif=True).order_by('nom')
     produits_avec_lots = Produit.objects.filter(
         lots__prix_achat_lot__gt=0, actif=True
     ).distinct().order_by('nom')
@@ -2479,9 +2477,9 @@ def dotation_creer(request):
 
 @login_required(login_url='login')
 def fiche_list(request):
-    qs = FicheBesoins.objects.select_related('cree_par').prefetch_related(
-        'besoins_achats'
-    ).annotate(nb_lignes=Count('lignes')).order_by('-date_creation')
+    qs = FicheBesoins.objects.select_related('cree_par').annotate(
+        nb_lignes=Count('lignes')
+    ).order_by('-date_creation')
     paginator = Paginator(qs, 25)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'stock/fiches/list.html', {'fiches': page_obj, 'page_obj': page_obj})
@@ -2519,7 +2517,7 @@ def fiche_create(request):
                 for p, qte_cmd in lignes_data
             ])
 
-            messages.success(request, f'Fiche {fiche.numero} créée. Vérifiez et envoyez aux achats.')
+            messages.success(request, f'Fiche {fiche.numero} créée. Vérifiez puis soumettez-la pour validation.')
             return redirect('stock_fiche_detail', pk=fiche.pk)
 
     categories = CategorieStock.objects.filter(actif=True).order_by('type', 'nom')
@@ -2601,51 +2599,6 @@ def fiche_valider(request, pk):
 
 
 @login_required(login_url='login')
-@require_POST
-def fiche_envoyer_achats(request, pk):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    from achats.models import BesoinAchat, LigneBesoin
-    fiche = get_object_or_404(FicheBesoins, pk=pk)
-
-    besoin_existant = fiche.besoins_achats.first()
-    if besoin_existant:
-        messages.warning(request, f"Cette fiche a déjà été transmise ({besoin_existant.numero}).")
-        return redirect('achats:besoin_detail', pk=besoin_existant.pk)
-
-    if fiche.statut == 'rejete':
-        messages.error(request, "Cette fiche a été rejetée et ne peut pas être transmise aux achats.")
-        return redirect('stock_fiche_detail', pk=pk)
-
-    if not fiche.lignes.exists():
-        messages.error(request, "Cette fiche ne contient aucun produit à transmettre.")
-        return redirect('stock_fiche_detail', pk=pk)
-
-    besoin = BesoinAchat.objects.create(
-        titre=f"Fiche besoins {fiche.numero} — {fiche.periode_debut.strftime('%d/%m/%Y')} au {fiche.periode_fin.strftime('%d/%m/%Y')}",
-        fiche_besoins=fiche, statut='soumis', cree_par=request.user,
-        notes=f"Généré depuis la fiche {fiche.numero}",
-    )
-    lignes_creees = 0
-    for ligne in fiche.lignes.select_related('produit', 'produit__unite_mesure').all():
-        qte = ligne.qte_accordee if ligne.qte_accordee else ligne.qte_commander
-        LigneBesoin.objects.create(
-            besoin=besoin, produit=ligne.produit,
-            quantite=qte,
-            unite=ligne.produit.unite_mesure.nom if ligne.produit.unite_mesure else 'unité',
-        )
-        lignes_creees += 1
-
-    fiche.statut          = 'valide'
-    fiche.valide_par       = request.user
-    fiche.date_validation  = timezone.now()
-    fiche.save(update_fields=['statut', 'valide_par', 'date_validation'])
-
-    messages.success(request, f"Besoin {besoin.numero} transmis aux achats ({lignes_creees} produit(s)).")
-    return redirect('achats:besoin_detail', pk=besoin.pk)
-
-
-@login_required(login_url='login')
 def fiche_print(request, pk):
     fiche  = get_object_or_404(FicheBesoins, pk=pk)
     lignes = fiche.lignes.select_related('produit', 'produit__unite_mesure').all()
@@ -2657,109 +2610,6 @@ def fiche_print(request, pk):
 # ──────────────────────────────────────────────────────────────
 # INTÉGRATION DES RÉCEPTIONS D'ACHATS
 # ──────────────────────────────────────────────────────────────
-
-@login_required(login_url='login')
-def receptions_a_integrer(request):
-    from achats.models import ReceptionAchat
-    receptions = ReceptionAchat.objects.filter(
-        integre_en_stock=False
-    ).select_related(
-        'commande__fournisseur',
-        'commande__proforma__besoin__fiche_besoins',
-        'receptionne_par',
-    ).order_by('-date_creation')
-    return render(request, 'stock/receptions_a_integrer.html', {
-        'receptions': receptions,
-        'nb': receptions.count(),
-    })
-
-
-@login_required(login_url='login')
-@require_POST
-def integrer_reception(request, pk):
-    if not can_manage_stock(request.user):
-        raise PermissionDenied
-    from achats.models import ReceptionAchat, LigneReceptionAchat
-
-    with transaction.atomic():
-        # select_for_update() + le filtre integre_en_stock=False dans la même transaction
-        # empêchent un double clic/double soumission d'intégrer deux fois la même réception.
-        reception = get_object_or_404(
-            ReceptionAchat.objects.select_for_update(), pk=pk, integre_en_stock=False
-        )
-        commande = reception.commande
-        lignes_ignorees = []
-
-        for lr in reception.lignes.select_related(
-            'ligne_commande__ligne_proforma__ligne_besoin__produit'
-        ).all():
-            if lr.quantite_recue <= 0:
-                continue
-            lc = lr.ligne_commande
-            produit = None
-            if (lc.ligne_proforma and
-                    lc.ligne_proforma.ligne_besoin and
-                    lc.ligne_proforma.ligne_besoin.produit):
-                produit = lc.ligne_proforma.ligne_besoin.produit
-            if produit is None:
-                lignes_ignorees.append(lc.designation)
-                continue
-
-            numero_lot = lr.numero_lot or reception.numero
-            lot = LotProduit.objects.filter(produit=produit, numero_lot=numero_lot).first()
-            if lot:
-                lot.quantite_actuelle += lr.quantite_recue
-                lot.quantite_initiale += lr.quantite_recue
-                update_lot_fields = ['quantite_actuelle', 'quantite_initiale']
-                if not lot.date_peremption and lr.date_peremption:
-                    lot.date_peremption = lr.date_peremption
-                    update_lot_fields.append('date_peremption')
-                lot.save(update_fields=update_lot_fields)
-            else:
-                lot = LotProduit.objects.create(
-                    produit=produit,
-                    numero_lot=numero_lot,
-                    date_reception=reception.date_reception,
-                    date_peremption=lr.date_peremption,
-                    quantite_initiale=lr.quantite_recue,
-                    quantite_actuelle=lr.quantite_recue,
-                    fournisseur=commande.fournisseur,
-                    prix_achat_lot=lc.prix_unitaire,
-                )
-            stock_avant = produit.stock_actuel
-            produit.stock_actuel = produit.stock_actuel + lr.quantite_recue
-            produit.save(update_fields=['stock_actuel'])
-            MouvementStock.objects.create(
-                produit=produit, lot=lot,
-                type='entree', motif='achat',
-                quantite=lr.quantite_recue,
-                stock_avant=stock_avant,
-                stock_apres=produit.stock_actuel,
-                reference=reception.numero,
-                notes=f'Réception {reception.numero} — Commande {commande.numero}',
-                cree_par=request.user,
-            )
-
-        reception.integre_en_stock = True
-        reception.date_integration = timezone.now()
-        reception.integre_par = request.user
-        if lignes_ignorees:
-            note = f"Non intégré en stock (produit non résolu) : {', '.join(lignes_ignorees)}"
-            reception.notes = f"{reception.notes}\n{note}".strip()
-            reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par', 'notes'])
-        else:
-            reception.save(update_fields=['integre_en_stock', 'date_integration', 'integre_par'])
-
-    if lignes_ignorees:
-        messages.warning(
-            request,
-            f"Réception {reception.numero} intégrée, mais {len(lignes_ignorees)} ligne(s) ignorée(s) "
-            f"faute de produit identifiable : {', '.join(lignes_ignorees)}. Vérifiez manuellement le stock pour ces articles."
-        )
-    else:
-        messages.success(request, f'Réception {reception.numero} intégrée dans le stock.')
-    return redirect('stock_receptions_a_integrer')
-
 
 # ──────────────────────────────────────────────────────────────
 # RÉCEPTION DIRECTE (manuelle, hors commande d'achat)

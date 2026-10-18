@@ -12,12 +12,11 @@ import json
 import locale
 
 from .models import (
-    Fournisseur, BesoinAchat, LigneBesoin,
+    Fournisseur, Article, BesoinAchat, LigneBesoin,
     Proforma, LigneProforma,
     CommandeAchat, LigneCommandeAchat,
     ReceptionAchat, LigneReceptionAchat,
 )
-from stock.models import Produit
 
 MOIS_FR = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 
@@ -120,11 +119,6 @@ def achats_dashboard(request):
         {'label': 'Reçues ce mois',          'count': ReceptionAchat.objects.filter(date_reception__month=today.month, date_reception__year=today.year).count(), 'color': '#065f46', 'url': '/achats/commandes/?statut=recue'},
     ]
 
-    from stock.models import FicheBesoins
-    nb_fiches_stock = FicheBesoins.objects.filter(
-        statut__in=('soumis', 'valide'), besoins_achats__isnull=True
-    ).count()
-
     # ── Alertes opérationnelles ──
     seuil_stagnation = today - timezone.timedelta(days=7)
     proformas_stagnantes = Proforma.objects.filter(
@@ -133,17 +127,12 @@ def achats_dashboard(request):
     besoins_sans_proforma = BesoinAchat.objects.filter(
         statut='soumis', date_creation__date__lt=seuil_stagnation
     ).order_by('date_creation')
-    receptions_non_integrees = ReceptionAchat.objects.filter(
-        integre_en_stock=False
-    ).select_related('commande__fournisseur').order_by('date_reception')
 
     alertes = {
         'proformas_stagnantes':     proformas_stagnantes[:5],
         'nb_proformas_stagnantes':  proformas_stagnantes.count(),
         'besoins_sans_proforma':    besoins_sans_proforma[:5],
         'nb_besoins_sans_proforma': besoins_sans_proforma.count(),
-        'receptions_non_integrees':    receptions_non_integrees[:5],
-        'nb_receptions_non_integrees': receptions_non_integrees.count(),
     }
 
     # ── Top fournisseurs (commandes non annulées, montant + taux de retard) ──
@@ -179,14 +168,14 @@ def achats_dashboard(request):
     lignes_annee = LigneCommandeAchat.objects.filter(
         commande__date_commande__year=today.year
     ).exclude(commande__statut='annulee').select_related(
-        'ligne_proforma__ligne_besoin__produit', 'commande'
+        'ligne_proforma__ligne_besoin__article', 'commande'
     )
     repartition_montants = {}
     for l in lignes_annee:
-        produit = None
-        if (l.ligne_proforma and l.ligne_proforma.ligne_besoin and l.ligne_proforma.ligne_besoin.produit):
-            produit = l.ligne_proforma.ligne_besoin.produit
-        label = produit.get_type_display() if produit else 'Hors catalogue'
+        article = None
+        if (l.ligne_proforma and l.ligne_proforma.ligne_besoin and l.ligne_proforma.ligne_besoin.article):
+            article = l.ligne_proforma.ligne_besoin.article
+        label = article.get_type_display() if article else 'Hors catalogue'
         repartition_montants[label] = repartition_montants.get(label, 0) + float(l.montant)
     total_repartition = sum(repartition_montants.values()) or 1
     repartition_categories = sorted([
@@ -208,7 +197,6 @@ def achats_dashboard(request):
 
     return render(request, 'achats/dashboard.html', {
         'stats': stats,
-        'nb_fiches_stock':    nb_fiches_stock,
         'besoins_recents':    BesoinAchat.objects.select_related('cree_par').order_by('-date_creation')[:6],
         'proformas_attente':  Proforma.objects.filter(statut='en_attente').select_related('fournisseur', 'besoin').order_by('-date_creation')[:6],
         'commandes_actives':  commandes_actives[:8],
@@ -312,8 +300,7 @@ def _save_fournisseur(obj, data):
 
 @login_required(login_url='login')
 def besoins_list(request):
-    from stock.models import FicheBesoins
-    qs = BesoinAchat.objects.select_related('cree_par', 'fiche_besoins').prefetch_related('lignes')
+    qs = BesoinAchat.objects.select_related('cree_par').prefetch_related('lignes')
     q = request.GET.get('q', '').strip()
     statut = request.GET.get('statut', '')
     if q:
@@ -321,17 +308,11 @@ def besoins_list(request):
     if statut:
         qs = qs.filter(statut=statut)
 
-    fiches_a_importer = FicheBesoins.objects.filter(
-        statut__in=('soumis', 'valide'),
-        besoins_achats__isnull=True,
-    ).order_by('-date_creation')
-
     return render(request, 'achats/besoins/list.html', {
         'besoins': qs,
         'q': q,
         'statut': statut,
         'statut_choices': BesoinAchat.STATUT_CHOICES,
-        'fiches_a_importer': fiches_a_importer,
         'stats': {
             'total': BesoinAchat.objects.count(),
             'soumis': BesoinAchat.objects.filter(statut='soumis').count(),
@@ -344,7 +325,7 @@ def besoins_list(request):
 @login_required(login_url='login')
 def besoin_detail(request, pk):
     besoin = get_object_or_404(BesoinAchat, pk=pk)
-    lignes = besoin.lignes.select_related('produit').all()
+    lignes = besoin.lignes.select_related('article').all()
     proformas = besoin.proformas.select_related('fournisseur').all()
     return render(request, 'achats/besoins/detail.html', {
         'besoin': besoin,
@@ -365,10 +346,10 @@ def besoin_create(request):
             _save_lignes_besoin(besoin, request.POST)
         messages.success(request, f'Besoin d\'achat {besoin.numero} créé.')
         return redirect('achats:besoin_detail', pk=besoin.pk)
-    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    articles = Article.objects.filter(actif=True).order_by('type', 'nom')
     return render(request, 'achats/besoins/form.html', {
         'action': 'create',
-        'produits': produits,
+        'articles': articles,
     })
 
 
@@ -387,12 +368,12 @@ def besoin_edit(request, pk):
             _save_lignes_besoin(besoin, request.POST)
         messages.success(request, 'Besoin mis à jour.')
         return redirect('achats:besoin_detail', pk=besoin.pk)
-    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    articles = Article.objects.filter(actif=True).order_by('type', 'nom')
     return render(request, 'achats/besoins/form.html', {
         'action': 'edit',
         'besoin': besoin,
-        'lignes': besoin.lignes.select_related('produit').all(),
-        'produits': produits,
+        'lignes': besoin.lignes.select_related('article').all(),
+        'articles': articles,
     })
 
 
@@ -421,7 +402,7 @@ def _save_besoin(obj, data):
 
 
 def _save_lignes_besoin(besoin, data):
-    produit_ids = data.getlist('produit_id')
+    article_ids = data.getlist('article_id')
     designations = data.getlist('designation')
     quantites = data.getlist('quantite')
     unites = data.getlist('unite')
@@ -435,10 +416,10 @@ def _save_lignes_besoin(besoin, data):
             continue
         if q <= 0:
             continue
-        pid = produit_ids[i] if i < len(produit_ids) else ''
+        aid = article_ids[i] if i < len(article_ids) else ''
         LigneBesoin.objects.create(
             besoin=besoin,
-            produit_id=int(pid) if pid else None,
+            article_id=int(aid) if aid else None,
             designation=designations[i] if i < len(designations) else '',
             quantite=q,
             unite=unites[i] if i < len(unites) else 'unité',
@@ -506,7 +487,7 @@ def proforma_create(request, besoin_pk):
         'action': 'create',
         'besoin': besoin,
         'fournisseurs': Fournisseur.objects.filter(actif=True),
-        'lignes_besoin': besoin.lignes.select_related('produit').all(),
+        'lignes_besoin': besoin.lignes.select_related('article').all(),
     })
 
 
@@ -531,7 +512,7 @@ def proforma_edit(request, pk):
         'proforma': pf,
         'besoin': pf.besoin,
         'fournisseurs': Fournisseur.objects.filter(actif=True),
-        'lignes_besoin': pf.besoin.lignes.select_related('produit').all(),
+        'lignes_besoin': pf.besoin.lignes.select_related('article').all(),
         'lignes': pf.lignes.all(),
     })
 
@@ -924,8 +905,8 @@ def reception_detail(request, pk):
 @login_required(login_url='login')
 def api_produits(request):
     q = request.GET.get('q', '').strip()
-    qs = Produit.objects.filter(actif=True).select_related('unite_mesure')
+    qs = Article.objects.filter(actif=True)
     if q:
         qs = qs.filter(Q(nom__icontains=q) | Q(code__icontains=q))
-    data = [{'id': p.pk, 'text': f'{p.nom} ({p.code})', 'unite': p.unite_mesure.nom if p.unite_mesure else ''} for p in qs[:30]]
+    data = [{'id': a.pk, 'text': f'{a.nom} ({a.code})'} for a in qs[:30]]
     return JsonResponse({'results': data})

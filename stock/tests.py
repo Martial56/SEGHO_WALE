@@ -6,13 +6,12 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
-from achats.models import Fournisseur
 from core.middleware import _locals
 
 from .models import (
     Produit, LotProduit, CommandeStock, LigneCommande, Inventaire,
     LigneInventaire, DemandePharmacie, LigneDemande, FicheBesoins,
-    LigneFicheBesoins,
+    LigneFicheBesoins, Fournisseur,
 )
 
 

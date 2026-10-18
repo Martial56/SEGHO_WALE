@@ -34,6 +34,43 @@ class CategorieStock(models.Model):
 
 
 
+class Fournisseur(models.Model):
+    """Fournisseurs du Stock — indépendant du Fournisseur du module Achats :
+    chaque module gère son propre carnet d'adresses fournisseurs."""
+    code              = models.CharField(max_length=20, unique=True, blank=True)
+    nom               = models.CharField(max_length=150)
+    telephone         = models.CharField(max_length=30, blank=True)
+    telephone2        = models.CharField(max_length=30, blank=True)
+    email             = models.EmailField(blank=True)
+    adresse           = models.TextField(blank=True)
+    ville             = models.CharField(max_length=100, blank=True)
+    pays              = models.CharField(max_length=100, default="Côte d'Ivoire")
+    contact_nom       = models.CharField("Nom du contact", max_length=150, blank=True)
+    contact_telephone = models.CharField("Tél. contact", max_length=30, blank=True)
+    contact_email     = models.EmailField("Email contact", blank=True)
+    specialites       = models.TextField("Types de produits fournis", blank=True)
+    conditions_paiement = models.CharField(max_length=200, blank=True)
+    delai_livraison_moyen = models.PositiveIntegerField("Délai livraison moyen (j)", null=True, blank=True)
+    actif             = models.BooleanField(default=True)
+    notes             = models.TextField(blank=True)
+    date_creation     = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self): return self.nom
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            annee = timezone.now().year
+            prefixe = f'FRN{annee}'
+            dernier = Fournisseur.objects.filter(code__startswith=prefixe).order_by('-code').first()
+            seq = (int(dernier.code[-4:]) + 1) if dernier else 1
+            self.code = f'{prefixe}{seq:04d}'
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Fournisseur"
+        ordering = ['nom']
+
+
 class Produit(models.Model):
     TYPE_CHOICES = [
         ('medicament',  'Médicament'),
@@ -56,7 +93,7 @@ class Produit(models.Model):
     type      = models.CharField(max_length=20, choices=TYPE_CHOICES, default='medicament')
     categorie = models.ForeignKey(CategorieStock, on_delete=models.SET_NULL, null=True, blank=True)
     fournisseur_principal = models.ForeignKey(
-        'achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True
+        Fournisseur, on_delete=models.SET_NULL, null=True, blank=True
     )
     description  = models.TextField(blank=True)
     unite_mesure = models.ForeignKey(
@@ -167,7 +204,7 @@ class LotProduit(models.Model):
     date_peremption   = models.DateField(null=True, blank=True)
     quantite_initiale = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     quantite_actuelle = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    fournisseur       = models.ForeignKey('achats.Fournisseur', on_delete=models.SET_NULL, null=True, blank=True)
+    fournisseur       = models.ForeignKey(Fournisseur, on_delete=models.SET_NULL, null=True, blank=True)
     date_reception    = models.DateField(default=timezone.now)
     prix_achat_lot    = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     notes             = models.TextField(blank=True)
@@ -248,7 +285,7 @@ class CommandeStock(models.Model):
         ('annule',    'Annulée'),
     ]
     numero        = models.CharField(max_length=20, unique=True, blank=True)
-    fournisseur   = models.ForeignKey('achats.Fournisseur', on_delete=models.PROTECT, related_name='commandes_stock')
+    fournisseur   = models.ForeignKey(Fournisseur, on_delete=models.PROTECT, related_name='commandes_stock')
     statut        = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon')
     date_commande = models.DateField(default=timezone.now)
     date_livraison_prevue = models.DateField(null=True, blank=True)

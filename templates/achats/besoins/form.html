@@ -70,7 +70,7 @@ html[data-theme="dark"] .btn-add-ligne { background:var(--surface-muted); border
           <table class="lignes-table" id="lignes-table">
             <thead>
               <tr>
-                <th style="width:35%;">Produit du catalogue</th>
+                <th style="width:35%;">Article du catalogue</th>
                 <th style="width:25%;">Désignation libre (si hors catalogue)</th>
                 <th style="width:12%;">Quantité</th>
                 <th style="width:12%;">Unité</th>
@@ -83,10 +83,10 @@ html[data-theme="dark"] .btn-add-ligne { background:var(--surface-muted); border
               {% for l in lignes %}
               <tr class="ligne-row">
                 <td>
-                  <select name="produit_id">
+                  <select name="article_id">
                     <option value="">— Hors catalogue —</option>
-                    {% for p in produits %}
-                    <option value="{{ p.pk }}" {% if l.produit_id == p.pk %}selected{% endif %}>{{ p.nom }} ({{ p.code }})</option>
+                    {% for a in articles %}
+                    <option value="{{ a.pk }}" {% if l.article_id == a.pk %}selected{% endif %}>{{ a.nom }} ({{ a.code }})</option>
                     {% endfor %}
                   </select>
                 </td>
@@ -99,7 +99,7 @@ html[data-theme="dark"] .btn-add-ligne { background:var(--surface-muted); border
               {% endfor %}
             {% else %}
               <tr class="ligne-row">
-                <td><select name="produit_id"><option value="">— Hors catalogue —</option>{% for p in produits %}<option value="{{ p.pk }}">{{ p.nom }} ({{ p.code }})</option>{% endfor %}</select></td>
+                <td><select name="article_id"><option value="">— Hors catalogue —</option>{% for a in articles %}<option value="{{ a.pk }}">{{ a.nom }} ({{ a.code }})</option>{% endfor %}</select></td>
                 <td><input type="text" name="designation" placeholder="Désignation libre…"></td>
                 <td><input type="number" name="quantite" step="1" min="1" required></td>
                 <td><input type="text" name="unite" value="unité"></td>
@@ -126,14 +126,14 @@ html[data-theme="dark"] .btn-add-ligne { background:var(--surface-muted); border
 </div>
 
 <script>
-var produitsOptions = `{% for p in produits %}<option value="{{ p.pk }}">{{ p.nom }} ({{ p.code }})</option>{% endfor %}`;
+var articlesOptions = `{% for a in articles %}<option value="{{ a.pk }}">{{ a.nom }} ({{ a.code }})</option>{% endfor %}`;
 
 function addLigne() {
   var tbody = document.getElementById('lignes-body');
   var row = document.createElement('tr');
   row.className = 'ligne-row';
   row.innerHTML = `
-    <td><select name="produit_id"><option value="">— Hors catalogue —</option>${produitsOptions}</select></td>
+    <td><select name="article_id"><option value="">— Hors catalogue —</option>${articlesOptions}</select></td>
     <td><input type="text" name="designation" placeholder="Désignation libre…"></td>
     <td><input type="number" name="quantite" step="1" min="1" required></td>
     <td><input type="text" name="unite" value="unité"></td>

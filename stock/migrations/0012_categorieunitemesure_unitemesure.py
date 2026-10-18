@@ -6,6 +6,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('stock', '0011_fiche_besoins_pharmacie_optional'),
+        # Dépendance manquante à l'origine : le RunSQL ci-dessous renomme
+        # services_categorieunitemesure / services_unitemesure, qui doivent
+        # donc déjà exister — créées par cette migration services. Sans ça,
+        # l'ordre ne tenait que par chance (une construction de base neuve,
+        # via `migrate` ou `test`, pouvait placer stock avant services et
+        # échouer sur « no such table »).
+        ('services', '0001_initial'),
     ]
 
     operations = [

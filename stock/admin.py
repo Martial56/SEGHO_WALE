@@ -1,11 +1,18 @@
 from django.contrib import admin
 from .models import (
-    CategorieStock, Produit,
+    CategorieStock, Produit, Fournisseur,
     LotProduit, MouvementStock, CommandeStock, LigneCommande,
     Inventaire, LigneInventaire,
     DemandePharmacie, LigneDemande,
     FicheBesoins, LigneFicheBesoins,
 )
+
+
+@admin.register(Fournisseur)
+class StockFournisseurAdmin(admin.ModelAdmin):
+    list_display  = ['code', 'nom', 'telephone', 'email', 'ville', 'actif']
+    search_fields = ['nom', 'code', 'email']
+    list_filter   = ['actif', 'pays']
 
 
 @admin.register(CategorieStock)

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import (
-    Fournisseur, BesoinAchat, LigneBesoin,
+    Fournisseur, Article, BesoinAchat, LigneBesoin,
     Proforma, LigneProforma,
     CommandeAchat, LigneCommandeAchat,
     ReceptionAchat, LigneReceptionAchat,
@@ -14,10 +14,17 @@ class FournisseurAdmin(admin.ModelAdmin):
     list_filter   = ['actif', 'pays']
 
 
+@admin.register(Article)
+class ArticleAdmin(admin.ModelAdmin):
+    list_display  = ['code', 'nom', 'type', 'actif']
+    search_fields = ['nom', 'code']
+    list_filter   = ['type', 'actif']
+
+
 class LigneBesoinInline(admin.TabularInline):
     model = LigneBesoin
     extra = 0
-    fields = ['produit', 'designation', 'quantite', 'unite', 'notes']
+    fields = ['article', 'designation', 'quantite', 'unite', 'notes']
 
 
 @admin.register(BesoinAchat)

@@ -52,6 +52,31 @@ class Fournisseur(models.Model):
         ordering = ['nom']
 
 
+class Article(models.Model):
+    """Catalogue d'articles propre aux Achats — indépendant du catalogue
+    Produit du module Stock : chaque module gère ses propres articles."""
+    TYPE_CHOICES = [
+        ('medicament',  'Médicament'),
+        ('consommable', 'Consommable médical'),
+        ('equipement',  'Équipement & matériel'),
+    ]
+    code   = models.CharField(max_length=20, unique=True, blank=True)
+    nom    = models.CharField(max_length=200)
+    type   = models.CharField(max_length=20, choices=TYPE_CHOICES, default='medicament')
+    actif  = models.BooleanField(default=True)
+
+    def __str__(self): return self.nom
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            self.code = _numero_auto(Article, 'ART', field='code')
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = "Article"
+        ordering = ['type', 'nom']
+
+
 class BesoinAchat(models.Model):
     STATUT_CHOICES = [
         ('brouillon',  'Brouillon'),
@@ -64,10 +89,6 @@ class BesoinAchat(models.Model):
     titre                = models.CharField(max_length=200)
     date_besoin_souhaite = models.DateField("Date de livraison souhaitée", null=True, blank=True)
     statut               = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon')
-    fiche_besoins        = models.ForeignKey(
-        'stock.FicheBesoins', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='besoins_achats', verbose_name="Fiche de besoins liée"
-    )
     notes                = models.TextField(blank=True)
     cree_par             = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='besoins_achats_crees')
     date_creation        = models.DateTimeField(auto_now_add=True)
@@ -88,7 +109,7 @@ class BesoinAchat(models.Model):
 
 class LigneBesoin(models.Model):
     besoin      = models.ForeignKey(BesoinAchat, on_delete=models.CASCADE, related_name='lignes')
-    produit     = models.ForeignKey('stock.Produit', on_delete=models.PROTECT, null=True, blank=True)
+    article     = models.ForeignKey(Article, on_delete=models.PROTECT, null=True, blank=True)
     designation = models.CharField("Désignation libre", max_length=250, blank=True)
     quantite    = models.DecimalField(max_digits=12, decimal_places=2)
     unite       = models.CharField(max_length=50, default='unité')
@@ -96,8 +117,8 @@ class LigneBesoin(models.Model):
 
     @property
     def libelle(self):
-        if self.produit:
-            return self.produit.nom
+        if self.article:
+            return self.article.nom
         return self.designation
 
     def __str__(self): return f"{self.libelle} × {self.quantite}"
@@ -224,9 +245,6 @@ class ReceptionAchat(models.Model):
     statut             = models.CharField(max_length=20, choices=STATUT_CHOICES, default='conforme')
     notes              = models.TextField(blank=True)
     receptionne_par    = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='receptions_achats')
-    integre_en_stock   = models.BooleanField("Intégré en stock", default=False)
-    date_integration   = models.DateTimeField("Date d'intégration stock", null=True, blank=True)
-    integre_par        = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='receptions_integrees')
     date_creation      = models.DateTimeField(auto_now_add=True)
 
     def __str__(self): return f"Réception {self.numero} — {self.commande.numero}"
