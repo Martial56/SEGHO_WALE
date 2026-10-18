@@ -465,15 +465,14 @@ def commande_create(request):
     produits     = Produit.objects.filter(actif=True).order_by('nom')
     if request.method == 'POST':
         frn_pk = request.POST.get('fournisseur', '')
-        fournisseur = Fournisseur.objects.filter(pk=frn_pk).first()
-        if fournisseur:
-            cmd = CommandeStock.objects.create(
-                fournisseur=fournisseur,
-                notes=request.POST.get('notes', '').strip(),
-                cree_par=request.user,
-            )
-            messages.success(request, f'Commande {cmd.numero} créée.')
-            return redirect('stock_commande_detail', pk=cmd.pk)
+        fournisseur = Fournisseur.objects.filter(pk=frn_pk).first() if frn_pk else None
+        cmd = CommandeStock.objects.create(
+            fournisseur=fournisseur,
+            notes=request.POST.get('notes', '').strip(),
+            cree_par=request.user,
+        )
+        messages.success(request, f'Commande {cmd.numero} créée.')
+        return redirect('stock_commande_detail', pk=cmd.pk)
     return render(request, 'stock/commandes/form.html', {
         'fournisseurs': fournisseurs,
         'produits':     produits,
@@ -921,7 +920,8 @@ def commande_envoyer(request, pk):
         return redirect('stock_commande_detail', pk=pk)
     commande.statut = 'envoye'
     commande.save(update_fields=['statut'])
-    messages.success(request, f'Commande {commande.numero} envoyée au fournisseur {commande.fournisseur.nom}.')
+    cible = f' au fournisseur {commande.fournisseur.nom}' if commande.fournisseur else ''
+    messages.success(request, f'Commande {commande.numero} envoyée{cible}.')
     return redirect('stock_commande_detail', pk=pk)
 
 
@@ -937,9 +937,7 @@ def commande_modifier(request, pk):
     errors = {}
     if request.method == 'POST':
         frn_pk = request.POST.get('fournisseur', '')
-        fournisseur = Fournisseur.objects.filter(pk=frn_pk).first()
-        if not fournisseur:
-            errors['fournisseur'] = 'Sélectionnez un fournisseur.'
+        fournisseur = Fournisseur.objects.filter(pk=frn_pk).first() if frn_pk else None
         if not errors:
             commande.fournisseur = fournisseur
             commande.notes = request.POST.get('notes', '').strip()

@@ -285,7 +285,7 @@ class CommandeStock(models.Model):
         ('annule',    'Annulée'),
     ]
     numero        = models.CharField(max_length=20, unique=True, blank=True)
-    fournisseur   = models.ForeignKey(Fournisseur, on_delete=models.PROTECT, related_name='commandes_stock')
+    fournisseur   = models.ForeignKey(Fournisseur, on_delete=models.PROTECT, related_name='commandes_stock', null=True, blank=True)
     statut        = models.CharField(max_length=20, choices=STATUT_CHOICES, default='brouillon')
     date_commande = models.DateField(default=timezone.now)
     date_livraison_prevue = models.DateField(null=True, blank=True)
