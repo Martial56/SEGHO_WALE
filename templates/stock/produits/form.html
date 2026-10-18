@@ -242,6 +242,20 @@ html[data-theme="dark"] .modal-categorie-box { background:var(--st-surface)!impo
           <span style="font-size:12px;color:var(--st-muted);">Stock actuel</span>
           <span style="font-size:20px;font-weight:800;color:{% if produit.en_rupture %}var(--rose-text){% elif produit.en_alerte %}var(--amber-text){% else %}var(--st-600){% endif %};">{{ produit.stock_actuel|floatformat:0 }} {{ produit.unite_mesure.nom }}</span>
         </div>
+        {% else %}
+        <div class="st-grid-2" style="margin-bottom:16px;">
+          <div class="st-field">
+            <label class="st-label" for="numero_lot">N° de lot <span style="font-weight:400;color:var(--st-muted);">(si ce produit existe déjà en stock)</span></label>
+            <input type="text" name="numero_lot" id="numero_lot" class="st-input{% if errors.numero_lot %} error{% endif %}" placeholder="Ex : LOT-2026-001"
+              value="{% if post %}{{ post.numero_lot }}{% endif %}">
+            {% if errors.numero_lot %}<div class="st-error">{{ errors.numero_lot }}</div>{% endif %}
+          </div>
+          <div class="st-field">
+            <label class="st-label" for="quantite_initiale">Quantité initiale</label>
+            <input type="number" name="quantite_initiale" id="quantite_initiale" class="st-input" min="0" step="1"
+              value="{% if post %}{{ post.quantite_initiale }}{% endif %}">
+          </div>
+        </div>
         {% endif %}
         <div class="st-grid-2">
           <div class="st-field">

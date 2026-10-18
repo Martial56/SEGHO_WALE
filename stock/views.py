@@ -232,12 +232,15 @@ def produit_create(request):
         type_ = request.POST.get('type', 'medicament')
         cat_pk = request.POST.get('categorie', '')
         um_pk = request.POST.get('unite_mesure', '')
+        numero_lot = request.POST.get('numero_lot', '').strip()
         if not nom:
             errors['nom'] = 'Le nom est obligatoire.'
         if not cat_pk:
             errors['categorie'] = 'La catégorie est obligatoire.'
         if not um_pk:
             errors['unite_mesure'] = "L'unité de mesure est obligatoire."
+        if numero_lot and LotProduit.objects.filter(numero_lot=numero_lot).exists():
+            errors['numero_lot'] = f'Le numéro de lot « {numero_lot} » existe déjà.'
         if not errors:
             p = Produit(
                 nom=nom, type=type_,
@@ -268,6 +271,24 @@ def produit_create(request):
                 errors.update({k: ' '.join(v) for k, v in e.message_dict.items()})
             else:
                 p.save()
+                try:
+                    quantite_initiale = float(request.POST.get('quantite_initiale', '') or 0)
+                except ValueError:
+                    quantite_initiale = 0
+                if numero_lot and quantite_initiale > 0:
+                    LotProduit.objects.create(
+                        produit=p, numero_lot=numero_lot,
+                        quantite_initiale=quantite_initiale, quantite_actuelle=quantite_initiale,
+                        fournisseur=p.fournisseur_principal, prix_achat_lot=p.prix_achat,
+                    )
+                    p.stock_actuel = quantite_initiale
+                    p.save(update_fields=['stock_actuel'])
+                    MouvementStock.objects.create(
+                        produit=p, type='entree', motif='autre',
+                        quantite=quantite_initiale, stock_avant=0, stock_apres=quantite_initiale,
+                        reference=numero_lot, notes='Stock initial déclaré à la création du produit',
+                        cree_par=request.user,
+                    )
                 messages.success(request, f'Produit « {p.nom} » créé (code : {p.code}).')
                 return redirect('stock_produit_detail', pk=p.pk)
 
