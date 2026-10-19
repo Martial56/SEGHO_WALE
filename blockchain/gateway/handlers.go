@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -58,6 +59,13 @@ func (s *Server) handleEvenements(w http.ResponseWriter, r *http.Request) {
 
 	var req requeteEvenement
 	if err := readJSON(r, &req); err != nil {
+		writeErreur(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Contrôles de conformité (liste blanche, pseudonymisation, empreinte)
+	// avant tout appel à Fabric.
+	if err := validerRequeteEvenement(&req); err != nil {
 		writeErreur(w, http.StatusBadRequest, err)
 		return
 	}
@@ -170,6 +178,10 @@ func (s *Server) handleConsentements(w http.ResponseWriter, r *http.Request) {
 			writeErreur(w, http.StatusBadRequest, err)
 			return
 		}
+		if err := validerCodePatient(req.CodePatient, true); err != nil {
+			writeErreur(w, http.StatusBadRequest, err)
+			return
+		}
 		porteeJSON, err := json.Marshal(req.Portee)
 		if err != nil {
 			writeErreur(w, http.StatusBadRequest, err)
@@ -195,6 +207,10 @@ func (s *Server) handleConsentements(w http.ResponseWriter, r *http.Request) {
 		dateReference := r.URL.Query().Get("dateReference")
 		if codePatient == "" || dateReference == "" {
 			writeErreur(w, http.StatusBadRequest, errors.New("les paramètres codePatient et dateReference sont obligatoires"))
+			return
+		}
+		if err := validerCodePatient(codePatient, true); err != nil {
+			writeErreur(w, http.StatusBadRequest, err)
 			return
 		}
 		resultat, err := s.fabric.Consentement.EvaluateTransaction("ConsentementsActifsPourPatient", codePatient, dateReference)
@@ -258,6 +274,10 @@ func (s *Server) handleTransferts(w http.ResponseWriter, r *http.Request) {
 			writeErreur(w, http.StatusBadRequest, err)
 			return
 		}
+		if err := validerCodePatient(req.CodePatient, true); err != nil {
+			writeErreur(w, http.StatusBadRequest, err)
+			return
+		}
 		_, err := s.fabric.Transfert.SubmitTransaction(
 			"InitierTransfert",
 			req.IDTransfert, req.CodePatient, req.CentreOrigine, req.CentreDestination, req.EmpreinteResume, req.DateInitiation,
@@ -277,6 +297,10 @@ func (s *Server) handleTransferts(w http.ResponseWriter, r *http.Request) {
 		codePatient := r.URL.Query().Get("codePatient")
 		if codePatient == "" {
 			writeErreur(w, http.StatusBadRequest, errors.New("le paramètre codePatient est obligatoire"))
+			return
+		}
+		if err := validerCodePatient(codePatient, true); err != nil {
+			writeErreur(w, http.StatusBadRequest, err)
 			return
 		}
 		resultat, err := s.fabric.Transfert.EvaluateTransaction("TransfertsParPatient", codePatient)
@@ -341,7 +365,7 @@ func (s *Server) handleTransfertParID(w http.ResponseWriter, r *http.Request) {
 
 func readJSON(r *http.Request, dest interface{}) error {
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
+	decoder := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(dest)
 }

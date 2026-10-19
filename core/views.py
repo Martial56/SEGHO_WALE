@@ -2001,113 +2001,40 @@ def get_logs(instance):
     return LogActivite.objects.filter(content_type=ct, object_id=instance.pk)
 @login_required(login_url='login')
 def kpi_dashboard(request):
-    import json as _json
-    from patients.models import Patient, RendezVous
-    from consultations.models import Consultation
-    from hospitalisation.models import Hospitalisation
-    from core.context_processors import _medicaments_alerte_count
-    from laboratoire.models import AnalyseLaboratoire
-    from employer.models import Employe
-    from soins.models import Soin
-    from medecins.models import Medecin
+    """Tableau de bord annuel, calqué sur la feuille Excel « Tableau de bord »
+    des DONNÉES WALÉ (voir core/kpi_annuel.py).
 
-    today = timezone.now().date()
+    Le total des cartes suit la période du bandeau (jour, semaine, mois ou
+    année, choisis dans des listes déroulantes) ; les trimestres T1 à T4 et
+    les graphiques mensuels détaillent l'année choisie."""
+    from core.kpi_annuel import (MOIS_LABELS, annees_disponibles, calculer_kpi_annuels,
+                                 calculer_totaux_periode, resoudre_periode)
 
-    # Période sélectionnée
-    period = request.GET.get('period', 'jour')
-    if period not in ('jour', 'semaine', 'mois', 'tout'):
-        period = 'jour'
+    today = timezone.localdate()
+    annees = annees_disponibles(today.year)
+    periode = resoudre_periode(request.GET, today, annees)
+    annee = periode['annee']
 
-    if period == 'jour':
-        date_from = today
-        period_label = f"Aujourd'hui — {today.strftime('%d/%m/%Y')}"
-    elif period == 'semaine':
-        date_from = today - timedelta(days=today.weekday())
-        period_label = f"Cette semaine — du {date_from.strftime('%d/%m')} au {today.strftime('%d/%m/%Y')}"
-    elif period == 'mois':
-        date_from = today.replace(day=1)
-        period_label = f"Ce mois — {today.strftime('%B %Y')}"
-    else:  # tout
-        from datetime import date as _date
-        date_from = _date(2000, 1, 1)
-        period_label = "Jusqu'à maintenant"
-
-    date_to = today
-
-    stats = {
-        'patients_total': Patient.objects.count(),
-        'patients_periode': Patient.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
-        'consultations_periode': Consultation.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
-        'rdv_periode': RendezVous.objects.filter(date_heure__date__range=[date_from, date_to]).count(),
-        'hospitalisations': Hospitalisation.objects.filter(statut='hospitalise').count(),
-        'analyses_pending': AnalyseLaboratoire.objects.filter(statut__in=['recu', 'en_analyse']).count(),
-        'medicaments_alerte': _medicaments_alerte_count(),
-        'employes_actifs': Employe.objects.filter(statut='actif').count(),
-        'soins_periode': Soin.objects.filter(date_creation__date__range=[date_from, date_to]).count(),
-        'medecins_actifs': Medecin.objects.filter(actif=True).count(),
-        'medecins_total': Medecin.objects.count(),
+    kpi = calculer_kpi_annuels(annee)
+    chart_data = {
+        'labels': [f'{m} {str(annee)[2:]}' for m in MOIS_LABELS],
+        'mg': {k: kpi['mg'][k] for k in ('adultes', 'enfants', 'mois')},
+        'mg_sexe': kpi['mg']['sexe'],
+        'cardio': kpi['cardio']['mois'],
+        'cpn': kpi['cpn']['mois'],
+        'gyn': kpi['gyn']['mois'],
+        'soins': kpi['soins']['mois'],
+        'mo': kpi['mo']['mois'],
+        'labo': {k: kpi['labo'][k] for k in ('internes', 'externes', 'mois')},
     }
 
-    try:
-        from facturation.models import Facture
-        from django.db.models import Sum
-        fq = Facture.objects.filter(statut__in=['brouillon', 'emise'])
-        stats['factures_impayees_count'] = fq.count()
-        m = fq.aggregate(t=Sum('montant_total'))['t'] or 0
-        if m >= 1_000_000:
-            stats['factures_montant_fmt'] = f"{m/1_000_000:.1f}M F"
-        elif m >= 1_000:
-            stats['factures_montant_fmt'] = f"{int(m/1_000)}k F"
-        else:
-            stats['factures_montant_fmt'] = f"{int(m)} F"
-    except Exception:
-        stats['factures_impayees_count'] = 0
-        stats['factures_montant_fmt'] = "0 F"
-
-    stats['patients_anniversaires'] = Patient.objects.filter(
-        date_naissance__month=today.month, date_naissance__day=today.day
-    ).count()
-    stats['employes_anniversaires'] = Employe.objects.filter(
-        date_naissance__month=today.month, date_naissance__day=today.day
-    ).count()
-
-    chart_labels, chart_patients, chart_rdv = [], [], []
-    current_monday = today - timedelta(days=today.weekday())
-    for i in range(7, -1, -1):
-        w_start = current_monday - timedelta(weeks=i)
-        w_end = w_start + timedelta(days=6)
-        chart_labels.append(w_start.strftime('%d/%m'))
-        chart_patients.append(Patient.objects.filter(date_creation__date__range=[w_start, w_end]).count())
-        chart_rdv.append(RendezVous.objects.filter(date_heure__date__range=[w_start, w_end]).count())
-
-    chart_data = _json.dumps({'labels': chart_labels, 'patients': chart_patients, 'rdv': chart_rdv})
-
-    rdv_auj = RendezVous.objects.filter(
-        date_heure__date__range=[date_from, date_to],
-        statut__in=['planifie', 'confirme', 'en_attente', 'en_consultation']
-    ).select_related('patient', 'medecin').order_by('date_heure')[:15]
-
-    last_cons = Consultation.objects.select_related('patient', 'medecin').order_by('-date_heure')[:6]
-
-    try:
-        from modules_permissions.models import get_user_modules
-        user_modules = get_user_modules(request.user)
-        accessible_codes = set(user_modules.values_list('code', flat=True))
-    except Exception:
-        user_modules = []
-        accessible_codes = set()
-
     return render(request, 'core/kpi_dashboard.html', {
-        'stats': stats,
-        'rdv_auj': rdv_auj,
-        'last_cons': last_cons,
-        'today': today,
-        'user': request.user,
-        'user_modules': user_modules,
-        'accessible_codes': accessible_codes,
+        'kpi': kpi,
+        'totaux': calculer_totaux_periode(periode['debut'], periode['fin']),
+        'annee': annee,
+        'annees': annees,
+        'periode': periode,
         'chart_data': chart_data,
-        'period': period,
-        'period_label': period_label,
     })
 
 
