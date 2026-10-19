@@ -10,7 +10,7 @@ from django.core.paginator import Paginator
 import datetime
 
 from .models import (
-    StockPharmacie, MouvementPharmacie,
+    StockPharmacie, MouvementPharmacie, LotPharmacie,
     DispensationOrdonnance, LigneDispensation, PHARMACIES_WALE, PHARMACIE_CENTRE_CODE,
     VentePharmacie, LigneVente,
     InventairePharmacie, LigneInventairePharmacie,
@@ -38,15 +38,98 @@ def can_manage_pharmacie(user):
     return user.has_perm('pharmacie.gerer_stock_pharmacie')
 
 
-def _stock_entierement_perime(produit):
-    """True si le produit est suivi par lots mais qu'aucun n'est à la fois en
-    stock et non périmé — sert à bloquer une vente/dispensation sur un stock
-    100% périmé au lieu de se fier au seul badge visuel informatif. Un
-    produit non suivi par lots (aucun LotProduit) n'est jamais bloqué ici."""
-    lots = list(produit.lots.all())
+def _stock_entierement_perime(produit, pharmacie):
+    """True si le produit est suivi par lots DANS CETTE PHARMACIE mais
+    qu'aucun n'est à la fois en stock et non périmé — sert à bloquer une
+    vente/dispensation sur un stock 100% périmé au lieu de se fier au seul
+    badge visuel informatif. Un produit non suivi par lots (aucun
+    LotPharmacie — ex. stock initial importé sans détail de lot, ou retour
+    manuel) n'est jamais bloqué ici.
+
+    Regarde bien les lots de la pharmacie (LotPharmacie), pas ceux du stock
+    central (stock.LotProduit) : un lot central peut périmer après avoir été
+    entièrement expédié vers les pharmacies (faux blocage), ou le central
+    peut recevoir un lot frais du même produit pendant qu'un vieux lot
+    périmé est encore en rayon ici (vente autorisée à tort)."""
+    lots = list(LotPharmacie.objects.filter(produit=produit, pharmacie=pharmacie))
     if not lots:
         return False
     return not any(l.quantite_actuelle > 0 and not l.est_perime for l in lots)
+
+
+def _decrementer_lots_pharmacie(produit, pharmacie, qte):
+    """Décrémente les lots d'une pharmacie en FEFO (lots non périmés les plus
+    proches de la péremption d'abord, repli sur les lots périmés si les
+    lots valides ne couvrent pas toute la quantité — même logique que la
+    dotation côté stock central). À appeler dans une transaction, après
+    verrouillage de la ligne StockPharmacie correspondante."""
+    qte_restante = float(qte)
+    today = timezone.now().date()
+    lots = list(
+        LotPharmacie.objects.select_for_update()
+        .filter(produit=produit, pharmacie=pharmacie, quantite_actuelle__gt=0)
+        .order_by('date_peremption')
+    )
+    valides = [l for l in lots if not l.date_peremption or l.date_peremption >= today]
+    perimes = [l for l in lots if l.date_peremption and l.date_peremption < today]
+    for lot in valides + perimes:
+        if qte_restante <= 0:
+            break
+        pris = min(float(lot.quantite_actuelle), qte_restante)
+        lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - pris)
+        lot.save(update_fields=['quantite_actuelle'])
+        qte_restante -= pris
+
+
+def _incrementer_lot_pharmacie(produit, pharmacie, qte, numero_lot, date_peremption=None):
+    """Crée ou incrémente un lot de pharmacie. Utilisé pour les mouvements
+    sans lot d'origine précis (retour, annulation de vente, excédent
+    d'inventaire) — `numero_lot` identifie alors un lot « générique » sans
+    date de péremption connue, jamais bloqué par `_stock_entierement_perime`,
+    plutôt que de laisser le total StockPharmacie se désynchroniser de la
+    somme des lots."""
+    lot, created = LotPharmacie.objects.select_for_update().get_or_create(
+        pharmacie=pharmacie, produit=produit, numero_lot=numero_lot,
+        defaults={'quantite_actuelle': qte, 'date_peremption': date_peremption},
+    )
+    if not created:
+        lot.quantite_actuelle = float(lot.quantite_actuelle) + float(qte)
+        lot.save(update_fields=['quantite_actuelle'])
+
+
+def _lignes_ordonnances_payees(pharmacie, date_debut, date_fin):
+    """Lignes de facture issues d'une ordonnance dispensée par cette
+    pharmacie et réglées dans la période, attribuées au jour où la facture a
+    été intégralement payée (date du dernier paiement enregistré dessus).
+
+    `pharmacie_dispenser` exige que la facture soit déjà au statut « payée »
+    avant toute dispensation — jamais de paiement partiel à proratiser ici."""
+    from django.db.models import Max
+
+    from facturation.models import LigneFacture
+
+    ordonnances_ids = DispensationOrdonnance.objects.filter(
+        pharmacie=pharmacie
+    ).values_list('ordonnance_id', flat=True)
+
+    return LigneFacture.objects.filter(
+        ligne_ordonnance__ordonnance_id__in=ordonnances_ids,
+        facture__statut='payee',
+    ).select_related('facture', 'produit').annotate(
+        date_reglement=Max('facture__paiements__date_paiement')
+    ).filter(date_reglement__date__range=(date_debut, date_fin))
+
+
+def _recette_ordonnances(pharmacie, date_debut, date_fin):
+    """Total payé des lignes de facture issues d'une ordonnance dispensée par
+    cette pharmacie dans la période (voir `_lignes_ordonnances_payees`).
+
+    Sans ce calcul, la « Recette » ne comptait que les ventes au comptoir :
+    la part prescrite sur ordonnance, pourtant bien réglée en caisse,
+    disparaissait des rapports financiers de la pharmacie."""
+    from decimal import Decimal
+    lignes = _lignes_ordonnances_payees(pharmacie, date_debut, date_fin)
+    return sum((l.montant_ligne for l in lignes), Decimal('0'))
 
 
 def _centre_de_pharmacie(pharmacie):
@@ -71,7 +154,10 @@ def peut_acceder_pharmacie(request, pharmacie):
         return True
     centre = _centre_de_pharmacie(pharmacie)
     if centre is None:
-        return True
+        # Rattachement centre introuvable (code Centre renommé/supprimé) :
+        # on refuse plutôt que d'ouvrir l'accès en grand — le cloisonnement
+        # par site est une protection de sécurité, pas un simple confort.
+        return False
     return getattr(request, 'centre', None) == centre
 
 
@@ -91,7 +177,8 @@ def _ordonnances_du_centre(pharmacie):
     from consultations.models import Ordonnance
     centre = _centre_de_pharmacie(pharmacie)
     if centre is None:
-        return Ordonnance.objects.all()
+        # Même logique de repli fermé que peut_acceder_pharmacie ci-dessus.
+        return Ordonnance.objects.none()
     return Ordonnance.objects.filter(
         Q(consultation__patient__centre=centre) | Q(patient__centre=centre)
     )
@@ -142,8 +229,10 @@ def pharmacie_dashboard(request, pharmacie):
     ca_data = VentePharmacie.objects.filter(
         pharmacie=pharmacie, date_vente__gte=month_start,
     ).aggregate(ca=Sum('montant_net'), nb=Count('id'))
-    ca_mois = ca_data['ca'] or 0
+    ca_comptoir_mois = ca_data['ca'] or 0
     nb_ventes_mois = ca_data['nb'] or 0
+    ca_ordonnances_mois = _recette_ordonnances(pharmacie, month_start, today)
+    ca_mois = ca_comptoir_mois + ca_ordonnances_mois
 
     ventes_par_mode = list(VentePharmacie.objects.filter(
         pharmacie=pharmacie, date_vente__gte=month_start,
@@ -177,6 +266,8 @@ def pharmacie_dashboard(request, pharmacie):
         'stats':               stats,
         'can_view_finances':   can_view_rapport_financier(request.user),
         'ca_mois':             ca_mois,
+        'ca_comptoir_mois':    ca_comptoir_mois,
+        'ca_ordonnances_mois': ca_ordonnances_mois,
         'nb_ventes_mois':      nb_ventes_mois,
         'ventes_par_mode':     ventes_par_mode,
         'top_produits':        top_produits,
@@ -193,7 +284,7 @@ def pharmacie_stock(request, pharmacie):
     get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
 
-    qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie').prefetch_related('produit__lots')
+    qs          = StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit', 'produit__categorie')
     q           = request.GET.get('q', '').strip()
     statut      = request.GET.get('statut', '')
     type_filtre = request.GET.get('type', '')
@@ -212,6 +303,14 @@ def pharmacie_stock(request, pharmacie):
     qs = qs.order_by('produit__type', 'produit__nom')
     paginator = Paginator(qs, 30)
     page_obj  = paginator.get_page(request.GET.get('page'))
+
+    lots_par_produit = {}
+    for lot in LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=[it.produit_id for it in page_obj], quantite_actuelle__gt=0
+    ):
+        lots_par_produit.setdefault(lot.produit_id, []).append(lot)
+    for item in page_obj:
+        item.lots_disponibles = lots_par_produit.get(item.produit_id, [])
 
     stats = StockPharmacie.objects.filter(pharmacie=pharmacie).aggregate(
         total=Count('id'),
@@ -338,6 +437,7 @@ def pharmacie_import_stock_initial(request, pharmacie):
                 )
                 sp.quantite = apres
                 sp.save(update_fields=['quantite'])
+                _incrementer_lot_pharmacie(produit, pharmacie, quantite, numero_lot='STOCK-INITIAL')
                 importes += 1
 
         if importes:
@@ -660,7 +760,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
                     qte = 0
                 qte = 0 if ailleurs else max(0, min(qte, item['quantite']))
 
-                if qte > 0 and item['produit'] and _stock_entierement_perime(item['produit']):
+                if qte > 0 and item['produit'] and _stock_entierement_perime(item['produit'], pharmacie):
                     # Le stock affiché n'est en réalité couvert par aucun lot
                     # non périmé : on refuse de le dispenser malgré la saisie.
                     alertes_peremption.append(item['produit'].nom)
@@ -695,6 +795,7 @@ def pharmacie_dispenser(request, pharmacie, pk):
                     )
                     sp.quantite = apres
                     sp.save(update_fields=['quantite'])
+                    _decrementer_lots_pharmacie(sp.produit, pharmacie, qte)
 
             dispensation.statut = statut_global
             dispensation.save(update_fields=['statut'])
@@ -800,6 +901,33 @@ def pharmacie_livraisons(request, pharmacie):
     })
 
 
+def _repartir_reception_lots(produit, pharmacie, demande, qte_recue):
+    """Retrouve, pour cette ligne de dotation, les lots centraux exacts
+    utilisés (tracés dans MouvementStock lors de dotation_valider, en FEFO —
+    voir stock/views.py:dotation_valider) et les reflète dans LotPharmacie au
+    prorata de ce qui est réellement reçu. Une réception partielle ne couvre
+    alors que le début de la liste, dans le même ordre FEFO que l'expédition.
+    Sans ce rattachement, la pharmacie recevrait une quantité sans savoir de
+    quel lot/péremption elle provient."""
+    from stock.models import MouvementStock
+    mouvements = MouvementStock.objects.filter(
+        produit=produit, reference=demande.numero, type='livraison',
+    ).select_related('lot').order_by('pk')
+    restante = qte_recue
+    for mvt in mouvements:
+        if restante <= 0:
+            break
+        pris = min(float(mvt.quantite), restante)
+        if mvt.lot_id:
+            _incrementer_lot_pharmacie(
+                produit, pharmacie, pris,
+                numero_lot=mvt.lot.numero_lot, date_peremption=mvt.lot.date_peremption,
+            )
+        else:
+            _incrementer_lot_pharmacie(produit, pharmacie, pris, numero_lot=f'SANS-LOT-{demande.numero}')
+        restante -= pris
+
+
 @login_required(login_url='login')
 def pharmacie_confirmer_livraison(request, pharmacie, pk):
     """La pharmacie confirme la réception d'une livraison → met à jour son stock."""
@@ -858,6 +986,7 @@ def pharmacie_confirmer_livraison(request, pharmacie, pk):
                     )
                     sp.quantite = apres
                     sp.save(update_fields=['quantite'])
+                    _repartir_reception_lots(ligne.produit, pharmacie, demande, qte_recue)
 
             demande_verrou.statut = 'approuvee' if tout_recu else 'partielle'
             demande_verrou.save(update_fields=['statut'])
@@ -961,7 +1090,7 @@ def pharmacie_caisse(request, pharmacie):
                             f'supérieure au stock disponible ({sp_frais.quantite}).'
                         )
                         continue
-                    if _stock_entierement_perime(sp_frais.produit):
+                    if _stock_entierement_perime(sp_frais.produit, pharmacie):
                         erreurs.append(f'{sp_frais.produit.nom} : stock restant entièrement périmé.')
                         continue
                     lignes_validees.append((sp_frais, qte))
@@ -992,6 +1121,7 @@ def pharmacie_caisse(request, pharmacie):
                             reference=vente.numero, cree_par=request.user,
                         ))
                         sp.quantite = Decimal(str(apres))
+                        _decrementer_lots_pharmacie(sp.produit, pharmacie, qte)
 
                     # LigneVente.save() calcule `montant` — bulk_create ne
                     # passe pas par save(), on le pré-calcule ici.
@@ -1012,11 +1142,16 @@ def pharmacie_caisse(request, pharmacie):
                 messages.success(request, f'Vente {vente.numero} enregistrée — {vente.montant_net} F CFA.')
                 return redirect('pharmacie_ticket', pharmacie=pharmacie, pk=vente.pk)
 
-    # Tous les lots avec du stock restant pour chaque produit, du plus proche
-    # au plus lointain (LotProduit.Meta.ordering = ['date_peremption']).
+    # Tous les lots de CETTE pharmacie avec du stock restant, du plus proche
+    # au plus lointain (LotPharmacie.Meta.ordering = ['date_peremption']).
     stock_items = list(qs)
+    lots_par_produit = {}
+    for lot in LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=[it.produit_id for it in stock_items], quantite_actuelle__gt=0
+    ):
+        lots_par_produit.setdefault(lot.produit_id, []).append(lot)
     for item in stock_items:
-        item.lots_disponibles = [l for l in item.produit.lots.all() if l.quantite_actuelle > 0]
+        item.lots_disponibles = lots_par_produit.get(item.produit_id, [])
 
     return render(request, 'pharmacie/caisse.html', {
         'pharmacie': pharmacie, 'label': label,
@@ -1086,6 +1221,10 @@ def pharmacie_annuler_vente(request, pharmacie, pk):
             ))
             sp.quantite = Decimal(str(apres))
             sp_a_maj.append(sp)
+            _incrementer_lot_pharmacie(
+                ligne.produit, pharmacie, ligne.quantite,
+                numero_lot=f'ANNULATION-{vente_verrou.numero}',
+            )
 
         if mouvements:
             MouvementPharmacie.objects.bulk_create(mouvements)
@@ -1132,6 +1271,10 @@ def pharmacie_recette(request, pharmacie):
             stats[k] = Decimal('0')
     if stats['nb'] is None:
         stats['nb'] = 0
+
+    stats['comptoir'] = stats['total']
+    stats['ordonnances'] = _recette_ordonnances(pharmacie, selected_date, selected_date)
+    stats['total'] = stats['comptoir'] + stats['ordonnances']
 
     return render(request, 'pharmacie/recette.html', {
         'pharmacie': pharmacie, 'label': label,
@@ -1190,7 +1333,23 @@ def pharmacie_rapport_journalier(request, pharmacie):
             recap_produits[pid]['qte_totale']   += ligne.quantite
             recap_produits[pid]['montant_total'] += ligne.montant
 
+    lignes_ord = list(_lignes_ordonnances_payees(pharmacie, selected_date, selected_date))
+    for ligne in lignes_ord:
+        pid = ligne.produit_id
+        if pid not in recap_produits:
+            recap_produits[pid] = {
+                'produit': ligne.produit,
+                'qte_totale': Decimal('0'),
+                'montant_total': Decimal('0'),
+            }
+        recap_produits[pid]['qte_totale']    += ligne.quantite
+        recap_produits[pid]['montant_total'] += ligne.montant_ligne
+
     recap_list = sorted(recap_produits.values(), key=lambda x: x['montant_total'], reverse=True)
+
+    stats['comptoir'] = stats['total']
+    stats['ordonnances'] = sum((l.montant_ligne for l in lignes_ord), Decimal('0'))
+    stats['total'] = stats['comptoir'] + stats['ordonnances']
 
     return render(request, 'pharmacie/rapport_journalier.html', {
         'pharmacie':     pharmacie,
@@ -1287,15 +1446,14 @@ def pharmacie_peremptions(request, pharmacie):
     q = request.GET.get('q', '').strip()
     produit_id = request.GET.get('produit_id', '').strip()
 
-    from stock.models import LotProduit
-    lots = LotProduit.objects.filter(
-        produit_id__in=produits_ids,
+    lots = LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=produits_ids,
         date_peremption__lte=today + timedelta(days=90),
         quantite_actuelle__gt=0,
     ).select_related('produit').order_by('date_peremption')
 
-    produits = LotProduit.objects.filter(
-        produit_id__in=produits_ids,
+    produits = LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=produits_ids,
         quantite_actuelle__gt=0
     ).select_related('produit').order_by('produit__nom').values_list('produit_id', 'produit__nom').distinct()
 
@@ -1391,6 +1549,7 @@ def pharmacie_retours(request, pharmacie):
             )
             sp.quantite = Decimal(str(apres))
             sp.save(update_fields=['quantite'])
+            _incrementer_lot_pharmacie(sp.produit, pharmacie, qte, numero_lot='RETOUR')
         messages.success(request, f'Retour de {qte} {sp.produit.unite_mesure.nom if sp.produit.unite_mesure else ""} de « {sp.produit.nom} » enregistré.')
         return redirect('pharmacie_retours', pharmacie=pharmacie)
 
@@ -1413,56 +1572,6 @@ def pharmacie_inventaire_list(request, pharmacie):
     })
 
 
-def _maj_lots_inventaire(request, stock_items, inv):
-    """Applique les corrections de n° de lot / date de péremption saisies
-    dans le formulaire d'inventaire (champs lot_num_<pk> / lot_per_<pk>).
-    Seuls les lots affichés (lots_disponibles) sont modifiables. Chaque
-    correction est tracée dans les notes du lot. Retourne (nb_modifiés,
-    [motifs de refus])."""
-    from datetime import datetime as _dt
-    modifies, refuses = 0, []
-    for sp in stock_items:
-        tous_lots = list(sp.produit.lots.all())
-        for lot in sp.lots_disponibles:
-            num_key, per_key = f'lot_num_{lot.pk}', f'lot_per_{lot.pk}'
-            if num_key not in request.POST and per_key not in request.POST:
-                continue
-            nouveau_num = request.POST.get(num_key, lot.numero_lot).strip() or lot.numero_lot
-            per_str = request.POST.get(per_key, '').strip()
-            if per_str:
-                try:
-                    nouvelle_per = _dt.strptime(per_str, '%Y-%m-%d').date()
-                except ValueError:
-                    refuses.append(f'{sp.produit.nom} — date invalide « {per_str} »')
-                    continue
-            else:
-                nouvelle_per = None
-
-            if nouveau_num == lot.numero_lot and nouvelle_per == lot.date_peremption:
-                continue
-            if nouveau_num != lot.numero_lot and any(
-                l.pk != lot.pk and l.numero_lot.lower() == nouveau_num.lower() for l in tous_lots
-            ):
-                refuses.append(f'{sp.produit.nom} — le lot « {nouveau_num} » existe déjà')
-                continue
-
-            changements = []
-            if nouveau_num != lot.numero_lot:
-                changements.append(f'n° {lot.numero_lot} → {nouveau_num}')
-            if nouvelle_per != lot.date_peremption:
-                avant = lot.date_peremption.strftime('%d/%m/%Y') if lot.date_peremption else '—'
-                apres = nouvelle_per.strftime('%d/%m/%Y') if nouvelle_per else '—'
-                changements.append(f'péremption {avant} → {apres}')
-            trace = (f"[{timezone.localdate():%d/%m/%Y}] Correction inventaire {inv.numero} "
-                     f"par {request.user.get_username()} : {', '.join(changements)}")
-            lot.numero_lot = nouveau_num
-            lot.date_peremption = nouvelle_per
-            lot.notes = f'{lot.notes}\n{trace}'.strip()
-            lot.save(update_fields=['numero_lot', 'date_peremption', 'notes'])
-            modifies += 1
-    return modifies, refuses
-
-
 @login_required(login_url='login')
 def pharmacie_inventaire_nouveau(request, pharmacie):
     from decimal import Decimal
@@ -1473,11 +1582,16 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
 
     stock_items = StockPharmacie.objects.filter(
         pharmacie=pharmacie
-    ).select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom')
+    ).select_related('produit').order_by('produit__type', 'produit__nom')
 
     stock_items = list(stock_items)
+    lots_par_produit = {}
+    for lot in LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=[sp.produit_id for sp in stock_items], quantite_actuelle__gt=0
+    ):
+        lots_par_produit.setdefault(lot.produit_id, []).append(lot)
     for sp in stock_items:
-        sp.lots_disponibles = [l for l in sp.produit.lots.all() if l.quantite_actuelle > 0]
+        sp.lots_disponibles = lots_par_produit.get(sp.produit_id, [])
 
     if request.method == 'POST':
         date_str = request.POST.get('date_inventaire', str(timezone.now().date()))
@@ -1507,12 +1621,7 @@ def pharmacie_inventaire_nouveau(request, pharmacie):
                     notes=commentaire,
                 ))
             LigneInventairePharmacie.objects.bulk_create(lignes_inv)
-            lots_modifies, lots_refuses = _maj_lots_inventaire(request, stock_items, inv)
         messages.success(request, f'Inventaire {inv.numero} créé.')
-        if lots_modifies:
-            messages.info(request, f'{lots_modifies} lot(s) corrigé(s) (n° de lot / date de péremption).')
-        if lots_refuses:
-            messages.warning(request, 'Lot(s) non modifié(s) : ' + ' ; '.join(lots_refuses))
         return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
 
     return render(request, 'pharmacie/inventaire_form.html', {
@@ -1574,6 +1683,13 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
                     ))
                     sp.quantite = Decimal(str(apres))
                     sp_a_maj.append(sp)
+                    if ecart > 0:
+                        _incrementer_lot_pharmacie(
+                            ligne.produit, pharmacie, ecart,
+                            numero_lot=f'INVENTAIRE-{inv.numero}',
+                        )
+                    elif ecart < 0:
+                        _decrementer_lots_pharmacie(ligne.produit, pharmacie, -ecart)
 
                 if mouvements:
                     MouvementPharmacie.objects.bulk_create(mouvements)
@@ -1587,7 +1703,7 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
             return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
         else:
             messages.success(request, 'Quantités enregistrées.')
-        lignes = list(inv.lignes.select_related('produit').prefetch_related('produit__lots').order_by('produit__type', 'produit__nom'))
+        lignes = list(inv.lignes.select_related('produit').order_by('produit__type', 'produit__nom'))
 
     stats = {
         'total': len(lignes),
@@ -1596,8 +1712,13 @@ def pharmacie_inventaire_detail(request, pharmacie, pk):
         'excedents': sum(1 for l in lignes if l.ecart > 0),
     }
 
+    lots_par_produit = {}
+    for lot in LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=[l.produit_id for l in lignes], quantite_actuelle__gt=0
+    ):
+        lots_par_produit.setdefault(lot.produit_id, []).append(lot)
     for ligne in lignes:
-        ligne.lots_disponibles = [l for l in ligne.produit.lots.all() if l.quantite_actuelle > 0]
+        ligne.lots_disponibles = lots_par_produit.get(ligne.produit_id, [])
 
     return render(request, 'pharmacie/inventaire_detail.html', {
         'pharmacie': pharmacie, 'label': label,
@@ -1659,14 +1780,21 @@ def pharmacie_rapport_mensuel(request, pharmacie):
         ).annotate(mois=TruncMonth('date')).values('mois').annotate(nb=Count('id'))
     }
 
+    import calendar
+
     ventes_mois = []
     disp_mois = []
     for mo in mois_list:
         cle = mo.strftime('%Y-%m')
         agg = ventes_par_mois.get(cle)
+        comptoir = float(agg['total'] or 0) if agg else 0.0
+        fin_mois = mo.replace(day=calendar.monthrange(mo.year, mo.month)[1])
+        ordonnances = float(_recette_ordonnances(pharmacie, mo, fin_mois))
         ventes_mois.append({
             'label': mo.strftime('%b %Y'),
-            'total': float(agg['total'] or 0) if agg else 0.0,
+            'comptoir': comptoir,
+            'ordonnances': ordonnances,
+            'total': comptoir + ordonnances,
             'nb': (agg['nb'] if agg else 0) or 0,
         })
         disp = disp_par_mois.get(cle)
@@ -1688,6 +1816,8 @@ def pharmacie_rapport_mensuel(request, pharmacie):
         'ventes_mois': ventes_mois, 'disp_mois': disp_mois,
         'top_produits': top_produits,
         'total_annee': sum(m['total'] for m in ventes_mois),
+        'total_comptoir_annee': sum(m['comptoir'] for m in ventes_mois),
+        'total_ordonnances_annee': sum(m['ordonnances'] for m in ventes_mois),
         'total_disp': sum(m['nb'] for m in disp_mois),
         'chart_labels': [m['label'] for m in ventes_mois],
         'chart_ventes': [m['total'] for m in ventes_mois],
@@ -1734,6 +1864,11 @@ def pharmacie_rapport_dispensation(request, pharmacie):
 @login_required(login_url='login')
 def pharmacie_comparaison(request, pharmacie):
     get_pharmacie_or_404(request, pharmacie)
+    # Affiche systématiquement le stock des DEUX pharmacies : le contrôle
+    # d'accès à une seule (ci-dessus) ne suffit pas, il faut être autorisé à
+    # voir l'ensemble — même exigence que les rapports financiers transverses.
+    if not request.user.is_superuser and not can_view_rapport_financier(request.user):
+        raise PermissionDenied("Vous n'avez pas accès à la comparaison entre pharmacies.")
     label = PHARMACIES_DICT[pharmacie]
 
     all_produits = Produit.objects.filter(actif=True).order_by('type', 'nom')

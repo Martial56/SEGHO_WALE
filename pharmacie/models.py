@@ -66,6 +66,45 @@ class StockPharmacie(models.Model):
         ordering = ['pharmacie', 'produit__nom']
 
 
+class LotPharmacie(models.Model):
+    """Lot physiquement présent dans une pharmacie — contrepartie, côté
+    pharmacie, de stock.LotProduit (le lot du stock central).
+
+    Sans ce suivi, StockPharmacie.quantite n'est qu'un total par produit sans
+    aucune notion de lot : le contrôle de péremption au comptoir ne pouvait
+    regarder que les lots du stock central, pas ce qui est réellement sur
+    l'étagère de CETTE pharmacie — un lot central peut périmer après avoir
+    été entièrement expédié (faux blocage), ou au contraire le central peut
+    recevoir un lot frais pendant qu'un vieux lot périmé traîne encore en
+    rayon (vente autorisée à tort). `numero_lot` conserve son identité même
+    si le lot central correspondant change par la suite.
+    """
+    pharmacie         = models.CharField(max_length=30, choices=PHARMACIES_WALE)
+    produit           = models.ForeignKey('stock.Produit', on_delete=models.CASCADE, related_name='lots_pharmacie')
+    numero_lot        = models.CharField(max_length=50)
+    date_peremption   = models.DateField(null=True, blank=True)
+    quantite_actuelle = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    date_reception    = models.DateField(default=timezone.now)
+
+    @property
+    def est_perime(self):
+        return bool(self.date_peremption and self.date_peremption < timezone.now().date())
+
+    @property
+    def jours_restants(self):
+        if not self.date_peremption:
+            return None
+        return (self.date_peremption - timezone.now().date()).days
+
+    def __str__(self): return f"{self.produit.nom} — Lot {self.numero_lot} ({self.get_pharmacie_display()})"
+
+    class Meta:
+        verbose_name = "Lot (pharmacie)"
+        verbose_name_plural = "Lots (pharmacie)"
+        unique_together = ('pharmacie', 'produit', 'numero_lot')
+        ordering = ['date_peremption']
+
+
 class MouvementPharmacie(models.Model):
     """Traçabilité des mouvements internes à chaque pharmacie."""
     TYPE_CHOICES = [
