@@ -3,12 +3,14 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
 const docTypeEvenementIntegrite = "evenementIntegrite"
 const indexTypeEntiteIDEntite = "typeEntite~idEntite~idEvenement"
+const indexCodeCentreIDEvenement = "codeCentre~idEvenement"
 
 // IntegriteContract ancre l'empreinte des enregistrements médicaux et
 // administratifs gérés hors chaîne, afin d'en garantir l'intégrité et la
@@ -20,6 +22,9 @@ type IntegriteContract struct {
 // EnregistrerEvenement ancre une nouvelle empreinte. Le registre est
 // append-only : aucune fonction de mise à jour ou de suppression n'est
 // exposée, un idEvenement déjà utilisé est refusé.
+//
+// Le paramètre horodatage est la date de l'acte déclarée par l'application ;
+// la date d'ancrage qui fait foi est lue dans la transaction Fabric.
 func (c *IntegriteContract) EnregistrerEvenement(
 	ctx contractapi.TransactionContextInterface,
 	idEvenement string,
@@ -34,6 +39,25 @@ func (c *IntegriteContract) EnregistrerEvenement(
 	if idEvenement == "" || typeEntite == "" || idEntite == "" || empreinteHash == "" {
 		return fmt.Errorf("idEvenement, typeEntite, idEntite et empreinteHash sont obligatoires")
 	}
+	if err := validerEmpreinte("empreinteHash", empreinteHash); err != nil {
+		return err
+	}
+	if err := validerCodePatient(codePatient, false); err != nil {
+		return err
+	}
+	if err := validerCodeCentre(codeCentre); err != nil {
+		return err
+	}
+
+	var metadonnees map[string]string
+	if metadonneesJSON != "" {
+		if err := json.Unmarshal([]byte(metadonneesJSON), &metadonnees); err != nil {
+			return fmt.Errorf("metadonneesJSON invalide: %w", err)
+		}
+	}
+	if err := validerMetadonnees(metadonnees); err != nil {
+		return err
+	}
 
 	existing, err := ctx.GetStub().GetState(idEvenement)
 	if err != nil {
@@ -43,31 +67,30 @@ func (c *IntegriteContract) EnregistrerEvenement(
 		return fmt.Errorf("un événement %s est déjà enregistré, le registre est immuable", idEvenement)
 	}
 
-	var metadonnees map[string]string
-	if metadonneesJSON != "" {
-		if err := json.Unmarshal([]byte(metadonneesJSON), &metadonnees); err != nil {
-			return fmt.Errorf("metadonneesJSON invalide: %w", err)
-		}
-	}
-
 	orgEmettrice, err := ctx.GetClientIdentity().GetMSPID()
 	if err != nil {
 		return fmt.Errorf("échec de lecture de l'identité de l'appelant: %w", err)
 	}
 
+	horodatageTransaction, err := lireHorodatageTransaction(ctx)
+	if err != nil {
+		return err
+	}
+
 	evenement := EvenementIntegrite{
-		DocType:        docTypeEvenementIntegrite,
-		IDEvenement:    idEvenement,
-		TypeEntite:     typeEntite,
-		IDEntite:       idEntite,
-		CodePatient:    codePatient,
-		CodeCentre:     codeCentre,
-		EmpreinteHash:  empreinteHash,
-		AlgorithmeHash: "SHA-256",
-		OrgEmettrice:   orgEmettrice,
-		Horodatage:     horodatage,
-		Metadonnees:    metadonnees,
-		TxIDCreation:   ctx.GetStub().GetTxID(),
+		DocType:               docTypeEvenementIntegrite,
+		IDEvenement:           idEvenement,
+		TypeEntite:            typeEntite,
+		IDEntite:              idEntite,
+		CodePatient:           codePatient,
+		CodeCentre:            codeCentre,
+		EmpreinteHash:         empreinteHash,
+		AlgorithmeHash:        "SHA-256",
+		OrgEmettrice:          orgEmettrice,
+		Horodatage:            horodatage,
+		HorodatageTransaction: horodatageTransaction,
+		Metadonnees:           metadonnees,
+		TxIDCreation:          ctx.GetStub().GetTxID(),
 	}
 
 	evenementJSON, err := json.Marshal(evenement)
@@ -87,7 +110,32 @@ func (c *IntegriteContract) EnregistrerEvenement(
 		return fmt.Errorf("échec d'écriture de l'index: %w", err)
 	}
 
+	// Index par centre : permet la recherche paginée sans requête riche
+	// CouchDB, donc compatible LevelDB et contrôlée à la validation.
+	if codeCentre != "" {
+		indexCentre, err := ctx.GetStub().CreateCompositeKey(indexCodeCentreIDEvenement, []string{codeCentre, idEvenement})
+		if err != nil {
+			return fmt.Errorf("échec de création de la clé d'index par centre: %w", err)
+		}
+		if err := ctx.GetStub().PutState(indexCentre, []byte{0x00}); err != nil {
+			return fmt.Errorf("échec d'écriture de l'index par centre: %w", err)
+		}
+	}
+
 	return ctx.GetStub().SetEvent("EvenementEnregistre", evenementJSON)
+}
+
+// lireHorodatageTransaction retourne la date de la transaction Fabric au
+// format RFC 3339 (UTC). Elle est identique chez tous les pairs approbateurs.
+func lireHorodatageTransaction(ctx contractapi.TransactionContextInterface) (string, error) {
+	ts, err := ctx.GetStub().GetTxTimestamp()
+	if err != nil {
+		return "", fmt.Errorf("échec de lecture de l'horodatage de la transaction: %w", err)
+	}
+	if ts == nil {
+		return "", fmt.Errorf("horodatage de la transaction absent")
+	}
+	return time.Unix(ts.GetSeconds(), int64(ts.GetNanos())).UTC().Format(time.RFC3339Nano), nil
 }
 
 // ConsulterEvenement retourne un événement par son identifiant.
@@ -111,8 +159,7 @@ func lireEvenement(ctx contractapi.TransactionContextInterface, idEvenement stri
 }
 
 // HistoriqueEntite retourne tous les événements ancrés pour une entité
-// donnée (ex. tous les événements de la consultation CONS20250001),
-// dans l'ordre où ils ont été enregistrés.
+// donnée (ex. tous les événements de la consultation CONS20250001).
 func (c *IntegriteContract) HistoriqueEntite(ctx contractapi.TransactionContextInterface, typeEntite string, idEntite string) ([]*EvenementIntegrite, error) {
 	iterator, err := ctx.GetStub().GetStateByPartialCompositeKey(indexTypeEntiteIDEntite, []string{typeEntite, idEntite})
 	if err != nil {
@@ -148,23 +195,37 @@ func (c *IntegriteContract) VerifierIntegrite(ctx contractapi.TransactionContext
 		return nil, err
 	}
 	return &ResultatVerification{
-		IDEvenement:       idEvenement,
-		Conforme:          evenement.EmpreinteHash == empreinteRecalculee,
-		EmpreinteAttendue: evenement.EmpreinteHash,
-		EmpreinteRecue:    empreinteRecalculee,
-		OrgEmettrice:      evenement.OrgEmettrice,
-		Horodatage:        evenement.Horodatage,
+		IDEvenement:           idEvenement,
+		Conforme:              evenement.EmpreinteHash == empreinteRecalculee,
+		EmpreinteAttendue:     evenement.EmpreinteHash,
+		EmpreinteRecue:        empreinteRecalculee,
+		OrgEmettrice:          evenement.OrgEmettrice,
+		Horodatage:            evenement.Horodatage,
+		HorodatageTransaction: evenement.HorodatageTransaction,
 	}, nil
 }
 
 // EvenementsParCentre liste, de façon paginée, les événements soumis par un
-// centre — utile à OrgVerificationFacture/OrgRegulateur pour l'audit. Nécessite une
-// base d'état CouchDB (requêtes riches).
+// centre, pour l'audit. La recherche utilise la clé composite
+// codeCentre~idEvenement : elle fonctionne avec LevelDB comme avec CouchDB.
+// Les résultats sont triés par idEvenement (ordre lexicographique).
+// Les événements ancrés avant la séquence 2 n'ont pas d'entrée dans cet index.
 func (c *IntegriteContract) EvenementsParCentre(ctx contractapi.TransactionContextInterface, codeCentre string, pageSize int32, bookmark string) (*EvenementsPage, error) {
-	selector := fmt.Sprintf(`{"selector":{"docType":"%s","codeCentre":"%s"}}`, docTypeEvenementIntegrite, codeCentre)
-	iterator, metadata, err := ctx.GetStub().GetQueryResultWithPagination(selector, pageSize, bookmark)
+	if codeCentre == "" {
+		return nil, fmt.Errorf("codeCentre est obligatoire")
+	}
+	if err := validerCodeCentre(codeCentre); err != nil {
+		return nil, err
+	}
+	if pageSize <= 0 || pageSize > 100 {
+		return nil, fmt.Errorf("pageSize doit être compris entre 1 et 100")
+	}
+
+	iterator, metadata, err := ctx.GetStub().GetStateByPartialCompositeKeyWithPagination(
+		indexCodeCentreIDEvenement, []string{codeCentre}, pageSize, bookmark,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("échec de la requête riche: %w", err)
+		return nil, fmt.Errorf("échec de la recherche par centre: %w", err)
 	}
 	defer iterator.Close()
 
@@ -174,11 +235,15 @@ func (c *IntegriteContract) EvenementsParCentre(ctx contractapi.TransactionConte
 		if err != nil {
 			return nil, fmt.Errorf("échec de parcours des résultats: %w", err)
 		}
-		var evenement EvenementIntegrite
-		if err := json.Unmarshal(result.Value, &evenement); err != nil {
-			return nil, fmt.Errorf("échec de désérialisation d'un résultat: %w", err)
+		_, parts, err := ctx.GetStub().SplitCompositeKey(result.Key)
+		if err != nil {
+			return nil, fmt.Errorf("clé d'index invalide: %w", err)
 		}
-		evenements = append(evenements, &evenement)
+		evenement, err := lireEvenement(ctx, parts[1])
+		if err != nil {
+			return nil, err
+		}
+		evenements = append(evenements, evenement)
 	}
 
 	return &EvenementsPage{

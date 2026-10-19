@@ -2,6 +2,13 @@
 // SEGHO-WALE. Aucune donnée médicale en clair n'est manipulée ici : seules
 // des empreintes (hash) et des métadonnées transitent sur le registre, les
 // dossiers complets restant dans la base applicative de chaque centre.
+//
+// Note sur les balises : fabric-contract-api-go génère un schéma JSON à
+// partir de ces structures et valide chaque réponse. Un champ est considéré
+// comme obligatoire sauf s'il porte la balise metadata:",optional" ; la
+// balise json omitempty ne suffit pas. Tout champ pouvant être absent d'un
+// enregistrement (champ facultatif, ou ajouté après coup) doit donc être
+// déclaré optionnel, sinon sa lecture échoue.
 package chaincode
 
 // Types d'entités pouvant être ancrées via IntegriteContract. La liste reste
@@ -19,22 +26,30 @@ const (
 
 // EvenementIntegrite est l'empreinte immuable d'un enregistrement géré hors
 // chaîne (base applicative d'un centre).
+//
+// Deux horodatages coexistent :
+//   - Horodatage : date de l'acte déclarée par l'application (non certifiée) ;
+//   - HorodatageTransaction : date de la transaction Fabric, signée par le
+//     client et identique chez tous les pairs approbateurs. C'est elle qui
+//     fait foi pour dater l'ancrage. Absente des événements ancrés avant la
+//     version 1.1 du chaincode.
 type EvenementIntegrite struct {
-	DocType        string            `json:"docType"`
-	IDEvenement    string            `json:"idEvenement"`
-	TypeEntite     string            `json:"typeEntite"`
-	IDEntite       string            `json:"idEntite"`
-	CodePatient    string            `json:"codePatient,omitempty"`
-	CodeCentre     string            `json:"codeCentre,omitempty"`
-	EmpreinteHash  string            `json:"empreinteHash"`
-	AlgorithmeHash string            `json:"algorithmeHash"`
-	OrgEmettrice   string            `json:"orgEmettrice"`
-	Horodatage     string            `json:"horodatage"`
-	Metadonnees    map[string]string `json:"metadonnees,omitempty"`
-	TxIDCreation   string            `json:"txIdCreation"`
+	DocType               string            `json:"docType"`
+	IDEvenement           string            `json:"idEvenement"`
+	TypeEntite            string            `json:"typeEntite"`
+	IDEntite              string            `json:"idEntite"`
+	CodePatient           string            `json:"codePatient,omitempty" metadata:",optional"`
+	CodeCentre            string            `json:"codeCentre,omitempty" metadata:",optional"`
+	EmpreinteHash         string            `json:"empreinteHash"`
+	AlgorithmeHash        string            `json:"algorithmeHash"`
+	OrgEmettrice          string            `json:"orgEmettrice"`
+	Horodatage            string            `json:"horodatage"`
+	HorodatageTransaction string            `json:"horodatageTransaction,omitempty" metadata:",optional"`
+	Metadonnees           map[string]string `json:"metadonnees,omitempty" metadata:",optional"`
+	TxIDCreation          string            `json:"txIdCreation"`
 }
 
-// EvenementsPage est le résultat paginé d'une requête riche CouchDB.
+// EvenementsPage est le résultat paginé d'une recherche par clé composite.
 type EvenementsPage struct {
 	Evenements      []*EvenementIntegrite `json:"evenements"`
 	BookmarkSuivant string                `json:"bookmarkSuivant"`
@@ -44,12 +59,13 @@ type EvenementsPage struct {
 // ResultatVerification compare l'empreinte ancrée sur la chaîne à une
 // empreinte recalculée côté applicatif à partir de l'état courant.
 type ResultatVerification struct {
-	IDEvenement       string `json:"idEvenement"`
-	Conforme          bool   `json:"conforme"`
-	EmpreinteAttendue string `json:"empreinteAttendue"`
-	EmpreinteRecue    string `json:"empreinteRecue"`
-	OrgEmettrice      string `json:"orgEmettrice"`
-	Horodatage        string `json:"horodatage"`
+	IDEvenement           string `json:"idEvenement"`
+	Conforme              bool   `json:"conforme"`
+	EmpreinteAttendue     string `json:"empreinteAttendue"`
+	EmpreinteRecue        string `json:"empreinteRecue"`
+	OrgEmettrice          string `json:"orgEmettrice"`
+	Horodatage            string `json:"horodatage"`
+	HorodatageTransaction string `json:"horodatageTransaction,omitempty" metadata:",optional"`
 }
 
 // Statuts possibles d'un Consentement.
@@ -66,14 +82,14 @@ type Consentement struct {
 	IDConsentement  string   `json:"idConsentement"`
 	CodePatient     string   `json:"codePatient"`
 	OrgBeneficiaire string   `json:"orgBeneficiaire"`
-	Portee          []string `json:"portee,omitempty"`
+	Portee          []string `json:"portee,omitempty" metadata:",optional"`
 	OrgEmettrice    string   `json:"orgEmettrice"`
 	DateOctroi      string   `json:"dateOctroi"`
-	DateExpiration  string   `json:"dateExpiration,omitempty"`
+	DateExpiration  string   `json:"dateExpiration,omitempty" metadata:",optional"`
 	Statut          string   `json:"statut"`
-	OrgRevocation   string   `json:"orgRevocation,omitempty"`
-	DateRevocation  string   `json:"dateRevocation,omitempty"`
-	MotifRevocation string   `json:"motifRevocation,omitempty"`
+	OrgRevocation   string   `json:"orgRevocation,omitempty" metadata:",optional"`
+	DateRevocation  string   `json:"dateRevocation,omitempty" metadata:",optional"`
+	MotifRevocation string   `json:"motifRevocation,omitempty" metadata:",optional"`
 	TxIDCreation    string   `json:"txIdCreation"`
 }
 
@@ -95,11 +111,11 @@ type TransfertPatient struct {
 	CentreOrigine     string `json:"centreOrigine"`
 	CentreDestination string `json:"centreDestination"`
 	EmpreinteResume   string `json:"empreinteResume"`
-	EmpreinteRecue    string `json:"empreinteRecue,omitempty"`
+	EmpreinteRecue    string `json:"empreinteRecue,omitempty" metadata:",optional"`
 	Statut            string `json:"statut"`
 	OrgInitiatrice    string `json:"orgInitiatrice"`
-	OrgConfirmatrice  string `json:"orgConfirmatrice,omitempty"`
+	OrgConfirmatrice  string `json:"orgConfirmatrice,omitempty" metadata:",optional"`
 	DateInitiation    string `json:"dateInitiation"`
-	DateConfirmation  string `json:"dateConfirmation,omitempty"`
+	DateConfirmation  string `json:"dateConfirmation,omitempty" metadata:",optional"`
 	TxIDCreation      string `json:"txIdCreation"`
 }

@@ -1,163 +1,119 @@
 # Blockchain — SEGHO-WALE
 
-Couche blockchain (Hyperledger Fabric) garantissant l'**intégrité**, la
-**traçabilité** et la **sécurité** des données médicales, et une
-**interopérabilité fiable** entre les acteurs de la prise en charge du
-patient : le centre de santé, les assureurs et le régulateur (Ministère de la
-Santé).
+Couche de preuve de SEGHO-WALE : un registre Hyperledger Fabric sur lequel
+sont ancrées les **empreintes** des enregistrements de l'application, afin de
+prouver qu'ils n'ont pas été altérés depuis leur ancrage, y compris face à un
+administrateur du système.
 
-## Principe : hash on-chain, données off-chain
+Documentation détaillée (fonctionnement, exploitation, tests) :
+[`docs/integration_blockchain.md`](../docs/integration_blockchain.md).
 
-Aucune donnée médicale en clair ne transite sur le registre partagé. Seuls
-sont ancrés : un **hash SHA-256** de l'enregistrement, son type, un
-identifiant métier (`PAT…`, `CONS…`, `FAC…`) et des métadonnées non
-sensibles (centre, horodatage). Les dossiers complets restent dans la base
-Django de chaque centre. La blockchain sert à prouver, entre organisations
-qui ne se font pas mutuellement confiance, qu'un enregistrement n'a pas été
-altéré depuis son ancrage — pas à le stocker.
+## Principe : la preuve sur le registre, la donnée dans Django
 
-## Organisations du réseau
+Le registre est **immuable** et **répliqué chez chaque organisation** du
+canal. Une donnée qui y est inscrite ne peut jamais en être effacée. Aucune
+donnée personnelle ni aucune donnée de santé n'y figure donc, pas même un
+identifiant interne :
 
-| Organisation | MSP ID | Rôle |
-|---|---|---|
-| Centre de santé (CMS WALÉ) | `CentreSanteMSP` | soumet l'essentiel des événements (dossiers patients, consultations, ordonnances, factures) |
-| VerificationFacture | `VerificationFactureMSP` | vérifie les faits liés à la facturation/remboursement sans voir le dossier médical complet |
-| Régulateur (Ministère de la Santé) | `RegulateurMSP` | audit, déclarations épidémiologiques obligatoires, registre de vaccination |
+| Champ inscrit | Contenu |
+|---|---|
+| `idEvenement` | `type:identifiant_public:vN` (exemple : `consultation:33f6…:v1`) |
+| `idEntite` | identifiant public de 32 caractères, dérivé par HMAC-SHA256 |
+| `codePatient` | pseudonyme HMAC-SHA256 de 64 caractères |
+| `empreinteHash` | SHA-256 de la représentation canonique de l'enregistrement |
+| `codeCentre` | code technique du centre (`WALE`, `TOUMBOKRO`) |
+| `metadonnees` | liste blanche : `version_schema`, `type_document`, `code_examen`, `type_message_hprim` |
+| `horodatage` / `horodatageTransaction` | date déclarée par l'application / date de la transaction Fabric |
 
-Les 3 organisations partagent un canal unique, `canal-sante` : les données
-qui y circulent n'étant que des empreintes et métadonnées, un canal unique
-suffit (pas de collection de données privées nécessaire au stade actuel).
+La clé HMAC (`BLOCKCHAIN_CLE_PSEUDONYMISATION`) n'est connue que du CMS WALE.
+La correspondance entre identifiant public et identifiant interne n'existe que
+dans la table locale `AncrageBlockchain`.
+
+## Réseau déployé
+
+| Élément | Valeur |
+|---|---|
+| Base | `fabric-samples/test-network`, Hyperledger Fabric 2.5.16 |
+| Organisations | `Org1MSP` (site principal, soumet les transactions), `Org2MSP` (contresigne) |
+| Nœuds | `peer0.org1.example.com`, `peer0.org2.example.com`, `orderer.example.com` (Raft) |
+| Canal | `seghochannel` |
+| Base d'état | LevelDB (aucune requête riche CouchDB n'est utilisée) |
+| Chaincode | `dossier-medical`, version 1.2, séquence 3 |
+| Politique d'endossement | `AND('Org1MSP.peer','Org2MSP.peer')`, déclarée explicitement |
+
+Avec cette politique, **aucune organisation ne peut inscrire seule un
+événement** : une transaction approuvée par Org1MSP seule est invalidée
+(`ENDORSEMENT_POLICY_FAILURE`).
+
+Il s'agit d'un réseau de démonstration : identités générées par `cryptogen`,
+deux organisations sur un même serveur. Le dossier `network/` contient une
+configuration à trois organisations (`canal-sante`) préparée au début du
+projet ; **elle n'est pas utilisée** par le réseau déployé.
 
 ## Structure du dossier
 
 ```
-chaincode/dossier-medical/   Chaincode Go (3 smart contracts), voir plus bas
-network/                     Configuration Fabric (configtx, crypto-config, docker-compose, scripts)
-gateway/                     Passerelle REST Go ↔ Fabric Gateway, appelée par Django
+chaincode/dossier-medical/   Chaincode Go : 3 contrats + tests unitaires (mocks)
+gateway/                     Passerelle REST Go ↔ Fabric Gateway (service blockchain-gateway)
+network/                     Configuration à 3 organisations, non utilisée (référence)
 ```
 
-## Smart contracts
+## Contrats intelligents
 
-- **`IntegriteContract`** — ancre l'empreinte de tout enregistrement
-  (`EnregistrerEvenement`), immuable (aucune mise à jour/suppression
-  exposée), interrogeable par entité (`HistoriqueEntite`) ou par centre
-  (`EvenementsParCentre`, requête riche CouchDB), et vérifiable
-  (`VerifierIntegrite` compare le hash ancré à un hash recalculé côté
-  applicatif).
-- **`ConsentementContract`** — octroi/révocation d'autorisations d'accès
-  qu'un patient (ou le centre en son nom) accorde à une autre organisation,
-  sur un périmètre et une durée donnés.
-- **`TransfertContract`** — notarise les transferts de patients entre
-  centres : le centre destinataire confirme la réception avec l'empreinte du
-  dossier reçu, comparée à celle notariée par le centre d'origine, prouvant
-  l'absence d'altération pendant le transfert.
+- **`IntegriteContract`** : `EnregistrerEvenement`, `ConsulterEvenement`,
+  `VerifierIntegrite`, `HistoriqueEntite`, `EvenementsParCentre` (pagination
+  par clé composite `codeCentre~idEvenement`). Aucune fonction de mise à jour
+  ni de suppression ; un identifiant déjà utilisé est refusé.
+- **`ConsentementContract`** : `AccorderConsentement`, `RevoquerConsentement`,
+  `ConsulterConsentement`, `ConsentementsActifsPourPatient`.
+- **`TransfertContract`** : `InitierTransfert`, `ConfirmerReception`,
+  `ConsulterTransfert`, `TransfertsParPatient`.
 
-## Portée de l'intégration Django (côté `blockchain_bridge/`)
+Le chaincode contrôle lui-même chaque écriture : empreinte SHA-256 au bon
+format, code patient pseudonymisé, code de centre technique, métadonnées en
+liste blanche. Les champs facultatifs portent la balise `metadata:",optional"`,
+indispensable pour relire les enregistrements où ils sont absents.
 
-Seul l'ancrage automatique via `IntegriteContract` est câblé sur les
-signaux `post_save` des modèles existants (Patient, Consultation, Ordonnance,
-Facture, Paiement). `ConsentementContract` et `TransfertContract` sont
-pleinement implémentés et exposés par la passerelle REST, mais pas encore
-reliés à une interface Django : les workflows métier correspondants (recueil
-de consentement patient, transfert inter-centres) n'existent pas encore dans
-l'application. Les brancher est une extension naturelle, pas une
-réinvention.
+## Passerelle REST
 
-### Cas central : l'échange HPRIM avec le laboratoire (`laboratoire/hprim/`)
-
-C'est le point d'interopérabilité inter-systèmes le plus concret du projet :
-SEGHO-WALE échange par FTP, au format HPRIM Santé v2.4, des demandes
-d'examens (ORM) et des résultats (ORU, ou une erreur ERR) avec le système du
-laboratoire externe (SYSLAM) — deux logiciels différents, deux acteurs
-différents, aucune confiance mutuelle a priori. C'est exactement le scénario
-que `IntegriteContract` sert à sécuriser, et il est câblé de bout en bout :
-
-- **`EchangeHPRIM`** (`blockchain_bridge/signals.py::ancrer_echange_hprim`) —
-  chaque message *réellement* échangé est ancré : l'envoi d'une demande une
-  fois transmise par FTP (`sens='envoi'`, `statut='transmis'`), et la
-  réception d'un résultat ou d'une erreur une fois intégrée
-  (`sens='reception'`, `statut='traite'`, que le contexte soit ORU ou ERR).
-  Les tentatives internes en échec (FTP indisponible, config absente) ne sont
-  pas ancrées : rien n'a alors franchi la frontière inter-systèmes. L'empreinte
-  porte sur le **contenu brut du message HPRIM** (`EchangeHPRIM.contenu`) —
-  exactement les octets transmis au/reçus du laboratoire, avant toute
-  interprétation côté SEGHO. Tous les événements liés à un même échange
-  partagent `type_entite='echange_hprim'`, consultables via
-  `IntegriteContract.HistoriqueEntite`.
-- **`AnalyseLaboratoire`** (`blockchain_bridge/signals.py::ancrer_analyse_laboratoire_validee`) —
-  une fois un résultat validé (`statut='valide'`), le résultat structuré
-  côté SEGHO (paramètres, valeurs, unités, interprétation) est ancré à son
-  tour. Appelé explicitement depuis
-  `laboratoire/hprim/integration.py::integrer_oru`, juste après que les
-  `ResultatAnalyse` d'une analyse ont été créées — **pas** via un signal
-  `post_save` générique sur `AnalyseLaboratoire` : au moment où son `statut`
-  passe à `valide` pendant un import HPRIM, ses résultats ne sont pas encore
-  attachés (ils le sont juste après, dans la même fonction) ; ancrer sur ce
-  seul signal aurait figé un jeu de résultats incomplet — un cas testé
-  explicitement dans `blockchain_bridge/tests.py`.
-
-Cette double empreinte donne une chaîne de traçabilité complète et vérifiable
-indépendamment à chaque étape : *demande envoyée* → *résultat brut reçu du
-labo* → *résultat validé cliniquement par SEGHO* — chacune comparable à tout
-moment à l'état courant de la base via l'action admin « Vérifier
-l'intégrité ».
-
-## Lancer le réseau (à faire par vous — Docker n'était pas disponible dans
-l'environnement où ce code a été écrit)
-
-Prérequis : Docker Desktop, Git Bash ou WSL2, les binaires Fabric
-(`cryptogen`, `configtxgen`, `peer`) sur le PATH — voir l'en-tête de
-`network/scripts/generate.sh` pour les obtenir.
+Service `systemd` `blockchain-gateway`, à l'écoute sur `127.0.0.1:8090`
+uniquement, identité `Org1MSP`. Elle applique les mêmes contrôles que le
+chaincode avant tout appel au réseau, refuse les champs inconnus et limite les
+requêtes à 1 Mo.
 
 ```bash
-cd blockchain/network
-./scripts/generate.sh      # matériel crypto + artefacts du canal
-./scripts/network.sh up
-./scripts/network.sh createChannel
-./scripts/network.sh deployCC
+curl -s http://127.0.0.1:8090/sante        # {"statut":"ok"}
 ```
 
-Puis démarrer la passerelle (côté CentreSante, celle que Django appelle) :
+## Versionnement des ancrages
+
+Chaque état distinct d'un enregistrement est ancré sous une version propre
+(`:v1`, `:v2`…). Une modification faite **par l'application** produit une
+nouvelle version : elle est donc tracée sur le registre, avec sa date et
+l'organisation émettrice. Une modification faite **hors de l'application**
+(par exemple directement en base) ne produit aucune version et est détectée
+comme une altération lors de la vérification. Voir la documentation
+détaillée, § 4.
+
+## Tests
 
 ```bash
-cd blockchain/gateway
-cp config.example.yaml config.yaml   # adapter les chemins si besoin
-go mod tidy
-go run . -config config.yaml
+# Chaincode (sans réseau, grâce aux mocks)
+cd blockchain/chaincode/dossier-medical && GOTOOLCHAIN=local go test ./chaincode/
+
+# Passerelle (sans réseau)
+cd blockchain/gateway && GOTOOLCHAIN=local go test ./...
+
+# Intégration Django
+python manage.py test blockchain_bridge
 ```
 
-Côté Django, activer l'intégration dans `.env` :
+## Règles d'exploitation
 
-```
-BLOCKCHAIN_ENABLED=True
-BLOCKCHAIN_GATEWAY_URL=http://localhost:8090
-```
-
-## Vérifier le chaincode sans Docker
-
-Les contrats sont testables unitairement sans réseau Fabric, via des
-doubles de test (`chaincode/dossier-medical/chaincode/mocks`) :
-
-```bash
-cd blockchain/chaincode/dossier-medical
-go mod tidy   # nécessite un accès internet la première fois
-go build ./...
-go vet ./...
-go test ./...
-```
-
-Ce code a été écrit et relu manuellement, mais **non compilé** dans
-l'environnement de développement de cette session (ni Docker, ni accès
-internet pour récupérer les modules Go Hyperledger n'y étaient disponibles).
-`go build`/`go test` ci-dessus doivent être la première chose lancée avant
-tout déploiement.
-
-## Évolutions possibles
-
-- Passer de `cryptogen` à une Fabric CA par organisation pour un
-  provisionnement d'identités plus réaliste.
-- Orderer etcdraft à 3 nœuds (au lieu d'1) pour la tolérance aux pannes.
-- Collections de données privées si des métadonnées elles-mêmes devenaient
-  sensibles (aujourd'hui, seuls des hash y transitent).
-- Brancher `ConsentementContract`/`TransfertContract` à des vues Django
-  dédiées une fois ces workflows métier définis.
+- **Ne jamais lancer `./network.sh down`** : cette commande détruit le
+  registre, le canal et les certificats.
+- Toute modification du chaincode se déploie avec une **nouvelle séquence**
+  (`-ccv` et `-ccs` incrémentés) et la politique explicite
+  `-ccep "AND('Org1MSP.peer','Org2MSP.peer')"`.
+- `BLOCKCHAIN_ENABLED` reste à `False` en production tant que l'activation n'a
+  pas été décidée.
