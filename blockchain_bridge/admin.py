@@ -6,9 +6,9 @@ from .services import verifier_integrite
 
 @admin.register(AncrageBlockchain)
 class AncrageBlockchainAdmin(admin.ModelAdmin):
-    list_display = ('id_evenement', 'type_entite', 'id_entite', 'code_patient', 'code_centre', 'statut', 'date_creation')
+    list_display = ('id_entite', 'type_entite', 'version', 'code_patient', 'code_centre', 'statut', 'date_creation')
     list_filter = ('type_entite', 'statut', 'code_centre')
-    search_fields = ('id_entite', 'code_patient', 'tx_id')
+    search_fields = ('id_entite', 'id_evenement', 'code_patient', 'tx_id')
     readonly_fields = [f.name for f in AncrageBlockchain._meta.fields]
     actions = ['verifier_integrite_action']
 
@@ -34,7 +34,14 @@ class AncrageBlockchainAdmin(admin.ModelAdmin):
                     level=messages.WARNING,
                 )
             elif resultat.get('conforme'):
-                self.message_user(request, f'{ancrage.id_evenement} : intégrité confirmée.', level=messages.SUCCESS)
+                version = resultat.get('version_verifiee', ancrage.version)
+                remarque = f" ({resultat['remarque']})" if resultat.get('remarque') else ''
+                self.message_user(
+                    request,
+                    f'{ancrage.get_type_entite_display()} {ancrage.id_entite} : intégrité confirmée '
+                    f'au regard de la version {version}{remarque}.',
+                    level=messages.SUCCESS,
+                )
             else:
                 self.message_user(
                     request,
