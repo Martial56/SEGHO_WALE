@@ -586,8 +586,17 @@ function togglePresent(empId, isPresent) {
   // Recalcule le nombre de lignes par page si la fenêtre est redimensionnée
   // (rotation tablette, fenêtre restaurée/agrandie) — sinon la pagination
   // reste figée sur la hauteur disponible au premier chargement.
+  //
+  // Ne réagit qu'à un changement de LARGEUR : sur mobile/tablette, faire
+  // défiler la page montre ou cache la barre d'adresse du navigateur, ce qui
+  // déclenche un `resize` (la hauteur visible change) à chaque scroll. Réagir
+  // à ce resize-là reconstruisait la pagination en boucle — la page "sautait"
+  // sans arrêt pendant le défilement.
   var resizeTimer = null;
+  var lastWidth = window.innerWidth;
   window.addEventListener('resize', function () {
+    if (window.innerWidth === lastWidth) return;
+    lastWidth = window.innerWidth;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
       pageSize = computePageSize();
