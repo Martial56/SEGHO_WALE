@@ -1947,7 +1947,7 @@ def kpi_dashboard(request):
     année, choisis dans des listes déroulantes) ; les trimestres T1 à T4 et
     les graphiques mensuels détaillent l'année choisie."""
     from core.kpi_annuel import (MOIS_LABELS, annees_disponibles, calculer_kpi_annuels,
-                                 calculer_totaux_periode, resoudre_periode)
+                                 calculer_totaux_periode, calendrier, resoudre_periode)
 
     today = timezone.localdate()
     annees = annees_disponibles(today.year)
@@ -1967,14 +1967,23 @@ def kpi_dashboard(request):
         'labo': {k: kpi['labo'][k] for k in ('internes', 'externes', 'mois')},
     }
 
-    return render(request, 'core/kpi_dashboard.html', {
+    contexte = {
         'kpi': kpi,
         'totaux': calculer_totaux_periode(periode['debut'], periode['fin']),
         'annee': annee,
         'annees': annees,
         'periode': periode,
         'chart_data': chart_data,
-    })
+        # Les listes déroulantes de toutes les années : l'écran les redessine
+        # lui-même quand on change d'année ou de mois, sans rien demander.
+        'calendrier': calendrier(annees, today),
+    }
+    # Changement de période : la page redemande ce seul fragment et le
+    # remplace sur place, au lieu de se recharger entière. Même contexte, même
+    # rendu — l'écran complet n'est qu'une page qui contient ce fragment.
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'core/includes/kpi_vue.html', contexte)
+    return render(request, 'core/kpi_dashboard.html', contexte)
 
 
 # ══════════════════════════════════════════════

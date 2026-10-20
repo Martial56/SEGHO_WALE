@@ -588,6 +588,23 @@
             .hist-aside { width: 100%; margin-left: 0; margin-top: 14px; position: static; max-height: none; }
         }
 
+        /* ── Logo de chargement posé sur un écran déjà rempli ──
+           Le fond plein du premier chargement cacherait des chiffres qu'on
+           vient de regarder. Ici on les laisse voir derrière un flou : on
+           comprend tout de suite qu'ils sont en train d'être remplacés, et
+           non que la page est partie.
+
+           `!important` parce que #page-loader porte son fond plein en style
+           en ligne, qui l'emporterait sinon sur cette feuille. */
+        #page-loader.loader-flou {
+            background: rgba(255,255,255,0.35) !important;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        html[data-theme="dark"] #page-loader.loader-flou {
+            background: rgba(0,0,0,0.30) !important;
+        }
+
         /* ═══════════════════════════════════════
            RESPONSIVE
         ═══════════════════════════════════════ */
@@ -1759,24 +1776,40 @@
     {% block extra_js %}{% endblock %}
 
     <script>
-    window.addEventListener('load', function() {
-      var loader = document.getElementById('page-loader');
-      if (loader) {
-        loader.style.opacity = '0';
-        setTimeout(function(){ loader.style.display = 'none'; }, 420);
-      }
-    });
-    // Réaffiche le loader global avec un message, avant une action bloquante
-    // (ex: soumission de formulaire) qui va recharger/naviguer la page.
-    window.showPageLoader = function(message) {
+    // Le logo de chargement, posé par le gabarit au-dessus de la page.
+    //
+    // Il s'efface quand la page a fini de charger, et se rallume avant une
+    // action bloquante qui va naviguer — une soumission de formulaire, par
+    // exemple. Les écrans qui renouvellent leurs données sans recharger la
+    // page s'en servent aussi : `showPageLoader` puis `hidePageLoader`, pour
+    // que l'attente ait la même tête partout.
+    var minuterieLoader = null;
+
+    // `flou` : le fond plein cache tout, ce qui est juste au premier
+    // chargement — il n'y a rien derrière. Quand l'écran est déjà là et qu'on
+    // ne renouvelle que ses chiffres, on le laisse voir, simplement flouté.
+    window.showPageLoader = function(message, flou) {
       var loader = document.getElementById('page-loader');
       var text = document.getElementById('page-loader-text');
       if (text) text.textContent = message || '';
-      if (loader) {
-        loader.style.display = 'flex';
-        loader.style.opacity = '1';
-      }
+      if (!loader) return;
+      loader.classList.toggle('loader-flou', !!flou);
+      // Une extinction encore en cours effacerait ce qu'on vient d'allumer.
+      clearTimeout(minuterieLoader);
+      loader.style.display = 'flex';
+      loader.style.opacity = '1';
     };
+
+    window.hidePageLoader = function() {
+      var loader = document.getElementById('page-loader');
+      if (!loader) return;
+      loader.style.opacity = '0';
+      clearTimeout(minuterieLoader);
+      // `display:none` seulement après le fondu, sinon il disparaît d'un coup.
+      minuterieLoader = setTimeout(function(){ loader.style.display = 'none'; }, 420);
+    };
+
+    window.addEventListener('load', function() { window.hidePageLoader(); });
     </script>
     <script>
     // ── Panneau notifications ──────────────────────────────────────────────────
