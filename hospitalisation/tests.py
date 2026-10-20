@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.contrib.auth.models import Permission, User
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1620,3 +1620,74 @@ class TestLaFicheCompteCommeLeRapport(TestCase):
         html = self._html()
         self.assertIn('id="dur-entree"', html)
         self.assertIn('data-heure-entree=""', html)
+
+
+class TestLeBoutonSauvegarderEstLaATousLesStatuts(TestCase):
+    """Un dossier déchargé se corrige encore — il faut pouvoir l'enregistrer.
+
+    Le bouton ne se posait qu'aux statuts Brouillon, Confirmé et Hospitalisé.
+    Passé la décharge, l'écran gardait une trentaine de champs saisissables,
+    la vue acceptait toujours le POST, mais plus rien à l'écran ne permettait
+    d'enregistrer : on modifiait une heure d'observation et le geste se
+    perdait. Seul « Annulé » s'en passe, et il le dit par son bandeau.
+    """
+
+    def setUp(self):
+        self.patient = _patient('Svg')
+        self.medecin = _medecin('Svg')
+        self.agent = _compte('u_svg', 'view_hospitalisation', 'change_hospitalisation')
+        self.patron = User.objects.create_superuser('su_svg', password='x')
+
+    def _bouton(self, statut, user):
+        """La balise du bouton Sauvegarder, ou None s'il n'est pas rendu."""
+        import re
+        hosp = _hosp(self.patient, self.medecin, statut=statut)
+        client = Client()
+        client.force_login(user)
+        reponse = client.get(reverse('hospitalisation:edit', args=[hosp.pk]))
+        self.assertEqual(reponse.status_code, 200, statut)
+        return re.search(r'<button[^>]*id="btn-save-bottom"[^>]*>',
+                         reponse.content.decode())
+
+    def test_il_est_la_jusqu_a_la_decharge(self):
+        for statut in ('brouillon', 'confirme', 'hospitalise', 'decharge'):
+            with self.subTest(statut=statut):
+                self.assertIsNotNone(self._bouton(statut, self.agent))
+
+    def test_il_est_la_sur_un_dossier_cloture(self):
+        """Clôturé, le dossier n'est ouvrable que par l'admin — mais alors il
+        s'enregistre, sinon ses champs sont décoratifs."""
+        self.assertIsNotNone(self._bouton('termine', self.patron))
+
+    def test_il_n_est_pas_la_sur_un_dossier_annule(self):
+        for user in (self.agent, self.patron):
+            with self.subTest(user=user.username):
+                self.assertIsNone(self._bouton('annule', user))
+
+    def test_il_nait_eteint_et_le_detecteur_l_allume(self):
+        """Désactivé au rendu ; c'est la première saisie qui l'allume."""
+        balise = self._bouton('decharge', self.agent)
+        self.assertIn('disabled', balise.group(0))
+        hosp = _hosp(self.patient, self.medecin, statut='decharge')
+        client = Client()
+        client.force_login(self.agent)
+        html = client.get(
+            reverse('hospitalisation:edit', args=[hosp.pk])).content.decode()
+        self.assertIn("getElementById('btn-save-bottom')", html)
+        self.assertIn("form.addEventListener('input',  markDirty)", html)
+        self.assertIn('saveBtn.disabled = false', html)
+
+    def test_le_dossier_decharge_enregistre_vraiment(self):
+        """Le bouton ne serait qu'un décor si la vue refusait le POST."""
+        hosp = _hosp(self.patient, self.medecin, statut='decharge')
+        hosp.nom_parent_gardien = 'Avant'
+        hosp.save(update_fields=['nom_parent_gardien'])
+
+        client = Client()
+        client.force_login(self.agent)
+        client.post(reverse('hospitalisation:edit', args=[hosp.pk]),
+                    {'patient': self.patient.pk,
+                     'nom_parent_gardien': 'Après'}, follow=True)
+
+        hosp.refresh_from_db()
+        self.assertEqual(hosp.nom_parent_gardien, 'Après')
