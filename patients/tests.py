@@ -2213,6 +2213,14 @@ class TestLaFenetreDesDossiersRessemblants(TestCase):
         self.assertIn('window.location.assign(fiches[choisi].url)', html)
         self.assertNotIn('window.open(', html)
 
+    def test_la_pastille_de_rappel_part_vraiment_quand_elle_est_vide(self):
+        """`display:inline-flex` l'emporte sur le `display:none` que
+        l'attribut `hidden` pose depuis la feuille du navigateur. Sans la
+        règle qui le redit, la pastille restait à l'écran sur tout
+        formulaire de création : une capsule ambre vide, sous le
+        téléphone."""
+        self.assertIn('.dbl-rappel[hidden]', self._page_de_saisie())
+
     def test_le_nom_de_la_carte_peut_etre_surligne(self):
         """Le nom est devenu le titre de la carte ; la règle de surlignage
         ne visait que `.dbl-val` et ne l'atteignait plus. Rien ne se voyait :
@@ -5449,6 +5457,40 @@ class TestLesBandesSeReplientCommeAilleurs(BaseReleveFourni):
     def test_la_case_de_section_ne_replie_pas_la_bande(self):
         self.assertContains(self.lignes(grouper='raison'),
                             'onclick="event.stopPropagation();"')
+
+
+class TestLeTableauTientDansLaFenetre(BaseReleveFourni):
+    """La colonne du score se désigne par son nom, jamais par son rang.
+
+    La règle `white-space: nowrap` visait `nth-child(6)` — le score. La
+    colonne des cases à cocher, ajoutée pour la sélection multiple, a décalé
+    tout d'un cran : le `nowrap` est tombé sur la raison, dont la phrase fait
+    soixante caractères. La colonne s'étirait à 550 px, le tableau dépassait
+    la fenêtre et le bouton « Masquer le doublon » sortait par la droite.
+    """
+
+    def test_la_colonne_du_score_porte_son_nom(self):
+        html = self.lignes().content.decode()
+        self.assertIn('<th class="dbl-col-score">', html)
+        self.assertIn('<td class="dbl-col-score">', html)
+
+    def test_tout_selectionner_est_en_tete_de_la_colonne_des_cases(self):
+        """En vue tableau, la case se cherche au-dessus de celles qu'elle
+        commande. La vue en cartes n'a pas d'en-tête de colonne : elle garde
+        la sienne dans la barre, et les deux portent `data-tout-page` —
+        deux éléments ne peuvent pas partager un identifiant."""
+        html = self.lignes().content.decode()
+        # Les cases elles-mêmes, pas les sélecteurs du script qui portent le
+        # même nom.
+        self.assertEqual(html.count('type="checkbox" data-tout-page'), 2)
+        entete = html[html.index('<th class="dbl-col-coche">'):]
+        self.assertIn('data-tout-page', entete[:entete.index('</th>')])
+
+    def test_aucune_colonne_n_est_visee_par_son_rang(self):
+        """Un sélecteur positionnel se décale en silence dès qu'on ajoute une
+        colonne : il n'y a rien à voir dans le gabarit, et le défaut
+        n'apparaît qu'à l'écran, à la largeur près."""
+        self.assertNotIn('nth-child(6)', self.lignes().content.decode())
 
 
 class BaseLots(BaseReleveFourni):

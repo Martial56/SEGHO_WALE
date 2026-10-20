@@ -38,8 +38,8 @@ from .models import (ChoixFicheGardee, LotDoublons, PaireEcartee,
                      Patient)
 
 #: Quatre colonnes de cartes : vingt-cinq par page laissaient la moitié de
-#: l'écran vide, et neuf cents groupes se parcourent mieux par douze rangées.
-PAR_PAGE = 48
+#: l'écran vide, et neuf cents groupes se parcourent mieux par longues rangées.
+PAR_PAGE = 100
 
 #: Ce que l'écran côte à côte montre, dans cet ordre. Les champs techniques
 #: n'y sont pas : ils ne disent rien du patient.

@@ -161,7 +161,15 @@ Les sous-menus et les coches des menus générés : le menu « Filtres » de cet
      du partiel l'habillent sans qu'on en écrive une. Ne restent ici que les
      colonnes propres aux doublons. */
   #list-view td.dbl-col-fiches { line-height: 1.5; min-width: 230px; }
-  #list-view th:nth-child(6), #list-view td:nth-child(6) { white-space: nowrap; }
+  {% comment %}
+  Par classe et non par rang. Cette règle visait `nth-child(6)`, c'est-à-dire
+  le score — jusqu'à ce que la colonne des cases à cocher, ajoutée pour la
+  sélection multiple, décale tout d'un cran. Le `nowrap` est alors tombé sur
+  la raison, dont la phrase fait soixante caractères : la colonne s'étirait à
+  550 px, le tableau dépassait la fenêtre de quarante pixels et le bouton
+  « Masquer le doublon » sortait de l'écran par la droite.
+  {% endcomment %}
+  #list-view th.dbl-col-score, #list-view td.dbl-col-score { white-space: nowrap; }
   #list-view td.dbl-col-fiches .code { font-family: var(--font-mono); font-size: 11px;
                                        color: var(--text-muted); margin-right: 5px; }
   #list-view td.dbl-col-fiches .nom { font-weight: 500; }
@@ -227,6 +235,16 @@ Les sous-menus et les coches des menus générés : le menu « Filtres » de cet
   .dbl-col-coche { width: 34px; text-align: center; }
   .dbl-entete { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
                 padding: 12px 0 4px; font-size: 12.5px; }
+  /* En vue tableau, la case de la barre s'efface : celle de l'en-tête de
+     colonne la remplace, au-dessus des cases qu'elle commande. Sans
+     pastille de filtre, il ne reste alors rien dans la barre — elle
+     disparaît aussi, sinon son espacement laissait une bande vide entre les
+     onglets et l'en-tête du tableau. */
+  body.dbl-vue-tableau .dbl-coche-page { display: none; }
+  body.dbl-vue-tableau .dbl-entete-vide { display: none; }
+  #list-view th.dbl-col-coche input { width: 15px; height: 15px;
+                                      accent-color: var(--accent); cursor: pointer;
+                                      margin: 0; vertical-align: middle; }
   .dbl-coche-page, .dbl-coche-section { display: inline-flex; align-items: center;
                                         gap: 6px; cursor: pointer; }
   .dbl-coche-page input, .dbl-coche-section input { width: 15px; height: 15px;
@@ -443,6 +461,9 @@ chemin n'y désigne rien de stable d'une page à l'autre.
     if (!cartes || !tableau) { return; }
     cartes.style.display = (nom === 'tableau') ? 'none' : '';
     tableau.style.display = (nom === 'tableau') ? 'block' : 'none';
+    // La vue en cours est écrite sur la page : c'est ce qui efface la case
+    // « tout sélectionner » de la barre quand le tableau porte la sienne.
+    document.body.classList.toggle('dbl-vue-tableau', nom === 'tableau');
     var bc = document.getElementById('btn-cartes');
     var bt = document.getElementById('btn-tableau');
     if (bc) { bc.classList.toggle('active', nom !== 'tableau'); }
@@ -764,9 +785,15 @@ chemin n'y désigne rien de stable d'une page à l'autre.
       majBarre();
       return;
     }
-    if (cible.id === 'dbl-tout-page') {
+    // `data-tout-page` et non un identifiant : la case existe deux fois —
+    // dans la barre pour les cartes, dans l'en-tête de colonne pour le
+    // tableau — et deux éléments ne peuvent pas porter le même id.
+    if (cible.dataset && cible.dataset.toutPage !== undefined) {
       document.querySelectorAll('#dbl-cartes .dbl-coche').forEach(function (c) {
         cocher(c.value, cible.checked);
+      });
+      document.querySelectorAll('[data-tout-page]').forEach(function (c) {
+        c.checked = cible.checked;
       });
       if (!cible.checked) { toutLeFiltre = false; }
       majBarre();
@@ -787,7 +814,7 @@ chemin n'y désigne rien de stable d'une page à l'autre.
   window.dblViderSelection = function () {
     choisis.clear();
     toutLeFiltre = false;
-    document.querySelectorAll('.dbl-coche, #dbl-tout-page, [data-section]')
+    document.querySelectorAll('.dbl-coche, [data-tout-page], [data-section]')
       .forEach(function (c) { if (c.type === 'checkbox') { c.checked = false; } });
     majBarre();
   };

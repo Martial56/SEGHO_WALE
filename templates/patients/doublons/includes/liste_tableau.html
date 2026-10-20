@@ -6,13 +6,23 @@ colonnes se lisent d'un côté à l'autre comme sur la liste des patients.
 <table>
   <thead>
     <tr>
-      <th class="dbl-col-coche"></th>
+      {% comment %}
+      « Tout sélectionner sur la page » est ici en vue tableau, au-dessus de
+      la colonne des cases qu'elle commande — c'est là qu'on la cherche. La
+      vue en cartes n'a pas d'en-tête de colonne : elle garde la sienne dans
+      la barre au-dessus du relevé (entete_resultats.html). Les deux portent
+      `data-tout-page` et se suivent.
+      {% endcomment %}
+      <th class="dbl-col-coche">
+        <input type="checkbox" data-tout-page
+               aria-label="Tout sélectionner sur la page">
+      </th>
       <th>Fiches</th>
       <th>Naissance</th>
       <th>Téléphone</th>
       <th>Données rattachées</th>
       <th>Raison</th>
-      <th>Score</th>
+      <th class="dbl-col-score">Score</th>
       <th></th>
     </tr>
   </thead>
@@ -74,7 +84,7 @@ colonnes se lisent d'un côté à l'autre comme sur la liste des patients.
         {% endfor %}
       </td>
       <td class="lv-muted">{{ groupe.raisons|join:', ' }}</td>
-      <td><span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span></td>
+      <td class="dbl-col-score"><span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span></td>
       <td class="dbl-col-action">
         {% if groupe.masquable %}
         <form class="dbl-rapide" method="post"
