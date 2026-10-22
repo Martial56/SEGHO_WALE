@@ -530,6 +530,9 @@ def presence_stats(request):
     stats = []
     stats_svc_map = {}
     for emp in tous_actifs:
+        if service_sel and emp.service_id != service_sel.pk:
+            continue
+
         jouvres_emp = _jouvres_emp(emp)
         counts = par_emp.get(emp.pk, {'p': 0, 'a': 0})
         nb_p, nb_a = counts['p'], counts['a']
@@ -541,8 +544,6 @@ def presence_stats(request):
             svc_entry['total_p']    += nb_p
             svc_entry['total_poss'] += jouvres_emp
 
-        if service_sel and emp.service_id != service_sel.pk:
-            continue
         stats.append({
             'emp': emp,
             'nb_p': nb_p,
@@ -563,10 +564,19 @@ def presence_stats(request):
         for v in stats_svc_map.values()
     ), key=lambda x: x['service'].nom)
 
+    taux_moyen = round(sum(s['taux'] for s in stats) / len(stats), 1) if stats else 0
+    chart_service = {
+        'labels': [s['service'].nom for s in stats_svc],
+        'data': [s['taux'] for s in stats_svc],
+        'nb_emps': [s['nb_emps'] for s in stats_svc],
+    }
+
     py, pm, ny, nm = _nav_month(year, month)
     return render(request, 'presence/stats.html', {
         'stats': page_stats, 'stats_svc': stats_svc,
         'page_obj': page_stats,
+        'chart_service': chart_service,
+        'taux_moyen': taux_moyen,
         'year': year, 'month': month, 'mois_fr': _MOIS_FR[month],
         'jouvres': jouvres, 'jouvres_mois_total': jouvres_mois_total,
         'jouvres_restants': jouvres_restants,

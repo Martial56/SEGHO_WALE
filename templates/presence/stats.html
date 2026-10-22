@@ -1,5 +1,5 @@
 {% extends 'presence/base.html' %}
-{% load l10n %}
+{% load l10n static %}
 {% block topbar_title %}Statistiques de présence{% endblock %}
 
 {% block extra_css %}
@@ -37,29 +37,31 @@
   <div style="font-size:12px;color:var(--pr-muted);">{{ jouvres_mois_total }} jours ouvrés ce mois — {{ jouvres }} écoulés, {{ jouvres_restants }} restants</div>
 </div>
 
-<!-- Stats par service -->
-{% if stats_svc %}
-<div class="pr-card" style="margin-top:24px;">
-  <div class="pr-card-header">
-    <div class="pr-card-title"><i class="bi bi-building"></i> Taux de présence par service</div>
-  </div>
-  <div class="pr-card-body">
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      {% for s in stats_svc %}
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:160px;font-size:12.5px;font-weight:600;color:var(--pr-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{ s.service.nom }}">{{ s.service.nom }}</div>
-        <div class="bar-track h12">
-          <div class="bar-fill {% if s.taux >= 80 %}good{% elif s.taux >= 60 %}warn{% else %}bad{% endif %}"
-               data-w="{{ s.taux|unlocalize }}"></div>
-        </div>
-        <div style="font-size:13px;font-weight:700;color:var(--accent-text);width:44px;text-align:right;">{{ s.taux }}%</div>
-        <div style="font-size:11.5px;color:var(--pr-muted);width:60px;">{{ s.nb_emps }} emp.</div>
+<!-- Graphes -->
+<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;margin-top:24px;">
+  <div class="pr-card" style="margin-top:0;display:flex;flex-direction:column;">
+    <div class="pr-card-header">
+      <div class="pr-card-title"><i class="bi bi-speedometer2"></i> Taux de présence — {{ mois_fr }}</div>
+    </div>
+    <div class="pr-card-body" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 20px;">
+      <div style="font-size:48px;font-weight:800;line-height:1;color:{% if taux_moyen >= 80 %}var(--pr-500){% elif taux_moyen >= 60 %}var(--amber){% else %}var(--rose){% endif %};">{{ taux_moyen }}%</div>
+      <div style="font-size:12px;color:var(--pr-muted);text-transform:uppercase;letter-spacing:.4px;font-weight:700;">Présence moyenne par employé</div>
+      <div class="bar-track h12" style="flex:0 0 12px;width:100%;max-width:280px;">
+        <div class="bar-fill {% if taux_moyen >= 80 %}good{% elif taux_moyen >= 60 %}warn{% else %}bad{% endif %}" data-w="{{ taux_moyen|unlocalize }}"></div>
       </div>
-      {% endfor %}
     </div>
   </div>
+  {% if stats_svc %}
+  <div class="pr-card" style="margin-top:0;">
+    <div class="pr-card-header">
+      <div class="pr-card-title"><i class="bi bi-building"></i> Taux de présence par service</div>
+    </div>
+    <div class="pr-card-body">
+      <canvas id="chartService" height="140"></canvas>
+    </div>
+  </div>
+  {% endif %}
 </div>
-{% endif %}
 
 <!-- Stats par employé -->
 <div class="pr-card">
@@ -74,7 +76,7 @@
           <th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--pr-800);border-bottom:2px solid var(--pr-200);">Employé</th>
           <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--accent-text);">Présents</th>
           <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--rose-btn);">Absents</th>
-          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pr-muted);">Non saisi</th>
+          <th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pr-muted);">Non pointés</th>
           <th style="padding:10px 16px;text-align:left;border-bottom:2px solid var(--pr-200);font-size:11px;font-weight:700;text-transform:uppercase;color:var(--pr-800);">Taux</th>
           <th style="padding:10px 12px;border-bottom:2px solid var(--pr-200);"></th>
         </tr>
@@ -140,6 +142,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ chart_service|json_script:"data-service" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 document.querySelectorAll('.bar-fill[data-w]').forEach(function(el) {
   el.style.width = el.dataset.w + '%';
@@ -147,5 +151,43 @@ document.querySelectorAll('.bar-fill[data-w]').forEach(function(el) {
 /* couleur cellule absences */
 document.querySelectorAll('td.col-abs').forEach(function(el) { el.style.color = 'var(--rose-btn)'; });
 document.querySelectorAll('td.col-ns').forEach(function(el) { el.style.color = 'var(--pr-muted)'; });
+
+var dataSvc = JSON.parse(document.getElementById('data-service').textContent);
+
+Chart.defaults.font.family = "'Sora', sans-serif";
+Chart.defaults.font.size   = 11;
+var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.05)';
+Chart.defaults.color = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.55)';
+var prRgb = getComputedStyle(document.documentElement).getPropertyValue('--pr-600-rgb').trim();
+
+/* Barres horizontales : taux de présence par service */
+if (document.getElementById('chartService') && dataSvc.labels.length > 0) {
+  new Chart(document.getElementById('chartService'), {
+    type: 'bar',
+    data: {
+      labels: dataSvc.labels,
+      datasets: [{
+        data: dataSvc.data,
+        backgroundColor: 'rgba(' + prRgb + ',.65)',
+        borderRadius: 4, borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: function(c) {
+          return ' ' + c.raw + '% · ' + dataSvc.nb_emps[c.dataIndex] + ' employé(s)';
+        } } }
+      },
+      scales: {
+        x: { beginAtZero: true, max: 100, grid: { color: gridColor },
+             ticks: { callback: function(v){ return v + '%'; } } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
 </script>
 {% endblock %}
