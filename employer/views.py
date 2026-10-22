@@ -313,6 +313,17 @@ def rh_dashboard(request):
         .order_by('date_fin')
     )
 
+    # ── Congés du jour ──────────────────────────────────────────────────────
+    # Qui est absent précisément aujourd'hui, par la date elle-même plutôt que
+    # par le champ statut (qui dépend d'une bascule automatique approuve→en_cours
+    # pouvant avoir un décalage) : filet de sécurité indépendant pour ce chiffre.
+    conges_du_jour = list(
+        Conge.objects
+        .filter(statut__in=['approuve', 'en_cours'], date_debut__lte=today, date_fin__gte=today)
+        .select_related('employe', 'employe__service')
+        .order_by('employe__nom')
+    )
+
     # ── Employés en période d'essai (embauchés depuis < 90 jours) ────────────
     periode_essai = list(
         Employe.objects
@@ -350,6 +361,7 @@ def rh_dashboard(request):
         'genre_data':      genre_data,
         'nouveaux_mois':   nouveaux_mois,
         'conges_en_cours': conges_en_cours,
+        'conges_du_jour': conges_du_jour,
         'periode_essai':   periode_essai,
         'taux_presence':   taux_presence,
         'total_presences': total_presences,

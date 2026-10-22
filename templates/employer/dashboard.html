@@ -1077,22 +1077,58 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     </div>
   </div>
 
-  <!-- Congés du jour (lien module Congés) -->
+  <!-- Congés du jour -->
   <div class="rh-card">
     <div class="rh-card-header">
       <div class="rh-card-title">
         <i class="bi bi-calendar-week" style="color:var(--rh-500);"></i>
         Congés du jour
       </div>
+      {% if conges_du_jour %}
+      <span style="font-size:12px;color:var(--rh-muted);">{{ conges_du_jour|length }}</span>
+      {% endif %}
     </div>
-    <div class="rh-card-body" style="padding:14px 20px;">
-      {% load static %}
-      <div style="font-size:13px;color:var(--rh-muted);">
-        <a href="{% url 'conge_dashboard' %}" style="color:var(--accent-text-soft);font-weight:600;text-decoration:none;">
-          <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> Aller au module Congés & Absences
-        </a>
-        pour voir les absences du jour, les soldes et le planning équipe.
+    <div class="rh-card-body" style="padding:0;">
+      {% if conges_du_jour %}
+      <div style="overflow-x:auto;">
+        <table class="rh-exp-table">
+          <thead>
+            <tr>
+              <th>Employé</th>
+              <th>Type</th>
+              <th>Fin le</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in conges_du_jour %}
+            <tr>
+              <td>
+                <a href="{% url 'rh_detail' c.employe.pk %}" style="color:var(--rh-text);font-weight:600;text-decoration:none;">
+                  {{ c.employe.nom_complet }}
+                </a>
+                {% if c.employe.service %}
+                <div style="font-size:11.5px;color:var(--rh-muted);">{{ c.employe.service.nom }}</div>
+                {% endif %}
+              </td>
+              <td><span class="rh-conge-type">{{ c.get_type_conge_display }}</span></td>
+              <td style="white-space:nowrap;">{{ c.date_fin|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+      {% else %}
+        <div class="rh-empty-inline">
+          <i class="bi bi-calendar-week"></i>
+          <p>Personne en congé aujourd'hui</p>
+        </div>
+      {% endif %}
+    </div>
+    <div style="padding:10px 20px;border-top:1px solid var(--rh-border);font-size:12px;color:var(--rh-muted);">
+      <a href="{% url 'conge_dashboard' %}" style="color:var(--accent-text-soft);font-weight:600;text-decoration:none;">
+        <i class="bi bi-box-arrow-up-right" style="font-size:11px;"></i> Module Congés & Absences
+      </a>
+      pour les soldes et le planning équipe.
     </div>
   </div>
 </div>
