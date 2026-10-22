@@ -127,7 +127,7 @@ class TestGetActionsDisponibles(TestCase):
         cas = (
             ('brouillon',   ('installer', 'decharger', 'terminer')),
             ('confirme',    ('confirmer', 'decharger', 'terminer')),
-            ('hospitalise', ('confirmer', 'installer', 'terminer')),
+            ('hospitalise', ('confirmer', 'installer', 'terminer', 'annuler')),
             ('decharge',    ('confirmer', 'installer', 'decharger', 'annuler')),
             ('termine',     ('confirmer', 'installer', 'decharger', 'terminer', 'annuler')),
             ('annule',      ('confirmer', 'installer', 'decharger', 'terminer', 'annuler')),
@@ -249,6 +249,72 @@ class TestGetActionsDisponibles(TestCase):
         )
         actions = get_actions_disponibles(hosp, self.user)
         self.assertFalse(actions['terminer']['enabled'])
+
+    def test_annuler_cache_des_que_le_patient_est_installe(self):
+        """Annuler veut dire « ce séjour n'a pas eu lieu » — faux dès
+        l'installation : l'heure d'entrée est figée et un lit est occupé. La
+        sortie est alors Décharger. Le bouton restait actif à Hospitalisé, et
+        l'annulation y fabriquait un dossier portant heure d'entrée, heure de
+        sortie et l'étiquette Annulé.
+        """
+        perm = Permission.objects.get(codename='can_annuler_demande')
+        self.user.user_permissions.add(perm)
+        for statut in ('brouillon', 'confirme'):
+            hosp = self._hosp(statut=statut)
+            actions = get_actions_disponibles(hosp, self.user)
+            self.assertTrue(
+                actions['annuler']['enabled'],
+                f"annuler devrait rester possible au statut {statut}"
+            )
+        for statut in ('hospitalise', 'decharge', 'termine', 'annule'):
+            hosp = self._hosp(statut=statut)
+            for qui, libelle in ((self.superuser, 'superuser'), (self.user, 'user')):
+                actions = get_actions_disponibles(hosp, qui)
+                self.assertFalse(
+                    actions['annuler']['visible'],
+                    f"annuler devrait être caché pour le {libelle} au statut {statut}"
+                )
+                ok, _err = check_action(hosp, qui, 'annuler')
+                self.assertFalse(
+                    ok,
+                    f"le serveur devrait refuser annuler au {libelle} "
+                    f"au statut {statut}"
+                )
+
+    def test_creer_facture_cache_sur_dossier_annule_ou_clos(self):
+        """Un dossier annulé ou clos ne se facture plus.
+
+        Le bouton restait actif pour le superuser — la branche su ne refermait
+        "Créer la facture" que sur l'absence de service à facturer, jamais sur
+        le statut — et seulement grisé pour les autres. check_action lisant la
+        même table, le serveur acceptait réellement la création : la facture
+        naissait en brouillon sur un dossier mort, et aucune transition ne
+        repassait jamais l'annuler.
+        """
+        # can_creer_facture existe aussi sur soins.Soin : filtrer par app_label.
+        perm = Permission.objects.get(
+            codename='can_creer_facture', content_type__app_label='hospitalisation',
+        )
+        self.user.user_permissions.add(perm)
+        for statut in ('annule', 'termine'):
+            hosp = self._hosp(statut=statut)
+            ServiceAFacturer.objects.create(
+                hospitalisation=hosp, service=_article(), quantite=1,
+                source='manuel',
+            )
+            for qui, libelle in ((self.superuser, 'superuser'), (self.user, 'user')):
+                actions = get_actions_disponibles(hosp, qui)
+                self.assertFalse(
+                    actions['creer_facture']['visible'],
+                    f"creer_facture devrait être caché pour le {libelle} "
+                    f"au statut {statut}"
+                )
+                ok, _err = check_action(hosp, qui, 'creer_facture')
+                self.assertFalse(
+                    ok,
+                    f"le serveur devrait refuser creer_facture au {libelle} "
+                    f"au statut {statut}"
+                )
 
 
 # ─── Tests check_action ────────────────────────────────────────────────────────

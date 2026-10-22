@@ -44,11 +44,16 @@ def get_actions_disponibles(hosp, user):
                   for k in ('confirmer', 'creer_facture', 'installer',
                             'decharger', 'terminer', 'annuler')}
         # Même pour le superuser, "Créer la facture" doit rester caché
-        # quand il n'y a plus aucun service non facturé à facturer.
+        # quand il n'y a plus aucun service non facturé à facturer — et sur un
+        # dossier clos ou annulé, où elle n'a plus d'objet. Ce second cas
+        # manquait : le bouton restait actif sur une hospitalisation annulée, et
+        # comme check_action lit cette même table, le serveur acceptait vraiment
+        # la création. La facture naissait en brouillon sur un dossier mort, et
+        # plus aucune transition ne repassait jamais l'annuler.
         nb_saf_nf = hosp.services_a_facturer.filter(
             facture__isnull=True, service__isnull=False
         ).count()
-        if nb_saf_nf == 0:
+        if nb_saf_nf == 0 or hosp.statut in ('termine', 'annule'):
             result['creer_facture'] = {
                 'visible': False, 'enabled': False, 'raison_blocage': '',
             }
@@ -56,7 +61,7 @@ def get_actions_disponibles(hosp, user):
         # déchargé — on ne saute pas d'étape, et on ne l'affiche pas en avance.
         if hosp.statut != 'decharge':
             result['terminer'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
-        if hosp.statut in ('decharge', 'termine', 'annule'):
+        if hosp.statut in ('hospitalise', 'decharge', 'termine', 'annule'):
             result['annuler'] = {'visible': False, 'enabled': False, 'raison_blocage': ''}
         # Même pour le superuser, chaque transition ne doit rester active qu'au
         # statut qui la précède réellement. Sans ce garde-fou, _transition_confirmer/
@@ -124,11 +129,11 @@ def get_actions_disponibles(hosp, user):
     # Rôle typique : Caisse
     if not perm('can_creer_facture'):
         result['creer_facture'] = _act(False, False)
-    elif statut not in ('brouillon', 'confirme', 'hospitalise', 'decharge'):
-        result['creer_facture'] = _act(
-            True, False,
-            f"Statut actuel : {hosp.get_statut_display()}"
-        )
+    elif statut in ('termine', 'annule'):
+        # État terminal — on ne facture plus un dossier clos ou annulé. Caché,
+        # comme l'est "Annuler" au même stade : le bouton n'était que grisé, ce
+        # qui laissait croire à une facture encore attendue.
+        result['creer_facture'] = _act(False, False)
     elif nb_saf_nf == 0:
         result['creer_facture'] = _act(False, False)
     else:
@@ -191,12 +196,19 @@ def get_actions_disponibles(hosp, user):
     else:
         result['terminer'] = _act(True, True)
 
-    # ── Annuler (brouillon/confirme/hospitalise → annule) ───────────────────
+    # ── Annuler (brouillon/confirme → annule) ───────────────────────────────
     # Rôle typique : Médecin, Accueil, Major
     if not perm('can_annuler_demande'):
         result['annuler'] = _act(False, False)
-    elif statut in ('decharge', 'termine', 'annule'):
-        result['annuler'] = _act(False, False)  # état terminal — annulation impossible, caché
+    elif statut in ('hospitalise', 'decharge', 'termine', 'annule'):
+        # Annuler veut dire « ce séjour n'a pas eu lieu ». À partir de
+        # l'installation, c'est faux : l'heure d'entrée est figée et un lit a
+        # été retiré du parc. La sortie est alors Décharger, qui enregistre les
+        # vraies dates et conserve ce qui a été payé. Annuler depuis Hospitalisé
+        # fabriquait un dossier portant heure d'entrée, heure de sortie et
+        # l'étiquette Annulé — un séjour qui avait eu lieu et n'avait pas eu
+        # lieu. Caché, comme aux statuts terminaux.
+        result['annuler'] = _act(False, False)
     else:
         result['annuler'] = _act(True, True)
 

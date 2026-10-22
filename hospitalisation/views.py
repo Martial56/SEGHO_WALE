@@ -610,24 +610,20 @@ def _transition_terminer(hosp, user):
 
 
 def _transition_annuler(hosp, user, motif=''):
-    """brouillon/confirme/hospitalise → annule."""
+    """brouillon/confirme → annule."""
     from .services import check_action
     ok, err = check_action(hosp, user, 'annuler')
     if not ok:
         return False, err
-    # Garde explicite : impossible depuis decharge, termine ou annule
-    if hosp.statut in ('decharge', 'termine', 'annule'):
+    # Garde explicite : impossible dès l'installation du patient. Voir la règle
+    # d'annulation dans services.py — un séjour commencé se décharge, il ne
+    # s'annule pas. Le passage qui libérait la chambre et figeait l'heure de
+    # sortie vivait ici ; il n'est plus atteignable et a été retiré.
+    if hosp.statut in ('hospitalise', 'decharge', 'termine', 'annule'):
         return False, f"Impossible d'annuler une hospitalisation au statut {hosp.get_statut_display()}."
     from django.utils import timezone as tz
     from facturation.models import Facture
     now = tz.now()
-    statut_avant = hosp.statut
-    if statut_avant == 'hospitalise' and hosp.chambre_id:
-        if hosp.chambre.nombre_lits == 1:
-            hosp.chambre.statut = True
-            hosp.chambre.save(update_fields=['statut'])
-        hosp.heure_sortie = now
-        hosp.heure_sortie_systeme = now
     # Annuler les factures impayées (les factures payées sont conservées)
     Facture.objects.filter(hospitalisation=hosp).exclude(
         statut__in=['payee', 'annulee']
@@ -635,10 +631,7 @@ def _transition_annuler(hosp, user, motif=''):
     hosp.statut = 'annule'
     hosp.modifie_par = user
     hosp.date_modification = now
-    fields = ['statut', 'modifie_par', 'date_modification']
-    if statut_avant == 'hospitalise':
-        fields += ['heure_sortie', 'heure_sortie_systeme']
-    hosp.save(update_fields=fields)
+    hosp.save(update_fields=['statut', 'modifie_par', 'date_modification'])
     msg = 'Hospitalisation annulée.'
     if motif:
         msg += f' Motif : {motif}'

@@ -890,8 +890,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           {% endif %}
         </div>
 
-        {# Barre info SAF non facturés #}
-        {% if saf_non_factures %}
+        {% comment %}
+        Barre info SAF non facturés. Masquée sur un dossier annulé : ces
+        services ne seront jamais facturés, et l'alerte s'y lisait comme une
+        dette à régler.
+        {% endcomment %}
+        {% if saf_non_factures and hosp.statut != 'annule' %}
         <div class="saf-info-bar" id="saf-nf-bar">
           <span style="font-size:13px;color:var(--text-muted);">
             <i class="bi bi-exclamation-circle" style="color:var(--color-warning);margin-right:4px;"></i>
