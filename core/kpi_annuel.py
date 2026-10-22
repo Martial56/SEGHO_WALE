@@ -185,6 +185,37 @@ def _semaines(annee, today):
     return semaines
 
 
+def calendrier(annees, today):
+    """Les choix des listes déroulantes pour chaque année, d'un seul tenant.
+
+    L'écran les redessine lui-même quand on change d'année ou de mois, sans
+    rien demander au serveur : il faut donc qu'il ait tout sous la main dès
+    le départ. C'est quelques dizaines de lignes par année, rien de plus.
+
+    Chaque semaine porte les mois de l'année qu'elle touche — une semaine à
+    cheval en a deux, et l'écran la propose dans les deux. Les mois sont
+    calculés ici plutôt que redevinés en JavaScript, pour qu'un seul endroit
+    décide de ce qu'« une semaine de mars » veut dire.
+    """
+    tout = {}
+    for annee in annees:
+        semaines = []
+        for n, lundi, dimanche in _semaines(annee, today):
+            mois = sorted({j.month for j in (lundi, dimanche) if j.year == annee})
+            semaines.append({
+                'n': n,
+                'libelle': f"S{n} — {lundi.strftime('%d/%m')} au {dimanche.strftime('%d/%m')}",
+                'mois': mois,
+            })
+        dernier_mois = today.month if annee == today.year else 12
+        tout[str(annee)] = {
+            'semaines': list(reversed(semaines)),
+            'mois': [{'n': m, 'libelle': MOIS_NOMS[m - 1].capitalize()}
+                     for m in range(1, dernier_mois + 1)],
+        }
+    return tout
+
+
 def resoudre_periode(params, today, annees):
     """Lit les filtres du bandeau (`period`, `annee`, `mois`, `semaine`) et
     renvoie la période retenue, ses bornes, son libellé et les choix des
@@ -200,6 +231,22 @@ def resoudre_periode(params, today, annees):
     semaines = _semaines(annee, today)
     dernier_mois = today.month if annee == today.year else 12
     mois_choix = [(m, MOIS_NOMS[m - 1].capitalize()) for m in range(1, dernier_mois + 1)]
+    defaut_mois = dernier_mois
+
+    # Le mois joue deux rôles : c'est une période à part entière, et c'est le
+    # cadre dans lequel on choisit une semaine. Il est donc lu même quand la
+    # période retenue est la semaine — sans quoi la liste des semaines se
+    # réélargirait à l'année dès qu'on en choisit une.
+    cadre = _entier(params.get('mois'), 0)
+    if not 1 <= cadre <= dernier_mois:
+        cadre = defaut_mois if period == 'mois' else 0
+    if cadre:
+        premier = date(annee, cadre, 1)
+        dernier = date(annee + (cadre == 12), cadre % 12 + 1, 1) - timedelta(days=1)
+        # Une semaine à cheval compte dans les deux mois qu'elle touche : on
+        # cherche « la semaine du 28 septembre », pas « la semaine dont le
+        # lundi tombe en octobre ».
+        semaines = [(n, l, d) for n, l, d in semaines if l <= dernier and d >= premier]
 
     semaine = mois = None
     if period == 'jour':
@@ -207,7 +254,12 @@ def resoudre_periode(params, today, annees):
         label = f"Aujourd'hui — {today.strftime('%d/%m/%Y')}"
     elif period == 'semaine':
         par_numero = {n: (lundi, dimanche) for n, lundi, dimanche in semaines}
-        defaut = today.isocalendar()[1] if annee == today.year or not semaines else semaines[-1][0]
+        # La semaine en cours si elle est proposée, la dernière de la liste
+        # sinon : une année passée n'a pas de semaine en cours, et un mois
+        # choisi ne contient pas forcément celle d'aujourd'hui.
+        defaut = today.isocalendar()[1]
+        if defaut not in par_numero and semaines:
+            defaut = semaines[-1][0]
         semaine = _entier(params.get('semaine'), defaut)
         if semaine not in par_numero:
             semaine = defaut
@@ -217,10 +269,7 @@ def resoudre_periode(params, today, annees):
                                                  today + timedelta(days=6 - today.weekday()))
         label = f"Semaine {semaine} — du {debut.strftime('%d/%m/%Y')} au {fin.strftime('%d/%m/%Y')}"
     elif period == 'mois':
-        defaut = today.month if annee == today.year else 12
-        mois = _entier(params.get('mois'), defaut)
-        if not 1 <= mois <= dernier_mois:
-            mois = defaut
+        mois = cadre
         debut = date(annee, mois, 1)
         fin = (date(annee + (mois == 12), mois % 12 + 1, 1)) - timedelta(days=1)
         label = f"{MOIS_NOMS[mois - 1].capitalize()} {annee}"
@@ -230,6 +279,10 @@ def resoudre_periode(params, today, annees):
 
     return {
         'period': period, 'annee': annee, 'semaine': semaine, 'mois': mois,
+        # Le mois retenu dans la liste déroulante, qu'il soit la période
+        # affichée ou seulement le cadre d'une semaine. `mois` ne dit que le
+        # premier cas ; c'est `cadre_mois` qui coche l'option.
+        'cadre_mois': cadre or None,
         'debut': debut, 'fin': fin, 'label': label,
         'semaines_choix': [(n, f"S{n} — {l.strftime('%d/%m')} au {d.strftime('%d/%m')}")
                            for n, l, d in reversed(semaines)],

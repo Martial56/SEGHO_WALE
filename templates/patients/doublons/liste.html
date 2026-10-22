@@ -1,0 +1,35 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+La liste des groupes, du plus ressemblant au moins. Aucun filtre n'est posé
+d'office : la page s'ouvre sur tout le relevé, et « Filtres » ne s'allume que
+sur un choix.
+
+La page ne remplit que des blocs : les composants, l'échange AJAX et le
+pilotage vivent dans le socle, parce que les onglets s'échangent sans
+recharger — un script écrit ici disparaîtrait au premier changement d'onglet.
+{% endcomment %}
+
+{% block onglet_liste %}active{% endblock %}
+{% block subheader_compte %}<span class="o-page-count">{{ total }}</span>{% endblock %}
+
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Nom ou code patient…" %}
+{% endblock %}
+
+{% block subheader_gauche %}
+  <form method="post" action="{% url 'patients:doublons_recalculer' %}">
+    {% csrf_token %}
+    <button type="submit" class="o-btn-create"
+            title="Reprend tout le relevé, sur toute la base : environ dix minutes.">
+      <i class="bi bi-arrow-clockwise" style="font-size:14px;margin-right:5px;"></i> Recalculer
+    </button>
+  </form>
+{% endblock %}
+
+{% block subheader_controles %}
+  {% include 'patients/doublons/includes/controles.html' %}
+{% endblock %}
+
+{% block doublons_contenu %}
+  {% include 'patients/doublons/includes/resultats.html' %}
+{% endblock %}

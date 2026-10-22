@@ -1,0 +1,114 @@
+{% comment %}
+Une carte par groupe, en grille. Chaque fiche y donne de quoi juger sans
+ouvrir la comparaison : nom, date de naissance, téléphone, ce qu'elle porte.
+Ce qui se contredit d'une fiche à l'autre est surligné, comme à la saisie.
+
+L'action rapide n'apparaît que lorsque l'autre fiche n'apprendrait rien de
+plus — c'est le cas de la plupart des groupes, et les ouvrir un par un pour
+n'y rien lire ferait des centaines d'écrans.
+{% endcomment %}
+{% if groupes %}
+<div class="dbl-grille">
+  {% for groupe in groupes %}
+  {% if grouper %}{% ifchanged groupe.section %}
+  {% comment %}
+  La bande d'une section, sur toute la largeur de la grille — celle des autres
+  listes : même classe, même chevron, même `lstBasculerGroupe`. Les cartes
+  portent `data-parent`, et c'est tout ce qu'il faut au script partagé pour
+  les replier sans rien demander au serveur.
+
+  `data-charge="1"` et pas de `data-feuille` : les cartes sont déjà là, il n'y
+  a rien à aller chercher au dépliage ni à précharger.
+
+  Son nombre vient de l'ensemble filtré, pas de la page : une section qui
+  déborde doit dire ce qu'elle contient, pas ce qu'on en voit.
+  {% endcomment %}
+  <div class="lst-groupe lst-groupe-bande open"
+       data-chemin="{{ groupe.section_rang }}" data-parent=""
+       data-total="{{ groupe.section_total }}" data-charge="1"
+       onclick="lstBasculerGroupe(this)">
+    <span class="dbl-bande-titre">
+      <i class="bi bi-chevron-right lst-chevron"></i>
+      {% comment %}
+      La case ne déplie pas : sans ce frein, cocher la section la refermerait
+      aussitôt.
+      {% endcomment %}
+      <label class="dbl-coche-section" onclick="event.stopPropagation();">
+        <input type="checkbox" data-section="{{ groupe.section }}">
+        <span>{{ groupe.section }}</span>
+      </label>
+      <span class="lst-compte">{{ groupe.section_total }}</span>
+    </span>
+  </div>
+  {% endifchanged %}{% endif %}
+  <div class="dbl-carte-groupe {{ groupe.niveau }}" data-groupe="{{ groupe.cle }}"
+       data-niveau="{{ groupe.niveau }}"
+       {% if grouper %}data-parent="{{ groupe.section_rang }}"{% endif %}
+       data-section="{{ groupe.section|default:'' }}">
+    <a class="dbl-lien" aria-label="Comparer ces {{ groupe.fiches|length }} fiches"
+       href="{% url 'patients:doublons_comparer' cle=groupe.cle %}?retour={{ request.get_full_path|urlencode }}"></a>
+
+    <div class="dbl-tete-groupe">
+      {% comment %}
+      La case est au-dessus du lien qui couvre la carte (`.dbl-lien`) : sans
+      cela, cocher ouvrirait la comparaison.
+      {% endcomment %}
+      <input type="checkbox" class="dbl-coche" value="{{ groupe.cle }}"
+             aria-label="Sélectionner ce groupe">
+      <span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span>
+      {% if groupe.fiches|length > 2 %}
+      <span class="dbl-nombre">{{ groupe.fiches|length }} fiches</span>
+      {% endif %}
+    </div>
+
+    <div class="dbl-identites">
+      {% for fiche in groupe.fiches %}
+      <div class="dbl-identite">
+        <span class="code">{{ fiche.code_patient }}</span>
+        {% if fiche.pk == groupe.garder %}<span class="etoile" title="Fiche à garder">★</span>{% endif %}
+        <span class="nom">{% for mot in fiche.mots_identite %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="diff">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}</span>
+        {% if fiche.masque %}<span class="dbl-vide">(masquée)</span>{% endif %}
+        <span class="dbl-traits">
+          {% if fiche.naissance %}{% if fiche.differe.naissance %}<span class="diff">{{ fiche.naissance }}</span>{% else %}{{ fiche.naissance }}{% endif %}{% else %}<span class="dbl-vide">date inconnue</span>{% endif %}
+          ·
+          {% if fiche.telephone %}{% if fiche.differe.telephone %}<span class="diff">{{ fiche.telephone }}</span>{% else %}{{ fiche.telephone }}{% endif %}{% else %}<span class="dbl-vide">pas de téléphone</span>{% endif %}
+        </span>
+        <span class="dbl-rattache">
+          {% if fiche.rattache_resume %}{{ fiche.rattache_resume }}
+          {% else %}<span class="dbl-vide">aucune donnée rattachée</span>{% endif %}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="dbl-pied">
+      <span class="dbl-raisons">
+        {% if groupe.raisons %}<i class="bi bi-info-circle"></i>{{ groupe.raisons|join:', ' }}{% endif %}
+      </span>
+      {% if groupe.masquable %}
+      <form class="dbl-rapide" method="post"
+            action="{% url 'patients:doublons_masquer' cle=groupe.cle pk=groupe.masquable.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="au_profit_de" value="{{ groupe.garder }}">
+        <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+        <button type="button" class="dbl-rapide-btn" data-demander>
+          <i class="bi bi-eye-slash"></i> Masquer le doublon
+        </button>
+        <span class="dbl-confirme" hidden>
+          Masquer {{ groupe.masquable.code_patient }} ?
+          <button type="submit" class="oui">Oui</button>
+          <button type="button" class="non" data-renoncer>Non</button>
+        </span>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="o-empty">
+  {% if q %}Aucun groupe ne correspond à cette recherche.
+  {% elif niveau != 'tous' %}Aucun doublon à ce niveau.
+  {% else %}Aucun doublon relevé dans ce centre.{% endif %}
+</div>
+{% endif %}

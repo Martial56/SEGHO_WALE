@@ -1,0 +1,94 @@
+{% load humanize %}
+{% comment %}
+Menu « Exporter » d'une liste : télécharge ce que la liste affiche.
+
+Les liens emportent la sélection en cours (`export_qs`), si bien que le fichier
+porte les lignes filtrées et non la table entière, et les titres de groupe
+quand un regroupement est posé. L'intitulé annonce lequel des deux, et combien,
+pour qu'on sache avant de cliquer.
+
+La vue doit poser dans le contexte :
+  export_url       l'adresse de sa vue d'export, déjà résolue
+  export_libelle   « les soins », « les factures »… (sans sélection active)
+  export_qs        core.listing.parametres_export(request)
+  nb_selection     le nombre de lignes du jeu filtré
+  selection_active Selection.active
+
+Styles et bascule sont portés ici : ce menu s'insère dans des listes qui n'ont
+jamais eu de bouton d'export, et ne peut pas compter sur le balisage d'import
+déjà présent ailleurs. Les règles reprennent celles de
+services/includes/io_styles.html à l'identique — là où les deux coexistent,
+elles se recouvrent sans se contredire.
+{% endcomment %}
+{% if export_url %}
+<style>
+  .io-page-wrap { position: relative; }
+  /* Sans libellé, le remplissage horizontal du bouton de contrôle laisserait
+     l'icône flotter dans une pastille trop large. */
+  .io-toggle-icone { padding-left: 8px; padding-right: 8px; }
+  .io-toggle-icone i { font-size: 14px; }
+  .io-page-menu {
+    display: none; position: absolute; top: calc(100% + 4px); left: 0;
+    min-width: 230px; background: #fff; border: 1px solid #dde3ea;
+    border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.12);
+    z-index: 9000; padding: 4px 0;
+  }
+  .io-page-wrap.open .io-page-menu { display: block; }
+  .io-pm-section {
+    padding: 6px 12px 2px; font-size: 10px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: #9aa3ad;
+  }
+  .io-pm-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 14px;
+    font-size: 13px; color: #2c3a46; text-decoration: none; cursor: pointer;
+    border: none; background: none; width: 100%; text-align: left;
+    font-family: inherit; white-space: nowrap;
+  }
+  .io-pm-item:hover { background: #f0f6fc; color: #1a6da3; }
+  html[data-theme="dark"] .io-page-menu {
+    background: var(--surface); border-color: var(--border-strong);
+    box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  }
+  html[data-theme="dark"] .io-pm-section { color: var(--text-muted); }
+  html[data-theme="dark"] .io-pm-item { color: var(--text-strong); }
+  html[data-theme="dark"] .io-pm-item:hover { background: var(--surface); color: #7ec8e3; }
+</style>
+
+<div class="io-page-wrap" id="io-page-wrap">
+  {% comment %}
+  L'icône seule : la barre porte déjà Créer, Filtres et Regrouper par, et un
+  quatrième libellé la chargeait. L'intitulé du menu, qui dit ce qu'on
+  télécharge et combien, prend le relais à l'ouverture ; `title` et
+  `aria-label` le disent avant, au survol et aux lecteurs d'écran.
+  {% endcomment %}
+  <button type="button" class="o-ctrl-btn io-toggle-btn io-toggle-icone"
+          onclick="toggleIOPage(event)"
+          title="Télécharger la liste affichée"
+          aria-label="Télécharger la liste affichée">
+    <i class="bi bi-download"></i>
+  </button>
+  <div class="io-page-menu" id="io-page-menu">
+    <div class="io-pm-section">
+      {% if selection_active %}Exporter la sélection ({{ nb_selection|intcomma }})
+      {% else %}Exporter {{ export_libelle|default:"la liste" }} ({{ nb_selection|intcomma }}){% endif %}
+    </div>
+    <a class="io-pm-item" href="{{ export_url }}?format=xlsx{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+    <a class="io-pm-item" href="{{ export_url }}?format=csv{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+    <a class="io-pm-item" href="{{ export_url }}?format=json{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+  </div>
+</div>
+
+<script>
+  /* Déjà définie par la liste hôte quand elle porte son propre menu
+     export/import : on ne l'écrase pas, les deux font la même chose. */
+  window.toggleIOPage = window.toggleIOPage || function (e) {
+    e.stopPropagation();
+    var w = document.getElementById('io-page-wrap');
+    if (w) w.classList.toggle('open');
+  };
+  document.addEventListener('click', function () {
+    var w = document.getElementById('io-page-wrap');
+    if (w) w.classList.remove('open');
+  });
+</script>
+{% endif %}

@@ -1,7 +1,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from . import views
+from . import doublons_vues, fusion_vues, views
 
 app_name = 'patients'
 
@@ -28,6 +28,7 @@ urlpatterns = [
     path('gynecologie/', _renvoi('gynecologie_list'), name='gynecologie_patients'),
     path('gynecologie/rendez-vous/', _renvoi('gynecologie_rdv'), name='gynecologie_rdv'),
     path('rendez-vous/', views.rdv_global_list, name='rdv_global'),
+    path('rendez-vous/export/', views.rdv_export, name='rdv_export'),
     path('rendez-vous/nouveau/', views.rdv_create, name='rdv_create'),
     path('rendez-vous/<int:pk>/modifier/', views.rdv_edit, name='rdv_edit'),
     path('<int:pk>/info/', views.patient_info_json, name='patient_info'),
@@ -43,6 +44,43 @@ urlpatterns = [
     path('<int:pk>/hospitalisations/', views.patient_hospitalisation_list, name='hospitalisation_list'),
     path('<int:pk>/examens-demandes/', views.patient_demande_examens_list, name='demande_examens_list'),
     path('<int:pk>/examens-resultats/', views.patient_resultat_examens_list, name='resultat_examens_list'),
+    path('doublons/verifier/', views.doublons_verifier, name='doublons_verifier'),
+    path('doublons/journaliser/', views.doublons_journaliser, name='doublons_journaliser'),
+    # ── L'écran des doublons (étape 4a) ──────────────────────────────────
+    # Les adresses fixes d'abord : `<str:cle>` attrape n'importe quel segment,
+    # et prendrait « journaliser » pour un groupe à comparer.
+    path('doublons/', doublons_vues.doublons_liste, name='doublons_liste'),
+    path('doublons/fusions/', fusion_vues.fusion_journal, name='fusions'),
+    path('doublons/fusions/<int:pk>/annuler/', fusion_vues.fusion_annuler,
+         name='fusion_annuler'),
+    path('doublons/journal/', doublons_vues.doublons_journal, name='doublons_journal'),
+    path('doublons/masquees/', doublons_vues.doublons_masquees,
+         name='doublons_masquees'),
+    path('doublons/lots/', doublons_vues.doublons_lots, name='doublons_lots'),
+    path('doublons/lots/preparer/', doublons_vues.doublons_lot_preparer,
+         name='doublons_lot_preparer'),
+    path('doublons/lots/<int:pk>/executer/', doublons_vues.doublons_lot_executer,
+         name='doublons_lot_executer'),
+    path('doublons/lots/<int:pk>/annuler/', doublons_vues.doublons_lot_annuler,
+         name='doublons_lot_annuler'),
+    path('doublons/supprimer/<int:pk>/', doublons_vues.doublons_supprimer,
+         name='doublons_supprimer'),
+    path('doublons/recalculer/', doublons_vues.doublons_recalculer,
+         name='doublons_recalculer'),
+    path('doublons/reafficher/<int:pk>/', doublons_vues.doublons_reafficher,
+         name='doublons_reafficher'),
+    path('doublons/<str:cle>/', doublons_vues.doublons_comparer,
+         name='doublons_comparer'),
+    path('doublons/<str:cle>/ecarter/', doublons_vues.doublons_ecarter,
+         name='doublons_ecarter'),
+    path('doublons/<str:cle>/reprendre/', doublons_vues.doublons_reprendre,
+         name='doublons_reprendre'),
+    path('doublons/<str:cle>/garder/<int:pk>/', doublons_vues.doublons_garder,
+         name='doublons_garder'),
+    path('doublons/<str:cle>/masquer/<int:pk>/', doublons_vues.doublons_masquer,
+         name='doublons_masquer'),
+    path('doublons/<str:cle>/fusionner/<int:pk>/', fusion_vues.fusion_ecran,
+         name='fusionner'),
     path('export/', views.export_patients, name='export_patients'),
     path('import/', views.import_patients, name='import_patients'),
     path('import/modele/', views.patients_modele_excel, name='patients_modele'),

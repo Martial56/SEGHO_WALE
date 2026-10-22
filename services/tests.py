@@ -562,3 +562,32 @@ class TestModelesDImport(TestCase):
         _, wb = self._classeur('/services/export/articles/modele/')
         cellule = wb.active.cell(row=2, column=1)
         self.assertTrue(cellule.font.italic)
+
+
+class TestLExportDesPrestationsDemandeLaPermission(TestCase):
+    """L'adresse d'export ne demandait qu'une connexion.
+
+    Le menu, lui, ne s'affiche qu'à qui détient `services.view_articleservice`.
+    Un bouton caché n'est pas un verrou : qui tapait l'adresse recevait le
+    catalogue entier.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth.models import Permission
+        cls.nu = User.objects.create_user('presta_nu', password='x')
+        cls.voit = User.objects.create_user('presta_voit', password='x')
+        cls.voit.user_permissions.add(Permission.objects.get(
+            content_type__app_label='services', codename='view_articleservice'))
+
+    def _code(self, utilisateur):
+        from django.test import Client
+        client = Client()
+        client.force_login(User.objects.get(pk=utilisateur.pk))
+        return client.get(reverse('services:export_articles') + '?format=csv').status_code
+
+    def test_refuse_sans_la_permission(self):
+        self.assertEqual(self._code(self.nu), 403)
+
+    def test_accepte_avec_la_permission(self):
+        self.assertEqual(self._code(self.voit), 200)

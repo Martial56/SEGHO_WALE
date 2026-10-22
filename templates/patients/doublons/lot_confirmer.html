@@ -1,0 +1,124 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Avant d'agir : qui est touché, et qui ne l'est pas.
+
+Chaque groupe retenu dit la fiche gardée (★) et celle qui va être masquée ou
+versée — c'est la décision qu'on confirme, pas un nombre. Les groupes ignorés
+sont listés avec leur raison : ils restent à traiter un par un, et le dire
+ici évite de les chercher après coup.
+{% endcomment %}
+
+{% block onglet_liste %}active{% endblock %}
+
+{% block subheader_gauche %}
+  <a class="o-back-btn" href="{{ retour }}">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5"/><path d="M12 5l-7 7 7 7"/></svg> Retour
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  .lot-page { padding: 18px 0 40px; }
+  .lot-annonce { font-size: 15px; margin-bottom: 4px; }
+  .lot-annonce b { font-size: 17px; }
+  .lot-sous { font-size: 13px; color: var(--text-muted); margin-bottom: 18px; }
+  .lot-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lot-table th { text-align: left; font-size: 11px; text-transform: uppercase;
+                  letter-spacing: .4px; color: var(--text-muted);
+                  padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .lot-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  .lot-table .code { font-family: var(--font-mono); font-size: 11px;
+                     color: var(--text-muted); }
+  .lot-table .etoile { color: var(--amber); }
+  .lot-ignores { margin-top: 26px; }
+  .lot-ignores .pourquoi { color: var(--text-muted); }
+  .lot-titre { font-size: 13px; font-weight: 600; margin: 24px 0 8px; }
+  .lot-actions { display: flex; align-items: center; gap: 12px;
+                 margin-top: 24px; }
+  .lot-vide { padding: 28px 0; color: var(--text-muted); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="lot-page">
+
+  <div class="lot-annonce">
+    {% if lot.action == 'masquer' %}
+      <b>{{ prevus|length }}</b> groupe{{ prevus|length|pluralize }} vont être masqués.
+    {% elif lot.action == 'ecarter' %}
+      <b>{{ prevus|length }}</b> paire{{ prevus|length|pluralize }} ne seront plus rapprochées.
+    {% else %}
+      <b>{{ prevus|length }}</b> groupe{{ prevus|length|pluralize }} vont être fusionnés.
+    {% endif %}
+  </div>
+  <div class="lot-sous">
+    Lot {{ lot.numero }} · {{ lot.cles|length }} groupe{{ lot.cles|length|pluralize }} sélectionné{{ lot.cles|length|pluralize }}
+    {% if ignores %}· {{ ignores|length }} ignoré{{ ignores|length|pluralize }}{% endif %}
+    {% if lot.raison %}· raison : « {{ lot.raison }} »{% endif %}
+  </div>
+
+  {% if prevus %}
+  <table class="lot-table">
+    <thead>
+      <tr>
+        <th>Fiche gardée</th>
+        <th>{% if lot.action == 'masquer' %}Fiche masquée
+            {% elif lot.action == 'ecarter' %}Autre fiche
+            {% else %}Fiche versée{% endif %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for prevu in prevus %}
+      <tr>
+        <td>
+          <span class="etoile" title="Fiche gardée">★</span>
+          <span class="code">{{ prevu.gardee.code_patient }}</span>
+          {{ prevu.gardee.nom }} {{ prevu.gardee.prenoms }}
+        </td>
+        <td>
+          <span class="code">{{ prevu.visee.code_patient }}</span>
+          {{ prevu.visee.nom }} {{ prevu.visee.prenoms }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="lot-vide">Aucun groupe de cette sélection ne peut être traité en lot.</div>
+  {% endif %}
+
+  {% if ignores %}
+  <div class="lot-titre">Ignorés — à traiter un par un</div>
+  <table class="lot-table lot-ignores">
+    <tbody>
+      {% for cle, pourquoi in ignores %}
+      <tr>
+        <td style="width:140px;">
+          <a class="o-lien" href="{% url 'patients:doublons_comparer' cle=cle %}">Voir le groupe</a>
+        </td>
+        <td class="pourquoi">{{ pourquoi }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="lot-actions">
+    {% if prevus %}
+    <form method="post" action="{% url 'patients:doublons_lot_executer' lot.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="retour" value="{{ retour }}">
+      <button type="submit" class="o-btn-create">
+        {% if lot.action == 'masquer' %}Masquer les {{ prevus|length }} groupes
+        {% elif lot.action == 'ecarter' %}Écarter les {{ prevus|length }} paires
+        {% else %}Fusionner les {{ prevus|length }} groupes{% endif %}
+      </button>
+    </form>
+    {% endif %}
+    <a class="o-ctrl-btn" href="{{ retour }}">Annuler</a>
+  </div>
+</div>
+{% endblock %}

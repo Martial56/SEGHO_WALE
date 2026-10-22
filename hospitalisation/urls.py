@@ -5,6 +5,7 @@ app_name = 'hospitalisation'
 
 urlpatterns = [
     path('', views.hospitalisation_list, name='list'),
+    path('export/', views.export_hospitalisations, name='export'),
     path('nouveau/', views.hospitalisation_create, name='create'),
     path('<int:pk>/',              views.hospitalisation_detail,       name='detail'),
     path('<int:pk>/modifier/',     views.hospitalisation_edit,         name='edit'),

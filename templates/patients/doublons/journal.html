@@ -1,0 +1,53 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Les deux traces posées à la saisie : « Continuer la saisie » devant une fiche
+proche, et les dossiers créés malgré un doublon bloquant. Retrouvées par leur
+code, jamais par le texte du message — un message est écrit pour être lu, il
+se reformule.
+{% endcomment %}
+
+{% block onglet_journal %}active{% endblock %}
+
+{% block subheader_compte %}<span class="o-page-count">{{ page.paginator.count }}</span>{% endblock %}
+
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Fiche ou utilisateur…" %}
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-tableau">
+<table class="jnl">
+  <thead>
+    <tr>
+      <th>Quand</th><th>Qui</th><th>Quoi</th><th>Fiche visée</th><th>Détail</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for ligne in lignes %}
+    <tr>
+      <td class="quand">{{ ligne.trace.date|date:'d/m/Y H:i' }}</td>
+      <td>{{ ligne.trace.user|default:'—' }}</td>
+      <td class="genre {% if ligne.trace.code == forcage %}forcage{% endif %}">
+        {{ ligne.libelle }}
+      </td>
+      <td>
+        {% if ligne.fiche %}
+        <a href="{% url 'patients:detail' ligne.fiche.pk %}" class="code">{{ ligne.fiche.code_patient }}</a>
+        {{ ligne.fiche.nom }} {{ ligne.fiche.prenoms }}
+        {% else %}<span class="cmp-vide">fiche supprimée</span>{% endif %}
+      </td>
+      <td>{{ ligne.trace.message }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="o-empty">
+      {% if q %}Aucune trace ne correspond à cette recherche.
+      {% else %}Aucune trace pour le moment.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div style="padding:12px 0;">
+  {% include 'patients/doublons/includes/pagination.html' %}
+</div>
+{% endblock %}

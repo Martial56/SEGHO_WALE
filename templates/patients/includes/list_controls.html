@@ -1,3 +1,4 @@
+{% load humanize %}
 {% comment %}
 Barre de contrôles de la liste patients (créer, export/import, effacer,
 filtres, regroupement, pagination haute, bascule kanban/liste). Extrait de
@@ -14,6 +15,12 @@ list.html pour pouvoir être renvoyé seul en AJAX.
       <i class="bi bi-plus" style="font-size:14px;margin-right:4px;"></i> Créer
     </a>
     {% endif %}
+    {% comment %}
+    Superutilisateurs seulement, et non `perms.patients.view_patient` comme
+    sur les autres listes : `export_patients` refuse déjà quiconque ne l'est
+    pas (voir le test « l'export reste aux administrateurs »). Afficher le
+    menu plus largement offrirait des liens qui répondent 403.
+    {% endcomment %}
     {% if request.user.is_superuser %}
     <div class="io-page-wrap" id="io-page-wrap">
       <button type="button" class="o-ctrl-btn io-toggle-btn" onclick="toggleIOPage(event)">
@@ -21,10 +28,18 @@ list.html pour pouvoir être renvoyé seul en AJAX.
         <i class="bi bi-chevron-down" style="font-size:9px;margin-left:2px;"></i>
       </button>
       <div class="io-page-menu" id="io-page-menu">
-        <div class="io-pm-section">Exporter les patients</div>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
-        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        {% comment %}
+        Les liens portent la sélection en cours (`export_qs` = la query string de
+        la page) : le fichier téléchargé contient donc les lignes affichées, et
+        non la table entière. L'intitulé dit lequel des deux, pour qu'on sache
+        avant de cliquer.
+        {% endcomment %}
+        <div class="io-pm-section">
+          {% if selection_active %}Exporter la sélection ({{ nb_selection|intcomma }}){% else %}Exporter les patients ({{ nb_selection|intcomma }}){% endif %}
+        </div>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=json{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=csv{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+        <a class="io-pm-item" href="{% url 'patients:export_patients' %}?format=xlsx{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
         <div class="io-pm-sep"></div>
         <div class="io-pm-section">Importer</div>
         <a class="io-pm-item" href="{% url 'patients:patients_modele' %}"><i class="bi bi-download" style="color:var(--teal-500);"></i> Télécharger le modèle</a>

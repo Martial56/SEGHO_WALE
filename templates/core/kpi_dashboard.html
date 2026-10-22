@@ -4,6 +4,13 @@
 {% block topbar_title %}Tableau de bord{% endblock %}
 
 {% block extra_css %}
+{% comment %}
+La police d'icônes est chargée module par module, jamais dans base.html.
+Cette page-ci l'avait oubliée : les deux icônes de sa barre — la grille qui
+ramène à l'accueil et le compteur du titre — n'affichaient rien du tout,
+dans les deux thèmes. Le lien restait cliquable, mais invisible.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
 <script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <style>
 /* Couleurs reprises du tableau de bord Excel « DONNÉES WALÉ » */
@@ -35,7 +42,16 @@ html[data-theme="dark"] {
 .year-tab:hover { background: rgba(255,255,255,0.18); }
 .year-tab.active { background: var(--kpi-green); border-color: var(--kpi-green); }
 
-.kpi-page { max-width: 1500px; margin: 0 auto; }
+/* « Actualiser » s'allume dès que la sélection ne correspond plus à ce qui
+   est affiché : c'est le seul indice qu'il reste un geste à faire. */
+.kpi-actualiser { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-family: inherit; }
+.kpi-actualiser.en-attente { background: var(--kpi-gold); border-color: var(--kpi-gold); color: #3a2c00; }
+
+/* Pas de plafond de largeur : le tableau de bord prend l'écran qui l'ouvre.
+   Il s'arrêtait à 1500 px et se centrait, si bien qu'au-delà tout le
+   surplus partait en marges vides. Les colonnes des deux grilles changent
+   par paliers, plus bas. */
+.kpi-page { width: 100%; }
 
 /* ══ Cartes indicateurs (ligne du haut de l'Excel) ══ */
 .kpi-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
@@ -62,13 +78,26 @@ html[data-theme="dark"] {
 .chart-title { font-size: 12.5px; font-weight: 800; color: var(--kpi-text); text-align: center; margin-bottom: 8px; }
 .chart-wrap { position: relative; height: 230px; }
 
+
+/* Les paliers. Le nombre de colonnes est choisi pour diviser le nombre de
+   tuiles — huit cartes, sinon la dernière rangée laisse un trou à droite,
+   ce qui est précisément l'espace perdu qu'on cherchait à récupérer. Les
+   graphiques sont sept : une rangée incomplète est inévitable, on se
+   contente de la réduire. */
+@media (min-width: 1860px) {
+  .kpi-cards  { grid-template-columns: repeat(8, 1fr); }
+  .kpi-charts { grid-template-columns: repeat(4, 1fr); }
+}
 @media (max-width: 1200px) {
-  .kpi-cards { grid-template-columns: repeat(3, 1fr); }
   .kpi-charts { grid-template-columns: repeat(2, 1fr); }
 }
-@media (max-width: 720px) {
+@media (max-width: 1000px) {
   .kpi-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 760px) {
+  .kpi-cards  { grid-template-columns: 1fr; }
   .kpi-charts { grid-template-columns: 1fr; }
+  .chart-wrap { height: 200px; }
 }
 </style>
 {% endblock %}
@@ -80,64 +109,12 @@ html[data-theme="dark"] {
 {% block breadcrumb %}{% endblock %}
 
 {% block content %}
-
-<div class="kpi-banner">
-  <div>
-    <h1>Les données de WALÉ Yamoussoukro</h1>
-    <span class="kpi-banner-sub">{{ periode.label }}</span>
-  </div>
-  <div class="kpi-filtres">
-    <a href="?period=jour" class="year-tab {% if periode.period == 'jour' %}active{% endif %}">Aujourd'hui</a>
-    <select class="kpi-select {% if periode.period == 'semaine' %}active{% endif %}" aria-label="Semaine" data-period="semaine" data-param="semaine">
-      <option value="" {% if periode.period != 'semaine' %}selected{% endif %} disabled>Semaine</option>
-      {% for n, libelle in periode.semaines_choix %}<option value="{{ n }}" {% if n == periode.semaine %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
-    </select>
-    <select class="kpi-select {% if periode.period == 'mois' %}active{% endif %}" aria-label="Mois" data-period="mois" data-param="mois">
-      <option value="" {% if periode.period != 'mois' %}selected{% endif %} disabled>Mois</option>
-      {% for m, libelle in periode.mois_choix %}<option value="{{ m }}" {% if m == periode.mois %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
-    </select>
-    <select class="kpi-select {% if periode.period == 'annee' %}active{% endif %}" aria-label="Année" data-period="annee">
-      {% for a in annees %}<option value="{{ a }}" {% if a == annee %}selected{% endif %}>{{ a }}</option>{% endfor %}
-    </select>
-  </div>
-</div>
-
-<div class="kpi-page">
-
-  <!-- ══ Indicateurs : total de la période, puis trimestres de l'année ══ -->
-  <div class="kpi-cards">
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation générale" total=totaux.mg serie=kpi.mg %}
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation prénatale" total=totaux.cpn serie=kpi.cpn %}
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation gynéco" total=totaux.gyn serie=kpi.gyn %}
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation cardiologie" total=totaux.cardio serie=kpi.cardio %}
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Examens laboratoire" total=totaux.labo serie=kpi.labo %}
-
-    <div class="kpi-card">
-      <div class="kpi-card-head"><span class="kpi-card-title">Part d'examens labo par provenance</span></div>
-      <div class="kpi-part">
-        <div class="kpi-part-row"><b>WALÉ :</b><strong>{{ totaux.provenance.wale }}</strong><span class="kpi-pct">{{ totaux.provenance.part_wale }} %</span></div>
-        <div class="kpi-part-row"><b>Externe :</b><strong>{{ totaux.provenance.externe }}</strong><span class="kpi-pct">{{ totaux.provenance.part_externe }} %</span></div>
-      </div>
-    </div>
-
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Soins infirmiers" total=totaux.soins serie=kpi.soins %}
-    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Mise en observation" total=totaux.mo serie=kpi.mo %}
-  </div>
-
-  <!-- ══ Graphiques mensuels ══ -->
-  <div class="kpi-charts">
-    <div class="chart-card"><div class="chart-title">Consultation générale</div><div class="chart-wrap"><canvas id="chMg"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Médecine générale par sexe</div><div class="chart-wrap"><canvas id="chSexe"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Consultation cardiologie</div><div class="chart-wrap"><canvas id="chCardio"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Consultation prénatale</div><div class="chart-wrap"><canvas id="chCpn"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Consultation gynécologie</div><div class="chart-wrap"><canvas id="chGyn"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Soins infirmiers</div><div class="chart-wrap"><canvas id="chSoins"></canvas></div></div>
-    <div class="chart-card"><div class="chart-title">Examens laboratoire</div><div class="chart-wrap"><canvas id="chLabo"></canvas></div></div>
-  </div>
-
-</div>
-
-{{ chart_data|json_script:"kpi-chart-data" }}
+{% include 'core/includes/kpi_vue.html' %}
+{% comment %}
+Hors du fragment : ce calendrier ne dépend d'aucune période, il couvre toutes
+les années d'un coup. Il n'a donc rien à faire dans ce qu'on remplace.
+{% endcomment %}
+{{ calendrier|json_script:"kpi-calendrier" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -166,33 +143,166 @@ html[data-theme="dark"] {
 </script>
 <script>
 (function () {
-  // Listes déroulantes du bandeau : semaine et mois se choisissent dans
-  // l'année affichée, l'année ramène au total annuel.
-  var annee = '{{ annee }}';
-  document.querySelectorAll('.kpi-select').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      var p = new URLSearchParams({ period: sel.dataset.period });
-      if (sel.dataset.param) { p.set('annee', annee); p.set(sel.dataset.param, sel.value); }
-      else { p.set('annee', sel.value); }
-      location.search = '?' + p.toString();
+  // Le bandeau compose une période sans rien demander au serveur : changer
+  // d'année refait la liste des mois, changer de mois refait celle des
+  // semaines, et rien ne part tant qu'on n'a pas cliqué « Actualiser ».
+  // Le relevé coûte près de trois secondes ; le recalculer à chaque clic
+  // pendant qu'on cherche sa semaine n'avait pas de sens.
+  //
+  // Les écouteurs sont posés sur le document et non sur les listes : celles-ci
+  // sont détruites à chaque échange, et des écouteurs posés dessus
+  // disparaîtraient avec elles dès le premier remplacement.
+  var demande = 0;
+  var CALENDRIER = {};
+  try {
+    CALENDRIER = JSON.parse(document.getElementById('kpi-calendrier').textContent);
+  } catch (erreur) { CALENDRIER = {}; }
+
+  function liste(id) { return document.getElementById(id); }
+
+  // Repose les options d'une liste. La valeur choisie est gardée si elle
+  // existe encore — passer de mars à avril ne doit pas oublier l'année — et
+  // abandonnée sinon : décembre n'existe pas dans une année en cours.
+  function garnir(sel, tete, options) {
+    var garde = sel.value;
+    sel.innerHTML = '';
+    var premier = document.createElement('option');
+    premier.value = '';
+    premier.textContent = tete;
+    sel.appendChild(premier);
+    options.forEach(function (o) {
+      var el = document.createElement('option');
+      el.value = String(o.n);
+      el.textContent = o.libelle;
+      sel.appendChild(el);
     });
+    sel.value = garde;
+    if (sel.selectedIndex < 0) { sel.value = ''; }
+  }
+
+  function redessiner(depuis) {
+    var annee = liste('kpi-annee'), mois = liste('kpi-mois'), semaine = liste('kpi-semaine');
+    if (!annee || !mois || !semaine) return;
+    var cal = CALENDRIER[annee.value];
+    if (!cal) return;
+    if (depuis === 'annee') { garnir(mois, 'Tous les mois', cal.mois); }
+    var m = parseInt(mois.value, 10);
+    garnir(semaine, 'Toutes les semaines', cal.semaines.filter(function (s) {
+      return !m || s.mois.indexOf(m) !== -1;
+    }));
+  }
+
+  // La période se lit dans les listes : la plus fine l'emporte. Le mois part
+  // avec la semaine, parce qu'il reste le cadre dans lequel elle a été prise.
+  function adresse() {
+    var annee = liste('kpi-annee').value;
+    var mois = liste('kpi-mois').value;
+    var semaine = liste('kpi-semaine').value;
+    var p = new URLSearchParams({ annee: annee });
+    if (semaine) {
+      p.set('period', 'semaine');
+      p.set('semaine', semaine);
+      if (mois) { p.set('mois', mois); }
+    } else if (mois) {
+      p.set('period', 'mois');
+      p.set('mois', mois);
+    } else {
+      p.set('period', 'annee');
+    }
+    return location.pathname + '?' + p.toString();
+  }
+
+  function enAttente(oui) {
+    var bouton = liste('kpi-actualiser');
+    if (bouton) { bouton.classList.toggle('en-attente', !!oui); }
+  }
+
+  function charger(url, empiler) {
+    var vue = document.getElementById('kpi-vue');
+    if (!vue) { location.assign(url); return; }
+    var jeton = ++demande;
+    // Le même logo que sur les écrans qui rechargent vraiment, mais posé sur
+    // un fond flou : l'écran reste visible derrière. Il demeure allumé sur
+    // les chemins qui finissent par naviguer — c'est la page entière qui
+    // arrive derrière, et elle l'éteindra elle-même.
+    if (window.showPageLoader) { window.showPageLoader('Chargement des données…', true); }
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                 credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) { throw new Error(r.status); } return r.text(); })
+      .then(function (html) {
+        // Une réponse arrivée après une demande plus récente est périmée :
+        // l'appliquer ferait réapparaître la période précédente.
+        if (jeton !== demande) return;
+        var boite = document.createElement('div');
+        boite.innerHTML = html;
+        var neuf = boite.querySelector('#kpi-vue');
+        if (!neuf) { location.assign(url); return; }
+        document.getElementById('kpi-vue').replaceWith(neuf);
+        if (empiler) { history.pushState({ kpi: true }, '', url); }
+        if (window.kpiRefaireGraphiques) { window.kpiRefaireGraphiques(); }
+        if (window.hidePageLoader) { window.hidePageLoader(); }
+        enAttente(false);
+      })
+      .catch(function () {
+        // Réseau coupé, session expirée : on laisse le navigateur faire ce
+        // qu'il aurait fait sans nous.
+        if (jeton === demande) { location.assign(url); }
+      });
+  }
+
+  document.addEventListener('change', function (e) {
+    var sel = e.target.closest && e.target.closest('.kpi-select');
+    if (!sel) return;
+    if (sel.id === 'kpi-annee') { redessiner('annee'); }
+    else if (sel.id === 'kpi-mois') { redessiner('mois'); }
+    enAttente(true);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    // Le bouton porte aussi `year-tab` pour son allure : on le reconnaît à
+    // son identifiant avant de le prendre pour « Aujourd'hui ».
+    var cible = e.target.closest && e.target.closest('#kpi-actualiser, .year-tab');
+    if (!cible) return;
+    e.preventDefault();
+    if (cible.id === 'kpi-actualiser') { charger(adresse(), true); }
+    else { charger(location.pathname + cible.getAttribute('href'), true); }
+  });
+
+  window.addEventListener('popstate', function () {
+    charger(location.pathname + location.search, false);
   });
 })();
 </script>
 <script>
 (function () {
-  var D = JSON.parse(document.getElementById('kpi-chart-data').textContent);
   var GREEN = '#70ad47', BLUE = '#4472c4', GOLD = '#ffc000';
   var charts = [];
 
   function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
 
-  // Valeurs affichées au-dessus des barres / points, comme les étiquettes de l'Excel.
+  function seChevauchent(a, b) {
+    return a.x1 < b.x2 && a.x2 > b.x1 && a.y1 < b.y2 && a.y2 > b.y1;
+  }
+
+  // Valeurs affichées au-dessus des barres / points, comme les étiquettes de
+  // l'Excel.
+  //
+  // Deux séries qui tombent sur la même valeur écrivaient au même endroit et
+  // les chiffres se superposaient, illisibles — le total des examens labo
+  // par-dessus celui des examens internes, par exemple, quand il n'y a aucun
+  // examen externe. On tient donc la liste des emplacements déjà pris :
+  //   · même chiffre au même endroit → c'est deux fois la même information,
+  //     on n'en écrit qu'une ;
+  //   · chiffres différents → l'étiquette remonte d'un cran jusqu'à trouver
+  //     sa place, et renonce plutôt que d'écrire par-dessus.
   var etiquettes = {
     id: 'etiquettes',
     afterDatasetsDraw: function (chart) {
       if (chart.config.type === 'pie' || chart.config.type === 'doughnut') return;
       var ctx = chart.ctx, horizontal = chart.options.indexAxis === 'y';
+      var prises = [], HAUTEUR = 10, ESSAIS = 3;
       ctx.save();
       ctx.font = '600 9.5px sans-serif';
       ctx.fillStyle = isDark() ? '#c9d3dc' : '#333';
@@ -202,8 +312,33 @@ html[data-theme="dark"] {
         meta.data.forEach(function (el, j) {
           var v = ds.data[j];
           if (!v) return;
-          if (horizontal) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(v, el.x + 4, el.y); }
-          else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(v, el.x, el.y - 3); }
+          var texte = String(v), largeur = ctx.measureText(texte).width;
+          var x, y, boite, place = false, redondante = false;
+
+          for (var n = 0; n < ESSAIS && !place && !redondante; n++) {
+            if (horizontal) {
+              x = el.x + 4 + n * (largeur + 5);
+              y = el.y;
+              boite = { x1: x, x2: x + largeur, y1: y - HAUTEUR / 2, y2: y + HAUTEUR / 2 };
+            } else {
+              x = el.x;
+              y = el.y - 3 - n * (HAUTEUR + 2);
+              boite = { x1: x - largeur / 2, x2: x + largeur / 2, y1: y - HAUTEUR, y2: y };
+            }
+            var gene = null;
+            for (var k = 0; k < prises.length; k++) {
+              if (seChevauchent(boite, prises[k])) { gene = prises[k]; break; }
+            }
+            if (!gene) { place = true; }
+            else if (gene.texte === texte) { redondante = true; }
+          }
+
+          if (!place) return;
+          boite.texte = texte;
+          prises.push(boite);
+          if (horizontal) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; }
+          else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; }
+          ctx.fillText(texte, x, y);
         });
       });
       ctx.restore();
@@ -241,6 +376,10 @@ html[data-theme="dark"] {
   function initCharts() {
     charts.forEach(function (c) { c.destroy(); });
     charts = [];
+
+    // Relu à chaque appel : après un changement de période, le fragment a
+    // été remplacé et ce bloc de données est un autre élément que le premier.
+    var D = JSON.parse(document.getElementById('kpi-chart-data').textContent);
 
     var tick = isDark() ? '#8a9aa8' : '#666';
     var grid = isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
@@ -287,6 +426,8 @@ html[data-theme="dark"] {
   }
 
   initCharts();
+  // Appelé par la navigation AJAX, qui vient de poser de nouveaux canevas.
+  window.kpiRefaireGraphiques = initCharts;
 
   var themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.addEventListener('click', function () { setTimeout(initCharts, 60); });

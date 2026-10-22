@@ -293,6 +293,13 @@
    * déplierait un groupe sans rapport.
    */
   function noterOuverts() {
+    /* Une liste dont les groupes ne viennent pas de core.listing ne sait pas
+     * relire `ouverts` : l'écran des doublons compose les siens en mémoire et
+     * les pagine, et un chemin n'y désigne rien de stable d'une page à
+     * l'autre. Lui écrire l'état déplié dans l'adresse et le dire au serveur
+     * ne ferait qu'une requête de plus pour rien. Le geste, lui, est bien le
+     * même : seule la mémoire est mise de côté. */
+    if (window.lstSansMemoire) return;
     var ouverts = [];
     document.querySelectorAll('.lst-groupe.open').forEach(function (bande) {
       if (ouverts.indexOf(bande.dataset.chemin) === -1) {

@@ -366,3 +366,23 @@ def dimensions_personnalisees(champs=None):
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_articles(),
                            exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_articles(par_page=40):
+    """Déclaration de la liste des prestations, partagée par la page et son
+    export. `par_page` varie avec la vue (cartes ou tableau), le reste non."""
+    from core.listing import Listing
+
+    champs = champs_articles()
+    declarees = construire_dimensions()
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_articles(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=par_page,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('nom',),
+        tris=TRIS,
+    )
+    return listing, champs, declarees, perso

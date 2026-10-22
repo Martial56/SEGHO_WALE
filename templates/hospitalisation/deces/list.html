@@ -1,4 +1,5 @@
 {% extends 'hospitalisation/base.html' %}
+{% load humanize %}
 {% load i18n static %}
 
 {% block extra_css %}
@@ -98,10 +99,14 @@ html[data-theme="dark"] .badge-termine   { background: rgba(6,95,70,.2);  color:
       </button>
       <div class="io-page-menu" id="io-page-menu">
         {% if perms.hospitalisation.view_registredeces %}
-        <div class="io-pm-section">Exporter le registre</div>
-        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=json"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
-        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=csv"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
-        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=xlsx"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
+        {% comment %}Les liens emportent la sélection : le fichier porte les
+        lignes affichées, pas tout le registre.{% endcomment %}
+        <div class="io-pm-section">
+          {% if selection_active %}Exporter la sélection ({{ nb_selection|intcomma }}){% else %}Exporter le registre ({{ nb_selection|intcomma }}){% endif %}
+        </div>
+        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=json{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-json" style="color:#c97a00;"></i> JSON</a>
+        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=csv{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-filetype-csv" style="color:#1a7a4a;"></i> CSV</a>
+        <a class="io-pm-item" href="{% url 'hospitalisation:deces_export' %}?format=xlsx{% if export_qs %}&amp;{{ export_qs }}{% endif %}"><i class="bi bi-file-earmark-excel" style="color:#217346;"></i> Excel</a>
         {% endif %}
         {% if perms.hospitalisation.add_registredeces and perms.hospitalisation.change_registredeces %}
         <div class="io-pm-sep"></div>

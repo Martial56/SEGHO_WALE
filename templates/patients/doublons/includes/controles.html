@@ -1,0 +1,92 @@
+{% comment %}
+Le contenu de `#subheader-controls` : effacement, menus « Filtres » et
+« Regrouper par », pagination haute et bascule cartes/tableau. Même balisage,
+mêmes classes et mêmes identifiants que la barre de la liste des patients,
+pour que le JS partagé (includes/listing/page_js.html) sache l'échanger et
+pour que l'écran ait la même tête.
+
+Les filtres se cumulent et passent par `toggleParam`, sauf le niveau, qui est
+exclusif — un groupe est quasi certain ou à vérifier, jamais les deux.
+{% endcomment %}
+{% if q or niveau != 'tous' or raisons or rattache or grouper %}
+<a href="?" class="o-ctrl-btn" data-effacer
+   style="color:var(--rose-text);" title="Effacer les filtres et la recherche">
+  <i class="bi bi-x-circle"></i> Effacer
+</a>
+{% endif %}
+
+<div class="o-dd-wrap">
+  <button class="o-ctrl-btn {% if niveau != 'tous' or raisons or rattache %}active{% endif %}"
+          id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+    <i class="bi bi-funnel{% if niveau != 'tous' or raisons or rattache %}-fill{% endif %}"></i>
+    Filtres
+  </button>
+  <div class="o-dd-panel lst-menu dbl-menu-filtres" id="dd-filtres">
+
+    <div class="o-dd-section">Niveau de ressemblance</div>
+    <a class="o-dd-item {% if niveau == 'certain' %}active{% endif %}"
+       href="#" onclick="dblNiveau('certain'); return false;">Quasi certain</a>
+    <a class="o-dd-item {% if niveau == 'avertissement' %}active{% endif %}"
+       href="#" onclick="dblNiveau('avertissement'); return false;">À vérifier</a>
+    <a class="o-dd-item {% if niveau == 'tous' %}active{% endif %}"
+       href="#" onclick="dblNiveau('tous'); return false;">Tous</a>
+
+    <div class="o-dd-section">Données rattachées</div>
+    {% for code, libelle, nombre in rattachees_possibles %}
+    <a class="o-dd-item {% if code in rattache %}active{% endif %}"
+       href="#" onclick="toggleParam('rattache','{{ code }}'); return false;">
+      {{ libelle }}{% if nombre %}<span class="dbl-compte">{{ nombre }}</span>{% endif %}
+    </a>
+    {% endfor %}
+
+    {% comment %}
+    Quarante phrases : le menu défile. Chacune porte son nombre, compté sur le
+    relevé déjà filtré par les autres filtres — c'est ce qu'on obtiendra en
+    cochant, pas un nombre théorique.
+    {% endcomment %}
+    <div class="o-dd-section">Raison du rapprochement</div>
+    <div class="dbl-raisons-liste">
+      {% for phrase, nombre in comptes_raison %}
+      <a class="o-dd-item {% if phrase in raisons %}active{% endif %}"
+         href="#" onclick="toggleParam('raison','{{ phrase|escapejs }}'); return false;"
+         title="{{ phrase }}">
+        <span class="dbl-raison-texte">{{ phrase }}</span>
+        <span class="dbl-compte">{{ nombre }}</span>
+      </a>
+      {% empty %}
+      <span class="o-dd-item" style="color:var(--text-muted);">Aucune raison relevée.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="o-dd-wrap">
+  <button class="o-ctrl-btn {% if grouper %}active{% endif %}"
+          id="btn-group" onclick="toggleDd('dd-group', this)">
+    <i class="bi bi-collection"></i> Regrouper par
+  </button>
+  <div class="o-dd-panel lst-menu" id="dd-group">
+    {% comment %}
+    Une dimension à la fois : les sections de l'écran des doublons portent une
+    phrase entière, les imbriquer les rendrait illisibles.
+    {% endcomment %}
+    {% for code, libelle in dimensions %}
+    <a class="o-dd-item {% if grouper == code %}active{% endif %}"
+       href="#" onclick="dblGrouper('{{ code }}'); return false;">{{ libelle }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="o-ctrl-sep"></div>
+{% include 'patients/doublons/includes/pagination.html' %}
+<div class="o-ctrl-sep"></div>
+<div class="o-view-btns">
+  {% comment %}
+  La vue retenue est rétablie par le script au chargement (`appliquerVue`) :
+  le serveur ne la connaît pas, elle vit dans le navigateur.
+  {% endcomment %}
+  <button class="o-view-btn active" id="btn-cartes" onclick="dblVue('cartes')"
+          title="Cartes"><i class="bi bi-grid"></i></button>
+  <button class="o-view-btn" id="btn-tableau" onclick="dblVue('tableau')"
+          title="Tableau"><i class="bi bi-list-ul"></i></button>
+</div>

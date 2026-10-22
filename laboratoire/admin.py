@@ -138,7 +138,8 @@ def action_reintegrer_oru(modeladmin, request, queryset):
     from .hprim.integration import integrer_oru
     for e in queryset.filter(sens="reception"):
         try:
-            _p, synthese = integrer_oru(e.contenu.encode("iso-8859-1", "replace"))
+            _p, synthese = integrer_oru(e.contenu.encode("iso-8859-1", "replace"),
+                                        centre=e.centre)
             e.statut = "traite"
             e.message_log = (f"Réintégré : {synthese['resultats']} résultat(s).")
             e.save(update_fields=["statut", "message_log"])

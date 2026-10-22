@@ -236,3 +236,50 @@ class TestLaDemandeDitCeQuiAEtePaye(TestCase):
             _sync(self.facture)
         self.garde.refresh_from_db()
         self.assertEqual(self.garde.origine, 'medecin')
+
+
+class TestLaNumerotationSurvitAUneSuppression(TestCase):
+    """Les trois numérotations du laboratoire partageaient le défaut de `Patient`.
+
+    Elles comptaient les lignes de l'année : effacer une analyse faisait
+    retomber le compteur sur un numéro déjà porté, et l'enregistrement suivant
+    butait sur la contrainte d'unicité.
+    """
+
+    def setUp(self):
+        self.patient = Patient.objects.create(
+            nom='Labo', prenoms='Test', date_naissance='1990-06-01',
+            sexe='M', telephone='0700000000')
+
+    def _demande(self):
+        return DemandeExamen.objects.create(patient=self.patient)
+
+    def test_une_demande_apres_une_suppression_ne_leve_plus(self):
+        a, b, c = (self._demande() for _ in range(3))
+        dernier = c.numero
+        b.delete()
+        suivante = self._demande()
+        self.assertGreater(suivante.numero, dernier)
+        self.assertEqual(
+            DemandeExamen.all_objects.filter(numero=suivante.numero).count(), 1)
+
+    def test_une_analyse_apres_une_suppression_ne_leve_plus(self):
+        from .models import AnalyseLaboratoire
+        faits = [AnalyseLaboratoire.objects.create(patient=self.patient)
+                 for _ in range(3)]
+        dernier = faits[-1].numero
+        faits[1].delete()
+        suivante = AnalyseLaboratoire.objects.create(patient=self.patient)
+        self.assertGreater(suivante.numero, dernier)
+
+    def test_une_imagerie_apres_une_suppression_ne_leve_plus(self):
+        from .models import ExamenImagerie
+        faits = [ExamenImagerie.objects.create(
+            patient=self.patient, type_imagerie='radiographie',
+            zone_examinee='Thorax') for _ in range(3)]
+        dernier = faits[-1].numero
+        faits[1].delete()
+        suivante = ExamenImagerie.objects.create(
+            patient=self.patient, type_imagerie='radiographie',
+            zone_examinee='Thorax')
+        self.assertGreater(suivante.numero, dernier)

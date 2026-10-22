@@ -377,3 +377,26 @@ def dimensions_personnalisees(champs=None):
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_factures(),
                            exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_factures():
+    """Déclaration de la liste des factures, partagée par la page et son export.
+
+    Une seule source : laisser les deux la rebâtir chacun de leur côté finirait
+    par faire diverger le fichier téléchargé de ce qui est affiché.
+    """
+    from core.listing import Listing
+
+    champs = champs_factures()
+    declarees = construire_dimensions()
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_factures(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_emission',),
+        tris=TRIS,
+    )
+    return listing, champs, declarees, perso

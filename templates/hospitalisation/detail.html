@@ -99,7 +99,6 @@ fiche en ayant plusieurs.{% endcomment %}
   border-radius: var(--radius-xs);
   font-size: 13px; color: var(--text-muted);
 }
-.act-sep { width: 1px; height: 24px; background: var(--border-strong); flex-shrink: 0; }
 
 /* Boutons d'action */
 .abtn {
@@ -537,7 +536,6 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
 
       {# ─ Clôturer le dossier ─ #}
       {% if actions.terminer.visible %}
-      <div class="act-sep"></div>
         {% if actions.terminer.enabled %}
         <button type="button" class="abtn abtn-dark"
                 onclick="doTransition('{% url 'hospitalisation:terminer' hosp.pk %}')">
@@ -892,8 +890,12 @@ html[data-theme="dark"] .saf-empty { color: var(--text-muted); }
           {% endif %}
         </div>
 
-        {# Barre info SAF non facturés #}
-        {% if saf_non_factures %}
+        {% comment %}
+        Barre info SAF non facturés. Masquée sur un dossier annulé : ces
+        services ne seront jamais facturés, et l'alerte s'y lisait comme une
+        dette à régler.
+        {% endcomment %}
+        {% if saf_non_factures and hosp.statut != 'annule' %}
         <div class="saf-info-bar" id="saf-nf-bar">
           <span style="font-size:13px;color:var(--text-muted);">
             <i class="bi bi-exclamation-circle" style="color:var(--color-warning);margin-right:4px;"></i>
@@ -1440,7 +1442,6 @@ function renderActionBar(data) {
   }
 
   if (A.terminer && A.terminer.visible) {
-    html += '<div class="act-sep"></div>';
     if (A.terminer.enabled) {
       html += '<button class="abtn abtn-dark" onclick="doTransition(\'' + URL_TERMINER + '\')">'
             + '<i class="bi bi-check-all"></i> Clôturer le dossier</button>';

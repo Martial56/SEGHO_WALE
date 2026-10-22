@@ -217,3 +217,65 @@
   html[data-theme="dark"] .io-filename { background: rgba(var(--teal-500-rgb), 0.14); border-color: #2d5a80; color: #7ec8e3; }
   html[data-theme="dark"] .io-btn-cancel { background: var(--surface); border-color: var(--border-strong); color: var(--text); }
   html[data-theme="dark"] .io-btn-cancel:hover { background: var(--surface); }
+
+  /* ── Jauge d'import (voir includes/io_progression.html) ── */
+  .io-progress { display: none; }
+  .io-progress.active { display: block; }
+
+  .io-prog-etape {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .io-prog-bar {
+    height: 10px;
+    border-radius: 5px;
+    background: #e6edf4;
+    overflow: hidden;
+  }
+
+  .io-prog-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 5px;
+    background: var(--teal-500);
+    transition: width .3s ease;
+  }
+
+  /* Tant que le fichier n'est pas lu on ignore le total : la barre balaie au
+     lieu d'afficher un 0 % qui ferait croire que rien ne démarre. */
+  .io-prog-fill.indetermine {
+    width: 35%;
+    animation: io-prog-balayage 1.1s ease-in-out infinite;
+  }
+
+  @keyframes io-prog-balayage {
+    0%   { margin-left: -35%; }
+    100% { margin-left: 100%; }
+  }
+
+  .io-prog-chiffres {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .io-prog-chiffres strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .io-prog-detail {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  .io-prog-detail.echec { color: #c0392b; white-space: pre-wrap; word-break: break-word; }
+
+  html[data-theme="dark"] .io-prog-bar { background: var(--surface); border: 1px solid var(--border-strong); }
+  html[data-theme="dark"] .io-prog-detail.echec { color: #ff8a7a; }

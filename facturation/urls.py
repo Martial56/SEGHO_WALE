@@ -5,6 +5,7 @@ app_name = 'facturation'
 
 urlpatterns = [
     path('', views.facturation_list, name='list'),
+    path('export/', views.export_factures, name='export'),
     path('nouvelle/', views.facture_create, name='create'),
     path('<int:pk>/', views.facture_detail, name='detail'),
     path('<int:pk>/modifier/', views.facture_edit, name='edit'),
@@ -16,6 +17,7 @@ urlpatterns = [
 
     # Configuration
     path('configuration/caisses/', views.caisses_list, name='caisses_list'),
+    path('configuration/caisses/export/', views.export_caisses, name='caisses_export'),
     path('configuration/caisses/nouvelle/', views.caisse_create, name='caisse_create'),
     path('configuration/caisses/<int:pk>/modifier/', views.caisse_edit, name='caisse_edit'),
     path('configuration/caisses/<int:pk>/supprimer/', views.caisse_delete, name='caisse_delete'),

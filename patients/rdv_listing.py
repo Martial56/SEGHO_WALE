@@ -679,3 +679,31 @@ def dimensions_personnalisees(champs=None):
     """
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_rdv(), exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_rdv(aujourdhui, contexte_gyneco=False):
+    """Déclaration d'une liste de rendez-vous, partagée par la page et son export.
+
+    Les trois listes de rendez-vous — module Rendez-vous, gynécologie, fiche
+    patient — partagent cette déclaration ; seul `contexte_gyneco` change les
+    filtres offerts.
+    """
+    from core.listing import Listing
+
+    champs = champs_rdv()
+    declarees = construire_dimensions(aujourdhui)
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        # Le téléphone est cherché comme le nom : taper « 0707… » dans une
+        # liste de rendez-vous doit trouver la personne. Posé ici, et non
+        # dans chaque vue, pour que les trois listes et leurs exports
+        # cherchent la même chose.
+        recherche=('patient__nom', 'patient__prenoms', 'patient__code_patient',
+                   'patient__telephone'),
+        familles=familles_rdv(contexte_gyneco),
+        dimensions=list(declarees.values()) + perso,
+        par_page=100,
+        filtres_defaut=FILTRES_PAR_DEFAUT,
+        tri_defaut=('-date_heure',),
+    )
+    return listing, champs, declarees, perso

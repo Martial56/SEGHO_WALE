@@ -198,3 +198,19 @@ def construire_dimensions():
 
     return {cle: Dimension(cle=cle, libelle=libelle, sous_menu=sous_menu, **d)
             for cle, libelle, sous_menu, d in brut}
+
+
+def listing_deces():
+    """Déclaration du registre des décès, partagée par la page et son export."""
+    from core.listing import Listing
+
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_deces(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('-date_deces',),
+    )
+    return listing, declarees

@@ -451,13 +451,22 @@
             flex-shrink: 0; margin-top: 1px;
         }
         .toast-close:hover { color: var(--teal-900); }
+        /* Le geste qui défait l'annonce : dans le toast, là où l'œil arrive. */
+        .toast-action {
+            background: none; border: none; cursor: pointer; padding: 0;
+            font-family: inherit; font-size: 13px; font-weight: 700;
+            color: var(--accent-text); text-decoration: underline;
+            flex-shrink: 0; margin-top: 1px; white-space: nowrap;
+        }
+        .toast-action:hover { color: var(--accent); }
+        html[data-theme="dark"] .toast-action { color: var(--teal-300); }
         .toast-progress {
             position: absolute;
             bottom: 0; left: 0;
             height: 3px;
             width: 100%;
             transform-origin: left;
-            animation: toast-shrink 4s linear forwards;
+            animation: toast-shrink var(--toast-duree, 4s) linear forwards;
         }
         .toast-success .toast-progress { background: var(--green); }
         .toast-error   .toast-progress { background: var(--rose); }
@@ -577,6 +586,23 @@
         @media (max-width: 900px) {
             .hist-wrapper { flex-direction: column; }
             .hist-aside { width: 100%; margin-left: 0; margin-top: 14px; position: static; max-height: none; }
+        }
+
+        /* ── Logo de chargement posé sur un écran déjà rempli ──
+           Le fond plein du premier chargement cacherait des chiffres qu'on
+           vient de regarder. Ici on les laisse voir derrière un flou : on
+           comprend tout de suite qu'ils sont en train d'être remplacés, et
+           non que la page est partie.
+
+           `!important` parce que #page-loader porte son fond plein en style
+           en ligne, qui l'emporterait sinon sur cette feuille. */
+        #page-loader.loader-flou {
+            background: rgba(255,255,255,0.35) !important;
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        html[data-theme="dark"] #page-loader.loader-flou {
+            background: rgba(0,0,0,0.30) !important;
         }
 
         /* ═══════════════════════════════════════
@@ -1686,10 +1712,16 @@
         ];
         var container = document.getElementById('toast-container');
 
-        function showToast(text, tag) {
+        /* `options` est facultatif : `{action: {libelle, faire}, duree}`.
+           Une action se défait souvent — masquer une fiche, par exemple — et
+           l'annulation doit se trouver là où l'annonce s'affiche, pas dans un
+           bandeau à part. Le texte reste posé par `textContent` : un message
+           peut contenir un nom de patient, jamais du balisage. */
+        function showToast(text, tag, options) {
             var validTags = ['success','error','warning','info'];
             var safeTag = validTags.indexOf(tag) !== -1 ? tag : 'info';
             var icon = icons[safeTag] || icons.info;
+            options = options || {};
 
             var toast = document.createElement('div');
             toast.className = 'toast toast-' + safeTag;
@@ -1699,14 +1731,31 @@
                 '<button class="toast-close" aria-label="Fermer">&#x2715;</button>' +
                 '<span class="toast-progress"></span>';
             toast.querySelector('.toast-body').textContent = text;
+
+            if (options.action) {
+                var lien = document.createElement('button');
+                lien.type = 'button';
+                lien.className = 'toast-action';
+                lien.textContent = options.action.libelle;
+                lien.addEventListener('click', function () {
+                    dismissToast(toast);
+                    options.action.faire();
+                });
+                toast.insertBefore(lien, toast.querySelector('.toast-close'));
+            }
             container.appendChild(toast);
 
-            var timer = setTimeout(function(){ dismissToast(toast); }, 4000);
+            // Une annonce qu'on peut défaire doit laisser le temps de lire,
+            // de comprendre, et de changer d'avis.
+            var delai = options.duree || (options.action ? 9000 : 4000);
+            var timer = setTimeout(function(){ dismissToast(toast); }, delai);
+            toast.style.setProperty('--toast-duree', delai + 'ms');
 
             toast.querySelector('.toast-close').addEventListener('click', function(){
                 clearTimeout(timer);
                 dismissToast(toast);
             });
+            return toast;
         }
         // Exposé globalement : les pages qui se rafraîchissent en AJAX n'ont
         // pas de cycle de messages Django pour signaler une erreur réseau.
@@ -1727,24 +1776,40 @@
     {% block extra_js %}{% endblock %}
 
     <script>
-    window.addEventListener('load', function() {
-      var loader = document.getElementById('page-loader');
-      if (loader) {
-        loader.style.opacity = '0';
-        setTimeout(function(){ loader.style.display = 'none'; }, 420);
-      }
-    });
-    // Réaffiche le loader global avec un message, avant une action bloquante
-    // (ex: soumission de formulaire) qui va recharger/naviguer la page.
-    window.showPageLoader = function(message) {
+    // Le logo de chargement, posé par le gabarit au-dessus de la page.
+    //
+    // Il s'efface quand la page a fini de charger, et se rallume avant une
+    // action bloquante qui va naviguer — une soumission de formulaire, par
+    // exemple. Les écrans qui renouvellent leurs données sans recharger la
+    // page s'en servent aussi : `showPageLoader` puis `hidePageLoader`, pour
+    // que l'attente ait la même tête partout.
+    var minuterieLoader = null;
+
+    // `flou` : le fond plein cache tout, ce qui est juste au premier
+    // chargement — il n'y a rien derrière. Quand l'écran est déjà là et qu'on
+    // ne renouvelle que ses chiffres, on le laisse voir, simplement flouté.
+    window.showPageLoader = function(message, flou) {
       var loader = document.getElementById('page-loader');
       var text = document.getElementById('page-loader-text');
       if (text) text.textContent = message || '';
-      if (loader) {
-        loader.style.display = 'flex';
-        loader.style.opacity = '1';
-      }
+      if (!loader) return;
+      loader.classList.toggle('loader-flou', !!flou);
+      // Une extinction encore en cours effacerait ce qu'on vient d'allumer.
+      clearTimeout(minuterieLoader);
+      loader.style.display = 'flex';
+      loader.style.opacity = '1';
     };
+
+    window.hidePageLoader = function() {
+      var loader = document.getElementById('page-loader');
+      if (!loader) return;
+      loader.style.opacity = '0';
+      clearTimeout(minuterieLoader);
+      // `display:none` seulement après le fondu, sinon il disparaît d'un coup.
+      minuterieLoader = setTimeout(function(){ loader.style.display = 'none'; }, 420);
+    };
+
+    window.addEventListener('load', function() { window.hidePageLoader(); });
     </script>
     <script>
     // ── Panneau notifications ──────────────────────────────────────────────────

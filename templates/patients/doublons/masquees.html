@@ -1,0 +1,85 @@
+{% extends 'patients/doublons/base_doublons.html' %}
+{% comment %}
+Les fiches retirées à la main. Ailleurs, elles n'existent plus : ni dans la
+recherche, ni dans les listes, ni dans les sélecteurs, et leur adresse directe
+ne s'ouvre que pour qui traite les doublons. C'est donc ici, et nulle part
+ailleurs, qu'on peut les revoir et les rendre.
+{% endcomment %}
+
+{% block onglet_masquees %}active{% endblock %}
+
+{% block subheader_compte %}<span class="o-page-count">{{ page.paginator.count }}</span>{% endblock %}
+
+{% block subheader_recherche %}
+  {% include 'patients/doublons/includes/recherche.html' with placeholder="Nom, code ou ancien identifiant…" %}
+{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+  /* Les deux actions sur une ligne : « Réafficher » se défait, « Supprimer »
+     non — elles ne doivent pas se ressembler. */
+  .msq-actions { display: flex; align-items: center; gap: 4px;
+                 justify-content: flex-end; }
+</style>
+{% endblock %}
+
+{% block doublons_contenu %}
+<div class="dbl-tableau">
+<table class="jnl">
+  <thead>
+    <tr>
+      <th>Fiche</th><th>Naissance</th><th>Téléphone</th><th>Doublon de</th>
+      <th>Masquée par</th><th>Quand</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for fiche in fiches %}
+    <tr>
+      <td>
+        <a href="{% url 'patients:detail' fiche.pk %}" class="code">{{ fiche.code_patient }}</a>
+        {{ fiche.nom }} {{ fiche.prenoms }}
+      </td>
+      <td>{{ fiche.naissance|default:'—' }}</td>
+      <td>{{ fiche.telephone|default:'—' }}</td>
+      <td>
+        {% if fiche.doublon_de %}
+        <a href="{% url 'patients:detail' fiche.doublon_de.pk %}"
+           class="code">{{ fiche.doublon_de.code_patient }}</a>
+        {{ fiche.doublon_de.nom }} {{ fiche.doublon_de.prenoms }}
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ fiche.masque_par|default:'—' }}</td>
+      <td class="quand">{{ fiche.masque_le|date:'d/m/Y H:i'|default:'—' }}</td>
+      <td class="msq-actions">
+        <form method="post"
+              action="{% url 'patients:doublons_reafficher' fiche.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+          <button type="submit" class="o-ctrl-btn">Réafficher</button>
+        </form>
+        {% comment %}
+        Réservée aux super-utilisateurs : une permission se donne à un
+        groupe, et un groupe s'élargit sans qu'on y pense.
+        {% endcomment %}
+        {% if user.is_superuser %}
+        <a class="o-btn-danger"
+           href="{% url 'patients:doublons_supprimer' fiche.pk %}?retour={{ request.get_full_path|urlencode }}">
+          Supprimer
+        </a>
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="o-empty">
+      {% if q %}Aucune fiche masquée ne correspond à cette recherche.
+      {% else %}Aucune fiche masquée dans ce centre.{% endif %}
+    </td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div style="padding:12px 0;">
+  {% include 'patients/doublons/includes/pagination.html' %}
+</div>
+{% endblock %}

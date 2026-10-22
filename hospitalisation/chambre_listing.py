@@ -113,3 +113,19 @@ def construire_dimensions():
 
     return {cle: Dimension(cle=cle, libelle=libelle, sous_menu=sous_menu, **d)
             for cle, libelle, sous_menu, d in brut}
+
+
+def listing_chambres():
+    """Déclaration de la liste des chambres, partagée par la page et son export."""
+    from core.listing import Listing
+
+    declarees = construire_dimensions()
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        familles=familles_chambres(),
+        dimensions=list(declarees.values()),
+        par_page=25,
+        filtres_defaut=FILTRES_DEFAUT,
+        tri_defaut=('salle_no',),
+    )
+    return listing, declarees

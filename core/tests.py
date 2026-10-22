@@ -10,9 +10,10 @@ Ces tests vérifient les deux moitiés de la correction : la permission ouvre la
 porte, et le nom du groupe qui la porte n'a aucune importance.
 """
 import re
+from datetime import date
 
 from django.contrib.auth.models import Group, Permission, User
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 
 from core.listing import TOUS_LES_GROUPES
@@ -1354,3 +1355,358 @@ class TestLaMemoireRetientLesFiltresPersonnalises(TestCase):
         self.client.get(self.url,
                         headers={'x-requested-with': 'XMLHttpRequest'})
         self.assertNotIn(PREFIXE_CLE + self.url, self.client.session)
+
+
+class TestProchainCode(TestCase):
+    """La brique de numérotation partagée (core.numerotation).
+
+    Elle remplace le « compter les lignes, plus un » qui équipait neuf modèles :
+    une suppression ramenait le compteur en arrière, et le code calculé était
+    déjà pris. La contrainte d'unicité rejetait l'enregistrement, et le rejetait
+    encore à chaque tentative suivante.
+    """
+
+    def _creer(self, suffixe):
+        from patients.models import Patient
+        return Patient.objects.create(
+            nom=f'Code{suffixe}', prenoms='Patient',
+            date_naissance='1990-06-01', sexe='M', telephone='0700000000')
+
+    def _prochain(self):
+        from core.numerotation import prochain_code
+        from patients.models import Patient
+        from django.utils import timezone
+        return prochain_code(Patient.all_objects, 'code_patient',
+                             f'PAT{timezone.now().year}', 5)
+
+    def test_sur_une_table_vide_le_rang_part_de_un(self):
+        from django.utils import timezone
+        self.assertEqual(self._prochain(), f'PAT{timezone.now().year}00001')
+
+    def test_le_rang_suit_le_plus_haut_et_non_le_nombre_de_lignes(self):
+        """Le coeur du correctif : on lit le plus haut code, pas le compte."""
+        patients = [self._creer(i) for i in range(5)]
+        plus_haut = patients[-1].code_patient
+        patients[1].delete()
+        patients[2].delete()
+        # Le compte est tombé à 3 ; le plus haut rang posé reste 5.
+        self.assertEqual(int(self._prochain()[-5:]), int(plus_haut[-5:]) + 1)
+
+    def test_un_code_hors_format_ne_fait_pas_tomber_la_numerotation(self):
+        """Une reprise de données peut avoir posé un code que `int` refuse.
+
+        Mieux vaut repartir d'un rang approché — la boucle anti-collision
+        rattrapant le reste — que de refuser tout enregistrement.
+        """
+        from patients.models import Patient
+        from django.utils import timezone
+        annee = timezone.now().year
+        p = self._creer('legacy')
+        Patient.all_objects.filter(pk=p.pk).update(
+            code_patient=f'PAT{annee}ABCDE')
+        code = self._prochain()
+        self.assertTrue(code.startswith(f'PAT{annee}'))
+        self.assertFalse(Patient.all_objects.filter(code_patient=code).exists())
+
+    def test_un_rang_deja_pris_est_enjambe(self):
+        """Deux guichets qui enregistrent dans la même seconde.
+
+        Ils lisent le même « dernier » et calculeraient le même code : la boucle
+        évite à la contrainte d'unicité d'avoir à servir de garde-fou.
+        """
+        from patients.models import Patient
+        from django.utils import timezone
+        annee = timezone.now().year
+        self._creer('a')
+        # On pose à la main le code que la numérotation va viser.
+        vise = self._prochain()
+        p = self._creer('b')
+        Patient.all_objects.filter(pk=p.pk).update(code_patient=vise)
+        self.assertNotEqual(self._prochain(), vise)
+
+
+class TestLeTelechargementDemandeLaPermission(TestCase):
+    """Cacher le bouton ne suffit pas : l'adresse doit refuser aussi.
+
+    Les listes de gynécologie rendent leur export dans la vue de la page, et
+    cette vue n'exigeait qu'une connexion. Le fichier — toutes les patientes,
+    tout le registre des naissances — partait donc à n'importe quel compte qui
+    tapait `?format=csv`, bouton visible ou non.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        # Les deux vues sont aussi gardées par `module_requis('gynecologie')`,
+        # qui répond à une autre question : « cette personne travaille-t-elle
+        # ici ? ». On la met de côté en donnant le module à tout le monde, pour
+        # n'éprouver que la permission.
+        from modules_permissions.models import Module, UserModuleOverride
+
+        module, _ = Module.objects.get_or_create(
+            code='gynecologie', defaults={'name': 'Gynécologie', 'is_active': True})
+        module.is_active = True
+        module.save()
+
+        def avec_module(nom, *codes):
+            user = User.objects.create_user(nom, password='x')
+            for code in codes:
+                user.user_permissions.add(_permission(code))
+            UserModuleOverride.objects.create(
+                user=user, module=module, override_type='grant')
+            return User.objects.get(pk=user.pk)
+
+        cls.nu = avec_module('tel_nu')
+        cls.voit_patientes = avec_module('tel_pat', 'patients.view_patient')
+        cls.voit_naissances = avec_module('tel_nai', 'patients.view_naissance')
+
+    def _code(self, utilisateur, url):
+        client = Client()
+        client.force_login(User.objects.get(pk=utilisateur.pk))
+        return client.get(url).status_code
+
+    def test_les_patientes_refusent_sans_view_patient(self):
+        url = reverse('gynecologie_list') + '?format=csv'
+        self.assertEqual(self._code(self.nu, url), 403)
+        self.assertEqual(self._code(self.voit_patientes, url), 200)
+
+    def test_le_registre_des_naissances_refuse_sans_view_naissance(self):
+        url = reverse('gynecologie_naissances') + '?format=csv'
+        self.assertEqual(self._code(self.nu, url), 403)
+        self.assertEqual(self._code(self.voit_naissances, url), 200)
+
+    def test_l_ancienne_adresse_du_registre_refuse_aussi(self):
+        """`?export=excel` est le lien que portait l'ancien bouton."""
+        url = reverse('gynecologie_naissances') + '?export=excel'
+        self.assertEqual(self._code(self.nu, url), 403)
+
+    def test_la_page_elle_meme_reste_ouverte(self):
+        """Seul le téléchargement est fermé : la vue n'a pas changé de garde."""
+        self.assertEqual(self._code(self.nu, reverse('gynecologie_list')), 200)
+        self.assertEqual(self._code(self.nu, reverse('gynecologie_naissances')), 200)
+
+
+class TestLeTableauDeBordChargeSaPoliceDIcones(TestCase):
+    """Deux icônes ne s'affichaient nulle part, dans les deux thèmes.
+
+    La police d'icônes est chargée module par module, jamais dans
+    `base.html`. La vue d'ensemble, qui étend `base.html` directement, avait
+    oublié le lien : la grille qui ramène à l'accueil et le compteur du titre
+    tombaient à zéro pixel de large. Le lien restait cliquable — simplement
+    invisible, et donc introuvable.
+    """
+
+    FEUILLE = 'vendor/bootstrap-icons/bootstrap-icons.min.css'
+
+    def _page(self):
+        user = User.objects.create_user('u_icones', password='x')
+        client = Client()
+        client.force_login(user)
+        reponse = client.get(reverse('kpi_dashboard'))
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_barre_porte_bien_ses_icones(self):
+        """Le garde-fou du test suivant : sans icône, il ne prouverait rien."""
+        html = self._page()
+        self.assertIn('<i class="bi bi-grid-3x3-gap-fill">', html)
+        self.assertIn('<i class="bi bi-speedometer2">', html)
+
+    def test_toute_icone_de_la_page_a_sa_feuille_de_style(self):
+        html = self._page()
+        icones = set(re.findall(r'class="bi (bi-[\w-]+)"', html))
+        self.assertTrue(icones)
+        self.assertIn(self.FEUILLE, html,
+                      f"Icônes sans police : {sorted(icones)}")
+
+
+class TestLeTableauDeBordChangeDePeriodeSansRecharger(TestCase):
+    """Choisir une semaine rechargeait toute la page.
+
+    Les listes du bandeau posaient `location.search`, ce qui refait tout :
+    requête complète, feuilles de style, graphiques reconstruits depuis
+    zéro. La page redemande maintenant le seul fragment qui change et le
+    remplace sur place ; l'adresse suit par `pushState`, donc le lien reste
+    partageable et le bouton Retour continue de marcher.
+    """
+
+    def setUp(self):
+        self.visiteur = Client()
+        self.visiteur.force_login(User.objects.create_user('u_kpi', password='x'))
+
+    def _page(self, params='', ajax=False):
+        entetes = {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'} if ajax else {}
+        reponse = self.visiteur.get(reverse('kpi_dashboard') + params, **entetes)
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_la_demande_ajax_ne_renvoie_que_le_fragment(self):
+        fragment = self._page(ajax=True)
+        self.assertIn('id="kpi-vue"', fragment)
+        self.assertNotIn('<html', fragment)
+        self.assertNotIn('</body>', fragment)
+
+    def test_la_page_entiere_porte_le_meme_fragment(self):
+        """Sans quoi le script ne trouverait rien à remplacer."""
+        self.assertIn('id="kpi-vue"', self._page())
+
+    def test_le_fragment_repond_bien_la_periode_demandee(self):
+        from django.utils import timezone as tz
+
+        annee = tz.localdate().year
+        fragment = self._page(f'?period=mois&annee={annee}&mois=1', ajax=True)
+        self.assertIn(f'Janvier {annee}', fragment)
+        self.assertIn('Année', self._page(f'?period=annee&annee={annee}', ajax=True))
+
+    def test_les_filtres_ne_rechargent_plus_la_page(self):
+        page = self._page()
+        self.assertIn("'X-Requested-With': 'XMLHttpRequest'", page)
+        self.assertIn('history.pushState', page)
+        self.assertNotIn('location.search =', page)
+
+
+class TestLesSemainesSuiventLeMoisChoisi(SimpleTestCase):
+    """La liste des semaines proposait l'année entière, quel que soit le mois.
+
+    Le mois joue deux rôles : c'est une période à part entière, et c'est le
+    cadre dans lequel on choisit une semaine. Seul le premier était tenu —
+    choisir « Mars » laissait les quarante-trois semaines de l'année dans la
+    liste d'à côté.
+    """
+
+    AUJOURD_HUI = date(2026, 10, 20)
+    ANNEES = [2026, 2025]
+
+    def _periode(self, **params):
+        from core.kpi_annuel import resoudre_periode
+        return resoudre_periode(params, self.AUJOURD_HUI, self.ANNEES)
+
+    def _numeros(self, periode):
+        return [n for n, _ in periode['semaines_choix']]
+
+    def test_sans_mois_la_liste_couvre_l_annee(self):
+        p = self._periode(period='annee', annee='2026')
+        self.assertEqual(self._numeros(p)[0], 43, "coupée à la semaine en cours")
+        self.assertEqual(self._numeros(p)[-1], 1)
+
+    def test_un_mois_choisi_ne_laisse_que_ses_semaines(self):
+        p = self._periode(period='mois', annee='2026', mois='3')
+        self.assertEqual(sorted(self._numeros(p)), [9, 10, 11, 12, 13, 14])
+
+    def test_une_semaine_a_cheval_compte_dans_les_deux_mois(self):
+        """S9 va du 23/02 au 01/03 : on la veut en février comme en mars."""
+        self.assertIn(9, self._numeros(self._periode(period='mois', annee='2026', mois='2')))
+        self.assertIn(9, self._numeros(self._periode(period='mois', annee='2026', mois='3')))
+
+    def test_le_cadre_survit_au_choix_d_une_semaine(self):
+        """Sans quoi la liste se réélargirait dès le premier choix."""
+        p = self._periode(period='semaine', annee='2026', mois='3', semaine='11')
+        self.assertEqual(p['semaine'], 11)
+        self.assertEqual(p['cadre_mois'], 3)
+        self.assertEqual(sorted(self._numeros(p)), [9, 10, 11, 12, 13, 14])
+
+    def test_une_semaine_hors_du_cadre_est_refusee(self):
+        """La semaine 40 est en octobre : demandée dans le cadre de mars, on
+        retombe sur la dernière semaine de mars plutôt que d'en sortir."""
+        p = self._periode(period='semaine', annee='2026', mois='3', semaine='40')
+        self.assertEqual(p['semaine'], 14)
+
+    def test_sans_cadre_toutes_les_semaines_restent_atteignables(self):
+        p = self._periode(period='semaine', annee='2026', semaine='40')
+        self.assertEqual(p['semaine'], 40)
+        self.assertIsNone(p['cadre_mois'])
+        self.assertEqual(len(self._numeros(p)), 43)
+
+    def test_une_annee_passee_garde_ses_semaines_entieres(self):
+        p = self._periode(period='annee', annee='2025')
+        self.assertEqual(self._numeros(p)[0], 52)
+
+    def test_le_mois_cadre_le_mois_affiche_et_la_case_cochee(self):
+        """`mois` ne vaut que pour la période ; `cadre_mois` coche l'option."""
+        mois = self._periode(period='mois', annee='2026', mois='3')
+        self.assertEqual((mois['mois'], mois['cadre_mois']), (3, 3))
+        semaine = self._periode(period='semaine', annee='2026', mois='3', semaine='11')
+        self.assertEqual((semaine['mois'], semaine['cadre_mois']), (None, 3))
+
+
+class TestLeCalendrierDesListesPartAvecLaPage(SimpleTestCase):
+    """Les listes se répondent entre elles sans repasser par le serveur.
+
+    Choisir une année puis un mois ne vaut pas une visite : le relevé coûte
+    près de trois secondes, et on le relançait à chaque clic pendant qu'on
+    cherchait sa semaine. L'écran reçoit donc d'un coup, pour chaque année,
+    ses mois et ses semaines — et c'est « Actualiser » qui va chercher les
+    chiffres, une fois la période composée.
+    """
+
+    AUJOURD_HUI = date(2026, 10, 20)
+
+    def _calendrier(self, *annees):
+        from core.kpi_annuel import calendrier
+        return calendrier(list(annees), self.AUJOURD_HUI)
+
+    def test_chaque_annee_porte_ses_mois_et_ses_semaines(self):
+        cal = self._calendrier(2026, 2025)
+        self.assertEqual(len(cal['2026']['mois']), 10, "arrêtés au mois en cours")
+        self.assertEqual(len(cal['2025']['mois']), 12)
+        self.assertEqual(len(cal['2026']['semaines']), 43)
+        self.assertEqual(len(cal['2025']['semaines']), 52)
+
+    def test_les_semaines_partent_de_la_plus_recente(self):
+        semaines = self._calendrier(2026)['2026']['semaines']
+        self.assertEqual(semaines[0]['n'], 43)
+        self.assertEqual(semaines[-1]['n'], 1)
+
+    def test_une_semaine_a_cheval_porte_ses_deux_mois(self):
+        """S9 2026 va du 23/02 au 01/03 : l'écran doit la proposer dans les
+        deux mois, exactement comme le fait le serveur."""
+        s9 = next(s for s in self._calendrier(2026)['2026']['semaines'] if s['n'] == 9)
+        self.assertEqual(s9['mois'], [2, 3])
+
+    def test_une_semaine_qui_deborde_sur_l_annee_d_avant_ne_compte_qu_ici(self):
+        """S1 2026 commence le 29/12/2025 : décembre n'est pas un mois de 2026."""
+        s1 = next(s for s in self._calendrier(2026)['2026']['semaines'] if s['n'] == 1)
+        self.assertEqual(s1['mois'], [1])
+
+    def test_le_decoupage_est_le_meme_que_celui_du_serveur(self):
+        """Les deux doivent dire la même chose, sinon la liste changerait
+        sous les yeux au premier « Actualiser »."""
+        from core.kpi_annuel import resoudre_periode
+
+        cote_ecran = sorted(s['n'] for s in self._calendrier(2026)['2026']['semaines']
+                            if 3 in s['mois'])
+        serveur = resoudre_periode({'period': 'mois', 'annee': '2026', 'mois': '3'},
+                                   self.AUJOURD_HUI, [2026])
+        self.assertEqual(cote_ecran, sorted(n for n, _ in serveur['semaines_choix']))
+
+
+class TestLeBandeauAttendLeBoutonActualiser(TestCase):
+
+    def setUp(self):
+        self.visiteur = Client()
+        self.visiteur.force_login(User.objects.create_user('u_act', password='x'))
+
+    def _page(self):
+        reponse = self.visiteur.get(reverse('kpi_dashboard'))
+        self.assertEqual(reponse.status_code, 200)
+        return reponse.content.decode()
+
+    def test_le_bouton_est_la_avec_le_calendrier_qu_il_lui_faut(self):
+        page = self._page()
+        self.assertIn('id="kpi-actualiser"', page)
+        self.assertIn('id="kpi-calendrier"', page)
+
+    def test_les_trois_listes_ont_leur_identifiant(self):
+        """Le script les désigne par là ; sans eux il ne redessine rien."""
+        page = self._page()
+        for ident in ('kpi-annee', 'kpi-mois', 'kpi-semaine'):
+            with self.subTest(ident=ident):
+                self.assertIn(f'id="{ident}"', page)
+
+    def test_le_calendrier_vit_hors_du_fragment_remplace(self):
+        """Il ne dépend d'aucune période : le réexpédier à chaque échange
+        serait du poids pour rien."""
+        fragment = self.visiteur.get(
+            reverse('kpi_dashboard'), HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        ).content.decode()
+        self.assertIn('id="kpi-actualiser"', fragment)
+        self.assertNotIn('id="kpi-calendrier"', fragment)

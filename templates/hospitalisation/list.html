@@ -208,14 +208,26 @@ html[data-theme="dark"] .o-dd-item.active { background: rgba(var(--teal-500-rgb)
   </div>
 
   <!-- Ligne 2 : créer + contrôles -->
-  <div class="o-subheader-row">
+  {% comment %}
+  #subheader-controls porte la ligne entière, et non plus le seul bloc de
+  droite : le rafraîchissement AJAX n'échange que l'intérieur de cet élément,
+  et le menu « Exporter » — qui annonce le nombre de lignes sélectionnées —
+  doit en faire partie pour ne pas rester sur un compte périmé.
+  {% endcomment %}
+  <div class="o-subheader-row" id="subheader-controls">
     {% if perms.hospitalisation.add_hospitalisation or user.is_superuser %}
     <a href="{% url 'hospitalisation:create' %}" class="o-btn-create">
       <i class="bi bi-plus-lg"></i> Nouvelle admission
     </a>
     {% endif %}
 
-    <div class="o-subheader-row-right" id="subheader-controls">
+    {% comment %}Collé au bouton Créer, comme le menu Export / Import
+    des autres listes. Réservé à qui peut consulter les hospitalisations.{% endcomment %}
+    {% if perms.hospitalisation.view_hospitalisation %}
+    {% include 'includes/listing/menu_export.html' %}
+    {% endif %}
+
+    <div class="o-subheader-row-right">
       {% include 'hospitalisation/includes/_list_controls.html' %}
     </div>
   </div>

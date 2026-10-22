@@ -1,0 +1,118 @@
+{% comment %}
+Le même relevé en tableau, pour qui préfère balayer une colonne plutôt qu'une
+grille. Une ligne par groupe : les fiches s'empilent dans la cellule, et les
+colonnes se lisent d'un côté à l'autre comme sur la liste des patients.
+{% endcomment %}
+<table>
+  <thead>
+    <tr>
+      {% comment %}
+      « Tout sélectionner sur la page » est ici en vue tableau, au-dessus de
+      la colonne des cases qu'elle commande — c'est là qu'on la cherche. La
+      vue en cartes n'a pas d'en-tête de colonne : elle garde la sienne dans
+      la barre au-dessus du relevé (entete_resultats.html). Les deux portent
+      `data-tout-page` et se suivent.
+      {% endcomment %}
+      <th class="dbl-col-coche">
+        <input type="checkbox" data-tout-page
+               aria-label="Tout sélectionner sur la page">
+      </th>
+      <th>Fiches</th>
+      <th>Naissance</th>
+      <th>Téléphone</th>
+      <th>Données rattachées</th>
+      <th>Raison</th>
+      <th class="dbl-col-score">Score</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% if groupes %}
+    {% for groupe in groupes %}
+    {% if grouper %}{% ifchanged groupe.section %}
+    {% comment %}La même bande qu'en cartes, en ligne de tableau — voir
+    liste_corps.html.{% endcomment %}
+    <tr class="lst-groupe open" data-chemin="{{ groupe.section_rang }}"
+        data-parent="" data-total="{{ groupe.section_total }}" data-charge="1"
+        onclick="lstBasculerGroupe(this)">
+      <td colspan="8">
+        <i class="bi bi-chevron-right lst-chevron"></i>
+        <label class="dbl-coche-section" onclick="event.stopPropagation();">
+          <input type="checkbox" data-section="{{ groupe.section }}">
+          <span>{{ groupe.section }}</span>
+        </label>
+        <span class="lst-compte">{{ groupe.section_total }}</span>
+      </td>
+    </tr>
+    {% endifchanged %}{% endif %}
+    <tr data-groupe="{{ groupe.cle }}" data-niveau="{{ groupe.niveau }}"
+        {% if grouper %}data-parent="{{ groupe.section_rang }}"{% endif %}
+        data-section="{{ groupe.section|default:'' }}"
+        {% comment %}
+        La ligne entière mène à la comparaison, sauf la dernière cellule :
+        `stopPropagation` sur le formulaire aurait aussi privé l'écouteur
+        délégué du masquage de son événement.
+        {% endcomment %}
+        onclick="if (!event.target.closest('.dbl-col-action') && !event.target.closest('.dbl-col-coche')) window.location='{% url 'patients:doublons_comparer' cle=groupe.cle %}?retour={{ request.get_full_path|urlencode }}'">
+      <td class="dbl-col-coche">
+        <input type="checkbox" class="dbl-coche" value="{{ groupe.cle }}"
+               aria-label="Sélectionner ce groupe">
+      </td>
+      <td class="dbl-col-fiches">
+        {% for fiche in groupe.fiches %}
+        <div>
+          <span class="code">{{ fiche.code_patient }}</span>
+          {% if fiche.pk == groupe.garder %}<span class="etoile" title="Fiche à garder">★</span>{% endif %}
+          <span class="nom">{% for mot in fiche.mots_identite %}{% if not forloop.first %} {% endif %}{% if mot.diff %}<span class="diff">{{ mot.mot }}</span>{% else %}{{ mot.mot }}{% endif %}{% endfor %}</span>
+          {% if fiche.masque %}<span class="dbl-vide">(masquée)</span>{% endif %}
+        </div>
+        {% endfor %}
+      </td>
+      <td class="lv-muted">
+        {% for fiche in groupe.fiches %}
+        <div>{% if fiche.naissance %}{% if fiche.differe.naissance %}<span class="diff">{{ fiche.naissance }}</span>{% else %}{{ fiche.naissance }}{% endif %}{% else %}<span class="dbl-vide">inconnue</span>{% endif %}</div>
+        {% endfor %}
+      </td>
+      <td class="lv-muted">
+        {% for fiche in groupe.fiches %}
+        <div>{% if fiche.telephone %}{% if fiche.differe.telephone %}<span class="diff">{{ fiche.telephone }}</span>{% else %}{{ fiche.telephone }}{% endif %}{% else %}<span class="dbl-vide">—</span>{% endif %}</div>
+        {% endfor %}
+      </td>
+      <td class="lv-muted">
+        {% for fiche in groupe.fiches %}
+        <div>{% if fiche.rattache_resume %}{{ fiche.rattache_resume }}{% else %}<span class="dbl-vide">aucune</span>{% endif %}</div>
+        {% endfor %}
+      </td>
+      <td class="lv-muted">{{ groupe.raisons|join:', ' }}</td>
+      <td class="dbl-col-score"><span class="dbl-pastille {{ groupe.niveau }}">{{ groupe.score }} %</span></td>
+      <td class="dbl-col-action">
+        {% if groupe.masquable %}
+        <form class="dbl-rapide" method="post"
+              action="{% url 'patients:doublons_masquer' cle=groupe.cle pk=groupe.masquable.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="au_profit_de" value="{{ groupe.garder }}">
+          <input type="hidden" name="retour" value="{{ request.get_full_path }}">
+          <button type="button" class="dbl-rapide-btn" data-demander>
+            <i class="bi bi-eye-slash"></i> Masquer le doublon
+          </button>
+          <span class="dbl-confirme" hidden>
+            Masquer {{ groupe.masquable.code_patient }} ?
+            <button type="submit" class="oui">Oui</button>
+            <button type="button" class="non" data-renoncer>Non</button>
+          </span>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    {% else %}
+    <tr>
+      <td colspan="8" style="text-align:center;padding:48px;color:var(--text-muted);">
+        {% if q %}Aucun groupe ne correspond à cette recherche.
+        {% elif niveau != 'tous' %}Aucun doublon à ce niveau.
+        {% else %}Aucun doublon relevé dans ce centre.{% endif %}
+      </td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>

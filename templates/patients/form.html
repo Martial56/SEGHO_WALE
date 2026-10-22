@@ -10,6 +10,184 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/intl-tel-input/css/intlTelInput.css' %}">
 <style>
+    /* ── Doublons ── */
+    .dbl-approx { display:flex; align-items:center; gap:6px; margin-top:6px;
+                  font-size:12px; color:var(--text-muted); cursor:pointer; }
+
+    /* Rappel sous le bloc d'identité. La fenêtre ne s'ouvre qu'une fois par
+       identité saisie : sans ce bouton, on ne pourrait plus la revoir. */
+    .dbl-sous-identite { display:flex; align-items:center; gap:14px;
+                         /* Marge haute négative : l'espace sous le bloc
+                            d'identité vient de ce bloc-là, pas d'ici. La
+                            reprendre de ce côté est le seul moyen de
+                            rapprocher l'avis du champ qu'il commente sans
+                            toucher à la grille des champs. */
+                         flex-wrap:wrap; margin:-16px 2px 8px 12px; }
+    /* Un avis, pas un autocollant. L'ancienne capsule entièrement arrondie,
+       en gras et en couleurs écrites à la main, jurait à côté de la phrase
+       grise qui la suit — deux familles visuelles pour une même information.
+       Tout passe par les jetons du projet : la teinte suit alors le thème
+       sombre toute seule, au lieu d'un bloc de rattrapage par couleur. */
+    .dbl-rappel { display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+                  border:1px solid rgba(var(--amber-rgb), .40);
+                  border-radius:var(--radius-sm);
+                  background:rgba(var(--amber-rgb), .10);
+                  color:var(--amber-text); font-size:12px; font-weight:500;
+                  padding:4px 10px; font-family:var(--font-main);
+                  transition:background .15s, border-color .15s; }
+    /* `display:inline-flex` l'emporte sur le `display:none` que l'attribut
+       `hidden` pose depuis la feuille du navigateur : sans cette ligne, la
+       pastille restait à l'écran, vide, sur tout formulaire où rien ne
+       ressemble encore — une petite capsule ambre sans texte. */
+    .dbl-rappel[hidden] { display:none; }
+    .dbl-rappel i { font-size:12px; opacity:.8; }
+    .dbl-rappel:hover { background:rgba(var(--amber-rgb), .18);
+                        border-color:rgba(var(--amber-rgb), .60); }
+    .dbl-rappel:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .dbl-rappel.blocage { border-color:rgba(var(--rose-rgb), .40);
+                          background:rgba(var(--rose-rgb), .10);
+                          color:var(--rose-text); }
+    .dbl-rappel.blocage:hover { background:rgba(var(--rose-rgb), .18);
+                                border-color:rgba(var(--rose-rgb), .60); }
+    html[data-theme="dark"] .dbl-rappel { color:#e8b84b; }
+    html[data-theme="dark"] .dbl-rappel.blocage { color:#f09aa3; }
+    .dbl-info { font-size:12px; color:var(--text-muted); }
+    /* Les trois champs du garde-fou ne sont plus proposés en bas de page : la
+       fenêtre les renseigne. Ils restent dans le formulaire, car c'est le
+       serveur qui décide à l'enregistrement, pas elle. */
+    .dbl-champs { display:none; }
+
+    /* ── Fenêtre des dossiers ressemblants ── */
+    .dbl-voile { position:fixed; inset:0; z-index:var(--z-modal, 500);
+                 display:flex; align-items:center; justify-content:center;
+                 padding:24px; background:rgba(7,30,40,.55); }
+    .dbl-voile[hidden] { display:none; }
+    /* La fenêtre prend la largeur de son contenu, sans dépasser trois cartes
+       et demie : à 880 px fixes, une seule fiche proche laissait les deux
+       tiers de la fenêtre vides. */
+    .dbl-fenetre { display:flex; flex-direction:column; width:fit-content;
+                   min-width:min(460px, 100%); max-width:min(880px, 100%);
+                   max-height:calc(100vh - 48px); overflow:hidden;
+                   border-radius:var(--radius-sm); background:var(--surface);
+                   color:var(--text); box-shadow:var(--shadow-lg);
+                   border:1px solid var(--border-strong); }
+    .dbl-tete { padding:16px 20px 12px; border-bottom:1px solid var(--border); }
+    .dbl-titre { display:flex; align-items:center; gap:8px;
+                 font-size:15px; font-weight:700; color:#8a6100; }
+    .dbl-titre.blocage { color:#b02a37; }
+    html[data-theme="dark"] .dbl-titre { color:#e8b84b; }
+    html[data-theme="dark"] .dbl-titre.blocage { color:#f09aa3; }
+    .dbl-saisie { margin-top:8px; font-size:13px; color:var(--text-muted); }
+    .dbl-saisie b { color:var(--text); font-weight:600; }
+
+    .dbl-corps { padding:16px 20px; overflow-y:auto; }
+    /* Trois cartes tiennent dans la largeur ; au-delà on fait défiler, plutôt
+       que de rétrécir chaque carte jusqu'à l'illisible. */
+    .dbl-cartes { display:flex; align-items:stretch; gap:12px;
+                  overflow-x:auto; padding-bottom:6px; }
+    /* La feuille globale masque toutes les barres de défilement. Ici elle doit
+       se voir : c'est le seul indice qu'il reste des fiches à droite. */
+    .dbl-cartes { scrollbar-width:thin; }
+    .dbl-cartes::-webkit-scrollbar { height:8px; }
+    .dbl-cartes::-webkit-scrollbar-thumb { background:var(--border-strong);
+                                           border-radius:4px; }
+    /* Une seule fiche proche : la carte prend toute la largeur plutôt que de
+       laisser le reste de la fenêtre vide. */
+    .dbl-cartes.une-seule .dbl-carte { flex:1 1 auto; }
+    /* `display:flex` cale le contenu en haut : un bouton centre verticalement
+       le sien, et les cartes courtes flottaient par rapport aux longues. */
+    .dbl-carte { flex:0 0 248px; display:flex; flex-direction:column;
+                 text-align:left; cursor:pointer;
+                 border:1px solid var(--border); border-radius:var(--radius-sm);
+                 background:var(--surface-muted); color:var(--text);
+                 padding:14px 16px; font-family:var(--font-main); font-size:13px; }
+    /* Survol et sélection ne doivent pas se confondre : le survol se contente
+       d'épaissir la couleur du trait, la sélection pose un liseré vert et une
+       coche. Changer le fond au survol faisait passer pour choisie la carte
+       sous le pointeur. L'`outline` tient lieu de bordure épaisse : une
+       bordure de 2 px décalerait les cartes voisines d'un pixel. */
+    .dbl-carte:hover { border-color:rgba(var(--teal-500-rgb), .55); }
+    .dbl-carte.choisie, .dbl-carte.choisie:hover {
+        border-color:var(--accent); outline:2px solid var(--accent);
+        outline-offset:-2px; background:rgba(var(--teal-500-rgb), .07); }
+    .dbl-carte:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    /* Réservée dès le départ : la faire apparaître changerait la largeur du
+       code au moment du clic. */
+    .dbl-coche { flex:0 0 auto; width:18px; height:18px; visibility:hidden;
+                 display:inline-flex; align-items:center; justify-content:center;
+                 border-radius:50%; background:var(--accent); color:#fff;
+                 font-size:11px; font-weight:700; line-height:1; }
+    .dbl-carte.choisie .dbl-coche { visibility:visible; }
+    /* `align-items:baseline` aligne le nom et le score sur la même assise ;
+       centrés, le score flottait au-dessus d'un nom sur deux lignes. */
+    .dbl-carte-tete { display:flex; align-items:baseline; gap:8px; }
+    /* Le nom porte la carte : c'est lui qu'on compare, et rien d'autre ne
+       doit lui disputer le regard. */
+    .dbl-ident { flex:1; min-width:0; font-size:15px; font-weight:650;
+                 line-height:1.25; color:var(--text-strong);
+                 letter-spacing:-.01em; overflow-wrap:anywhere; }
+    .dbl-code { display:block; margin:2px 0 10px;
+                font-family:var(--font-mono); font-size:11.5px;
+                letter-spacing:.02em; color:var(--text-faint); }
+    .dbl-score { flex:0 0 auto; font-weight:700; font-size:13px;
+                 padding:1px 7px; border-radius:999px; line-height:1.5; }
+    .dbl-score.blocage { color:#b02a37; background:rgba(176,42,55,.10); }
+    .dbl-score.avertissement { color:#8a6100; background:rgba(var(--amber-rgb), .16); }
+    html[data-theme="dark"] .dbl-score.blocage { color:#f09aa3;
+                                                 background:rgba(240,154,163,.14); }
+    html[data-theme="dark"] .dbl-score.avertissement { color:#e8b84b;
+                                                       background:rgba(232,184,75,.14); }
+    /* Une grille plutôt que six lignes indépendantes : les intitulés
+       s'alignent sur le plus long (« Dernière visite ») au lieu d'être
+       repliés sur deux lignes par une colonne fixe de 76 px. */
+    .dbl-faits { display:grid; grid-template-columns:auto 1fr; gap:4px 12px;
+                 align-items:baseline; }
+    .dbl-ligne { display:contents; }
+    .dbl-cle { color:var(--text-muted); font-size:11.5px; white-space:nowrap;
+               text-transform:uppercase; letter-spacing:.04em; }
+    .dbl-val { min-width:0; word-break:break-word; }
+    /* Ce qui diffère de la saisie est surligné : c'est la seule chose que la
+       personne doit lire pour trancher. Le surlignage est porté par un span
+       intérieur, sinon il s'étirerait sur toute la largeur de la colonne.
+       Le titre y a droit comme les autres champs : c'est même là qu'il sert
+       le plus, puisque le nom est ce qu'on compare en premier. */
+    .dbl-ident .diff, .dbl-val .diff {
+        background:rgba(var(--amber-rgb), .22); border-radius:3px;
+        padding:0 3px; font-weight:600; }
+    /* Le nom est déjà gras : un fond un peu plus franc pour qu'il se
+       détache quand même. */
+    .dbl-ident .diff { background:rgba(var(--amber-rgb), .34);
+                       box-decoration-break:clone;
+                       -webkit-box-decoration-break:clone; }
+    /* La raison ferme la carte, et elle est poussée en bas : deux cartes
+       côte à côte alignent ainsi leur dernière ligne même si l'une a un nom
+       sur deux lignes. */
+    .dbl-raisons { margin-top:auto; padding-top:10px;
+                   border-top:1px solid var(--border);
+                   font-size:12px; color:var(--text-muted); line-height:1.45; }
+
+    .dbl-pied { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+                padding:14px 20px; border-top:1px solid var(--border);
+                background:var(--surface-muted); }
+    .dbl-pied .btn:disabled { opacity:.45; cursor:not-allowed; box-shadow:none; }
+    .dbl-pied .btn { white-space:nowrap; }
+    /* `min-width:0` autorise le texte à se réduire : sans lui, sa largeur
+       minimale repoussait « Ouvrir la fiche » à la ligne suivante dès que la
+       fenêtre se resserrait. */
+    .dbl-note { flex:1 1 0; min-width:0; font-size:12px; color:var(--text-muted); }
+    /* Les deux boutons forment un bloc insécable, collé à droite. */
+    .dbl-boutons { flex:0 0 auto; margin-left:auto; display:flex; gap:12px; }
+    /* Rien ne dit qu'une carte se clique : le bouton « Ouvrir la fiche » reste
+       grisé et on ne sait pas pourquoi. L'invite disparaît dès qu'on a choisi,
+       elle n'a plus rien à apprendre. */
+    .dbl-aide { flex:1 1 100%; font-size:12px; color:var(--text-muted);
+                display:flex; align-items:center; gap:6px; }
+    .dbl-aide[hidden] { display:none; }
+    .dbl-raison { flex:1 1 100%; }
+    .dbl-raison[hidden] { display:none; }
+    .dbl-raison label { display:block; font-size:12px; color:var(--text-muted);
+                        margin-bottom:4px; }
+
     /* ── intl-tel-input ── */
     .iti { width: 100%; display: block; }
     .iti__selected-flag { background: transparent !important; }
@@ -482,10 +660,19 @@
         </div>
         <div>
             <label class="field-label" for="{{ form.date_naissance.id_for_label }}">
-                Date de naissance <span class="required-star">*</span>
+                Date de naissance{% if not edit %} <span class="required-star">*</span>{% endif %}
             </label>
             {{ form.date_naissance }}
             {% if form.date_naissance.errors %}<div class="field-error">{{ form.date_naissance.errors.0 }}</div>{% endif %}
+            {% comment %}
+            Cochée quand on ne connaît que l'année — un âge déclaré, par
+            exemple. La recherche de doublons ne comparera alors que l'année,
+            au lieu de croire à une date certaine.
+            {% endcomment %}
+            <label class="dbl-approx">
+                {{ form.date_naissance_approx }}
+                <span>{{ form.date_naissance_approx.label }}</span>
+            </label>
         </div>
         <div>
             <span class="field-label">Âge</span>
@@ -510,6 +697,25 @@
             <label class="field-label" for="{{ form.nationalite.id_for_label }}">Nationalité</label>
             {{ form.nationalite }}
         </div>
+    </div>
+
+    {% comment %}
+    Rappel des dossiers ressemblants. La fenêtre ne s'ouvre qu'une fois par
+    identité saisie — on ne va pas la remettre devant quelqu'un qui vient de
+    la lire. Ce bouton est le moyen d'y revenir ; il reste masqué tant que
+    rien ne ressemble.
+    {% endcomment %}
+    <div class="dbl-sous-identite">
+        {% comment %}
+        L'icône est posée en dur et le texte vit dans son propre span : le
+        script n'écrit plus que dans le span, sinon `textContent` effacerait
+        l'icône à chaque mise à jour.
+        {% endcomment %}
+        <button type="button" class="dbl-rappel" id="dbl-rappel" hidden>
+            <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+            <span id="dbl-rappel-texte"></span>
+        </button>
+        <span class="dbl-info" id="dbl-info" hidden></span>
     </div>
 
 </div><!-- /patient-header-card -->
@@ -604,6 +810,17 @@
     </div>
 </div><!-- /tabs-wrapper -->
 
+{% comment %}
+Les trois champs du garde-fou. Ils ne sont plus proposés en bas de page : la
+fenêtre des dossiers ressemblants les renseigne, et elle seule. Ils restent
+dans le formulaire parce que c'est le serveur qui tranche à l'enregistrement
+— la fenêtre n'empêche rien, elle montre.
+{% endcomment %}
+<div class="dbl-champs">
+    {{ form.doublon_confirme }}
+    {{ form.forcer_doublon }}
+</div>
+
 <!-- ── Bottom actions ── -->
 <div class="form-actions">
     {% if edit %}
@@ -614,6 +831,56 @@
     <button type="submit" class="btn btn-primary">
         {% if edit %}Enregistrer les modifications{% else %}Créer le dossier patient{% endif %}
     </button>
+</div>
+
+{% comment %}
+Fenêtre des dossiers ressemblants. Elle s'ouvre à la sortie du champ date de
+naissance (ou du téléphone si la date est vide), une seule fois par identité
+saisie, et seulement si un dossier ressemble. L'encadré qu'elle remplace
+vivait en bas de page : on ne le découvrait qu'après avoir cliqué sur
+« Créer », c'est-à-dire trop tard.
+
+Elle est rendue vide ; les cartes viennent du serveur. Elle vit dans le
+formulaire parce que le champ « raison » qu'elle porte doit partir avec lui.
+{% endcomment %}
+<div class="dbl-voile" id="dbl-voile" hidden>
+    <div class="dbl-fenetre" role="dialog" aria-modal="true"
+         aria-labelledby="dbl-titre" tabindex="-1" id="dbl-fenetre">
+        <div class="dbl-tete">
+            <div class="dbl-titre" id="dbl-titre">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <span id="dbl-titre-texte"></span>
+            </div>
+            <div class="dbl-saisie" id="dbl-saisie"></div>
+        </div>
+        <div class="dbl-corps">
+            <div class="dbl-cartes" id="dbl-cartes"></div>
+        </div>
+        <div class="dbl-pied">
+            <span class="dbl-aide" id="dbl-aide" hidden>
+                <i class="bi bi-hand-index"></i>
+                Cliquez sur une fiche pour la choisir
+            </span>
+            <div class="dbl-raison" id="dbl-raison" hidden>
+                <label for="{{ form.raison_forcage.id_for_label }}">
+                    Pourquoi ce dossier doit exister malgré tout
+                </label>
+                {{ form.raison_forcage }}
+                {% if form.raison_forcage.errors %}
+                <div class="field-error">{{ form.raison_forcage.errors.0 }}</div>
+                {% endif %}
+            </div>
+            <span class="dbl-note" id="dbl-note"></span>
+            <div class="dbl-boutons">
+                <button type="button" class="btn btn-secondary" id="dbl-continuer">
+                    Continuer la saisie
+                </button>
+                <button type="button" class="btn btn-primary" id="dbl-ouvrir" disabled>
+                    Ouvrir la fiche
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 </form>
@@ -822,6 +1089,466 @@
             }
         });
     }
+})();
+</script>
+
+{% comment %}
+Fenêtre des dossiers ressemblants.
+
+Elle n'empêche rien : elle montre, pour qu'on ouvre le dossier existant plutôt
+que d'en ouvrir un second. Le contrôle qui refuse est côté serveur, dans
+PatientForm — et il refuserait de la même façon si ce script ne tournait pas.
+
+Elle s'ouvre à la sortie du champ date de naissance, ou du téléphone quand la
+date est vide, et une seule fois par identité saisie : revenir sur ce qu'on
+vient de lire fait fermer sans lire. Le rappel sous le bloc d'identité est là
+pour y retourner.
+
+La frappe, elle, continue d'interroger le serveur une demi-seconde après la
+dernière touche — sans rien ouvrir : c'est ce qui tient le rappel à jour.
+« KOUASSI » partirait sinon en sept requêtes.
+{% endcomment %}
+<script>
+(function () {
+    var url        = "{{ url_verif_doublons }}";
+    var urlJournal = "{{ url_journal_doublons }}";
+    if (!url) { return; }
+
+    var voile      = document.getElementById('dbl-voile');
+    var fenetre    = document.getElementById('dbl-fenetre');
+    var titre      = document.getElementById('dbl-titre');
+    var titreTexte = document.getElementById('dbl-titre-texte');
+    var zoneSaisie = document.getElementById('dbl-saisie');
+    var zoneCartes = document.getElementById('dbl-cartes');
+    var note       = document.getElementById('dbl-note');
+    var zoneRaison = document.getElementById('dbl-raison');
+    var aide       = document.getElementById('dbl-aide');
+    var btnOuvrir  = document.getElementById('dbl-ouvrir');
+    var btnSuite   = document.getElementById('dbl-continuer');
+    var rappel     = document.getElementById('dbl-rappel');
+    // Le texte seul : écrire dans le bouton effacerait son icône.
+    var rappelTxt  = document.getElementById('dbl-rappel-texte');
+    var info       = document.getElementById('dbl-info');
+    if (!voile || !rappel) { return; }
+
+    var champ = function (nom) { return document.getElementById('id_' + nom); };
+    var valeur = function (nom) { var e = champ(nom); return e ? (e.value || '') : ''; };
+
+    var caseConfirme = champ('doublon_confirme');
+    var caseForcer   = champ('forcer_doublon');
+    var champRaison  = champ('raison_forcage');
+
+    {% comment %}
+    En modification le serveur ne refuse jamais — deux fiches déjà en double
+    doivent rester corrigeables. La fenêtre suit la même règle : à l'écran
+    comme au serveur, « Continuer la saisie » n'est jamais grisé ici.
+    {% endcomment %}
+    var edition    = {% if edit %}true{% else %}false{% endif %};
+    var peutForcer = {% if peut_forcer %}true{% else %}false{% endif %};
+
+    var surveilles = ['nom', 'prenoms', 'date_naissance', 'telephone',
+                      'telephone2', 'sexe', 'date_naissance_approx'];
+    var identite   = ['nom', 'prenoms', 'date_naissance', 'telephone'];
+
+    var donnees = null;             // dernière réponse du serveur
+    var fiches = [];                // ses dossiers ressemblants
+    var bloque = false;             // au moins un à 85 % ou plus, hors modification
+    var choisi = null;              // index de la carte sélectionnée
+    var vueFor = null;              // identité pour laquelle la fenêtre s'est ouverte
+    var confirmeFor = null;      // identité pour laquelle la confirmation a été donnée
+    var focusAvant = null;
+    var minuteur = null, enCours = null;
+
+    // ── Comparaison ────────────────────────────────────────────────────────
+
+    function pareil(a, b) {
+        return (a || '').toString().toUpperCase().normalize('NFD')
+               .replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function chiffres(v) {
+        var d = (v || '').replace(/\D/g, '');
+        return d.length > 8 ? d.slice(-8) : d;
+    }
+
+    function signature() {
+        return identite.map(function (n) { return pareil(valeur(n)); }).join('|');
+    }
+
+    function sexeSaisi() {
+        var e = champ('sexe');
+        if (!e || e.selectedIndex < 0) { return ''; }
+        var opt = e.options[e.selectedIndex];
+        return e.value ? (opt ? opt.text : '') : '';
+    }
+
+    // ── Dialogue avec le serveur ───────────────────────────────────────────
+
+    function parametres() {
+        var p = new URLSearchParams();
+        surveilles.forEach(function (nom) {
+            var e = champ(nom);
+            if (!e) { return; }
+            p.set(nom, e.type === 'checkbox' ? (e.checked ? '1' : '') : (e.value || ''));
+        });
+        {% if edit %}p.set('exclure', '{{ patient.pk }}');{% endif %}
+        return p;
+    }
+
+    function verifier(ouvrirEnsuite) {
+        var nom = valeur('nom'), prenoms = valeur('prenoms');
+        if (nom.trim().length < 2 && prenoms.trim().length < 2) {
+            donnees = null; fiches = []; majRappel();
+            return;
+        }
+        if (enCours) { enCours.abort(); }
+        enCours = new AbortController();
+        fetch(url + '?' + parametres().toString(),
+              { headers: { 'X-Requested-With': 'XMLHttpRequest' }, signal: enCours.signal })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) {
+                if (!d) { return; }
+                donnees = d;
+                fiches = d.doublons || [];
+                bloque = !edition && fiches.some(function (f) { return f.niveau === 'blocage'; });
+                majRappel();
+                if (ouvrirEnsuite && fiches.length && signature() !== vueFor) { ouvrir(); }
+            })
+            .catch(function (e) { if (e.name !== 'AbortError') { majRappel(); } });
+    }
+
+    function journaliser() {
+        if (!urlJournal || !fiches.length) { return; }
+        var f = fiches[choisi === null ? 0 : choisi];
+        var jeton = document.querySelector('[name=csrfmiddlewaretoken]');
+        var corps = new URLSearchParams();
+        corps.set('pk', f.pk);
+        corps.set('score', f.score);
+        corps.set('nom', valeur('nom'));
+        corps.set('prenoms', valeur('prenoms'));
+        corps.set('raison', champRaison ? champRaison.value.trim() : '');
+        fetch(urlJournal, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': jeton ? jeton.value : ''
+            },
+            body: corps.toString()
+        }).catch(function () { /* le journal ne doit jamais retenir la saisie */ });
+    }
+
+    // ── Rappel sous le bloc d'identité ─────────────────────────────────────
+
+    function majRappel() {
+        // Sans centre actif, le serveur ne cherche rien et dit pourquoi. On
+        // le montre ici plutôt que de laisser croire qu'aucun dossier ne
+        // ressemble : l'enregistrement sera refusé pour la même raison.
+        if (donnees && donnees.message) {
+            rappel.hidden = false;
+            rappelTxt.textContent = donnees.message;
+            rappel.classList.add('blocage');
+            info.hidden = true;
+            return;
+        }
+        rappel.hidden = fiches.length === 0;
+        rappelTxt.textContent = fiches.length === 1
+            ? '1 patient proche — revoir'
+            : fiches.length + ' patients proches — revoir';
+        rappel.classList.toggle('blocage', bloque);
+        var n = donnees ? (donnees.meme_telephone || 0) : 0;
+        info.hidden = n === 0;
+        info.textContent = n + (n > 1 ? ' patients ont déjà ce numéro.'
+                                      : ' patient a déjà ce numéro.');
+    }
+
+    // ── Contenu de la fenêtre ──────────────────────────────────────────────
+
+    /* Un mot, surligné s'il diffère de la saisie. Le surlignage est porté
+       par un span intérieur : posé sur la cellule, il s'étirerait sur toute
+       la largeur de la colonne. */
+    function morceau(texte, different) {
+        var el = document.createElement('span');
+        if (different) { el.className = 'diff'; }
+        el.textContent = texte || '—';
+        return el;
+    }
+
+    function ligne(cle, val, different) {
+        var l = document.createElement('div');
+        l.className = 'dbl-ligne';
+        var c = document.createElement('span');
+        c.className = 'dbl-cle';
+        c.textContent = cle;
+        var v = document.createElement('span');
+        v.className = 'dbl-val';
+        if (different) {
+            var marque = document.createElement('span');
+            marque.className = 'diff';
+            marque.textContent = val || '—';
+            v.appendChild(marque);
+        } else {
+            v.textContent = val || '—';
+        }
+        l.appendChild(c); l.appendChild(v);
+        return l;
+    }
+
+    function naissance(f) {
+        if (!f.date_naissance) { return ''; }
+        return f.approximative ? '≈ ' + f.annee : f.date_naissance;
+    }
+
+    function memeNaissance(fiche, saisie) {
+        // Dès qu'un des deux côtés n'est qu'une estimation, seule l'année se
+        // compare : « ≈ 1996 » et « 01/10/1996 » ne se contredisent pas, et
+        // surligner cette ligne détournerait le regard de ce qui diffère
+        // vraiment.
+        if (!saisie) { return true; }
+        var a = fiche || '';
+        if (a.charAt(0) === '≈' || saisie.charAt(0) === '≈') {
+            return a.slice(-4) === saisie.slice(-4);
+        }
+        return pareil(a) === pareil(saisie);
+    }
+
+    function naissanceSaisie() {
+        var v = valeur('date_naissance');
+        if (!v) { return ''; }
+        var m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        var texte = m ? m[3] + '/' + m[2] + '/' + m[1] : v;
+        var approx = champ('date_naissance_approx');
+        return (approx && approx.checked) ? '≈ ' + (m ? m[1] : texte) : texte;
+    }
+
+    function rappelerLaSaisie() {
+        zoneSaisie.textContent = 'Vous saisissez : ';
+        var qui = document.createElement('b');
+        qui.textContent = (valeur('nom') + ' ' + valeur('prenoms')).trim() || '(sans nom)';
+        zoneSaisie.appendChild(qui);
+        var reste = [naissanceSaisie(), sexeSaisi(), valeur('telephone')]
+                    .filter(function (x) { return x; }).join(' · ');
+        if (reste) { zoneSaisie.appendChild(document.createTextNode(' — ' + reste)); }
+    }
+
+    function carte(f, index) {
+        var c = document.createElement('button');
+        c.type = 'button';
+        c.className = 'dbl-carte';
+        c.setAttribute('aria-pressed', 'false');
+
+        var nomSaisi = valeur('nom'), prenomsSaisis = valeur('prenoms');
+        var dateSaisie = naissanceSaisie(), sexe = sexeSaisi(), tel = valeur('telephone');
+
+        /* Le nom tient lieu de titre : c'est la ligne qu'on lit pour
+           trancher. Rangé en « Nom / Prénoms » parmi quatre autres champs de
+           même poids, il fallait le chercher. */
+        var tete = document.createElement('div');
+        tete.className = 'dbl-carte-tete';
+        var coche = document.createElement('span');
+        coche.className = 'dbl-coche';
+        coche.setAttribute('aria-hidden', 'true');
+        coche.textContent = '\u2713';
+        tete.appendChild(coche);
+        var ident = document.createElement('span');
+        ident.className = 'dbl-ident';
+        ident.appendChild(morceau(f.nom, nomSaisi && pareil(f.nom) !== pareil(nomSaisi)));
+        ident.appendChild(document.createTextNode(' '));
+        ident.appendChild(morceau(
+            f.prenoms, prenomsSaisis && pareil(f.prenoms) !== pareil(prenomsSaisis)));
+        tete.appendChild(ident);
+        var score = document.createElement('span');
+        score.className = 'dbl-score ' + f.niveau;
+        score.textContent = f.score + ' %';
+        tete.appendChild(score);
+        c.appendChild(tete);
+
+        var code = document.createElement('span');
+        code.className = 'dbl-code';
+        code.textContent = f.code;
+        c.appendChild(code);
+
+        /* Les quatre autres champs en grille : les intitulés s'alignent sur
+           le plus long au lieu d'être coupés dans une colonne fixe. */
+        var faits = document.createElement('div');
+        faits.className = 'dbl-faits';
+        faits.appendChild(ligne('Naissance', naissance(f),
+                                !memeNaissance(naissance(f), dateSaisie)));
+        faits.appendChild(ligne('Sexe', f.sexe, sexe && pareil(f.sexe) !== pareil(sexe)));
+        faits.appendChild(ligne('Téléphone', f.telephone,
+                                tel && chiffres(f.telephone) !== chiffres(tel)));
+        faits.appendChild(ligne('Dernière visite',
+                                f.derniere_visite || 'aucune visite', false));
+        c.appendChild(faits);
+
+        if (f.raisons && f.raisons.length) {
+            var r = document.createElement('div');
+            r.className = 'dbl-raisons';
+            r.textContent = f.raisons.join(', ');
+            c.appendChild(r);
+        }
+
+        c.addEventListener('click', function () { selectionner(index); });
+        return c;
+    }
+
+    function selectionner(index) {
+        choisi = index;
+        Array.prototype.forEach.call(zoneCartes.children, function (el, i) {
+            el.classList.toggle('choisie', i === index);
+            el.setAttribute('aria-pressed', i === index ? 'true' : 'false');
+        });
+        btnOuvrir.disabled = choisi === null;
+        aide.hidden = choisi !== null || zoneCartes.children.length < 2;
+    }
+
+    function peindre() {
+        titre.classList.toggle('blocage', bloque);
+        titreTexte.textContent = bloque ? 'Ce dossier existe probablement déjà'
+                                        : 'Ce patient existe peut-être déjà';
+        rappelerLaSaisie();
+
+        zoneCartes.innerHTML = '';
+        zoneCartes.classList.toggle('une-seule', fiches.length === 1);
+        fiches.forEach(function (f, i) { zoneCartes.appendChild(carte(f, i)); });
+
+        // Une seule fiche : il n'y a rien à choisir, le bouton est actif tout
+        // de suite. Plusieurs : on attend de savoir laquelle ouvrir.
+        choisi = null;
+        btnOuvrir.disabled = true;
+        aide.hidden = fiches.length < 2;
+        if (fiches.length === 1) { selectionner(0); }
+
+        zoneRaison.hidden = !(champRaison && champRaison.value.trim());
+        btnSuite.disabled = bloque && !peutForcer;
+        note.textContent = btnSuite.disabled ? 'Demandez à un responsable.' : '';
+    }
+
+    // ── Ouverture et fermeture ─────────────────────────────────────────────
+
+    function ouvrir() {
+        if (!fiches.length) { return; }
+        vueFor = signature();
+        peindre();
+        focusAvant = document.activeElement;
+        voile.hidden = false;
+        document.body.style.overflow = 'hidden';
+        fenetre.focus();
+    }
+
+    function fermer() {
+        voile.hidden = true;
+        document.body.style.overflow = '';
+        majRappel();
+        if (focusAvant && focusAvant.focus) { focusAvant.focus(); }
+    }
+
+    function continuer() {
+        if (btnSuite.disabled) { return; }
+        if (bloque && peutForcer) {
+            if (zoneRaison.hidden) {
+                zoneRaison.hidden = false;
+                note.textContent = 'Indiquez la raison, puis cliquez à nouveau.';
+                if (champRaison) { champRaison.focus(); }
+                return;
+            }
+            if (!champRaison || !champRaison.value.trim()) {
+                note.textContent = 'La raison est obligatoire.';
+                if (champRaison) { champRaison.focus(); }
+                return;
+            }
+            if (caseForcer) { caseForcer.checked = true; }
+        }
+        if (caseConfirme) { caseConfirme.checked = true; }
+        confirmeFor = signature();
+        journaliser();
+        fermer();
+    }
+
+    btnSuite.addEventListener('click', continuer);
+    btnOuvrir.addEventListener('click', function () {
+        if (choisi === null) { return; }
+        // Dans l'onglet courant, et non dans un second : ouvrir la fiche
+        // existante, c'est renoncer à la création. Il n'y a rien à garder
+        // derrière soi, et le nouvel onglet laissait un formulaire à demi
+        // rempli dans celui d'avant — qu'on finissait par enregistrer.
+        window.location.assign(fiches[choisi].url);
+    });
+    // Rien à ouvrir quand le rappel ne porte qu'un message.
+    rappel.addEventListener('click', function () { if (fiches.length) { ouvrir(); } });
+    voile.addEventListener('mousedown', function (e) {
+        // Un clic hors de la fenêtre vaut « Continuer la saisie » : la fermer
+        // sans cocher laisserait l'enregistrement refusé sans rien dire.
+        if (e.target === voile) { continuer(); }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (voile.hidden) { return; }
+        if (e.key === 'Escape') { e.preventDefault(); continuer(); return; }
+        if (e.key !== 'Tab') { return; }
+        // Le clavier reste dans la fenêtre tant qu'elle est ouverte.
+        var cibles = fenetre.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), [tabindex="0"]');
+        var visibles = Array.prototype.filter.call(cibles, function (el) {
+            return el.offsetParent !== null;
+        });
+        if (!visibles.length) { return; }
+        var premier = visibles[0], dernier = visibles[visibles.length - 1];
+        if (e.shiftKey && (document.activeElement === premier || document.activeElement === fenetre)) {
+            e.preventDefault(); dernier.focus();
+        } else if (!e.shiftKey && document.activeElement === dernier) {
+            e.preventDefault(); premier.focus();
+        }
+    });
+
+    // ── Déclenchement ──────────────────────────────────────────────────────
+
+    function declencher(origine) {
+        if (!valeur('nom').trim() || !valeur('prenoms').trim()) { return; }
+        var aDate = valeur('date_naissance').trim() !== '';
+        // La date d'abord ; le téléphone ne prend le relais que si elle manque.
+        if (origine === 'date' ? !aDate : aDate) { return; }
+        if (signature() === vueFor) { return; }
+        verifier(true);
+    }
+
+    ['date_naissance', 'telephone'].forEach(function (nom) {
+        var e = champ(nom);
+        if (!e) { return; }
+        e.addEventListener('blur', function () {
+            setTimeout(function () { declencher(nom === 'telephone' ? 'telephone' : 'date'); }, 0);
+        });
+    });
+
+    surveilles.forEach(function (nom) {
+        var e = champ(nom);
+        if (!e) { return; }
+        ['input', 'change'].forEach(function (evt) {
+            e.addEventListener(evt, function () {
+                // L'identité a bougé : la confirmation donnée pour l'ancienne
+                // ne vaut plus. Le serveur la redemandera, autant le dire ici.
+                if (confirmeFor !== null && signature() !== confirmeFor) {
+                    confirmeFor = null;
+                    if (caseConfirme) { caseConfirme.checked = false; }
+                    if (caseForcer) { caseForcer.checked = false; }
+                    if (champRaison) { champRaison.value = ''; }
+                }
+                clearTimeout(minuteur);
+                minuteur = setTimeout(function () { verifier(false); }, 500);
+            });
+        });
+    });
+
+    if (caseConfirme && caseConfirme.checked) { confirmeFor = signature(); }
+
+    {% comment %}
+    Le serveur vient de refuser pour cause de doublon : on remet la fenêtre
+    devant, sinon la personne lit un message en haut de page sans savoir de
+    quelle fiche il parle.
+    {% endcomment %}
+    {% if form.non_field_errors or form.raison_forcage.errors %}
+    verifier(true);
+    {% endif %}
 })();
 </script>
 

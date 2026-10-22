@@ -2419,3 +2419,43 @@ class TestAnnulationDUneFacture(TestCase):
         html = self._fiche('u_an_avec')
         self.assertIn('name="motif_annulation"', html)
         self.assertIn('id="annuler-facture-modal"', html)
+
+
+class TestLeBoutonExporterSurLaListe(TestCase):
+    """Le bouton de téléchargement se tient contre « Nouvelle facture ».
+
+    Il était parti à droite, dans la barre des filtres : loin du regard, et
+    loin de l'endroit où les autres listes le placent. Ce test fixe les deux
+    choses demandées — la position, et le fait qu'il disparaisse pour qui n'a
+    pas le droit de consulter les factures.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.voit = User.objects.create_user('fact_voit', password='x')
+        # `add_facture` en plus : sans elle le bouton Créer n'est pas rendu, et
+        # la question « le menu le suit-il ? » n'aurait plus de sens.
+        cls.voit.user_permissions.set(Permission.objects.filter(
+            content_type__app_label='facturation',
+            codename__in=['view_facture', 'add_facture']))
+        cls.nu = User.objects.create_user('fact_nu', password='x')
+
+    def _page(self, utilisateur):
+        client = Client()
+        client.force_login(User.objects.get(pk=utilisateur.pk))
+        return client.get(reverse('facturation:list')).content.decode('utf-8')
+
+    def test_le_bouton_suit_le_bouton_creer(self):
+        page = self._page(self.voit)
+        creer = page.find('class="o-btn-create"')
+        exporter = page.find('class="io-page-wrap"')
+        # Celle de la deuxième ligne : la première sert au titre et à la
+        # recherche, plus haut dans la page.
+        droite = page.find('class="o-subheader-row-right"', creer)
+        self.assertNotEqual(exporter, -1, "le menu d'export est absent de la page")
+        self.assertNotEqual(creer, -1, "le bouton Créer est absent de la page")
+        self.assertLess(creer, exporter, "le menu doit venir après le bouton Créer")
+        self.assertLess(exporter, droite, "le menu doit rester avant la barre de droite")
+
+    def test_le_bouton_disparait_sans_la_permission(self):
+        self.assertNotIn('class="io-page-wrap"', self._page(self.nu))

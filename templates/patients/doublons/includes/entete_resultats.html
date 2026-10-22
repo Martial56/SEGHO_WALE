@@ -1,0 +1,27 @@
+{% comment %}
+Ce qui surmonte le relevé : les filtres actifs en pastilles, et la case
+« tout sélectionner sur la page ». Au-dessus des résultats et non dans le
+sous-en-tête, pour que l'échange AJAX les renouvelle avec les cartes.
+{% endcomment %}
+<div class="dbl-entete{% if not pastilles %} dbl-entete-vide{% endif %}">
+  {% comment %}
+  Réservée à la vue en cartes : en vue tableau, la case vit dans l'en-tête de
+  la colonne qu'elle commande, et celle-ci s'efface (voir `.dbl-vue-tableau`).
+  {% endcomment %}
+  <label class="dbl-coche-page">
+    <input type="checkbox" data-tout-page>
+    <span>Tout sélectionner sur la page</span>
+  </label>
+
+  {% if pastilles %}
+  <div class="dbl-pastilles">
+    {% for pastille in pastilles %}
+    <button type="button" class="o-filter-tag"
+            onclick="dblRetirer('{{ pastille.cle }}', '{{ pastille.valeur|escapejs }}')"
+            title="Retirer ce filtre">
+      {{ pastille.libelle }} <span aria-hidden="true">×</span>
+    </button>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

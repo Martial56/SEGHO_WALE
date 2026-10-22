@@ -46,7 +46,6 @@ au-dessus.{% endcomment %}
   border: 1px solid var(--border); font-weight: 500;
 }
 .abtn-discard:hover { border-color: var(--border-strong); color: var(--text); background: var(--surface-muted); }
-.act-sep { width: 1px; height: 24px; background: var(--border-strong); flex-shrink: 0; }
 
 /* ── Champ d'en-tête verrouillé (statut > brouillon + valeur déjà renseignée) ── */
 .field-locked-val {
@@ -293,7 +292,6 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
       </a>
       {% endif %}
       {% if actions.terminer.visible %}
-      <div class="act-sep"></div>
         {% if actions.terminer.enabled %}
         <button type="submit" form="hosp-form" name="action_terminer" class="abtn abtn-dark" title="Clôturer administrativement le dossier">
           <i class="bi bi-check-all"></i> Clôturer
@@ -307,7 +305,7 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     {% endif %}
   </div>
 
-  {% if not edit or hosp.statut == 'brouillon' or hosp.statut == 'confirme' or hosp.statut == 'hospitalise' %}
+  {% if not edit or hosp.statut != 'annule' %}
   {% comment %}
     Le bouton naît désactivé et s'active à la première modification. Ce
     détecteur a du sens sur un dossier qu'on retouche ; pas sur une mise en
@@ -316,6 +314,13 @@ html[data-theme="dark"] .ts-dropdown .option:hover, html[data-theme="dark"] .ts-
     tel quel. Sur un rendez-vous déjà diagnostiqué, plus aucun champ n'est
     modifiable à l'écran : le bouton restait éteint sans rien expliquer, et le
     seul moyen de l'allumer était d'ajouter une ligne dans l'onglet Soins.
+
+    Il paraît à tous les statuts sauf « Annulé ». Il ne se posait qu'aux trois
+    premiers, alors qu'un dossier déchargé garde une trentaine de champs
+    saisissables — heures d'observation, soins, lignes à facturer, relevés —
+    et que la vue accepte très bien le POST : l'écran laissait donc corriger
+    sans donner par où enregistrer, et sans rien dire. Au statut « Annulé »,
+    c'est volontaire : le bandeau de lecture seule tient lieu de réponse.
   {% endcomment %}
   <button type="submit" form="hosp-form" class="abtn abtn-primary" id="btn-save-bottom"{% if not is_mo %} disabled{% endif %}>
     Sauvegarder

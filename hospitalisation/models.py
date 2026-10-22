@@ -295,7 +295,9 @@ class Hospitalisation(ModeleCentre):
             ('add_hospitalisation', 'Peut créer une hospitalisation'),
             ('change_hospitalisation', 'Peut modifier une hospitalisation'),
             ('delete_hospitalisation', 'Peut supprimer une hospitalisation'),
-            # Rôles typiques indiqués en commentaire — attribution via init_groupes_hospitalisation
+            # Rôles typiques indiqués en commentaire — l'attribution se fait
+            # dans /admin/, ou d'un bloc via `manage.py init_groupes`
+            # (modules_permissions), seule matrice de référence.
             ('can_confirmer_demande', "Peut confirmer une demande d'hospitalisation"),   # Médecin, Major
             # Attention : codename dupliqué avec soins.Soin — toujours qualifier
             # (user.has_perm('hospitalisation.can_creer_facture')), jamais un

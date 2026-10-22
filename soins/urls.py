@@ -7,6 +7,7 @@ urlpatterns = [
     # Soins infirmiers
     path('patient-counts/', views.soins_patient_counts, name='patient_counts'),
     path('', views.soins_list, name='list'),
+    path('export/', views.export_soins, name='export'),
     path('nouveau/', views.soins_create, name='create'),
     path('<int:pk>/', views.soins_detail, name='detail'),
     path('<int:pk>/modifier/', views.soins_edit, name='edit'),
@@ -14,6 +15,7 @@ urlpatterns = [
 
     # Liste des soins (procédures)
     path('procedures/', views.procedure_list, name='procedure_list'),
+    path('procedures/export/', views.export_procedures, name='export_procedures'),
     path('procedures/nouveau/', views.procedure_create, name='procedure_create'),
     path('procedures/<int:pk>/', views.procedure_detail, name='procedure_detail'),
     path('procedures/<int:pk>/modifier/', views.procedure_edit, name='procedure_edit'),

@@ -134,7 +134,7 @@
         </thead>
         <tbody>
         {% for o in items %}
-            <tr data-url="/admin/consultations/ordonnance/{{ o.pk }}/change/">
+            <tr data-url="{% url 'ordonnance_detail' o.pk %}">
                 <td><code style="font-size:12px; color:var(--accent-text-soft);">{{ o.numero }}</code></td>
                 <td>{{ o.date_emission|date:"d/m/Y" }}</td>
                 <td>{{ o.get_type_ordonnance_display }}</td>
@@ -168,7 +168,7 @@
         </thead>
         <tbody>
         {% for h in items %}
-            <tr data-url="/admin/hospitalisation/hospitalisation/{{ h.pk }}/change/">
+            <tr data-url="{% url 'hospitalisation:detail' h.pk %}">
                 <td><code style="font-size:12px; color:var(--accent-text-soft);">{{ h.numero }}</code></td>
                 <td>{{ h.date_admission|date:"d/m/Y" }}</td>
                 <td>{{ h.motif_admission|truncatechars:50 }}</td>
@@ -232,7 +232,11 @@
         {% endfor %}
         </tbody>
     </table>
-    <!--Onglet Résultats d'examens  -->
+    {% comment %}
+    Onglet Résultats d'examens. AnalyseLaboratoire n'a pas de page de détail :
+    tout le module Laboratoire est bâti sur DemandeExamen. Les lignes ne portent
+    donc pas de data-url, comme celles des consultations plus haut.
+    {% endcomment %}
     {% elif view_type == 'resultat_examens' %}
     <table class="data-table">
         <thead>
@@ -246,7 +250,7 @@
         </thead>
         <tbody>
         {% for a in items %}
-            <tr data-url="/admin/laboratoire/analyselaboratoire/{{ a.pk }}/change/">
+            <tr>
                 <td><code style="font-size:12px; color:var(--accent-text-soft);">{{ a.numero }}</code></td>
                 <td>{{ a.date_resultat|date:"d/m/Y à H:i:s"|default:"—" }}</td>
                 <td>{{ a.type_examen }}</td>

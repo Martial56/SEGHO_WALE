@@ -3,7 +3,7 @@ import io
 import json
 
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
@@ -11,6 +11,8 @@ from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_POST
 from core import memoire_listing
+from core.export_listing import contexte as contexte_export
+from django.urls import reverse
 
 import openpyxl
 from openpyxl import Workbook
@@ -36,13 +38,10 @@ def services_list(request):
     demander « Services » puis « Favoris » effaçait le premier critère, et
     « Archivé » faisait doublon avec « Inactif ».
     """
-    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS, Listing, appliquer_conditions,
-                              champs_pour_navigateur, conditions_demandees,
+    from core.listing import (PARAM_DECALAGE, PARAM_GROUPE, PARAM_OUVERTS,
+                              champs_pour_navigateur,
                               menu_filtres, menu_groupes, paginer_groupes)
-    from .article_listing import (CHAMPS_RECHERCHE, CODES_PERIODE, FILTRES_DEFAUT,
-                                  TRIS, champs_articles, construire_dimensions,
-                                  dimensions_personnalisees, familles_articles,
-                                  libelle_periode)
+    from .article_listing import CODES_PERIODE, libelle_periode, listing_articles
 
     today = timezone.now().date()
     q = request.GET.get('q', '').strip()
@@ -62,18 +61,8 @@ def services_list(request):
     # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
     # liste des champs est établie une fois et sert aussi au constructeur de
     # conditions — la bâtir interroge la base, autant ne pas le faire deux fois.
-    champs = champs_articles()
-    dims_perso = dimensions_personnalisees(champs)
-    declarees = construire_dimensions()
-    listing = Listing(
-        recherche=CHAMPS_RECHERCHE,
-        familles=familles_articles(),
-        dimensions=list(declarees.values()) + dims_perso,
-        par_page=24 if vue == 'kanban' else 40,
-        filtres_defaut=FILTRES_DEFAUT,
-        tri_defaut=('nom',),
-        tris=TRIS,
-    )
+    listing, champs, declarees, dims_perso = listing_articles(
+        24 if vue == 'kanban' else 40)
 
     # Revenir d'une fiche sans paramètres : on remet la sélection retenue
     # dans l'URL (voir core.memoire_listing).
@@ -81,19 +70,15 @@ def services_list(request):
     if redirection:
         return redirection
 
-    filtres = listing.filtres_demandes(request)
-    qs = listing.appliquer_recherche(base_qs, q)
-    qs = listing.appliquer_filtres(qs, filtres, {
+    # Même chemin que `export_articles` : le fichier porte ce que l'écran montre.
+    selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
     })
-    # Conditions personnalisées (champ + opérateur + valeur), validées contre la
-    # liste des champs découverts : une condition portant sur autre chose est
-    # ignorée, une URL forgée ne peut donc pas atteindre une relation arbitraire.
-    conditions = conditions_demandees(request, champs)
-    mode_conditions = 'ou' if request.GET.get('cm') == 'ou' else 'et'
-    qs = appliquer_conditions(qs, conditions, mode_conditions)
-    tri, tri_sens = listing.tri_demande(request)
-    qs = listing.trier(qs, groupes, tri, tri_sens)
+    qs = selection.qs
+    filtres = selection.filtres
+    conditions = selection.conditions
+    mode_conditions = selection.mode_conditions
+    tri, tri_sens = selection.tri, selection.sens
 
     # Le regroupement ne vaut que pour la vue liste : paginer_groupes renvoie
     # une page de *libellés de groupe*, sur laquelle le kanban itérerait à tort.
@@ -135,6 +120,9 @@ def services_list(request):
         'selection_active': bool(q or groupes or conditions
                                  or not listing.est_selection_par_defaut(filtres)),
         'periode_libelle': libelle_periode(filtres, date_from, date_to),
+        # Menu « Exporter » : télécharge la sélection affichée, pas la table.
+        **contexte_export(request, selection, reverse('services:export_articles'),
+                          'le catalogue', total),
         # Un catalogue s'ouvre entier : la mention de période n'a de sens que
         # lorsqu'une période est réellement demandée, sinon le titre répète
         # « tout le catalogue » en permanence.
@@ -615,12 +603,42 @@ def _art_row(a):
 
 
 @login_required
+@permission_required('services.view_articleservice', raise_exception=True)
 def export_articles(request):
-    fmt = request.GET.get('format', 'json')
-    qs  = Articleservice.objects.select_related('categorie', 'departement', 'unite_mesure')
-    rows = [_art_row(a) for a in qs]
-    return _export_file(fmt, 'prestations', _ART_HDR, rows,
-                        [dict(zip(_ART_HDR, r)) for r in rows])
+    """Télécharge le catalogue tel que la liste l'affiche.
+
+    Sortait tout le catalogue quels que soient les filtres posés. Les colonnes
+    restent celles que relit `import_articles`.
+    """
+    from core.export_listing import Colonne, repondre
+    from .article_listing import listing_articles
+
+    base_qs = Articleservice.objects.select_related(
+        'categorie', 'departement', 'unite_mesure')
+    listing, champs, _declarees, _perso = listing_articles()
+    selection = listing.selection(request, base_qs, champs, {
+        'aujourdhui': timezone.now().date(),
+        'date_from': request.GET.get('date_from', '').strip(),
+        'date_to': request.GET.get('date_to', '').strip(),
+    })
+    # `_art_row` sait déjà tirer les dix-sept colonnes d'un article ; on la
+    # réutilise plutôt que de les redécrire. Elle serait appelée une fois par
+    # colonne sans ce cache d'une seule ligne — l'export les demande dans
+    # l'ordre, article après article, une entrée suffit donc.
+    derniere = {}
+
+    def cellule(article, index):
+        if derniere.get('objet') is not article:
+            derniere['objet'] = article
+            derniere['valeurs'] = _art_row(article)
+        return derniere['valeurs'][index]
+
+    colonnes = [Colonne(entete, (lambda a, i=index: cellule(a, i)))
+                for index, entete in enumerate(_ART_HDR)]
+    # Virgule : comme pour les patients, ce CSV se réimporte dans l'application.
+    return repondre(request.GET.get('format', 'xlsx'), 'prestations', colonnes,
+                    selection.qs, selection.dims, titre_feuille='Prestations',
+                    separateur=',')
 
 
 # ── Export Catégories articles ───────────────────────────────────────────────

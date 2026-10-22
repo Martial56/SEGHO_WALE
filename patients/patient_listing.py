@@ -12,6 +12,8 @@ from datetime import date
 
 from django.db.models import Case, CharField, Q, Value, When
 
+from .resolution import condition_reperes
+
 from core.utils import annees_avant
 
 
@@ -25,7 +27,10 @@ LIBELLE_MINEUR = 'Mineurs (< 18 ans)'
 LIBELLE_ADULTE = 'Adultes (18–60 ans)'
 LIBELLE_SENIOR = 'Seniors (> 60 ans)'
 
-CHAMPS_RECHERCHE = ('nom', 'prenoms', 'code_patient', 'telephone')
+#: `ancien_identifiant` en fait partie : les dossiers venus de l'ancien
+#: logiciel se cherchent encore par le numéro qu'ils y portaient.
+CHAMPS_RECHERCHE = ('nom', 'prenoms', 'code_patient', 'telephone',
+                    'ancien_identifiant')
 
 
 def _bornes(aujourdhui):
@@ -162,3 +167,30 @@ def dimensions_personnalisees(champs=None):
     """
     from core.listing import dimensions_auto
     return dimensions_auto(champs or champs_patients(), exclure=CHAMPS_DEJA_GROUPABLES)
+
+
+def listing_patients(aujourdhui=None):
+    """Déclaration de la liste patients, et champs du constructeur de conditions.
+
+    Déclarée ici plutôt que dans la vue parce que deux appelants en ont besoin :
+    la page, et son export. Les laisser la rebâtir chacun de leur côté garantit
+    qu'un jour l'un gagnera un filtre que l'autre ignorera — et le fichier
+    téléchargé cesserait silencieusement de correspondre à l'écran.
+    """
+    from core.listing import Listing
+
+    aujourdhui = aujourdhui or date.today()
+    champs = champs_patients()
+    declarees = construire_dimensions(aujourdhui)
+    perso = dimensions_personnalisees(champs)
+    listing = Listing(
+        recherche=CHAMPS_RECHERCHE,
+        # Le code et l'ancien identifiant d'une fiche fusionnée ramènent la
+        # fiche gardée : voir `patients.resolution`.
+        recherche_en_plus=condition_reperes,
+        familles=familles_patients(),
+        dimensions=list(declarees.values()) + perso,
+        par_page=100,
+        tri_defaut=('nom', 'prenoms'),
+    )
+    return listing, champs, declarees, perso

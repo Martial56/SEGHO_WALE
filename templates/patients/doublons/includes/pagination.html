@@ -1,0 +1,27 @@
+{% comment %}
+`previous_page_number` lève une exception sur la première page, et le filtre
+`default` n'y peut rien : l'erreur part avant. D'où les deux gardes.
+{% endcomment %}
+{% if page.paginator.num_pages > 1 %}
+<div class="o-pagination">
+  {% comment %}
+  Les trois nombres portent un repère : après un masquage, la liste se corrige
+  sur place, sans redemander la page au serveur.
+  {% endcomment %}
+  <span><span data-debut>{{ page.start_index }}</span>–<span
+        data-fin>{{ page.end_index }}</span> sur <span
+        data-total>{{ page.paginator.count }}</span></span>
+  {% if page.has_previous %}
+  <a class="o-pag-btn" href="?{{ qs_base }}page={{ page.previous_page_number }}"
+     aria-label="Page précédente"><i class="bi bi-chevron-left"></i></a>
+  {% else %}
+  <span class="o-pag-btn disabled"><i class="bi bi-chevron-left"></i></span>
+  {% endif %}
+  {% if page.has_next %}
+  <a class="o-pag-btn" href="?{{ qs_base }}page={{ page.next_page_number }}"
+     aria-label="Page suivante"><i class="bi bi-chevron-right"></i></a>
+  {% else %}
+  <span class="o-pag-btn disabled"><i class="bi bi-chevron-right"></i></span>
+  {% endif %}
+</div>
+{% endif %}

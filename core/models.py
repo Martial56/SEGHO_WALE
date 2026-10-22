@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -16,6 +18,10 @@ class LogActivite(models.Model):
         ('suppression', 'Suppression'),
         ('connexion', 'Connexion'),
         ('consultation', 'Consultation'),
+        # Posé quand on est passé outre un garde-fou : création d'un dossier
+        # malgré un doublon signalé, saisie poursuivie sur un patient proche.
+        # C'est ce type que le futur menu « Doublons » filtrera.
+        ('alerte', 'Alerte'),
     ]
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id    = models.PositiveIntegerField()
@@ -26,6 +32,11 @@ class LogActivite(models.Model):
     date         = models.DateTimeField(auto_now_add=True)
     ip_address   = models.GenericIPAddressField(null=True, blank=True, verbose_name="Adresse IP")
     duree_secondes = models.PositiveIntegerField(null=True, blank=True, verbose_name="Durée (secondes)")
+    #: Repère technique stable, pour retrouver une famille d'événements sans
+    #: fouiller le texte des messages — qui se reformule au gré des versions.
+    #: Exemples : « doublon.forcage », « doublon.confirmation ».
+    code         = models.CharField(max_length=50, blank=True, db_index=True,
+                                    verbose_name='Code')
     module       = models.CharField(
         max_length=50, blank=True, verbose_name="Module",
         help_text="Nom de l'app Django concernée — indépendant de l'objet lié, "
@@ -96,3 +107,58 @@ def create_or_save_profile(sender, instance, created, **kwargs):
         UserProfile.objects.create(user=instance)
     else:
         UserProfile.objects.get_or_create(user=instance)
+
+
+class TacheImport(models.Model):
+    """Avancement d'un import lancé en tâche de fond.
+
+    Suivi en base et non en mémoire : en production gunicorn tourne avec
+    plusieurs workers, et la requête qui demande « où en est-on ? » n'atterrit
+    pas forcément sur celui qui mène l'import. Une variable de processus ne
+    serait lue qu'une fois sur trois.
+
+    Les écritures sont espacées par l'appelant (voir core.taches.Avancement) :
+    une ligne par lot traité, pas une par enregistrement.
+    """
+
+    ETATS = [
+        ('en_cours', 'En cours'),
+        ('termine', 'Terminé'),
+        ('echec', 'Échec'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    libelle = models.CharField(max_length=100)
+    etat = models.CharField(max_length=10, choices=ETATS, default='en_cours')
+    etape = models.CharField(max_length=100, blank=True,
+                             help_text="Phase en cours : lecture du fichier, enregistrement…")
+    total = models.PositiveIntegerField(default=0, help_text="0 tant que le fichier n'est pas lu.")
+    traites = models.PositiveIntegerField(default=0)
+    crees = models.PositiveIntegerField(default=0)
+    mis_a_jour = models.PositiveIntegerField(default=0)
+    ignores = models.PositiveIntegerField(default=0)
+    erreurs = models.PositiveIntegerField(default=0)
+    # Lignes créées bien qu'une fiche leur ressemble : trop proches pour être
+    # passées sous silence, trop éloignées pour être rapprochées d'office.
+    doublons_possibles = models.PositiveIntegerField(default=0)
+    codes_doublons = models.TextField(
+        blank=True, help_text="Codes des fiches créées malgré une ressemblance, "
+                              "pour qu'on puisse aller les vérifier.")
+    message = models.TextField(blank=True)
+    utilisateur = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    date_debut = models.DateTimeField(auto_now_add=True)
+    date_fin = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def pourcentage(self):
+        if not self.total:
+            return 0
+        return min(100, round(self.traites * 100 / self.total))
+
+    def __str__(self):
+        return f"{self.libelle} — {self.get_etat_display()}"
+
+    class Meta:
+        verbose_name = "Tâche d'import"
+        verbose_name_plural = "Tâches d'import"
+        ordering = ['-date_debut']

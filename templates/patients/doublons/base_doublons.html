@@ -1,0 +1,850 @@
+{% extends 'patients/base.html' %}
+{% load static %}
+{% comment %}
+Socle des pages de l'écran des doublons : la feuille de style, le sous-en-tête,
+les onglets et la zone des banderoles. Les pages n'ont plus qu'à remplir
+`doublons_contenu`.
+
+L'écran ne possède plus ses propres composants de liste : sous-en-tête,
+recherche, boutons, menus, paginations et tableau viennent du même partiel que
+la liste des patients (includes/listing/composants.html). Ne restent ici que
+les pièces qui n'existent nulle part ailleurs — la carte d'un groupe, le
+surlignage des différences, l'action rapide et les banderoles.
+{% endcomment %}
+
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% comment %}
+Les composants d'une page de liste, tels que la liste des patients les emploie.
+{% endcomment %}
+{% include 'includes/listing/composants.html' %}
+{% comment %}
+Les sous-menus et les coches des menus générés : le menu « Filtres » de cet
+écran a le même balisage que celui de la liste des patients.
+{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+<style>
+  /* `.content` est déclaré `overflow-y: auto` pour toute l'application, ce qui
+     en fait un conteneur de défilement. À l'intérieur, `position: sticky` ne
+     s'accroche à rien : c'est la fenêtre qui défile, pas lui. Le rendre
+     `visible` ici ne déplace rien — il n'a jamais de hauteur contrainte, donc
+     il ne défile jamais — et rend au sous-en-tête comme à la barre d'actions
+     l'ancrage qu'ils annoncent. Le sous-en-tête se cale alors sous l'en-tête
+     fixe, et non sous le haut de la fenêtre. */
+  .content { overflow: visible; }
+  .o-subheader { top: var(--header-h); }
+
+  /* Les annonces passent par le toast du projet : plus de bandeau propre à
+     cet écran. Ne reste que le lien discret d'un geste secondaire. */
+  .o-lien { background: none; border: none; padding: 0; font: inherit;
+            color: var(--accent-text); font-weight: 600; cursor: pointer;
+            text-decoration: underline; font-family: var(--font-main); }
+  .o-lien:hover { color: var(--accent); }
+
+  /* ── Le bouton destructeur ───────────────────────────────────────────────
+     Les boutons partagés vont du plein (créer) au discret (contrôles) ; aucun
+     ne dit « ceci retire quelque chose ». Celui-ci reprend la forme de
+     `.o-ctrl-btn` et n'en change que la couleur. */
+  .o-btn-danger { background: none; border: 1px solid transparent; border-radius: 4px;
+                  padding: 4px 8px; font-size: 12px; font-family: inherit;
+                  color: var(--rose-text); cursor: pointer; text-decoration: none;
+                  display: inline-flex; align-items: center; gap: 4px;
+                  white-space: nowrap; transition: background .15s, border-color .15s; }
+  .o-btn-danger:hover { background: rgba(var(--rose-rgb), .10);
+                        border-color: rgba(var(--rose-rgb), .35); color: var(--rose-text); }
+  .o-btn-create:disabled, .o-btn-create[disabled],
+  .o-ctrl-btn:disabled, .o-btn-danger:disabled { opacity: .45; cursor: not-allowed; }
+  .o-ctrl-btn:disabled:hover, .o-btn-danger:disabled:hover { background: none; }
+  html[data-theme="dark"] .o-btn-danger { color: #f09aa3; }
+  html[data-theme="dark"] .o-btn-danger:hover { background: rgba(240,154,163,.12);
+                                                border-color: rgba(240,154,163,.45); }
+
+  /* ── Les actions posées dans une ligne de tableau ────────────────────────
+     `.o-ctrl-btn` et `.o-btn-danger` ne montrent leur cadre qu'au survol :
+     c'est juste dans une barre d'outils, où les boutons se suivent et se
+     devinent. Dans une ligne de tableau, entouré de texte, un bouton sans
+     cadre se lit comme du texte. On le dessine donc toujours, au gabarit de
+     `.dbl-rapide-btn`, pour que toutes les actions posées dans une ligne se
+     ressemblent — réafficher, annuler, supprimer, masquer. (Pas de libellé
+     exact dans ce commentaire : il part au navigateur avec la feuille de
+     style, et un test qui cherche un bouton le trouverait ici.) */
+  .dbl-tableau .o-ctrl-btn, .dbl-tableau .o-btn-danger {
+      border-color: var(--border-strong); border-radius: 4px;
+      padding: 3px 9px; font-size: 11.5px; }
+  .dbl-tableau .o-ctrl-btn:hover { background: var(--surface-muted);
+                                   color: var(--text); }
+  .dbl-tableau .o-btn-danger { border-color: rgba(var(--rose-rgb), .35); }
+  .dbl-tableau .o-btn-danger:hover { border-color: rgba(var(--rose-rgb), .55); }
+  html[data-theme="dark"] .dbl-tableau .o-ctrl-btn {
+      border-color: var(--border-strong); }
+  html[data-theme="dark"] .dbl-tableau .o-btn-danger {
+      border-color: rgba(240,154,163,.40); }
+
+  /* ── La grille de cartes ─────────────────────────────────────────────────
+     Neuf cents groupes à parcourir : autant en voir une douzaine d'un coup
+     d'œil plutôt que six bandes pleine largeur. La largeur minimale laisse
+     tenir un nom long sans le couper. */
+  .dbl-grille { display: grid; gap: 12px; margin-top: 16px;
+                grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+  .dbl-carte-groupe { position: relative; background: var(--surface);
+                      border: 1px solid var(--border); border-left: 3px solid var(--border-strong);
+                      border-radius: var(--radius-sm); padding: 10px 14px 11px;
+                      display: flex; flex-direction: column; gap: 8px;
+                      color: var(--text); transition: border-color .12s, box-shadow .12s; }
+  .dbl-carte-groupe.certain { border-left-color: #c0392b; }
+  .dbl-carte-groupe.avertissement { border-left-color: var(--amber); }
+  .dbl-carte-groupe:hover { border-color: var(--accent); border-left-color: var(--accent);
+                            box-shadow: var(--shadow-sm); }
+  .dbl-carte-groupe.partie { opacity: .25; pointer-events: none;
+                             transition: opacity .25s; }
+  /* Toute la carte mène à la comparaison, mais un bouton ne peut pas vivre
+     dans un lien : le lien se superpose, et l'action rapide repasse dessus. */
+  .dbl-lien { position: absolute; inset: 0; z-index: 0; border-radius: inherit; }
+  .dbl-carte-groupe > *:not(.dbl-lien) { position: relative; z-index: 1;
+                                         pointer-events: none; }
+  .dbl-carte-groupe .dbl-rapide,
+  .dbl-carte-groupe .dbl-coche { pointer-events: auto; }
+
+  .dbl-tete-groupe { display: flex; align-items: center; gap: 8px; }
+  .dbl-pastille { font-weight: 700; font-size: 12px; padding: 1px 8px;
+                  border-radius: 999px; letter-spacing: .2px; white-space: nowrap; }
+  .dbl-pastille.certain { color: #b02a37; background: rgba(var(--rose-rgb), .13); }
+  .dbl-pastille.avertissement { color: var(--amber-text); background: rgba(var(--amber-rgb), .16); }
+  html[data-theme="dark"] .dbl-pastille.certain { color: #f09aa3; }
+  html[data-theme="dark"] .dbl-pastille.avertissement { color: #e8b84b; }
+  .dbl-nombre { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+
+  .dbl-identites { display: flex; flex-direction: column; }
+  .dbl-identite { font-size: 13px; line-height: 1.45; padding: 5px 0; }
+  .dbl-identite + .dbl-identite { border-top: 1px dashed var(--border); }
+  .dbl-identite .code { font-family: var(--font-mono); font-size: 10.5px;
+                        color: var(--text-muted); margin-right: 5px; }
+  .dbl-identite .nom { font-weight: 600; }
+  .dbl-identite .etoile { color: var(--amber); margin-right: 2px; }
+  /* Même surlignage qu'à la fenêtre de saisie, porté par un span intérieur :
+     sur la ligne entière, il s'étirerait jusqu'au bord de la carte. */
+  .dbl-identite .diff { background: rgba(var(--amber-rgb), .22); border-radius: 3px;
+                        padding: 0 3px; }
+  .dbl-traits { display: block; font-size: 12px; color: var(--text-muted);
+                margin-top: 1px; }
+  .dbl-rattache { display: block; font-size: 11.5px; color: var(--text-muted); }
+  .dbl-vide { color: var(--text-faint); font-style: italic; }
+
+  .dbl-pied { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+              border-top: 1px solid var(--border); padding-top: 8px; }
+  .dbl-raisons { flex: 1 1 auto; font-size: 11.5px; color: var(--text-muted);
+                 display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .dbl-raisons .bi { font-size: 12px; flex: 0 0 auto; }
+  .dbl-rapide { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+  .dbl-rapide-btn { background: transparent; border: 1px solid var(--border-strong);
+                    color: var(--text-muted); border-radius: 4px; padding: 3px 9px;
+                    font-size: 11.5px; font-family: var(--font-main); cursor: pointer;
+                    white-space: nowrap; }
+  .dbl-rapide-btn:hover { border-color: #c0392b; color: #b02a37; background: #fdf2f3; }
+  html[data-theme="dark"] .dbl-rapide-btn:hover { border-color: #f09aa3; color: #f09aa3;
+                                                  background: rgba(240,154,163,.12); }
+  .dbl-confirme { display: flex; align-items: center; gap: 6px; font-size: 11.5px;
+                  color: var(--text); }
+  .dbl-confirme[hidden] { display: none; }
+  .dbl-confirme .oui { background: #c0392b; color: #fff; border: none; border-radius: 4px;
+                       padding: 3px 9px; font-size: 11.5px; cursor: pointer;
+                       font-family: var(--font-main); }
+  .dbl-confirme .oui:hover { background: #a93226; }
+  .dbl-confirme .non { background: none; border: none; color: var(--text-muted);
+                       font-size: 11.5px; cursor: pointer; text-decoration: underline;
+                       font-family: var(--font-main); padding: 0; }
+
+  /* ── Le tableau ──────────────────────────────────────────────────────────
+     Porté par `#list-view`, comme celui de la liste des patients : les règles
+     du partiel l'habillent sans qu'on en écrive une. Ne restent ici que les
+     colonnes propres aux doublons. */
+  #list-view td.dbl-col-fiches { line-height: 1.5; min-width: 230px; }
+  {% comment %}
+  Par classe et non par rang. Cette règle visait `nth-child(6)`, c'est-à-dire
+  le score — jusqu'à ce que la colonne des cases à cocher, ajoutée pour la
+  sélection multiple, décale tout d'un cran. Le `nowrap` est alors tombé sur
+  la raison, dont la phrase fait soixante caractères : la colonne s'étirait à
+  550 px, le tableau dépassait la fenêtre de quarante pixels et le bouton
+  « Masquer le doublon » sortait de l'écran par la droite.
+  {% endcomment %}
+  #list-view th.dbl-col-score, #list-view td.dbl-col-score { white-space: nowrap; }
+  #list-view td.dbl-col-fiches .code { font-family: var(--font-mono); font-size: 11px;
+                                       color: var(--text-muted); margin-right: 5px; }
+  #list-view td.dbl-col-fiches .nom { font-weight: 500; }
+  #list-view td.dbl-col-fiches .diff { background: rgba(var(--amber-rgb), .22);
+                                       border-radius: 3px; padding: 0 3px; }
+  #list-view td.dbl-col-action { text-align: right; white-space: nowrap; }
+  #list-view tbody tr.partie { opacity: .25; pointer-events: none; transition: opacity .25s; }
+
+  /* La barre échangée en AJAX est une ligne de contrôles, comme chez les
+     patients, où elle porte la ligne entière du sous-en-tête. Ici les onglets
+     restent en place et seule la droite est remplacée : sans cette règle, le
+     conteneur resterait un bloc et empilerait ses boutons. */
+  #subheader-controls { display: flex; align-items: center; gap: 6px; }
+
+  /* Les onglets au milieu de la barre : les deux côtés prennent la même part
+     de ce qui reste. `min-width: max-content` les empêche de passer sous leur
+     contenu — à l'étroit, les onglets se décalent plutôt que de chevaucher. */
+  .dbl-cote { flex: 1 1 0; min-width: max-content; display: flex;
+              align-items: center; gap: 6px; }
+  .dbl-cote.droite { justify-content: flex-end; }
+
+  /* ── Les tableaux des deux autres onglets ────────────────────────────────
+     Ils vivaient dans la feuille de chaque page. Les onglets s'échangent
+     désormais sans recharger : seul le corps est remplacé, pas les feuilles
+     de style, qui doivent donc être là dès le premier onglet ouvert. */
+  /* D'un bord à l'autre, comme le tableau de l'onglet « Groupes » : la marge
+     de `.content` est reprise par le conteneur, pas par le tableau, qui garde
+     sa largeur de 100 %. */
+  .dbl-tableau { margin: 0 -32px; }
+  .jnl, .fus-journal { width: 100%; border-collapse: collapse; font-size: 12.5px;
+                       background: var(--surface); }
+  .jnl thead th, .fus-journal thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase;
+    color: var(--text-muted); font-weight: 600; padding: 10px 16px;
+    border-bottom: 2px solid var(--border); background: var(--surface-muted); }
+  .jnl td, .fus-journal td { padding: 9px 16px; border-bottom: 1px solid var(--border);
+                             vertical-align: top; }
+  .jnl tbody tr:hover, .fus-journal tbody tr:hover { background: rgba(0,0,0,.02); }
+  html[data-theme="dark"] .jnl tbody tr:hover,
+  html[data-theme="dark"] .fus-journal tbody tr:hover {
+    background: rgba(var(--teal-500-rgb), .08); }
+  .jnl .quand, .fus-journal .quand { white-space: nowrap; color: var(--text-muted); }
+  /* Le code est un repère, pas un appel à cliquer : il mène bien à la fiche,
+     mais sans couleur ni soulignement qui le détacheraient du nom qu'il
+     accompagne. Le lien se montre au survol. */
+  .jnl .code, .fus-journal .code { font-family: var(--font-mono); font-size: 11px;
+                                   color: inherit; text-decoration: none; }
+  a.code:hover { color: var(--accent-text); text-decoration: underline; }
+  .jnl .genre { font-weight: 600; white-space: nowrap; }
+  .jnl .genre.forcage { color: #b02a37; }
+  html[data-theme="dark"] .jnl .genre.forcage { color: #f09aa3; }
+  .fus-journal .annulee { color: var(--text-muted); }
+  .fus-journal .empeche { font-size: 11px; color: var(--text-muted); max-width: 260px;
+                          display: block; }
+
+  /* ── La sélection multiple ───────────────────────────────────────────────
+     Le contenu des cartes est posé au-dessus du lien qui les couvre, mais
+     avec `pointer-events: none` pour que le clic traverse jusqu'au lien. La
+     case doit faire exception, sinon cocher ouvrirait la comparaison (voir
+     `.dbl-carte-groupe .dbl-coche` plus haut). */
+  .dbl-coche { position: relative; z-index: 3; width: 15px; height: 15px;
+               accent-color: var(--accent); cursor: pointer; margin: 0 2px 0 0; }
+  .dbl-col-coche { width: 34px; text-align: center; }
+  .dbl-entete { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+                padding: 12px 0 4px; font-size: 12.5px; }
+  /* En vue tableau, la case de la barre s'efface : celle de l'en-tête de
+     colonne la remplace, au-dessus des cases qu'elle commande. Sans
+     pastille de filtre, il ne reste alors rien dans la barre — elle
+     disparaît aussi, sinon son espacement laissait une bande vide entre les
+     onglets et l'en-tête du tableau. */
+  body.dbl-vue-tableau .dbl-coche-page { display: none; }
+  body.dbl-vue-tableau .dbl-entete-vide { display: none; }
+  #list-view th.dbl-col-coche input { width: 15px; height: 15px;
+                                      accent-color: var(--accent); cursor: pointer;
+                                      margin: 0; vertical-align: middle; }
+  .dbl-coche-page, .dbl-coche-section { display: inline-flex; align-items: center;
+                                        gap: 6px; cursor: pointer; }
+  .dbl-coche-page input, .dbl-coche-section input { width: 15px; height: 15px;
+                                                    accent-color: var(--accent);
+                                                    cursor: pointer; }
+  .dbl-pastilles { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+  /* ── Les bandes de section ───────────────────────────────────────────────
+     Tout vient de la brique (`.lst-groupe-bande` dans
+     includes/listing/styles.html) : la bande, le chevron, le compteur. Ne
+     reste ici que ce qui est propre à cet écran — la case de section logée
+     dans le titre, que les autres listes n'ont pas. */
+  .dbl-bande-titre { display: inline-flex; align-items: center; gap: 8px; }
+  #list-view tbody tr.lst-groupe td { padding: 7px 10px; }
+  #list-view tbody tr.lst-groupe .dbl-coche-section { vertical-align: middle; }
+
+  /* ── Le menu des filtres ─────────────────────────────────────────────────
+     Quarante phrases : la liste défile plutôt que de déborder de l'écran. */
+  .dbl-menu-filtres { min-width: 330px; }
+  .dbl-raisons-liste { max-height: 300px; overflow-y: auto; }
+  .dbl-raisons-liste .o-dd-item { display: flex; align-items: baseline; gap: 8px; }
+  .dbl-raison-texte { flex: 1; }
+  .dbl-compte { font-size: 10.5px; color: var(--text-muted);
+                font-variant-numeric: tabular-nums; }
+
+  /* ── La barre des actions en lot ─────────────────────────────────────────
+     Collée au bas de l'écran, comme celle de la comparaison : on décide
+     après avoir parcouru, pas avant. */
+  .dbl-barre-lot { position: sticky; bottom: 0; z-index: 20;
+                   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+                   margin: 12px -32px 0; padding: 10px 32px;
+                   background: var(--surface); border-top: 1px solid var(--border);
+                   box-shadow: 0 -6px 18px rgba(0,0,0,.06); font-size: 12.5px; }
+  .dbl-barre-lot[hidden] { display: none; }
+  .dbl-lot-compte b { font-size: 14px; }
+  .dbl-lot-espace { flex: 1; }
+  .dbl-lot-lien { background: none; border: none; padding: 0; cursor: pointer;
+                  font-family: inherit; font-size: 12.5px; color: var(--accent-text);
+                  text-decoration: underline; }
+  .dbl-lot-avertis { color: var(--amber-text); }
+  .dbl-lot-avertis[hidden] { display: none; }
+  /* Le dégrisement seul ne se voit pas sur le vert plein du bouton de
+     fusion en thème sombre : on lui retire aussi sa couleur. */
+  .dbl-barre-lot button[disabled] { opacity: .45; cursor: not-allowed;
+                                    filter: grayscale(.8); }
+  html[data-theme="dark"] .dbl-lot-avertis { color: #e8b84b; }
+  .dbl-lot-raison { display: flex; align-items: center; gap: 6px;
+                    color: var(--text-muted); }
+  /* `display: flex` l'emporterait sur le `display: none` que l'attribut
+     `hidden` pose depuis la feuille du navigateur : il faut le redire. */
+  .dbl-lot-raison[hidden] { display: none; }
+  .dbl-lot-raison input { font-family: inherit; font-size: 12.5px; padding: 5px 8px;
+                          border: 1px solid var(--border); border-radius: 4px;
+                          background: var(--surface); color: var(--text); width: 210px; }
+  html[data-theme="dark"] .dbl-barre-lot { box-shadow: 0 -6px 18px rgba(0,0,0,.45); }
+
+  .o-empty { padding: 48px 16px; text-align: center; color: var(--text-muted);
+             font-size: 13px; }
+  .dbl-contenu { padding: 0 0 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="o-subheader">
+  {% comment %}
+  Deux lignes, comme la liste des patients : le titre et la recherche en haut,
+  les onglets et les contrôles en dessous.
+  {% endcomment %}
+  <div class="o-subheader-row">
+    <span class="o-page-title">{{ titre|default:"Doublons" }}{% block subheader_compte %}{% endblock %}</span>
+    <div class="o-subheader-row-right" id="dbl-recherche">
+      {% block subheader_recherche %}{% endblock %}
+    </div>
+  </div>
+  <div class="o-subheader-row dbl-ligne-onglets">
+    {% comment %}
+    Trois parts : l'action de la page à gauche, sous le titre, là où la liste
+    des patients met « Créer » ; les onglets au milieu de la barre ; les
+    contrôles à droite. Les deux côtés se partagent également ce qui reste,
+    c'est ce qui centre les onglets sur la barre et non sur l'espace libre.
+    {% endcomment %}
+    <div class="dbl-cote" id="dbl-gauche">{% block subheader_gauche %}{% endblock %}</div>
+    <div class="tab-nav" id="dbl-onglets">
+      <a href="{% url 'patients:doublons_liste' %}"
+         class="tab-btn {% block onglet_liste %}{% endblock %}">Groupes</a>
+      <a href="{% url 'patients:doublons_journal' %}"
+         class="tab-btn {% block onglet_journal %}{% endblock %}">Créations forcées et confirmations</a>
+      <a href="{% url 'patients:doublons_masquees' %}"
+         class="tab-btn {% block onglet_masquees %}{% endblock %}">Fiches masquées</a>
+      {% if perms.patients.fusionner_patients %}
+      <a href="{% url 'patients:fusions' %}"
+         class="tab-btn {% block onglet_fusions %}{% endblock %}">Fusions</a>
+      {% endif %}
+      <a href="{% url 'patients:doublons_lots' %}"
+         class="tab-btn {% block onglet_lots %}{% endblock %}">Lots</a>
+    </div>
+    <div class="dbl-cote droite" id="subheader-controls">
+      {% block subheader_controles %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+{% comment %}
+Les décisions prises s'annoncent par le toast du projet, comme partout
+ailleurs. Les messages Django sont déjà posés par base.html : les redoubler
+ici d'un bandeau les affichait deux fois. Ne reste que de quoi annoncer un
+masquage qui a rechargé la page — le JS du socle le lit et lève le toast.
+{% endcomment %}
+{% if masquage %}{% include 'patients/doublons/includes/bandeau_masquage.html' %}{% endif %}
+
+<div id="dbl-resultats">{% block doublons_contenu %}{% endblock %}</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{% comment %}
+Le pilotage commun des listes : `toggleDd`, l'échange AJAX
+(`listeRafraichir`), l'interception de la pagination. Inclus ici, dans le
+socle, parce que les onglets s'échangent sans recharger : un script posé dans
+le gabarit d'un onglet disparaîtrait au premier changement.
+{% endcomment %}
+{% include 'includes/listing/page_js.html' with listing_resultats='dbl-resultats' %}
+{% comment %}
+Le repliage des bandes de section, celui des autres listes
+(`lstBasculerGroupe`). `lstSansMemoire` met de côté la seule partie que cet
+écran ne peut pas honorer : l'état déplié rangé dans l'adresse et redit au
+serveur. Les groupes des doublons sont composés en mémoire puis paginés — un
+chemin n'y désigne rien de stable d'une page à l'autre.
+{% endcomment %}
+<script>window.lstSansMemoire = true;</script>
+<script src="{% static 'js/listing_groupes.js' %}?v=4"></script>
+<script>
+// @ts-nocheck
+(function () {
+
+  /* ── D'un onglet à l'autre, sans recharger ─────────────────────────────
+     Les trois onglets sont trois adresses et trois vues. On va chercher la
+     page entière — chacune a ses propres contrôles, que le fragment de la
+     liste ne porte pas — et on n'en remplace que les régions qui changent.
+     Le reste de la page, scripts compris, ne bouge pas : c'est pour cela que
+     ce script vit dans le socle et non dans le gabarit d'un onglet.
+
+     `listePopstate = false` : le retour arrière est traité ici, pour tous les
+     cas. Laisser le pilotage commun le traiter aussi lancerait deux échanges
+     concurrents pour la même adresse. */
+  window.listePopstate = false;
+
+  var REGIONS = ['dbl-recherche', 'dbl-gauche', 'subheader-controls',
+                 'dbl-resultats'];
+  var onglets = document.getElementById('dbl-onglets');
+  var resultats = document.getElementById('dbl-resultats');
+
+  function memeOnglet(a, b) {
+    return new URL(a, location.origin).pathname === new URL(b, location.origin).pathname;
+  }
+
+  function changerOnglet(adresse, empiler) {
+    if (!resultats) { window.location = adresse; return; }
+    resultats.style.opacity = '.5';
+    fetch(adresse)
+      .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        REGIONS.forEach(function (id) {
+          var neuf = doc.getElementById(id), actuel = document.getElementById(id);
+          if (actuel) { actuel.innerHTML = neuf ? neuf.innerHTML : ''; }
+        });
+        // Le titre porte le nom de l'onglet et sa pastille de compte.
+        var titre = doc.querySelector('.o-page-title');
+        var ici = document.querySelector('.o-page-title');
+        if (titre && ici) { ici.innerHTML = titre.innerHTML; }
+        // L'onglet courant : relu de la page reçue, pas déduit du lien cliqué
+        // — le serveur sait seul lequel est actif.
+        var neufsOnglets = doc.getElementById('dbl-onglets');
+        if (neufsOnglets && onglets) { onglets.innerHTML = neufsOnglets.innerHTML; }
+        resultats.style.opacity = '';
+        if (empiler) { history.pushState({ dbl: adresse }, '', adresse); }
+        window.scrollTo(0, 0);
+        if (window.initListe) { window.initListe(); }
+      })
+      .catch(function () { window.location = adresse; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var onglet = e.target.closest('#dbl-onglets .tab-btn');
+    if (!onglet || onglet.classList.contains('active')) { return; }
+    e.preventDefault();
+    changerOnglet(onglet.getAttribute('href'), true);
+  });
+
+  window.addEventListener('popstate', function () {
+    // Revenu sur le même onglet : le pilotage commun échange la barre et les
+    // résultats, c'est plus léger. Sur un autre onglet : tout change.
+    var actif = document.querySelector('#dbl-onglets .tab-btn.active[href]');
+    if (actif && memeOnglet(window.location.href, actif.getAttribute('href'))) {
+      window.listeRafraichir(window.location.href, false);
+      return;
+    }
+    changerOnglet(window.location.href, false);
+  });
+
+  /* ────────────────────────────────────────────────────────────────────────
+     Ce qui suit ne vaut que pour l'onglet « Groupes ». Les écouteurs sont
+     posés sur `document` et les fonctions se gardent de l'absence de leurs
+     éléments : sur les autres onglets, ils ne trouvent rien et se taisent.
+     ──────────────────────────────────────────────────────────────────────── */
+
+  /* ── Cartes ou tableau ──────────────────────────────────────────────────
+     Le choix suit l'utilisateur d'une page à l'autre, comme sur la liste des
+     patients. */
+  function appliquerVue(nom) {
+    var cartes = document.getElementById('dbl-cartes');
+    var tableau = document.getElementById('list-view');
+    if (!cartes || !tableau) { return; }
+    cartes.style.display = (nom === 'tableau') ? 'none' : '';
+    tableau.style.display = (nom === 'tableau') ? 'block' : 'none';
+    // La vue en cours est écrite sur la page : c'est ce qui efface la case
+    // « tout sélectionner » de la barre quand le tableau porte la sienne.
+    document.body.classList.toggle('dbl-vue-tableau', nom === 'tableau');
+    var bc = document.getElementById('btn-cartes');
+    var bt = document.getElementById('btn-tableau');
+    if (bc) { bc.classList.toggle('active', nom !== 'tableau'); }
+    if (bt) { bt.classList.toggle('active', nom === 'tableau'); }
+  }
+
+  function vueRetenue() {
+    try { return localStorage.getItem('dbl-vue') || 'cartes'; }
+    catch (e) { return 'cartes'; }
+  }
+
+  window.dblVue = function (nom) {
+    try { localStorage.setItem('dbl-vue', nom); } catch (e) {}
+    appliquerVue(nom);
+  };
+
+  // Rappelé par le JS partagé après chaque échange : la barre et les
+  // résultats sont neufs, la vue retenue est à ré-appliquer.
+  window.initListe = function () {
+    appliquerVue(vueRetenue());
+    // Un rafraîchissement remplace les cartes : la sélection précédente ne
+    // désigne plus ce qui est à l'écran. On la vide plutôt que d'emporter
+    // sans le dire des groupes qu'on ne voit plus.
+    if (window.dblViderSelection) { window.dblViderSelection(); }
+  };
+
+  /* ── Recherche ──────────────────────────────────────────────────────────
+     Une demi-seconde après la dernière touche : « KOUASSI » partirait sinon
+     en sept requêtes. */
+  function adresseRecherche() {
+    var champ = document.getElementById('dbl-q');
+    var params = new URLSearchParams(window.location.search);
+    params.delete('page');
+    params.delete('masque');
+    if (champ && champ.value.trim()) { params.set('q', champ.value.trim()); }
+    else { params.delete('q'); }
+    var qs = params.toString();
+    return window.location.pathname + (qs ? '?' + qs : '');
+  }
+
+  window.dblChercher = function () {
+    window.listeRafraichir(adresseRecherche(), true);
+  };
+
+  // Délégué sur `document` : le champ est remplacé à chaque changement
+  // d'onglet, un écouteur posé dessus partirait avec lui.
+  (function () {
+    var minuteur;
+    document.addEventListener('input', function (e) {
+      if (!e.target || e.target.id !== 'dbl-q') { return; }
+      clearTimeout(minuteur);
+      minuteur = setTimeout(window.dblChercher, 500);
+    });
+  })();
+
+  /* ── « Effacer » ────────────────────────────────────────────────────────
+     Les entrées des menus se pilotent elles-mêmes (`toggleParam`,
+     `dblNiveau`, `dblGrouper`) : leur `href="#"` n'est qu'un repli. Les
+     intercepter ici rafraîchissait l'adresse « # », c'est-à-dire la page sans
+     filtre — le clic sur une raison semblait alors ne rien faire. */
+  document.addEventListener('click', function (e) {
+    var lien = e.target.closest('[data-effacer]');
+    if (!lien) { return; }
+    e.preventDefault();
+    document.querySelectorAll('.o-dd-panel.open').forEach(function (p) {
+      p.classList.remove('open');
+    });
+    if (lien.hasAttribute('data-effacer')) {
+      var champ = document.getElementById('dbl-q');
+      if (champ) { champ.value = ''; }
+    }
+    window.listeRafraichir(lien.getAttribute('href'), true);
+  });
+
+  /* La pagination basse est celle de la liste des patients : des liens nus,
+     que le JS partagé n'intercepte pas — il ne connaît que `.o-pag-btn`. */
+  document.addEventListener('click', function (e) {
+    var lien = e.target.closest('.pagination-pages a[href]');
+    if (!lien) { return; }
+    e.preventDefault();
+    window.listeRafraichir(lien.getAttribute('href'), true);
+  });
+
+  /* ── Le masquage depuis une carte ou une ligne ──────────────────────────
+     La fiche s'efface sur place : recharger la zone entière ferait sauter la
+     lecture d'une page qu'on est en train de traiter une par une. */
+  function csrf() {
+    var champ = document.querySelector('[name=csrfmiddlewaretoken]');
+    return champ ? champ.value : '';
+  }
+
+  function envoyer(formulaire) {
+    return fetch(formulaire.action, {
+      method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: new FormData(formulaire)
+    })
+      .then(function (r) {
+        return r.json().then(function (d) { return d; }, function () { return null; });
+      })
+      .then(function (d) {
+        if (d && d.ok) { return d; }
+        // Refus du serveur — une fiche qui porte des données, un relevé qui a
+        // bougé : la page complète le dira mieux qu'un message inventé ici.
+        window.location.reload();
+        return null;
+      })
+      .catch(function () { window.location.reload(); return null; });
+  }
+
+  /* ── L'annonce d'un masquage ────────────────────────────────────────────
+     Le toast du projet, comme partout ailleurs, avec le geste qui le défait
+     dedans : une décision prise doit se reprendre là où elle s'annonce. Un
+     seul chemin pour les deux cas — masquage en AJAX, ou page rechargée qui
+     dépose `#dbl-annonce`. */
+  function annoncerMasquage(code, codeGardee, adresseAnnuler) {
+    var texte = codeGardee
+      ? code + ' est masquée, doublon de ' + codeGardee + '.'
+      : code + ' est masquée.';
+    window.showToast(texte, 'success', {
+      action: { libelle: 'Annuler', faire: function () { reafficher(adresseAnnuler); } }
+    });
+  }
+
+  function reafficher(adresse) {
+    var corps = new FormData();
+    corps.append('csrfmiddlewaretoken', csrf());
+    fetch(adresse, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                     body: corps })
+      .then(function (r) { if (!r.ok) { throw new Error('refus'); } })
+      .then(function () {
+        // Le groupe revient dans la liste, mais à sa place : seul le serveur
+        // sait laquelle.
+        var u = new URL(window.location.href);
+        u.searchParams.delete('masque');
+        var retour = u.pathname + (u.search || '');
+        history.replaceState({}, '', retour);
+        if (document.getElementById('dbl-resultats')) {
+          window.listeRafraichir(retour, false);
+        } else {
+          window.location = retour;
+        }
+      })
+      .catch(function () { window.location.reload(); });
+  }
+
+  function retirerUn(element) {
+    if (!element) { return; }
+    var n = parseInt(element.textContent, 10);
+    if (!isNaN(n) && n > 0) { element.textContent = n - 1; }
+  }
+
+  // « 1–48 sur 903 » devient « 1–47 sur 902 » : le total parce qu'un groupe
+  // est traité, la fin parce qu'une carte de moins est à l'écran. La pastille
+  // du titre et le pied de page portent le même total.
+  function decompter() {
+    document.querySelectorAll('[data-total], .o-page-count').forEach(retirerUn);
+    retirerUn(document.querySelector('[data-fin]'));
+  }
+
+  document.addEventListener('click', function (e) {
+    var demande = e.target.closest('[data-demander]');
+    if (demande) {
+      demande.hidden = true;
+      demande.parentNode.querySelector('.dbl-confirme').hidden = false;
+      return;
+    }
+    var renonce = e.target.closest('[data-renoncer]');
+    if (renonce) {
+      var rapide = renonce.closest('.dbl-rapide');
+      rapide.querySelector('.dbl-confirme').hidden = true;
+      rapide.querySelector('[data-demander]').hidden = false;
+    }
+  });
+
+  document.addEventListener('submit', function (e) {
+    var formulaire = e.target.closest('.dbl-rapide');
+    if (!formulaire) { return; }
+    e.preventDefault();
+    var cle = formulaire.closest('[data-groupe]').getAttribute('data-groupe');
+    envoyer(formulaire).then(function (d) {
+      if (!d) { return; }
+      annoncerMasquage(d.code, d.code_gardee, d.annuler);
+      // Le groupe est présent deux fois — une carte et une ligne : les deux
+      // s'en vont, quelle que soit la vue affichée.
+      document.querySelectorAll('[data-groupe="' + cle + '"]').forEach(function (bloc) {
+        bloc.classList.add('partie');
+        setTimeout(function () { bloc.remove(); }, 260);
+      });
+      setTimeout(decompter, 260);
+    });
+  });
+
+  // Un masquage qui a rechargé la page : la même annonce, levée au
+  // chargement depuis les données que le serveur a déposées.
+  (function () {
+    var annonce = document.getElementById('dbl-annonce');
+    if (!annonce) { return; }
+    annoncerMasquage(annonce.dataset.code, annonce.dataset.gardee,
+                     annonce.dataset.annuler);
+  })();
+
+  /* ── Les filtres exclusifs et le retrait d'une pastille ────────────────
+     `toggleParam` du pilotage commun cumule les valeurs ; le niveau et le
+     regroupement, eux, se remplacent. */
+  function remplacer(cle, valeur) {
+    var params = new URLSearchParams(window.location.search);
+    params.delete(cle);
+    params.delete('page');
+    if (valeur) { params.set(cle, valeur); }
+    window.listeRafraichir('?' + params.toString());
+  }
+
+  window.dblNiveau = function (code) { remplacer('niveau', code === 'tous' ? '' : code); };
+  window.dblGrouper = function (code) {
+    var actuel = new URLSearchParams(window.location.search).get('grouper');
+    remplacer('grouper', actuel === code ? '' : code);
+  };
+
+  /* Retirer une pastille : une valeur pour les filtres cumulables, le
+     paramètre entier pour les autres. */
+  window.dblRetirer = function (cle, valeur) {
+    if (cle === 'raison' || cle === 'rattache') { window.toggleParam(cle, valeur); }
+    else { remplacer(cle, valeur); }
+  };
+
+  /* ── La sélection multiple ─────────────────────────────────────────────
+     La sélection vit dans la page affichée : changer de page, de filtre ou
+     d'onglet la remet à zéro. Mieux vaut cela qu'une sélection invisible
+     qu'on emporterait sans le savoir — « tout le filtre » existe pour agir
+     au-delà de la page, et il le dit. */
+  var choisis = new Set();
+  var toutLeFiltre = false;
+
+  function barre() { return document.getElementById('dbl-barre-lot'); }
+
+  /* Combien de groupes « à vérifier » sont pris. Avec « tout le filtre »,
+     on ne tient pas les clés : seul le filtre de niveau renseigne, et s'il
+     n'est pas posé on ne prétend rien — le serveur fera le tri et le bilan
+     le dira. */
+  function combienAVerifier(nombre) {
+    if (toutLeFiltre) {
+      var filtre = barre().querySelector('[name="niveau"]');
+      return (filtre && filtre.value === 'avertissement') ? nombre : 0;
+    }
+    var compte = 0;
+    choisis.forEach(function (cle) {
+      var bloc = document.querySelector('[data-groupe="' + cle + '"]');
+      if (bloc && bloc.dataset.niveau === 'avertissement') { compte += 1; }
+    });
+    return compte;
+  }
+
+  /* Les deux boutons qui retirent une fiche ne valent que pour les
+     groupes quasi certains. Le mot du bouton n'est pas écrit ici : ce
+     gabarit sert aussi l'écran de comparaison, où un test vérifie
+     qu'il n'apparaît pas sans la permission. */
+  function majAvertissement(nombre) {
+    var combien = combienAVerifier(nombre);
+    var note = document.getElementById('dbl-lot-avertis');
+    note.hidden = combien === 0;
+    note.textContent = combien + ' « à vérifier » : seul « Pas un doublon » '
+      + 'les traitera.';
+    var eteindre = combien > 0 && combien === nombre;
+    ['dbl-lot-masquer', 'dbl-lot-fusionner'].forEach(function (id) {
+      var bouton = document.getElementById(id);
+      if (!bouton) { return; }
+      bouton.disabled = eteindre;
+      bouton.title = eteindre
+        ? 'Un groupe à vérifier se masque ou se fusionne une fiche à la fois, '
+          + 'depuis l’écran de comparaison.' : '';
+    });
+  }
+
+  function majBarre() {
+    var forme = barre();
+    if (!forme) { return; }
+    var nombre = toutLeFiltre
+      ? parseInt(document.getElementById('dbl-lot-total').textContent, 10) || 0
+      : choisis.size;
+    forme.hidden = nombre === 0;
+    document.getElementById('dbl-lot-nombre').textContent = nombre;
+    document.getElementById('dbl-lot-tout').value = toutLeFiltre ? '1' : '';
+    majAvertissement(nombre);
+
+    // « Tout le filtre » ne se propose que lorsque la page entière est prise
+    // et qu'il reste des groupes au-delà.
+    var cases = document.querySelectorAll('#dbl-cartes .dbl-coche');
+    var total = parseInt(document.getElementById('dbl-lot-total').textContent, 10) || 0;
+    var lien = document.getElementById('dbl-lot-filtre');
+    lien.hidden = toutLeFiltre || !cases.length
+                  || choisis.size < cases.length || total <= cases.length;
+
+    var contenant = document.getElementById('dbl-lot-cles');
+    contenant.textContent = '';
+    if (!toutLeFiltre) {
+      choisis.forEach(function (cle) {
+        var champ = document.createElement('input');
+        champ.type = 'hidden';
+        champ.name = 'cle';
+        champ.value = cle;
+        contenant.appendChild(champ);
+      });
+    }
+  }
+
+  function cocher(cle, etat) {
+    if (etat) { choisis.add(cle); } else { choisis.delete(cle); toutLeFiltre = false; }
+    // Le groupe est présent deux fois — une carte et une ligne : les deux
+    // cases suivent, quelle que soit la vue affichée.
+    document.querySelectorAll('[data-groupe="' + cle + '"] .dbl-coche')
+      .forEach(function (c) { c.checked = etat; });
+  }
+
+  document.addEventListener('change', function (evenement) {
+    var cible = evenement.target;
+
+    if (cible.classList && cible.classList.contains('dbl-coche')) {
+      cocher(cible.value, cible.checked);
+      majBarre();
+      return;
+    }
+    // `data-tout-page` et non un identifiant : la case existe deux fois —
+    // dans la barre pour les cartes, dans l'en-tête de colonne pour le
+    // tableau — et deux éléments ne peuvent pas porter le même id.
+    if (cible.dataset && cible.dataset.toutPage !== undefined) {
+      document.querySelectorAll('#dbl-cartes .dbl-coche').forEach(function (c) {
+        cocher(c.value, cible.checked);
+      });
+      document.querySelectorAll('[data-tout-page]').forEach(function (c) {
+        c.checked = cible.checked;
+      });
+      if (!cible.checked) { toutLeFiltre = false; }
+      majBarre();
+      return;
+    }
+    if (cible.dataset && cible.dataset.section !== undefined
+        && cible.type === 'checkbox') {
+      var section = cible.dataset.section;
+      document.querySelectorAll('#dbl-cartes [data-section]').forEach(function (carte) {
+        if (carte.dataset.section !== section) { return; }
+        var case_ = carte.querySelector('.dbl-coche');
+        if (case_) { cocher(case_.value, cible.checked); }
+      });
+      majBarre();
+    }
+  });
+
+  window.dblViderSelection = function () {
+    choisis.clear();
+    toutLeFiltre = false;
+    document.querySelectorAll('.dbl-coche, [data-tout-page], [data-section]')
+      .forEach(function (c) { if (c.type === 'checkbox') { c.checked = false; } });
+    majBarre();
+  };
+
+  window.dblToutLeFiltre = function () {
+    toutLeFiltre = true;
+    majBarre();
+  };
+
+  window.dblLot = function (action) {
+    document.getElementById('dbl-lot-action').value = action;
+    // La raison commune n'a de sens que pour « pas un doublon » ; ailleurs
+    // elle partirait sans être lue.
+    var raison = document.getElementById('dbl-lot-raison');
+    if (raison && action !== 'ecarter') {
+      raison.querySelector('input').value = '';
+    }
+  };
+
+  // La case « pas un doublon » demande sa raison dès qu'on survole son
+  // bouton : la montrer d'office encombrerait la barre.
+  document.addEventListener('mouseover', function (evenement) {
+    var bouton = evenement.target.closest
+      && evenement.target.closest('[onclick*="ecarter"]');
+    var raison = document.getElementById('dbl-lot-raison');
+    if (bouton && raison) { raison.hidden = false; }
+  });
+
+  appliquerVue(vueRetenue());
+  majBarre();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% comment %}
+Tout ce que les filtres du bandeau font changer, en un seul morceau : le
+bandeau lui-même, les cartes, les graphiques et leurs données.
+
+Ce fragment est rendu seul quand la page le redemande en AJAX. Le bandeau en
+fait partie parce qu'il change aussi — le libellé de la période et l'option
+retenue dans chaque liste. `data-annee` porte l'année affichée : c'est elle
+que les listes « semaine » et « mois » renvoient au serveur, et elle vit ici
+pour suivre le fragment quand il est remplacé.
+{% endcomment %}
+<div id="kpi-vue" data-annee="{{ annee }}">
+<div class="kpi-banner">
+  <div>
+    <h1>Les données de WALÉ Yamoussoukro</h1>
+    <span class="kpi-banner-sub">{{ periode.label }}</span>
+  </div>
+  {% comment %}
+  Les trois listes ne déclenchent rien : on compose sa période — l'année, puis
+  le mois, puis la semaine — et c'est « Actualiser » qui va chercher les
+  chiffres. Le relevé coûte près de trois secondes ; le recalculer à chaque
+  clic pendant qu'on cherche sa semaine n'avait pas de sens.
+
+  Les listes se répondent entre elles sans passer par le serveur : changer
+  d'année refait les mois, changer de mois refait les semaines. Tout ce qu'il
+  faut pour ça est dans `kpi-calendrier`, posé une fois dans la page.
+
+  « Aujourd'hui » reste immédiat : c'est déjà un clic volontaire, il n'a rien
+  à composer.
+
+  Le mois n'est pas qu'une période, c'est aussi le cadre dans lequel on
+  choisit une semaine — d'où `cadre_mois`, qui vaut aussi quand la période
+  retenue est la semaine, là où `mois` ne dit que le premier cas.
+  {% endcomment %}
+  <div class="kpi-filtres">
+    <a href="?period=jour" class="year-tab {% if periode.period == 'jour' %}active{% endif %}">Aujourd'hui</a>
+    <select class="kpi-select {% if periode.period == 'semaine' %}active{% endif %}"
+            aria-label="Semaine" id="kpi-semaine">
+      <option value="" {% if not periode.semaine %}selected{% endif %}>Toutes les semaines</option>
+      {% for n, libelle in periode.semaines_choix %}<option value="{{ n }}" {% if n == periode.semaine %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+    </select>
+    <select class="kpi-select {% if periode.period == 'mois' %}active{% endif %}"
+            aria-label="Mois" id="kpi-mois">
+      <option value="" {% if not periode.cadre_mois %}selected{% endif %}>Tous les mois</option>
+      {% for m, libelle in periode.mois_choix %}<option value="{{ m }}" {% if m == periode.cadre_mois %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+    </select>
+    <select class="kpi-select {% if periode.period == 'annee' %}active{% endif %}"
+            aria-label="Année" id="kpi-annee">
+      {% for a in annees %}<option value="{{ a }}" {% if a == annee %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+    <button type="button" class="year-tab kpi-actualiser" id="kpi-actualiser"
+            title="Aller chercher les chiffres de la période choisie">
+      <i class="bi bi-arrow-clockwise"></i> Actualiser
+    </button>
+  </div>
+</div>
+
+<div class="kpi-page">
+
+  <!-- ══ Indicateurs : total de la période, puis trimestres de l'année ══ -->
+  <div class="kpi-cards">
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation générale" total=totaux.mg serie=kpi.mg %}
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation prénatale" total=totaux.cpn serie=kpi.cpn %}
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation gynéco" total=totaux.gyn serie=kpi.gyn %}
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Consultation cardiologie" total=totaux.cardio serie=kpi.cardio %}
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Examens laboratoire" total=totaux.labo serie=kpi.labo %}
+
+    <div class="kpi-card">
+      <div class="kpi-card-head"><span class="kpi-card-title">Part d'examens labo par provenance</span></div>
+      <div class="kpi-part">
+        <div class="kpi-part-row"><b>WALÉ :</b><strong>{{ totaux.provenance.wale }}</strong><span class="kpi-pct">{{ totaux.provenance.part_wale }} %</span></div>
+        <div class="kpi-part-row"><b>Externe :</b><strong>{{ totaux.provenance.externe }}</strong><span class="kpi-pct">{{ totaux.provenance.part_externe }} %</span></div>
+      </div>
+    </div>
+
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Soins infirmiers" total=totaux.soins serie=kpi.soins %}
+    {% include 'core/includes/kpi_carte_trimestres.html' with titre="Mise en observation" total=totaux.mo serie=kpi.mo %}
+  </div>
+
+  <!-- ══ Graphiques mensuels ══ -->
+  <div class="kpi-charts">
+    <div class="chart-card"><div class="chart-title">Consultation générale</div><div class="chart-wrap"><canvas id="chMg"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Médecine générale par sexe</div><div class="chart-wrap"><canvas id="chSexe"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Consultation cardiologie</div><div class="chart-wrap"><canvas id="chCardio"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Consultation prénatale</div><div class="chart-wrap"><canvas id="chCpn"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Consultation gynécologie</div><div class="chart-wrap"><canvas id="chGyn"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Soins infirmiers</div><div class="chart-wrap"><canvas id="chSoins"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Examens laboratoire</div><div class="chart-wrap"><canvas id="chLabo"></canvas></div></div>
+  </div>
+
+</div>
+
+{{ chart_data|json_script:"kpi-chart-data" }}
+</div>

@@ -1,0 +1,136 @@
+{% comment %}
+Jauge d'avancement pour un import mené en tâche de fond (core.taches).
+
+À inclure DANS la modale d'import (`.io-modal`), juste après le formulaire. Le
+formulaire porte `data-io-progression` : le script l'intercepte, poste le
+fichier en arrière-plan et remplace le formulaire par la jauge, qu'il rafraîchit
+jusqu'à la fin. Les styles sont dans services/includes/io_styles.html.
+
+La vue visée doit rendre {"tache": …, "url_statut": …} quand la requête porte
+l'en-tête X-Requested-With (voir patients.views.import_patients).
+{% endcomment %}
+
+<div class="io-progress" id="io-progress">
+  <div class="io-modal-body">
+    <div class="io-prog-etape">
+      <i class="bi bi-arrow-repeat" id="io-prog-icone"></i>
+      <span id="io-prog-etape">Démarrage…</span>
+    </div>
+    <div class="io-prog-bar">
+      <div class="io-prog-fill indetermine" id="io-prog-fill"></div>
+    </div>
+    <div class="io-prog-chiffres">
+      <span id="io-prog-compte"></span>
+      <strong id="io-prog-pct"></strong>
+    </div>
+    <div class="io-prog-detail" id="io-prog-detail"></div>
+  </div>
+  <div class="io-modal-footer">
+    <button type="button" class="io-btn-cancel" id="io-prog-fermer">Fermer</button>
+    <button type="button" class="io-btn-submit" id="io-prog-terminer" style="display:none;">
+      <i class="bi bi-check2"></i> Voir le résultat
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const form = document.querySelector('form[data-io-progression]');
+  if (!form) return;
+
+  const bloc    = document.getElementById('io-progress');
+  const etape   = document.getElementById('io-prog-etape');
+  const icone   = document.getElementById('io-prog-icone');
+  const barre   = document.getElementById('io-prog-fill');
+  const compte  = document.getElementById('io-prog-compte');
+  const pct     = document.getElementById('io-prog-pct');
+  const detail  = document.getElementById('io-prog-detail');
+  const fermer  = document.getElementById('io-prog-fermer');
+  const terminer = document.getElementById('io-prog-terminer');
+
+  const nombre = (n) => (n || 0).toLocaleString('fr-FR');
+
+  // Fermer la fenêtre n'arrête rien : le travail se poursuit côté serveur.
+  fermer.addEventListener('click', function () {
+    if (typeof closeImportModal === 'function') closeImportModal();
+  });
+  terminer.addEventListener('click', function () { window.location.reload(); });
+
+  function afficherJauge() {
+    form.style.display = 'none';
+    bloc.classList.add('active');
+  }
+
+  function echec(texte) {
+    icone.className = 'bi bi-exclamation-triangle';
+    barre.classList.remove('indetermine');
+    barre.style.width = '100%';
+    barre.style.background = '#c0392b';
+    etape.textContent = 'Import interrompu';
+    detail.className = 'io-prog-detail echec';
+    detail.textContent = texte;
+    terminer.style.display = 'none';
+  }
+
+  function peindre(d) {
+    etape.textContent = d.etape || 'En cours…';
+    if (d.total) {
+      compte.textContent = nombre(d.traites) + ' / ' + nombre(d.total) + ' lignes';
+    }
+    // Le total est connu dès la lecture du fichier, mais rien n'est encore
+    // traité pendant le relevé des patients déjà en base : une barre figée à
+    // 0 % donnerait justement l'impression de blocage qu'elle doit dissiper.
+    if (d.total && d.traites) {
+      barre.classList.remove('indetermine');
+      barre.style.width = d.pourcentage + '%';
+      pct.textContent = d.pourcentage + ' %';
+    }
+    const lots = [];
+    if (d.crees)      lots.push(nombre(d.crees) + ' créé(s)');
+    if (d.mis_a_jour) lots.push(nombre(d.mis_a_jour) + ' mis à jour');
+    if (d.ignores)    lots.push(nombre(d.ignores) + ' ignoré(s)');
+    if (d.erreurs)    lots.push(nombre(d.erreurs) + ' erreur(s)');
+    detail.className = 'io-prog-detail';
+    detail.textContent = lots.join(' · ');
+  }
+
+  function suivre(url) {
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then((r) => {
+        if (!r.ok) throw new Error('Statut indisponible (' + r.status + ')');
+        return r.json();
+      })
+      .then((d) => {
+        if (d.etat === 'echec') { echec(d.message || 'Erreur inconnue.'); return; }
+        peindre(d);
+        if (d.termine) {
+          icone.className = 'bi bi-check-circle';
+          barre.classList.remove('indetermine');
+          barre.style.width = '100%';
+          etape.textContent = 'Import terminé';
+          if (d.message) detail.textContent = d.message;
+          terminer.style.display = 'flex';
+          return;
+        }
+        setTimeout(() => suivre(url), 2000);
+      })
+      .catch((e) => echec(String(e.message || e)));
+  }
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    afficherJauge();
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error('Le serveur a refusé le fichier (' + r.status + ')');
+        return r.json();
+      })
+      .then((d) => suivre(d.url_statut))
+      .catch((e) => echec(String(e.message || e)));
+  });
+})();
+</script>
