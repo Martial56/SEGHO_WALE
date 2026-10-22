@@ -132,7 +132,7 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
 <div class="rh-subheader" id="subheader">
   <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <h1 style="font-size:20px;font-weight:800;color:var(--rh-900);" id="page-title">Annuaire</h1>
-    <span class="ann-count">{{ employes|length }} employé{% if employes|length != 1 %}s{% endif %}</span>
+    <span class="ann-count o-page-count">{{ nb_total }} employé{% if nb_total != 1 %}s{% endif %}</span>
   </div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <!-- Toggle vue -->
@@ -153,26 +153,27 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
 </div>
 
 <!-- Filtres (communs aux deux vues) -->
-<form method="get" class="ann-filters">
-  <input type="search" name="q" value="{{ q|default:'' }}"
+<form method="get" class="ann-filters" onsubmit="return false;">
+  <input type="search" name="q" id="search-input" value="{{ q|default:'' }}"
          placeholder="Rechercher par nom, fonction…"
          class="rh-input" style="min-width:220px;max-width:280px;" autocomplete="off">
-  <select name="service" class="rh-input" style="max-width:200px;" onchange="this.form.submit()">
+  <button type="button" class="btn-rh-outline" style="padding:8px 12px;" onclick="lancerRecherche()" title="Rechercher">
+    <i class="bi bi-search"></i>
+  </button>
+  <select name="service" class="rh-input" style="max-width:200px;" onchange="rhAnnAppliquerFiltres()">
     <option value="">Tous les services</option>
     {% for svc in services %}
     <option value="{{ svc.pk }}" {% if f_service == svc.pk|stringformat:"s" %}selected{% endif %}>{{ svc.nom }}</option>
     {% endfor %}
   </select>
-  <button type="submit" class="btn-rh" style="padding:8px 16px;">
-    <i class="bi bi-search"></i> Filtrer
-  </button>
   {% if q or f_service %}
-  <a href="{% url 'rh_annuaire' %}" class="btn-rh-outline" style="padding:8px 14px;">
+  <a href="{% url 'rh_annuaire' %}" class="btn-rh-outline" style="padding:8px 14px;" onclick="return rhAnnEffacerFiltres()">
     <i class="bi bi-x-lg"></i> Effacer
   </a>
   {% endif %}
 </form>
 
+<div id="list-result">
 {% if employes %}
 {% regroup employes by service as par_service %}
 
@@ -265,16 +266,18 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
   <i class="bi bi-people"></i>
   <p>Aucun employé actif trouvé{% if q or f_service %} pour ces critères{% endif %}.</p>
   {% if q or f_service %}
-  <a href="{% url 'rh_annuaire' %}" class="btn-rh-outline" style="margin-top:12px;display:inline-flex;">
+  <a href="{% url 'rh_annuaire' %}" class="btn-rh-outline" style="margin-top:12px;display:inline-flex;" onclick="return rhAnnEffacerFiltres()">
     <i class="bi bi-x-lg"></i> Effacer les filtres
   </a>
   {% endif %}
 </div>
+{% endif %}
+
 {% if page_obj.has_other_pages %}
 <div class="rh-pagination" style="padding:20px 32px;">
   {% if page_obj.has_previous %}
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page=1" class="rh-page-link" title="Première page"><i class="bi bi-chevron-double-left"></i></a>
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page=1" class="rh-page-link o-pag-btn" title="Première page"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rh-page-link o-pag-btn"><i class="bi bi-chevron-left"></i></a>
   {% else %}
     <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
     <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
@@ -282,12 +285,12 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
   {% for num in page_obj.paginator.page_range %}
     {% if num == page_obj.number %}<span class="rh-page-link active">{{ num }}</span>
     {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ num }}" class="rh-page-link">{{ num }}</a>
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ num }}" class="rh-page-link o-pag-btn">{{ num }}</a>
     {% endif %}
   {% endfor %}
   {% if page_obj.has_next %}
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.next_page_number }}" class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="rh-page-link" title="Dernière page"><i class="bi bi-chevron-double-right"></i></a>
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.next_page_number }}" class="rh-page-link o-pag-btn"><i class="bi bi-chevron-right"></i></a>
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="rh-page-link o-pag-btn" title="Dernière page"><i class="bi bi-chevron-double-right"></i></a>
   {% else %}
     <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
     <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
@@ -298,8 +301,7 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
   </span>
 </div>
 {% endif %}
-
-{% endif %}
+</div><!-- /#list-result -->
 
 {% endblock %}
 
@@ -309,17 +311,35 @@ html[data-theme="dark"] .ann-count { background: rgba(var(--teal-400-rgb), 0.18)
 var TITLES = { liste: 'Annuaire', org: 'Organigramme' };
 
 function setVue(vue) {
-  document.getElementById('view-liste').style.display = vue === 'liste' ? '' : 'none';
-  document.getElementById('view-org').style.display   = vue === 'org'   ? '' : 'none';
+  var vListe = document.getElementById('view-liste'), vOrg = document.getElementById('view-org');
+  if (vListe) vListe.style.display = vue === 'liste' ? '' : 'none';
+  if (vOrg) vOrg.style.display   = vue === 'org'   ? '' : 'none';
   document.getElementById('btn-liste').classList.toggle('active', vue === 'liste');
   document.getElementById('btn-org').classList.toggle('active',   vue === 'org');
   document.getElementById('page-title').textContent = TITLES[vue];
   localStorage.setItem('rh-annuaire-vue', vue);
 }
 
-(function () {
+function rhAnnAppliquerFiltres() {
+  var params = new URLSearchParams(window.location.search);
+  var svc = document.querySelector('select[name="service"]').value;
+  if (svc) { params.set('service', svc); } else { params.delete('service'); }
+  params.delete('page');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+function rhAnnEffacerFiltres() {
+  document.getElementById('search-input').value = '';
+  var svcSel = document.querySelector('select[name="service"]');
+  if (svcSel) svcSel.value = '';
+  window.listeRafraichir(window.location.pathname, true);
+  return false;
+}
+
+window.initListe = function () {
   var saved = localStorage.getItem('rh-annuaire-vue') || 'liste';
   setVue(saved);
-})();
+};
+window.initListe();
 </script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}

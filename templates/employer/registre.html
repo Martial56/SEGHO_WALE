@@ -30,22 +30,25 @@ html[data-theme="dark"] .reg-title{color:var(--rh-200);}
 html[data-theme="dark"] .reg-filter{background:var(--rh-surface);border-color:var(--rh-border);}
 html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
 
-/* ── Tableau ── */
-.reg-wrap{margin-top:20px;box-shadow:0 2px 16px rgba(27,67,50,0.08);}
+/* ── Tableau ──
+   Repris du style sobre de la liste Employés (rh-table) : en-tête clair,
+   lignes séparées par un simple filet et surlignées au survol, au lieu du
+   bandeau vert plein + rayures alternées d'origine. L'impression (plus bas)
+   garde ses propres couleurs, inchangées : les deux styles ne se touchent pas. */
+.reg-wrap{margin-top:20px;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(27,67,50,0.06);}
 .reg-table{width:100%;border-collapse:collapse;font-size:11.5px;
   background:var(--rh-surface);table-layout:fixed;}
-.reg-table thead tr{background:var(--rh-500);color:#fff;}
+.reg-table thead tr{background:var(--rh-50);}
 .reg-table thead th{
-  padding:8px 10px;font-weight:700;font-size:10.5px;
+  padding:9px 10px;font-weight:700;font-size:10.5px;color:var(--rh-800);
   text-transform:uppercase;letter-spacing:0.3px;text-align:left;
-  border-right:1px solid rgba(255,255,255,0.1);
+  border-bottom:2px solid var(--rh-100);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.reg-table thead th:last-child{border-right:none;}
-.reg-table tbody tr{border-bottom:1px solid var(--rh-border);}
-.reg-table tbody tr:nth-child(even){background:var(--rh-50);}
-.reg-table tbody tr:hover{background:rgba(var(--rh-600-rgb),0.07);}
-.reg-table tbody td{padding:7px 10px;color:var(--rh-text);vertical-align:middle;
+.reg-table tbody tr{border-bottom:1px solid rgba(0,0,0,0.04);}
+.reg-table tbody tr:last-child{border-bottom:none;}
+.reg-table tbody tr:hover{background:rgba(var(--rh-600-rgb),0.03);}
+.reg-table tbody td{padding:8px 10px;color:var(--rh-text);vertical-align:middle;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .reg-table tbody td.obs{white-space:normal;font-size:11px;color:var(--rh-muted);}
 
@@ -54,16 +57,10 @@ html[data-theme="dark"] .reg-filter select{color:var(--rh-text);}
 .reg-nom{font-weight:600;}
 .reg-date{font-variant-numeric:tabular-nums;font-size:12px;}
 
-{% comment %}
---rh-800 servait de fond à la ligne d'en-tête. Or base.html inverse les paliers
-800/900/950 en thème sombre (ils n'y sont censés servir qu'au texte) : le fond
-devenait donc clair, sous un texte lui aussi clair — en-tête illisible. Le palier
-700, qui n'est pas inversé, reste sombre et garde le texte blanc lisible.
-Le survol reprend l'accent au lieu d'un vert écrit en dur.
-{% endcomment %}
-html[data-theme="dark"] .reg-table thead tr{background:var(--teal-700);color:#fff;}
-html[data-theme="dark"] .reg-table tbody tr:nth-child(even){background:var(--rh-100);}
-html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(var(--teal-500-rgb),0.10);}
+html[data-theme="dark"] .reg-table thead tr{background:rgba(var(--rh-600-rgb),0.1);}
+html[data-theme="dark"] .reg-table thead th{color:var(--rh-300);border-bottom-color:var(--rh-border);}
+html[data-theme="dark"] .reg-table tbody tr{border-bottom-color:rgba(255,255,255,0.04);}
+html[data-theme="dark"] .reg-table tbody tr:hover{background:rgba(var(--rh-600-rgb),0.08);}
 
 /* ── Stats ── */
 .reg-stats{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;}
@@ -118,17 +115,15 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
   </div>
   <div class="reg-actions">
     <!-- Filtre statut -->
-    <form method="get" style="display:contents;">
-      <div class="reg-filter">
-        <i class="bi bi-funnel" style="color:var(--accent-text-soft);font-size:13px;"></i>
-        <select name="statut" onchange="this.form.submit()">
-          <option value="" {% if not statut_filtre %}selected{% endif %}>Tous les statuts</option>
-          <option value="actif"    {% if statut_filtre == 'actif' %}selected{% endif %}>Actifs</option>
-          <option value="suspendu" {% if statut_filtre == 'suspendu' %}selected{% endif %}>Suspendus</option>
-          <option value="quitte"   {% if statut_filtre == 'quitte' %}selected{% endif %}>Quittés</option>
-        </select>
-      </div>
-    </form>
+    <div class="reg-filter">
+      <i class="bi bi-funnel" style="color:var(--accent-text-soft);font-size:13px;"></i>
+      <select name="statut" onchange="regFiltrer()">
+        <option value="" {% if not statut_filtre %}selected{% endif %}>Tous les statuts</option>
+        <option value="actif"    {% if statut_filtre == 'actif' %}selected{% endif %}>Actifs</option>
+        <option value="suspendu" {% if statut_filtre == 'suspendu' %}selected{% endif %}>Suspendus</option>
+        <option value="quitte"   {% if statut_filtre == 'quitte' %}selected{% endif %}>Quittés</option>
+      </select>
+    </div>
     {% if perms.employer.view_employe %}
     <!-- Export Excel -->
     <a href="{% url 'rh_registre_export' %}{% if statut_filtre %}?statut={{ statut_filtre }}{% endif %}"
@@ -143,19 +138,16 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
   </div>
 </div>
 
+<div id="list-result">
 <!-- Stats -->
 <div class="reg-stats">
-  {% with actifs=employes|length %}
   <div class="reg-stat">
-    <span class="reg-stat-val">{{ employes|length }}</span>
+    <span class="reg-stat-val">{{ nb_total }}</span>
     <span class="reg-stat-lbl">{% if statut_filtre %}Filtrés{% else %}Total{% endif %}</span>
   </div>
-  {% endwith %}
   {% if not statut_filtre %}
   <div class="reg-stat">
-    <span class="reg-stat-val">
-      {{ employes|dictsort:"statut"|length }}
-    </span>
+    <span class="reg-stat-val">{{ nb_actifs }}</span>
     <span class="reg-stat-lbl">Actifs</span>
   </div>
   {% endif %}
@@ -234,8 +226,8 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
 {% if page_obj.has_other_pages %}
 <div class="rh-pagination">
   {% if page_obj.has_previous %}
-    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page=1" class="rh-page-link" title="Première page"><i class="bi bi-chevron-double-left"></i></a>
-    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page=1" class="rh-page-link o-pag-btn" title="Première page"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.previous_page_number }}" class="rh-page-link o-pag-btn"><i class="bi bi-chevron-left"></i></a>
   {% else %}
     <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
     <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
@@ -245,13 +237,13 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
     {% if num == page_obj.number %}
       <span class="rh-page-link active">{{ num }}</span>
     {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-      <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ num }}" class="rh-page-link">{{ num }}</a>
+      <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ num }}" class="rh-page-link o-pag-btn">{{ num }}</a>
     {% endif %}
   {% endfor %}
 
   {% if page_obj.has_next %}
-    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.next_page_number }}" class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
-    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="rh-page-link" title="Dernière page"><i class="bi bi-chevron-double-right"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.next_page_number }}" class="rh-page-link o-pag-btn"><i class="bi bi-chevron-right"></i></a>
+    <a href="?{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="rh-page-link o-pag-btn" title="Dernière page"><i class="bi bi-chevron-double-right"></i></a>
   {% else %}
     <span class="rh-page-link disabled"><i class="bi bi-chevron-right"></i></span>
     <span class="rh-page-link disabled"><i class="bi bi-chevron-double-right"></i></span>
@@ -263,5 +255,20 @@ html[data-theme="dark"] .rh-page-link.active { background:var(--rh-600); color:#
   </span>
 </div>
 {% endif %}
+</div><!-- /#list-result -->
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function regFiltrer() {
+  var params = new URLSearchParams(window.location.search);
+  var sta = document.querySelector('select[name="statut"]').value;
+  if (sta) { params.set('statut', sta); } else { params.delete('statut'); }
+  params.delete('page');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}

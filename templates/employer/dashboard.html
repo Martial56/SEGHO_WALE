@@ -1,5 +1,5 @@
 {% extends 'employer/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block topbar_title %}Tableau de bord RH{% endblock %}
 
@@ -38,53 +38,47 @@ html[data-theme="dark"] .rh-subheader {
 }
 html[data-theme="dark"] .rh-subheader h1 { color: var(--rh-text); }
 
-/* ── Stat cards ── */
+/* ── Stat cards ──
+   Repris tel quel du style de la liste Employés (rh-stat-card) : même carte
+   blanche à liseré de couleur en haut, même typographie. Avant, cette page
+   avait sa propre variante (icône + liseré à gauche), et le bloc "Mouvement
+   du personnel" plus bas une troisième encore (fonds teintés en style
+   inline) — trois looks différents pour la même idée de "chiffre clé". */
 .rh-stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 14px;
   margin-top: 28px;
   margin-bottom: 24px;
 }
+@media (max-width: 1100px) { .rh-stats-row { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 900px)  { .rh-stats-row { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 500px)  { .rh-stats-row { grid-template-columns: 1fr; } }
 
 .rh-stat-card {
   background: var(--rh-surface);
   border-radius: 11px;
-  padding: 18px 20px;
+  padding: 16px 20px;
   box-shadow: var(--shadow-sm);
   display: flex;
-  align-items: center;
-  gap: 14px;
-  border-left: 4px solid transparent;
-  transition: box-shadow 0.18s, transform 0.15s;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 3px solid transparent;
+  transition: box-shadow 0.18s;
 }
-.rh-stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.rh-stat-card.total   { border-left-color: var(--rh-500); }
-.rh-stat-card.actif   { border-left-color: var(--green); }
-.rh-stat-card.suspendu{ border-left-color: var(--amber); }
-.rh-stat-card.quitte  { border-left-color: #aaa; }
+.rh-stat-card:hover { box-shadow: var(--shadow-md); }
+.rh-stat-card.total   { border-top-color: var(--rh-500); }
+.rh-stat-card.actif   { border-top-color: var(--green); }
+.rh-stat-card.suspendu{ border-top-color: var(--amber); }
+.rh-stat-card.quitte  { border-top-color: #aaa; }
+.rh-stat-card.conge   { border-top-color: var(--sky); }
+.rh-stat-card.embauches  { border-top-color: var(--rh-500); }
+.rh-stat-card.departs    { border-top-color: var(--rose); }
+.rh-stat-card.turnover   { border-top-color: var(--rh-400); }
+.rh-stat-card.anciennete { border-top-color: var(--sky); }
 
-.rh-stat-icon {
-  width: 44px; height: 44px;
-  border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 20px;
-  flex-shrink: 0;
-}
-.rh-stat-card.total   .rh-stat-icon { background: var(--rh-50); color: var(--accent-text-soft); }
-.rh-stat-card.actif   .rh-stat-icon { background: rgba(var(--rh-600-rgb),0.1); color: var(--accent-text-soft); }
-.rh-stat-card.suspendu .rh-stat-icon{ background: rgba(var(--amber-rgb),0.1); color: var(--amber-text); }
-.rh-stat-card.quitte  .rh-stat-icon { background: rgba(0,0,0,0.05); color: #777; }
-html[data-theme="dark"] .rh-stat-card.total   .rh-stat-icon { background: rgba(var(--rh-600-rgb),0.2); color: var(--rh-300); }
-html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-icon { background: rgba(var(--teal-400-rgb), 0.15); color: #7ab8d0; }
-html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-icon{ background: rgba(var(--amber-rgb),0.15); color: #f0c060; }
-html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-icon { background: rgba(255,255,255,0.05); color: var(--text); }
-
-.rh-stat-info { flex: 1; min-width: 0; }
 .rh-stat-val {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
   line-height: 1;
 }
@@ -92,9 +86,17 @@ html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-icon { background: rgba(2
 .rh-stat-card.actif   .rh-stat-val { color: var(--accent-text-soft); }
 .rh-stat-card.suspendu .rh-stat-val{ color: var(--amber-text); }
 .rh-stat-card.quitte  .rh-stat-val { color: #777; }
+.rh-stat-card.conge   .rh-stat-val { color: var(--sky); }
+.rh-stat-card.embauches  .rh-stat-val { color: var(--accent-text-soft); }
+.rh-stat-card.departs    .rh-stat-val { color: var(--rose); }
+.rh-stat-card.turnover   .rh-stat-val { color: var(--accent-text-soft); }
+.rh-stat-card.anciennete .rh-stat-val { color: var(--sky); }
+html[data-theme="dark"] .rh-stat-card { background: var(--rh-surface); }
 html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-val { color: #7ab8d0; }
 html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-val{ color: #f0c060; }
 html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-val { color: var(--text); }
+html[data-theme="dark"] .rh-stat-card.conge   .rh-stat-val { color: #7ab8d0; }
+html[data-theme="dark"] .rh-stat-card.anciennete .rh-stat-val { color: #7ab8d0; }
 
 .rh-stat-lbl {
   font-size: 11.5px;
@@ -102,9 +104,15 @@ html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-val { color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.3px;
   font-weight: 600;
-  margin-top: 4px;
 }
 html[data-theme="dark"] .rh-stat-lbl { color: var(--text); }
+
+.rh-stats-row-sm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
 
 /* ── Two-column grid ── */
 .rh-2col {
@@ -424,32 +432,24 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
 <!-- ── 1. Stat cards ── -->
 <div class="rh-stats-row">
   <div class="rh-stat-card total">
-    <div class="rh-stat-icon"><i class="bi bi-people-fill"></i></div>
-    <div class="rh-stat-info">
-      <div class="rh-stat-val">{{ total }}</div>
-      <div class="rh-stat-lbl">Total employés</div>
-    </div>
+    <div class="rh-stat-val">{{ total }}</div>
+    <div class="rh-stat-lbl">Total employés</div>
   </div>
   <div class="rh-stat-card actif">
-    <div class="rh-stat-icon"><i class="bi bi-person-check-fill"></i></div>
-    <div class="rh-stat-info">
-      <div class="rh-stat-val">{{ actifs }}</div>
-      <div class="rh-stat-lbl">Actifs</div>
-    </div>
+    <div class="rh-stat-val">{{ actifs }}</div>
+    <div class="rh-stat-lbl">Actifs</div>
   </div>
   <div class="rh-stat-card suspendu">
-    <div class="rh-stat-icon"><i class="bi bi-pause-circle-fill"></i></div>
-    <div class="rh-stat-info">
-      <div class="rh-stat-val">{{ suspendus }}</div>
-      <div class="rh-stat-lbl">Suspendus</div>
-    </div>
+    <div class="rh-stat-val">{{ suspendus }}</div>
+    <div class="rh-stat-lbl">Suspendus</div>
   </div>
   <div class="rh-stat-card quitte">
-    <div class="rh-stat-icon"><i class="bi bi-person-dash-fill"></i></div>
-    <div class="rh-stat-info">
-      <div class="rh-stat-val">{{ quittes }}</div>
-      <div class="rh-stat-lbl">Quittés</div>
-    </div>
+    <div class="rh-stat-val">{{ quittes }}</div>
+    <div class="rh-stat-lbl">Quittés</div>
+  </div>
+  <div class="rh-stat-card conge">
+    <div class="rh-stat-val">{{ en_conge }}</div>
+    <div class="rh-stat-lbl">En congé</div>
   </div>
 </div>
 
@@ -468,19 +468,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     </div>
     <div class="rh-card-body">
       {% if par_contrat %}
-        {% with max_n=par_contrat.0.n %}
-        <div class="rh-bar-list">
-          {% for item in par_contrat %}
-          <div class="rh-bar-item">
-            <span class="rh-bar-label" title="{{ item.type_contrat__nom }}">{{ item.type_contrat__nom|default:"—" }}</span>
-            <div class="rh-bar-track">
-              <div class="rh-bar-fill" style="width:{% widthratio item.n max_n 100 %}%;"></div>
-            </div>
-            <span class="rh-bar-count">{{ item.n }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% endwith %}
+        <canvas id="chartContrat" height="180"></canvas>
       {% else %}
         <div class="rh-empty-inline">
           <i class="bi bi-file-earmark"></i>
@@ -713,29 +701,27 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
         Mouvement du personnel — {{ annee }}
       </div>
     </div>
-    <div class="rh-card-body" style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
-      <!-- Entrées -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rh-600-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rh-600-rgb),.15);">
-        <div style="font-size:32px;font-weight:800;color:var(--accent-text-soft);line-height:1;">{{ entrees_annee }}</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Embauches</div>
+    <div class="rh-card-body">
+      <div class="rh-stats-row-sm">
+        <div class="rh-stat-card embauches">
+          <div class="rh-stat-val">{{ entrees_annee }}</div>
+          <div class="rh-stat-lbl">Embauches</div>
+        </div>
+        <div class="rh-stat-card departs">
+          <div class="rh-stat-val">{{ departs_annee }}</div>
+          <div class="rh-stat-lbl">Départs</div>
+        </div>
+        <div class="rh-stat-card turnover">
+          <div class="rh-stat-val">{{ taux_turnover }}%</div>
+          <div class="rh-stat-lbl">Taux turnover</div>
+        </div>
+        {% if anciennete_moy is not None %}
+        <div class="rh-stat-card anciennete">
+          <div class="rh-stat-val">{{ anciennete_moy }}<span style="font-size:14px;">an{{ anciennete_moy|floatformat:0|pluralize:"s" }}</span></div>
+          <div class="rh-stat-lbl">Ancienneté moy.</div>
+        </div>
+        {% endif %}
       </div>
-      <!-- Départs -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(var(--rose-rgb),.07);border-radius:10px;border:1px solid rgba(var(--rose-rgb),.12);">
-        <div style="font-size:32px;font-weight:800;color:var(--rose);line-height:1;">{{ departs_annee }}</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Départs</div>
-      </div>
-      <!-- Taux de turnover -->
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:var(--rh-50);border-radius:10px;border:1px solid var(--rh-100);">
-        <div style="font-size:28px;font-weight:800;color:var(--accent-text-soft);line-height:1;">{{ taux_turnover }}%</div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Taux turnover</div>
-      </div>
-      <!-- Ancienneté moyenne -->
-      {% if anciennete_moy is not None %}
-      <div style="flex:1;min-width:110px;text-align:center;padding:10px;background:rgba(45,153,219,.07);border-radius:10px;border:1px solid rgba(45,153,219,.12);">
-        <div style="font-size:28px;font-weight:800;color:#2d99db;line-height:1;">{{ anciennete_moy }}<span style="font-size:14px;">an{{ anciennete_moy|floatformat:0|length|pluralize:"s" }}</span></div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--rh-muted);margin-top:4px;font-weight:700;">Ancienneté moy.</div>
-      </div>
-      {% endif %}
     </div>
   </div>
 
@@ -1115,8 +1101,41 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
 
 {% block extra_js %}
 {{ block.super }}
+{{ chart_contrat|json_script:"data-contrat" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
 <script>
 (function () {
+  /* ── Histogramme : répartition par type de contrat ── */
+  var elContrat = document.getElementById('chartContrat');
+  if (elContrat) {
+    var dataContrat = JSON.parse(document.getElementById('data-contrat').textContent);
+    Chart.defaults.font.family = "'Sora', sans-serif";
+    Chart.defaults.font.size   = 11;
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.05)';
+    Chart.defaults.color = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.55)';
+    var rhRgb = getComputedStyle(document.documentElement).getPropertyValue('--rh-600-rgb').trim();
+    new Chart(elContrat, {
+      type: 'bar',
+      data: {
+        labels: dataContrat.labels,
+        datasets: [{
+          data: dataContrat.data,
+          backgroundColor: 'rgba(' + rhRgb + ',.65)',
+          borderRadius: 4, borderSkipped: false,
+          maxBarThickness: 56,
+        }]
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
   /* ── Bouton Actualiser ── */
   var refreshBtn = document.getElementById('btn-refresh-dashboard');
   if (refreshBtn) {

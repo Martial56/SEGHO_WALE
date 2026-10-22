@@ -161,6 +161,7 @@ def rh_dashboard(request):
     actifs   = Employe.objects.filter(statut='actif').count()
     suspendus = Employe.objects.filter(statut='suspendu').count()
     quittes  = Employe.objects.filter(statut='quitte').count()
+    en_conge = Conge.objects.filter(statut='en_cours').values('employe').distinct().count()
 
     # Répartition par type de contrat
     par_contrat = (
@@ -169,6 +170,10 @@ def rh_dashboard(request):
         .annotate(n=Count('id'))
         .order_by('-n')
     )
+    chart_contrat = {
+        'labels': [item['type_contrat__nom'] or '—' for item in par_contrat],
+        'data': [item['n'] for item in par_contrat],
+    }
 
     # Répartition par service
     par_service = (
@@ -325,7 +330,9 @@ def rh_dashboard(request):
 
     return render(request, 'employer/dashboard.html', {
         'total': total, 'actifs': actifs, 'suspendus': suspendus, 'quittes': quittes,
+        'en_conge': en_conge,
         'par_contrat': list(par_contrat),
+        'chart_contrat': chart_contrat,
         'par_service': list(par_service),
         'par_nationalite': list(par_nationalite),
         'fin_90j': fin_90j,
@@ -431,11 +438,19 @@ def employe_list(request):
     paginator = Paginator(qs, 10)
     page_obj  = paginator.get_page(request.GET.get('page'))
 
+    # Les cartes reflètent le filtre par service (sélectionner "Pharmacie"
+    # montre les effectifs de Pharmacie, pas ceux de tout l'établissement) ;
+    # la recherche texte et le filtre statut, eux, ne les recalculent pas —
+    # ce sont les cartes qui disent "sur quoi porte le statut", les filtrer
+    # par statut les rendrait creuses (ex. 0 ailleurs qu'"Actifs").
+    stats_qs = Employe.objects.filter(service_id=f_service) if f_service else Employe.objects.all()
     stats = {
-        'total':     Employe.objects.count(),
-        'actifs':    Employe.objects.filter(statut='actif').count(),
-        'suspendus': Employe.objects.filter(statut='suspendu').count(),
-        'quittes':   Employe.objects.filter(statut='quitte').count(),
+        'total':     stats_qs.count(),
+        'actifs':    stats_qs.filter(statut='actif').count(),
+        'suspendus': stats_qs.filter(statut='suspendu').count(),
+        'quittes':   stats_qs.filter(statut='quitte').count(),
+        'en_conge':  Conge.objects.filter(statut='en_cours', employe__in=stats_qs)
+                          .values('employe').distinct().count(),
     }
 
     return render(request, 'employer/list.html', {
@@ -883,6 +898,8 @@ def rh_registre(request):
     return render(request, 'employer/registre.html', {
         'employes':      page_obj,
         'page_obj':      page_obj,
+        'nb_total':      paginator.count,
+        'nb_actifs':     Employe.objects.filter(statut='actif').count(),
         'statut_filtre': statut,
         'can_manage':    can_manage_rh(request.user),
         'today':         date.today(),
@@ -1080,6 +1097,8 @@ def employe_import(request):
                 messages.success(request, f'{created} employé(s) importé(s) avec succès.')
             for err in errors[:10]:
                 messages.warning(request, err)
+            if len(errors) > 10:
+                messages.warning(request, f'+ {len(errors) - 10} autre(s) erreur(s) non affichée(s).')
         except Exception as e:
             messages.error(request, f'Erreur lecture fichier : {e}')
         return redirect('ressources_humaines_list')
@@ -1235,6 +1254,7 @@ def rh_annuaire(request):
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'employer/annuaire.html', {
         'employes':   page_obj,
+        'nb_total':   paginator.count,
         'page_obj':   page_obj,
         'services':   Service.objects.filter(actif=True).order_by('nom'),
         'q':          q,
@@ -1411,8 +1431,16 @@ def presence_rapport_mensuel(request):
     jours_feries = set(
         JourFerie.objects.filter(date__year=annee, date__month=mois).values_list('date', flat=True)
     )
+    # Le mois en cours ne compte que jusqu'à aujourd'hui inclus : un jour pas
+    # encore arrivé ne peut pas déjà avoir une présence, donc ne doit pas
+    # gonfler le dénominateur du taux (même bug déjà corrigé dans presence/views.py).
+    nb_jours_ecoules = nb_jours
+    if (annee, mois) == (today.year, today.month):
+        nb_jours_ecoules = today.day
+    elif (annee, mois) > (today.year, today.month):
+        nb_jours_ecoules = 0
     nb_ouvrables = sum(
-        1 for d in range(1, nb_jours + 1)
+        1 for d in range(1, nb_jours_ecoules + 1)
         if date(annee, mois, d).weekday() < 5 and date(annee, mois, d) not in jours_feries
     )
 
@@ -2481,6 +2509,8 @@ def employer_service_detail(request, pk):
 
 @login_required(login_url='login')
 def employer_service_create(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     Form = _service_form_class()
     form = Form(request.POST or None)
     is_ajax = _rh_config_is_ajax(request)
@@ -2499,6 +2529,8 @@ def employer_service_create(request):
 
 @login_required(login_url='login')
 def employer_service_edit(request, pk):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     obj  = get_object_or_404(Service, pk=pk)
     Form = _service_form_class()
     form = Form(request.POST or None, instance=obj)
@@ -2519,6 +2551,8 @@ def employer_service_edit(request, pk):
 @login_required(login_url='login')
 @require_POST
 def employer_service_bulk_delete(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     ids = request.POST.getlist('ids[]')
     if ids:
         Service.objects.filter(pk__in=ids).delete()
@@ -2538,6 +2572,8 @@ def _svc_row(s):
 
 @login_required(login_url='login')
 def employer_export_services(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     from services.views import _export_file
     fmt = request.GET.get('format', 'json')
     qs = Service.objects.select_related('chef_service').order_by('nom')
@@ -2549,6 +2585,8 @@ def employer_export_services(request):
 @login_required(login_url='login')
 @require_POST
 def employer_import_services(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     from medecins.models import Medecin
     from services.views import _parse_upload, _s, _b, _fk_warning
 

@@ -61,11 +61,12 @@ html[data-theme="dark"] .rh-count-badge {
 /* ── Stats ── */
 .rh-stats-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   padding: 16px 32px 0;
   margin-bottom: 16px;
 }
+@media (max-width: 1100px) { .rh-stats-row { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 900px)  { .rh-stats-row { grid-template-columns: repeat(2,1fr); } }
 @media (max-width: 500px)  { .rh-stats-row { grid-template-columns: 1fr; } }
 
@@ -85,6 +86,7 @@ html[data-theme="dark"] .rh-count-badge {
 .rh-stat-card.actif   { border-top-color: var(--green); }
 .rh-stat-card.suspendu{ border-top-color: var(--amber); }
 .rh-stat-card.quitte  { border-top-color: #aaa; }
+.rh-stat-card.conge   { border-top-color: var(--sky); }
 .rh-stat-val {
   font-size: 26px;
   font-weight: 800;
@@ -94,6 +96,7 @@ html[data-theme="dark"] .rh-count-badge {
 .rh-stat-card.actif   .rh-stat-val { color: var(--accent-text-soft); }
 .rh-stat-card.suspendu .rh-stat-val{ color: var(--amber-text); }
 .rh-stat-card.quitte  .rh-stat-val { color: #777; }
+.rh-stat-card.conge   .rh-stat-val { color: var(--sky); }
 .rh-stat-lbl {
   font-size: 11.5px;
   color: rgba(0,0,0,0.45);
@@ -105,6 +108,7 @@ html[data-theme="dark"] .rh-stat-card { background: var(--rh-surface); }
 html[data-theme="dark"] .rh-stat-card.actif   .rh-stat-val { color: #7ab8d0; }
 html[data-theme="dark"] .rh-stat-card.suspendu .rh-stat-val{ color: #f0c060; }
 html[data-theme="dark"] .rh-stat-card.quitte  .rh-stat-val { color: rgba(255,255,255,0.35); }
+html[data-theme="dark"] .rh-stat-card.conge   .rh-stat-val { color: #7ab8d0; }
 html[data-theme="dark"] .rh-stat-lbl { color: rgba(255,255,255,0.35); }
 
 /* ── Filter row ── */
@@ -272,7 +276,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
 <div class="rh-subheader" id="subheader">
   <div class="rh-subheader-left">
     <h1>Employés</h1>
-    <span class="rh-count-badge">{{ page_obj.paginator.count }} personne{% if page_obj.paginator.count != 1 %}s{% endif %}</span>
+    <span class="rh-count-badge o-page-count">{{ page_obj.paginator.count }} personne{% if page_obj.paginator.count != 1 %}s{% endif %}</span>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
     {% if perms.employer.view_employe %}
@@ -289,6 +293,40 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
   </div>
 </div>
 
+<!-- Filtres -->
+<form method="get" class="rh-filter-row" id="filterForm" onsubmit="return false;">
+  <input type="search" name="q" id="search-input" value="{{ q|default:'' }}"
+         placeholder="Rechercher par nom, matricule…"
+         class="rh-input" style="min-width:220px; max-width:280px;"
+         aria-label="Rechercher">
+  <button type="button" class="btn-rh-outline" style="padding:8px 12px;" onclick="lancerRecherche()" title="Rechercher">
+    <i class="bi bi-search"></i>
+  </button>
+  <select name="service" class="rh-input" style="max-width:200px;"
+          onchange="rhAppliquerFiltres()">
+    <option value="">Tous les services</option>
+    {% for svc in services %}
+    <option value="{{ svc.pk }}" {% if f_service == svc.pk|stringformat:"s" %}selected{% endif %}>
+      {{ svc.nom }}
+    </option>
+    {% endfor %}
+  </select>
+  <select name="statut" class="rh-input" style="max-width:160px;"
+          onchange="rhAppliquerFiltres()">
+    <option value="">Tous les statuts</option>
+    {% for code, label in statuts %}
+    <option value="{{ code }}" {% if f_statut == code %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% if q or f_service or f_statut %}
+  <a href="{% url 'ressources_humaines_list' %}" class="rh-clear-link" title="Effacer les filtres"
+     onclick="return rhEffacerFiltres()">
+    <i class="bi bi-x-circle"></i> Effacer
+  </a>
+  {% endif %}
+</form>
+
+<div id="list-result">
 <!-- Stats -->
 <div class="rh-stats-row">
   <div class="rh-stat-card total">
@@ -307,39 +345,11 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     <div class="rh-stat-val">{{ stats.quittes|default:"0" }}</div>
     <div class="rh-stat-lbl">Quittés</div>
   </div>
+  <div class="rh-stat-card conge">
+    <div class="rh-stat-val">{{ stats.en_conge|default:"0" }}</div>
+    <div class="rh-stat-lbl">En congé</div>
+  </div>
 </div>
-
-<!-- Filtres -->
-<form method="get" class="rh-filter-row" id="filterForm">
-  <input type="search" name="q" value="{{ q|default:'' }}"
-         placeholder="Rechercher par nom, matricule…"
-         class="rh-input" style="min-width:220px; max-width:280px;"
-         aria-label="Rechercher">
-  <select name="service" class="rh-input" style="max-width:200px;"
-          onchange="this.form.submit()">
-    <option value="">Tous les services</option>
-    {% for svc in services %}
-    <option value="{{ svc.pk }}" {% if f_service == svc.pk|stringformat:"s" %}selected{% endif %}>
-      {{ svc.nom }}
-    </option>
-    {% endfor %}
-  </select>
-  <select name="statut" class="rh-input" style="max-width:160px;"
-          onchange="this.form.submit()">
-    <option value="">Tous les statuts</option>
-    {% for code, label in statuts %}
-    <option value="{{ code }}" {% if f_statut == code %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit" class="btn-rh" style="padding:8px 16px;">
-    <i class="bi bi-search"></i> Filtrer
-  </button>
-  {% if q or f_service or f_statut %}
-  <a href="{% url 'ressources_humaines_list' %}" class="rh-clear-link" title="Effacer les filtres">
-    <i class="bi bi-x-circle"></i> Effacer
-  </a>
-  {% endif %}
-</form>
 
 <!-- Table -->
 <div class="rh-table-wrap">
@@ -433,11 +443,11 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
   <div class="rh-pagination">
     {% if page_obj.has_previous %}
       <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}{% if f_statut %}statut={{ f_statut }}&{% endif %}page=1"
-         class="rh-page-link" title="Première page">
+         class="rh-page-link o-pag-btn" title="Première page">
         <i class="bi bi-chevron-double-left"></i>
       </a>
       <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}{% if f_statut %}statut={{ f_statut }}&{% endif %}page={{ page_obj.previous_page_number }}"
-         class="rh-page-link"><i class="bi bi-chevron-left"></i></a>
+         class="rh-page-link o-pag-btn"><i class="bi bi-chevron-left"></i></a>
     {% else %}
       <span class="rh-page-link disabled"><i class="bi bi-chevron-double-left"></i></span>
       <span class="rh-page-link disabled"><i class="bi bi-chevron-left"></i></span>
@@ -448,15 +458,15 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
         <span class="rh-page-link active">{{ num }}</span>
       {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
         <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}{% if f_statut %}statut={{ f_statut }}&{% endif %}page={{ num }}"
-           class="rh-page-link">{{ num }}</a>
+           class="rh-page-link o-pag-btn">{{ num }}</a>
       {% endif %}
     {% endfor %}
 
     {% if page_obj.has_next %}
       <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}{% if f_statut %}statut={{ f_statut }}&{% endif %}page={{ page_obj.next_page_number }}"
-         class="rh-page-link"><i class="bi bi-chevron-right"></i></a>
+         class="rh-page-link o-pag-btn"><i class="bi bi-chevron-right"></i></a>
       <a href="?{% if q %}q={{ q }}&{% endif %}{% if f_service %}service={{ f_service }}&{% endif %}{% if f_statut %}statut={{ f_statut }}&{% endif %}page={{ page_obj.paginator.num_pages }}"
-         class="rh-page-link" title="Dernière page">
+         class="rh-page-link o-pag-btn" title="Dernière page">
         <i class="bi bi-chevron-double-right"></i>
       </a>
     {% else %}
@@ -474,7 +484,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
     {% if q or f_service or f_statut %}
       <small>Essayez d'élargir vos critères de recherche.</small>
       <div style="margin-top:16px;">
-        <a href="{% url 'ressources_humaines_list' %}" class="btn-rh-outline">
+        <a href="{% url 'ressources_humaines_list' %}" class="btn-rh-outline" onclick="return rhEffacerFiltres()">
           <i class="bi bi-x-circle"></i> Effacer les filtres
         </a>
       </div>
@@ -491,6 +501,30 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
   </div>
   {% endif %}
 </div>
+</div><!-- /#list-result -->
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function rhAppliquerFiltres() {
+  var params = new URLSearchParams(window.location.search);
+  var svc = document.querySelector('select[name="service"]').value;
+  var sta = document.querySelector('select[name="statut"]').value;
+  if (svc) { params.set('service', svc); } else { params.delete('service'); }
+  if (sta) { params.set('statut', sta); } else { params.delete('statut'); }
+  params.delete('page');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+function rhEffacerFiltres() {
+  document.getElementById('search-input').value = '';
+  document.querySelector('select[name="service"]').value = '';
+  document.querySelector('select[name="statut"]').value = '';
+  window.listeRafraichir(window.location.pathname, true);
+  return false;
+}
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}
 
