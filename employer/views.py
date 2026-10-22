@@ -1335,17 +1335,21 @@ def presence_historique(request, employe_pk):
             statut = 'present' if presence.present else ('conge' if conge else 'absent')
         elif conge:
             statut = 'conge'
+        elif d > today:
+            statut = 'futur'
         else:
             statut = 'non_saisi'
 
         jours.append({
             'date': d, 'day': day_num,
             'weekday': ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][d.weekday()],
-            'weekend': weekend, 'ferie': ferie,
+            'weekend': weekend, 'ferie': ferie, 'futur': d > today,
             'presence': presence, 'conge': conge, 'statut': statut,
         })
 
-    nb_ouvrables   = sum(1 for j in jours if not j['weekend'] and not j['ferie'])
+    # Un jour pas encore arrivé (mois en cours) n'est ni « ouvrable » déjà vécu
+    # ni « non saisi » : il n'a simplement pas encore eu lieu.
+    nb_ouvrables   = sum(1 for j in jours if not j['weekend'] and not j['ferie'] and not j['futur'])
     nb_presents    = sum(1 for j in jours if j['statut'] == 'present')
     nb_absents     = sum(1 for j in jours if j['statut'] == 'absent')
     nb_conge       = sum(1 for j in jours if j['statut'] == 'conge')

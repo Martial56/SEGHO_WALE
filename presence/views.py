@@ -47,6 +47,21 @@ def can_unlock_registre(user):
     return user.is_authenticated and user.has_perm('presence.can_rouvrir_registre')
 
 
+def _jours_ouvres_mois(year, month, today):
+    """Dates ouvrées (lun-ven) du mois, limitées aux jours déjà « vécus ».
+
+    Le mois en cours ne compte que jusqu'à aujourd'hui inclus : un jour pas
+    encore arrivé n'a pas pu être pointé, ce n'est donc pas un « non saisi ».
+    Un mois déjà terminé compte en entier ; un mois futur n'en compte aucun."""
+    last_day = calendar.monthrange(year, month)[1]
+    if (year, month) == (today.year, today.month):
+        last_day = min(last_day, today.day)
+    elif (year, month) > (today.year, today.month):
+        last_day = 0
+    return [date(year, month, d) for d in range(1, last_day + 1)
+            if date(year, month, d).weekday() < 5]
+
+
 def _nav_month(year, month):
     if month == 1:
         py, pm = year - 1, 12
@@ -437,7 +452,7 @@ def presence_employe(request, pk):
             'conge':   _conge_pour(d) if d.weekday() < 5 else None,
         })
 
-    jouvres  = sum(1 for j in jours if not j['weekend'])
+    jouvres  = len(_jours_ouvres_mois(year, month, today))
     nb_p     = sum(1 for j in jours if j['p'] and j['p'].present and not j['weekend'])
     nb_a     = sum(1 for j in jours if j['p'] and not j['p'].present and not j['weekend'])
     nb_retards = sum(
@@ -481,10 +496,11 @@ def presence_stats(request):
     except (ValueError, TypeError):
         year, month = today.year, today.month
 
-    last_day  = calendar.monthrange(year, month)[1]
-    jours_ouvres_mois = [date(year, month, d) for d in range(1, last_day + 1)
-                         if date(year, month, d).weekday() < 5]
+    jours_ouvres_mois = _jours_ouvres_mois(year, month, today)
     jouvres = len(jours_ouvres_mois)
+    last_day = calendar.monthrange(year, month)[1]
+    jouvres_mois_total = sum(1 for d in range(1, last_day + 1) if date(year, month, d).weekday() < 5)
+    jouvres_restants = max(0, jouvres_mois_total - jouvres)
 
     from medecins.models import Service
     services   = Service.objects.order_by('nom')
@@ -552,7 +568,9 @@ def presence_stats(request):
         'stats': page_stats, 'stats_svc': stats_svc,
         'page_obj': page_stats,
         'year': year, 'month': month, 'mois_fr': _MOIS_FR[month],
-        'jouvres': jouvres, 'services': services, 'service_sel': service_sel,
+        'jouvres': jouvres, 'jouvres_mois_total': jouvres_mois_total,
+        'jouvres_restants': jouvres_restants,
+        'services': services, 'service_sel': service_sel,
         'prev_year': py, 'prev_month': pm, 'next_year': ny, 'next_month': nm,
         'can_manage': True,
     })
@@ -572,10 +590,11 @@ def presence_rapport(request):
     except (ValueError, TypeError):
         year, month = today.year, today.month
 
-    last_day = calendar.monthrange(year, month)[1]
-    jouvres_list = [date(year, month, d) for d in range(1, last_day + 1)
-                    if date(year, month, d).weekday() < 5]
+    jouvres_list = _jours_ouvres_mois(year, month, today)
     nb_jouvres = len(jouvres_list)
+    last_day = calendar.monthrange(year, month)[1]
+    nb_jouvres_mois = sum(1 for d in range(1, last_day + 1) if date(year, month, d).weekday() < 5)
+    nb_jouvres_restants = max(0, nb_jouvres_mois - nb_jouvres)
 
     from medecins.models import Service
     services   = Service.objects.order_by('nom')
@@ -686,8 +705,11 @@ def presence_rapport(request):
     page_stats  = paginator.get_page(request.GET.get('page'))
 
     py, pm, ny, nm = _nav_month(year, month)
+    from presence.models import ConfigurationPresence
+    tolerance_retard_min = ConfigurationPresence.actuelle().tolerance_retard_min
     return render(request, 'presence/rapport.html', {
         'stats':        page_stats,
+        'tolerance_retard_min': tolerance_retard_min,
         'stats_all':    stats,
         'page_obj':     page_stats,
         'retards_all':  retards_all,
@@ -696,6 +718,8 @@ def presence_rapport(request):
         'month':        month,
         'mois_fr':      _MOIS_FR[month],
         'nb_jouvres':   nb_jouvres,
+        'nb_jouvres_mois': nb_jouvres_mois,
+        'nb_jouvres_restants': nb_jouvres_restants,
         'nb_employes':  len(stats),
         'nb_retards':   len(retards_all),
         'taux_moyen':   taux_moyen,
@@ -726,9 +750,7 @@ def presence_rapport_export(request):
     except (ValueError, TypeError):
         year, month = today.year, today.month
 
-    last_day = calendar.monthrange(year, month)[1]
-    jouvres_list = [date(year, month, d) for d in range(1, last_day + 1)
-                    if date(year, month, d).weekday() < 5]
+    jouvres_list = _jours_ouvres_mois(year, month, today)
     nb_jouvres = len(jouvres_list)
 
     from medecins.models import Service
@@ -1092,25 +1114,6 @@ def _detecter_action(emp, d):
     return 'complet'
 
 
-_MATIN_LIMITE = time(6, 0)
-
-
-def _date_reference(emp, now=None):
-    """Détermine à quel jour rattacher un pointage à l'instant `now`.
-
-    Si une session soir d'hier est restée ouverte (arrivée pointée, jamais de
-    départ) et qu'il est tôt le matin, on rattache le pointage à HIER plutôt
-    qu'à aujourd'hui — sinon une garde chevauchant minuit se retrouvait
-    réattribuée au jour suivant comme une nouvelle "arrivée matin", laissant
-    la session de la veille définitivement incomplète."""
-    now = now or datetime.now()
-    today = now.date()
-    if now.time() < _MATIN_LIMITE:
-        hier = today - timedelta(days=1)
-        p_hier = Presence.objects.filter(employe=emp, date=hier).first()
-        if p_hier and p_hier.heure_arrivee_soir and not p_hier.heure_depart_soir:
-            return hier
-    return today
 
 
 @login_required(login_url='login')
@@ -1136,6 +1139,34 @@ def presence_biometrie_reglages(request):
         return redirect('presence_biometrie_reglages')
 
     return render(request, 'presence/biometrie_reglages.html', {'config': config})
+
+
+@login_required(login_url='login')
+def presence_parametres_generaux(request):
+    """Réglages généraux (RH) du module Présence — pour l'instant, la
+    tolérance avant retard, utilisée par Presence.retard_matin_min/
+    retard_soir_min/depart_anticipe_min (employer/models.py)."""
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
+
+    from presence.models import ConfigurationPresence
+    config = ConfigurationPresence.actuelle()
+
+    if request.method == 'POST':
+        try:
+            tolerance = int(request.POST.get('tolerance_retard_min', '').strip())
+        except (TypeError, ValueError):
+            tolerance = None
+        if tolerance is None or tolerance < 0:
+            messages.error(request, "La tolérance doit être un nombre de minutes positif ou nul.")
+        else:
+            config.tolerance_retard_min = tolerance
+            config.modifie_par = request.user
+            config.save()
+            messages.success(request, "Réglages de présence enregistrés.")
+            return redirect('presence_parametres_generaux')
+
+    return render(request, 'presence/parametres_generaux.html', {'config': config})
 
 
 def presence_pointage(request):
@@ -1214,7 +1245,7 @@ def presence_chercher(request):
     if not emp:
         return JsonResponse({'ok': False, 'erreur': 'Matricule introuvable ou employé inactif'})
 
-    today = _date_reference(emp)
+    today = date.today()
     conge = _conge_du_jour(emp, today)
     if conge:
         return JsonResponse({
@@ -1268,7 +1299,7 @@ def presence_pointer(request):
     except Employe.DoesNotExist:
         return JsonResponse({'ok': False, 'erreur': 'Employé introuvable'})
 
-    today = _date_reference(emp)
+    today = date.today()
     ouvre, raison = _est_jour_ouvre(today)
     if not ouvre:
         return JsonResponse({'ok': False, 'erreur': raison})

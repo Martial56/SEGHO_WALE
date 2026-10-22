@@ -658,7 +658,12 @@ class Presence(models.Model):
             d = _date.today()
             dt1 = datetime.combine(d, self.heure_arrivee_matin)
             dt2 = datetime.combine(d, self.heure_depart_matin)
-            diff = (dt2 - dt1).seconds // 60
+            # .total_seconds(), pas .seconds : un départ saisi avant l'arrivée
+            # (erreur de saisie) donne un timedelta négatif — .seconds le
+            # normalise vers ~86400s (proche de 24h) au lieu d'un nombre
+            # négatif, ce qui désamorçait le garde-fou "diff > 0 else 0" et
+            # affichait ~23h59 de travail au lieu de 0.
+            diff = int((dt2 - dt1).total_seconds() // 60)
             return diff if diff > 0 else 0
         return None
 
@@ -670,7 +675,7 @@ class Presence(models.Model):
             d = _date.today()
             dt1 = datetime.combine(d, self.heure_arrivee_soir)
             dt2 = datetime.combine(d, self.heure_depart_soir)
-            diff = (dt2 - dt1).seconds // 60
+            diff = int((dt2 - dt1).total_seconds() // 60)
             return diff if diff > 0 else 0
         return None
 
@@ -693,7 +698,10 @@ class Presence(models.Model):
 
     @property
     def retard_matin_min(self):
-        """Retard à l'arrivée — référence 08:00, tolérance 15 min.
+        """Retard à l'arrivée — référence 08:00, tolérance configurable
+        (presence.ConfigurationPresence.tolerance_retard_min) DÉDUITE du
+        retard brut (ex. arrivée 8h25, tolérance 8 min → 17 min affichées,
+        pas 25).
         Pour les permanences, la référence est l'heure de début réelle du
         PlanningPermanence de la semaine (configurable), pas 08:00 fixe."""
         if not self.heure_arrivee_matin:
@@ -709,41 +717,50 @@ class Presence(models.Model):
             ).first()
             if planning:
                 ref_heure = planning.heure_debut
-        from datetime import datetime as _dt, timedelta as _td
+        from datetime import datetime as _dt
+        from presence.models import ConfigurationPresence
+        tolerance = ConfigurationPresence.actuelle().tolerance_retard_min
         ref = _dt.combine(self.date, ref_heure)
-        if self.heure_arrivee_matin <= (ref + _td(minutes=15)).time():
-            return 0
         arr = _dt.combine(self.date, self.heure_arrivee_matin)
-        return int((arr - ref).total_seconds() // 60)
+        brut = int((arr - ref).total_seconds() // 60)
+        retard = brut - tolerance
+        return retard if retard > 0 else 0
 
     @property
     def retard_soir_min(self):
-        """Retard à la session soir — référence 15:00, tolérance 15 min.
+        """Retard à la session soir — référence 15:00, tolérance configurable
+        (presence.ConfigurationPresence.tolerance_retard_min) déduite du
+        retard brut, comme retard_matin_min.
         Pour les permanences ce champ n'est pas utilisé (ils n'ont pas de session soir)."""
         if self.permanence:
             return 0
         if self.date.weekday() >= 5 or not self.heure_arrivee_soir:
             return 0
-        if self.heure_arrivee_soir <= time(15, 15):
-            return 0
         from datetime import datetime as _dt
+        from presence.models import ConfigurationPresence
+        tolerance = ConfigurationPresence.actuelle().tolerance_retard_min
         ref = _dt.combine(self.date, time(15, 0))
         arr = _dt.combine(self.date, self.heure_arrivee_soir)
-        return int((arr - ref).total_seconds() // 60)
+        brut = int((arr - ref).total_seconds() // 60)
+        retard = brut - tolerance
+        return retard if retard > 0 else 0
 
     @property
     def depart_anticipe_min(self):
-        """Départ avant 14h45 pour les employés de permanence (référence 15:00)."""
+        """Départ avant l'heure de fin de permanence (15:00), avec la même
+        tolérance configurable (déduite) que les retards."""
         if not self.permanence:
             return 0
         if not self.heure_depart_soir:
             return 0
-        if self.heure_depart_soir >= time(14, 45):
-            return 0
         from datetime import datetime as _dt
+        from presence.models import ConfigurationPresence
+        tolerance = ConfigurationPresence.actuelle().tolerance_retard_min
         ref = _dt.combine(self.date, time(15, 0))
         dep = _dt.combine(self.date, self.heure_depart_soir)
-        return int((ref - dep).total_seconds() // 60)
+        brut = int((ref - dep).total_seconds() // 60)
+        anticipe = brut - tolerance
+        return anticipe if anticipe > 0 else 0
 
     class Meta:
         db_table = 'ressources_humaines_presence'

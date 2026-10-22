@@ -13,6 +13,7 @@ urlpatterns = [
     path('parametres/medecins/', views.presence_parametres, {'type_permanence': 'medecins'},
          name='presence_parametres_medecins'),
     path('biometrie/',           views.presence_biometrie_reglages, name='presence_biometrie_reglages'),
+    path('reglages/',            views.presence_parametres_generaux, name='presence_parametres_generaux'),
     # Kiosque
     path('pointage/',           views.presence_pointage,       name='presence_pointage'),
     path('pointage/chercher/',  views.presence_chercher,       name='presence_chercher'),

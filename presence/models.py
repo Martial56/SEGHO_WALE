@@ -97,6 +97,31 @@ class AffectationPermanence(models.Model):
         ordering = ['date', 'employe__nom']
 
 
+class ConfigurationPresence(models.Model):
+    """Réglages généraux (singleton) du module Présence."""
+    tolerance_retard_min = models.PositiveSmallIntegerField(
+        default=15,
+        verbose_name="Tolérance avant retard (minutes)",
+        help_text="Un pointage dans cette marge après l'heure de référence (08h00 le matin, "
+                   "15h00 le soir, ou le début de permanence configuré) n'est pas compté comme un retard.",
+    )
+    modifie_par = models.ForeignKey(User, null=True, blank=True,
+                                     on_delete=models.SET_NULL, related_name='+')
+    modifie_le = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuration de présence"
+        verbose_name_plural = "Configuration de présence"
+
+    def __str__(self):
+        return "Paramètres de présence"
+
+    @classmethod
+    def actuelle(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class ConfigurationBiometrique(models.Model):
     """Réglage (singleton) du lecteur d'empreinte digitale du kiosque de
     pointage. Aucun matériel n'existe encore au moment de l'implémentation :
