@@ -14,6 +14,10 @@ html[data-theme="dark"] .solde-ok-inline { color:var(--cg-400); }
 .sg-wrap { display:flex; flex-direction:column; height:calc(100vh - var(--topbar-h)); overflow:hidden; }
 .sg-wrap .cg-subheader { position:relative; top:auto; flex-shrink:0; }
 .sg-body { flex:1; overflow:auto; min-height:0; }
+/* #list-result enveloppe corps+pied pour le rafraîchissement AJAX : reprend
+   le flex:1/colonne que .sg-wrap donnait directement à .sg-body/.sg-footer
+   (flex:1 sans parent flex ne fait plus rien). */
+#list-result { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 
 /* ── Barre de filtres ── */
 .sg-filters {
@@ -96,34 +100,28 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
 </div>
 
 <!-- Filtres -->
-<form method="get" class="sg-filters">
+<form method="get" class="sg-filters" id="filter-form" onsubmit="return false;">
   <input type="hidden" name="year" value="{{ year }}">
   <div class="sg-search-wrap">
     <i class="bi bi-search"></i>
-    <input type="search" name="q" value="{{ q|default:'' }}"
+    <input type="search" name="q" id="search-input" value="{{ q|default:'' }}"
            placeholder="Nom, prénoms, matricule…" class="cg-input" style="width:220px;">
   </div>
-  <select name="service" class="cg-input" style="width:190px;" onchange="this.form.submit()">
+  <select name="service" class="cg-input" style="width:190px;" onchange="sgAppliquerFiltres()">
     <option value="">Tous les services</option>
     {% for sv in services %}
     <option value="{{ sv.pk }}" {% if f_service == sv.pk|stringformat:"s" %}selected{% endif %}>{{ sv.nom }}</option>
     {% endfor %}
   </select>
-  <button type="submit" class="btn-cg" style="padding:7px 14px;font-size:12.5px;">
-    <i class="bi bi-search"></i> Filtrer
-  </button>
-  {% if q or f_service %}
-  <a href="?year={{ year }}" class="btn-cg-outline" style="padding:7px 12px;font-size:12.5px;">
+  <a href="?year={{ year }}" class="btn-cg-outline" style="padding:7px 12px;font-size:12.5px;" onclick="return sgEffacerFiltres()">
     <i class="bi bi-x"></i> Effacer
   </a>
-  {% endif %}
-  {% if page_obj.paginator.count %}
-  <span style="font-size:11.5px;color:var(--cg-muted);margin-left:4px;">
+  <span style="font-size:11.5px;color:var(--cg-muted);margin-left:4px;" class="o-page-count">
     {{ page_obj.paginator.count }} employé{{ page_obj.paginator.count|pluralize }}
   </span>
-  {% endif %}
 </form>
 
+<div id="list-result">
 <div class="sg-body">
 <!-- Tableau -->
 <div class="cg-table-wrap" style="padding:20px 32px 0;">
@@ -255,8 +253,8 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
   {% if page_obj.has_other_pages %}
   <div class="sg-pag">
     {% if page_obj.has_previous %}
-    <a href="?page=1&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-double-left"></i></a>
-    <a href="?page={{ page_obj.previous_page_number }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-left"></i></a>
+    <a class="o-pag-btn" href="?page=1&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-double-left"></i></a>
+    <a class="o-pag-btn" href="?page={{ page_obj.previous_page_number }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-left"></i></a>
     {% else %}
     <span class="dis"><i class="bi bi-chevron-double-left"></i></span>
     <span class="dis"><i class="bi bi-chevron-left"></i></span>
@@ -264,12 +262,12 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
     {% for num in page_obj.paginator.page_range %}
       {% if num == page_obj.number %}<span class="cur">{{ num }}</span>
       {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-        <a href="?page={{ num }}&year={{ year }}&q={{ q }}&service={{ f_service }}">{{ num }}</a>
+        <a class="o-pag-btn" href="?page={{ num }}&year={{ year }}&q={{ q }}&service={{ f_service }}">{{ num }}</a>
       {% endif %}
     {% endfor %}
     {% if page_obj.has_next %}
-    <a href="?page={{ page_obj.next_page_number }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-right"></i></a>
-    <a href="?page={{ page_obj.paginator.num_pages }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-double-right"></i></a>
+    <a class="o-pag-btn" href="?page={{ page_obj.next_page_number }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-right"></i></a>
+    <a class="o-pag-btn" href="?page={{ page_obj.paginator.num_pages }}&year={{ year }}&q={{ q }}&service={{ f_service }}"><i class="bi bi-chevron-double-right"></i></a>
     {% else %}
     <span class="dis"><i class="bi bi-chevron-right"></i></span>
     <span class="dis"><i class="bi bi-chevron-double-right"></i></span>
@@ -277,6 +275,30 @@ html[data-theme="dark"] .sg-pag a, html[data-theme="dark"] .sg-pag span { backgr
   </div>
   {% endif %}
 </div>
+</div><!-- /#list-result -->
 </div><!-- /sg-wrap -->
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function sgAppliquerFiltres() {
+  var params = new URLSearchParams(window.location.search);
+  var q = document.getElementById('search-input').value.trim();
+  if (q) { params.set('q', q); } else { params.delete('q'); }
+  var svc = document.querySelector('select[name="service"]').value;
+  if (svc) { params.set('service', svc); } else { params.delete('service'); }
+  params.delete('page');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+function sgEffacerFiltres() {
+  document.getElementById('search-input').value = '';
+  document.querySelector('select[name="service"]').value = '';
+  var year = document.querySelector('input[name="year"]').value;
+  window.listeRafraichir(window.location.pathname + '?year=' + year, true);
+  return false;
+}
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}

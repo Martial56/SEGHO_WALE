@@ -1,4 +1,5 @@
 {% extends 'conges/base.html' %}
+{% load static %}
 {% block topbar_title %}Tableau de bord — Congés & Absences{% endblock %}
 
 {% block extra_css %}
@@ -26,48 +27,48 @@
 .db-title { font-size:16px; font-weight:800; color:var(--cg-900); }
 html[data-theme="dark"] .db-title { color:var(--cg-200); }
 
-/* ── KPIs ── */
+/* ── KPIs ──
+   Repris du style de carte déjà harmonisé sur le tableau de bord Employés
+   (rh-stat-card) : carte blanche à liseré de couleur en haut, chiffre
+   centré, sans icône — au lieu de la bande continue à icônes d'origine,
+   un style de plus dans l'appli à ranger avec les autres. */
 .db-kpis {
-  display:grid; grid-template-columns:repeat(5,1fr);
-  flex-shrink:0; border-bottom:1px solid var(--cg-border);
+  display:grid; grid-template-columns:repeat(5,1fr); gap:12px;
+  padding:14px 20px; flex-shrink:0;
+  border-bottom:1px solid var(--cg-border);
 }
-@media(max-width:900px){ .db-kpis{ grid-template-columns:repeat(3,1fr); } }
-.db-kpi {
-  display:flex; align-items:center; gap:12px;
-  padding:10px 18px; border-right:1px solid var(--cg-border);
-  text-decoration:none; transition:background .15s;
+@media(max-width:1100px){ .db-kpis{ grid-template-columns:repeat(3,1fr); } }
+@media(max-width:640px) { .db-kpis{ grid-template-columns:repeat(2,1fr); } }
+
+.cg-stat-card {
+  background:var(--cg-surface); border-radius:11px; padding:14px 16px;
+  box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:4px;
+  border-top:3px solid transparent; text-decoration:none; transition:box-shadow .18s;
 }
-.db-kpi:last-child { border-right:none; }
-.db-kpi:hover { background:var(--cg-50); }
-html[data-theme="dark"] .db-kpi:hover { background: var(--surface); }
-.db-kpi-icon {
-  width:36px; height:36px; border-radius:9px; flex-shrink:0;
-  display:flex; align-items:center; justify-content:center; font-size:15px;
-}
-.ki-venir  { background:rgba(var(--cg-600-rgb),.1);  color:var(--accent-text); }
-.ki-cours  { background:rgba(45,153,219,.1);  color:#1a4d6d; }
-.ki-retard { background:rgba(var(--rose-rgb),.1);   color:var(--rose-text); }
-.ki-7j     { background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); }
-.ki-an     { background:rgba(var(--cg-600-rgb),.1);   color:var(--accent-text); }
-html[data-theme="dark"] .ki-venir  { color:#7ab8d0; }
-html[data-theme="dark"] .ki-cours  { color:#80c8ef; }
-html[data-theme="dark"] .ki-retard { color:#f09090; }
-html[data-theme="dark"] .ki-7j     { color:#f0c060; }
-html[data-theme="dark"] .ki-an     { color:var(--cg-300); }
-.db-kpi-val { font-size:22px; font-weight:800; line-height:1; }
-.kv-venir  { color:var(--accent-text); }
-.kv-cours  { color:#1a4d6d; }
-.kv-retard { color:var(--rose-text); }
-.kv-7j     { color:var(--amber-text); }
-.kv-an     { color:var(--accent-text); }
-html[data-theme="dark"] .kv-venir  { color:#7ab8d0; }
-html[data-theme="dark"] .kv-cours  { color:#80c8ef; }
-html[data-theme="dark"] .kv-retard { color:#f09090; }
-html[data-theme="dark"] .kv-7j     { color:#f0c060; }
-html[data-theme="dark"] .kv-an     { color:var(--cg-300); }
+.cg-stat-card:hover { box-shadow:var(--shadow-md); }
+.cg-stat-val { font-size:24px; font-weight:800; line-height:1; }
+.cg-stat-lbl { font-size:10.5px; color:var(--cg-muted); text-transform:uppercase; letter-spacing:.3px; font-weight:600; }
+
+.cg-stat-card.st-venir  { border-top-color:var(--cg-600); }
+.cg-stat-card.st-venir  .cg-stat-val { color:var(--accent-text); }
+.cg-stat-card.st-cours  { border-top-color:#2d99db; }
+.cg-stat-card.st-cours  .cg-stat-val { color:#1a4d6d; }
+.cg-stat-card.st-retard { border-top-color:var(--rose); }
+.cg-stat-card.st-retard .cg-stat-val { color:var(--rose-text); }
+.cg-stat-card.st-7j     { border-top-color:var(--amber); }
+.cg-stat-card.st-7j     .cg-stat-val { color:var(--amber-text); }
+.cg-stat-card.st-an     { border-top-color:var(--cg-600); }
+.cg-stat-card.st-an     .cg-stat-val { color:var(--accent-text); }
+
+html[data-theme="dark"] .cg-stat-card { background:var(--cg-surface); }
+html[data-theme="dark"] .cg-stat-card.st-venir  .cg-stat-val { color:#7ab8d0; }
+html[data-theme="dark"] .cg-stat-card.st-cours  .cg-stat-val { color:#80c8ef; }
+html[data-theme="dark"] .cg-stat-card.st-retard .cg-stat-val { color:#f09090; }
+html[data-theme="dark"] .cg-stat-card.st-7j     .cg-stat-val { color:#f0c060; }
+html[data-theme="dark"] .cg-stat-card.st-an     .cg-stat-val { color:var(--cg-300); }
+
 .db-count-badge { background:var(--cg-100); color:var(--accent-text); border-radius:20px; padding:1px 8px; font-size:10.5px; font-weight:700; }
 html[data-theme="dark"] .db-count-badge { background:rgba(var(--teal-400-rgb), 0.15); color:var(--cg-300); }
-.db-kpi-lbl { font-size:10.5px; color:var(--cg-muted); font-weight:600; text-transform:uppercase; letter-spacing:.3px; margin-top:1px; }
 
 /* ── Corps ── */
 .db-body { flex:1; overflow:auto; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:0; }
@@ -103,12 +104,6 @@ html[data-theme="dark"] .db-item:hover { background: var(--surface); }
 .db-item-date  { font-size:11.5px; color:var(--cg-muted); }
 .db-item-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; display:inline-block; }
 
-/* ── Répartition ── */
-.rep-row { margin-bottom:8px; }
-.rep-label { display:flex; justify-content:space-between; font-size:12px; margin-bottom:3px; color:var(--cg-text); }
-.rep-track { background:rgba(var(--cg-600-rgb),.1); border-radius:3px; height:6px; overflow:hidden; }
-.rep-fill  { height:100%; border-radius:3px; background:var(--cg-500); transition:width .4s; }
-
 /* ── Anniversaires ── */
 .ann-item {
   display:flex; align-items:center; justify-content:space-between;
@@ -141,9 +136,6 @@ html[data-theme="dark"] .db-item-badge.c-info   { background:rgba(45,153,219,.18
 
 .db-date-warn { font-weight:700; color:var(--amber-text); }
 html[data-theme="dark"] .db-date-warn { color:#f0c060; }
-
-.rep-value { font-weight:700; color:var(--accent-text); }
-html[data-theme="dark"] .rep-value { color:var(--cg-300); }
 
 .db-planifie { font-size:10px; color:var(--accent-text); font-weight:700; }
 html[data-theme="dark"] .db-planifie { color:#7ab8d0; }
@@ -179,25 +171,25 @@ html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--a
 <div class="db-page">
   <!-- ── KPIs ── -->
   <div class="db-kpis">
-    <a href="{% url 'conge_list' %}?statut=approuve" class="db-kpi">
-      <div class="db-kpi-icon ki-venir"><i class="bi bi-calendar-event-fill"></i></div>
-      <div><div class="db-kpi-val kv-venir">{{ a_venir }}</div><div class="db-kpi-lbl">À venir</div></div>
+    <a href="{% url 'conge_list' %}?statut=approuve" class="cg-stat-card st-venir">
+      <div class="cg-stat-val">{{ a_venir }}</div>
+      <div class="cg-stat-lbl">À venir</div>
     </a>
-    <a href="{% url 'conge_list' %}?statut=en_cours" class="db-kpi">
-      <div class="db-kpi-icon ki-cours"><i class="bi bi-play-circle-fill"></i></div>
-      <div><div class="db-kpi-val kv-cours">{{ en_cours }}</div><div class="db-kpi-lbl">En cours</div></div>
+    <a href="{% url 'conge_list' %}?statut=en_cours" class="cg-stat-card st-cours">
+      <div class="cg-stat-val">{{ en_cours }}</div>
+      <div class="cg-stat-lbl">En cours</div>
     </a>
-    <a href="{% url 'conge_suivi_retours' %}" class="db-kpi">
-      <div class="db-kpi-icon ki-retard"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <div><div class="db-kpi-val kv-retard">{{ en_retard|length }}</div><div class="db-kpi-lbl">En retard</div></div>
+    <a href="{% url 'conge_suivi_retours' %}" class="cg-stat-card st-retard">
+      <div class="cg-stat-val">{{ en_retard|length }}</div>
+      <div class="cg-stat-lbl">En retard</div>
     </a>
-    <a href="{% url 'conge_suivi_retours' %}" class="db-kpi">
-      <div class="db-kpi-icon ki-7j"><i class="bi bi-calendar-week-fill"></i></div>
-      <div><div class="db-kpi-val kv-7j">{{ nb_dans_7j }}</div><div class="db-kpi-lbl">Retour dans 7j</div></div>
+    <a href="{% url 'conge_suivi_retours' %}" class="cg-stat-card st-7j">
+      <div class="cg-stat-val">{{ nb_dans_7j }}</div>
+      <div class="cg-stat-lbl">Retour dans 7j</div>
     </a>
-    <a href="{% url 'conge_list' %}?annee={{ annee }}" class="db-kpi">
-      <div class="db-kpi-icon ki-an"><i class="bi bi-calendar-check-fill"></i></div>
-      <div><div class="db-kpi-val kv-an">{{ total_jours_annee }}</div><div class="db-kpi-lbl">Jours pris {{ annee }}</div></div>
+    <a href="{% url 'conge_list' %}?annee={{ annee }}" class="cg-stat-card st-an">
+      <div class="cg-stat-val">{{ total_jours_annee }}</div>
+      <div class="cg-stat-lbl">Jours pris {{ annee }}</div>
     </a>
   </div>
 
@@ -296,15 +288,31 @@ html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--a
           <i class="bi bi-bar-chart-fill"></i> Répartition par type — {{ annee }}
           <span class="db-count-badge">{{ total_jours_annee }}j</span>
         </div>
-        {% for label, count, pct in repartition %}
-        <div class="rep-row">
-          <div class="rep-label">
-            <span>{{ label }}</span>
-            <span class="rep-value">{{ count }} · {{ pct }}%</span>
-          </div>
-          <div class="rep-track"><div class="rep-fill" style="width:{{ pct }}%;"></div></div>
+        <div style="height:{% widthratio repartition|length 1 55 %}px;">
+          <canvas id="chartRepartition"></canvas>
         </div>
-        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Évolution mensuelle -->
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-graph-up"></i> Évolution mensuelle — {{ annee }}
+        </div>
+        <div style="height:160px;">
+          <canvas id="chartMensuel"></canvas>
+        </div>
+      </div>
+
+      <!-- Par service -->
+      {% if chart_service.labels %}
+      <div class="db-section">
+        <div class="db-section-title">
+          <i class="bi bi-building"></i> Par service — {{ annee }}
+        </div>
+        <div style="height:{% widthratio chart_service.labels|length 1 40 %}px;">
+          <canvas id="chartService"></canvas>
+        </div>
       </div>
       {% endif %}
 
@@ -380,4 +388,109 @@ html[data-theme="dark"] .db-note-legale { color:#f0c060; background:rgba(var(--a
   </div><!-- /db-body -->
 </div><!-- /db-page -->
 </div><!-- /db-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+{{ chart_repartition|json_script:"data-repartition" }}
+{{ chart_mensuel|json_script:"data-mensuel" }}
+{{ chart_service|json_script:"data-service" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+  Chart.defaults.font.family = "'Sora', sans-serif";
+  Chart.defaults.font.size   = 11;
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  var gridColor = isDark ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.05)';
+  Chart.defaults.color = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.55)';
+  var cgRgb   = getComputedStyle(document.documentElement).getPropertyValue('--cg-600-rgb').trim();
+  var roseRgb = getComputedStyle(document.documentElement).getPropertyValue('--rose-rgb').trim();
+
+  /* ── Répartition par type (barres horizontales) ── */
+  var elRepartition = document.getElementById('chartRepartition');
+  if (elRepartition) {
+    var dataRepartition = JSON.parse(document.getElementById('data-repartition').textContent);
+    new Chart(elRepartition, {
+      type: 'bar',
+      data: {
+        labels: dataRepartition.labels,
+        datasets: [{
+          data: dataRepartition.data,
+          backgroundColor: 'rgba(' + cgRgb + ',.65)',
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + c.raw + 'j'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+
+  /* ── Évolution mensuelle (barres verticales) ── */
+  var elMensuel = document.getElementById('chartMensuel');
+  if (elMensuel) {
+    var dataMensuel = JSON.parse(document.getElementById('data-mensuel').textContent);
+    new Chart(elMensuel, {
+      type: 'bar',
+      data: {
+        labels: dataMensuel.labels,
+        datasets: [{
+          data: dataMensuel.data,
+          backgroundColor: 'rgba(' + cgRgb + ',.65)',
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + c.raw + 'j'; } } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+          y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
+  /* ── Par service (barres horizontales) ── */
+  var elService = document.getElementById('chartService');
+  if (elService) {
+    var dataService = JSON.parse(document.getElementById('data-service').textContent);
+    new Chart(elService, {
+      type: 'bar',
+      data: {
+        labels: dataService.labels,
+        datasets: [{
+          data: dataService.data,
+          backgroundColor: 'rgba(' + roseRgb + ',.5)',
+          borderRadius: 4, borderSkipped: false,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: function (c) { return ' ' + c.raw + 'j'; } } }
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } },
+          y: { grid: { display: false } }
+        }
+      }
+    });
+  }
+})();
+</script>
 {% endblock %}

@@ -1075,7 +1075,7 @@ def conge_dashboard(request):
         date_fin__gte=today,
     ).order_by('date_debut').select_related('employe')[:10]
 
-    from collections import Counter
+    from collections import Counter, defaultdict
     type_qs = Conge.objects.filter(
         statut__in=['approuve', 'en_cours', 'termine'],
         date_debut__year=annee,
@@ -1087,6 +1087,33 @@ def conge_dashboard(request):
         (type_labels.get(code, code), count, round(count * 100 / total_types))
         for code, count in type_counts.most_common()
     ]
+    chart_repartition = {
+        'labels': [label for label, _, _ in repartition],
+        'data': [count for _, count, _ in repartition],
+    }
+
+    # Évolution mensuelle et répartition par service — mêmes données que la
+    # page Rapport (conge_rapport), reprises ici pour le tableau de bord.
+    jours_qs = Conge.objects.filter(
+        statut__in=['approuve', 'en_cours', 'termine'],
+        date_debut__year=annee,
+    ).select_related('employe__service')
+    par_mois = defaultdict(int)
+    par_service = defaultdict(int)
+    for c in jours_qs:
+        par_mois[c.date_debut.month] += c.nb_jours_ouvres
+        svc = c.employe.service.nom if c.employe.service else 'Sans service'
+        par_service[svc] += c.nb_jours_ouvres
+
+    chart_mensuel = {
+        'labels': [_MOIS_FR[m] for m in range(1, 13)],
+        'data': [par_mois.get(m, 0) for m in range(1, 13)],
+    }
+    service_tries = sorted(par_service.items(), key=lambda x: -x[1])[:8]
+    chart_service = {
+        'labels': [svc for svc, _ in service_tries],
+        'data': [jours for _, jours in service_tries],
+    }
 
     # Retards (en_cours avec date_fin dépassée)
     en_retard_db = Conge.objects.filter(statut='en_cours', date_fin__lt=today).select_related('employe')
@@ -1105,6 +1132,9 @@ def conge_dashboard(request):
         'conges_aujourd_hui':  conges_aujourd_hui,
         'prochains_conges':    prochains_conges,
         'repartition':         repartition,
+        'chart_repartition':   chart_repartition,
+        'chart_mensuel':       chart_mensuel,
+        'chart_service':       chart_service,
         'conges_a_venir':      _conges_a_venir(60),
         'dans_7j':             dans_7j,
         'nb_dans_7j':          dans_7j.count(),

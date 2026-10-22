@@ -1,5 +1,5 @@
 {% extends 'conges/base.html' %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block topbar_title %}Congés & Absences{% endblock %}
 
@@ -65,6 +65,12 @@ html[data-theme="dark"] .cl-kpi.k-fin   .kv { color: var(--text); }
 
 /* ── Corps ── */
 .cl-body { flex:1; overflow:auto; min-height:0; }
+
+/* #list-result enveloppe kpis+corps+pied pour le rafraîchissement AJAX : il
+   doit reprendre le flex:1/colonne que .cl-page donnait directement à ces
+   éléments, sinon .cl-body perd sa hauteur (flex:1 sans parent flex) et toute
+   la mise en page plein-écran s'effondre. */
+#list-result { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 
 /* ── Tableau ── */
 .cl-table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -168,69 +174,63 @@ html[data-theme="dark"] .cl-footer { background:rgba(var(--cg-600-rgb),.04); }
   </div>
 
 <div class="cl-page">
-  <!-- ── KPIs cliquables ── -->
-  <div class="cl-kpis">
-    <a href="?q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
-       class="cl-kpi k-total {% if not f_statut %}active{% endif %}">
-      <div><div class="kv">{{ stats.total }}</div><div class="kl">Total</div></div>
-    </a>
-    <a href="?statut=approuve&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
-       class="cl-kpi k-venir {% if f_statut == 'approuve' %}active{% endif %}">
-      <span style="width:8px;height:8px;border-radius:50%;background:var(--cg-600);flex-shrink:0;"></span>
-      <div><div class="kv">{{ stats.a_venir }}</div><div class="kl">À venir</div></div>
-    </a>
-    <a href="?statut=en_cours&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
-       class="cl-kpi k-cours {% if f_statut == 'en_cours' %}active{% endif %}">
-      <span style="width:8px;height:8px;border-radius:50%;background:#2d99db;flex-shrink:0;"></span>
-      <div><div class="kv">{{ stats.en_cours }}</div><div class="kl">En cours</div></div>
-    </a>
-    <a href="?statut=termine&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
-       class="cl-kpi k-fin {% if f_statut == 'termine' %}active{% endif %}">
-      <span style="width:8px;height:8px;border-radius:50%;background:#999;flex-shrink:0;"></span>
-      <div><div class="kv">{{ stats.termine }}</div><div class="kl">Terminés</div></div>
-    </a>
-  </div>
-
   <!-- ── Filtres ── -->
-  <form method="get" class="cl-filters" id="filter-form">
+  <form method="get" class="cl-filters" id="filter-form" onsubmit="return false;">
     <div class="cl-search-wrap">
       <i class="bi bi-search"></i>
-      <input type="search" name="q" value="{{ q|default:'' }}"
+      <input type="search" name="q" id="search-input" value="{{ q|default:'' }}"
              placeholder="Nom, matricule…" class="cg-input" style="width:190px;">
     </div>
-    <select name="type_conge" class="cg-input" style="width:150px;" onchange="this.form.submit()">
+    <select name="type_conge" class="cg-input" style="width:150px;" onchange="cgAppliquerFiltres()">
       <option value="">Tous les types</option>
       {% for code,label in types %}
       <option value="{{ code }}" {% if f_type == code %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-    <select name="employe" class="cg-input" style="width:170px;" onchange="this.form.submit()">
+    <select name="employe" class="cg-input" style="width:170px;" onchange="cgAppliquerFiltres()">
       <option value="">Tous les employés</option>
       {% for emp in employes %}
       <option value="{{ emp.pk }}" {% if f_employe == emp.pk|stringformat:"s" %}selected{% endif %}>{{ emp.nom_complet }}</option>
       {% endfor %}
     </select>
-    <select name="annee" class="cg-input" style="width:100px;" onchange="this.form.submit()">
+    <select name="annee" class="cg-input" style="width:100px;" onchange="cgAppliquerFiltres()">
       <option value="">Année…</option>
       {% for an in annees %}
       <option value="{{ an }}" {% if f_annee == an|stringformat:"s" %}selected{% endif %}>{{ an }}</option>
       {% endfor %}
     </select>
     <input type="hidden" name="statut" value="{{ f_statut }}">
-    <button type="submit" class="btn-cg" style="padding:7px 14px;font-size:12.5px;">
-      <i class="bi bi-search"></i> Filtrer
-    </button>
-    {% if f_type or f_employe or q or f_annee %}
-    <a href="?statut={{ f_statut }}" class="btn-cg-outline" style="padding:7px 12px;font-size:12.5px;">
+    <a href="?statut={{ f_statut }}" class="btn-cg-outline" style="padding:7px 12px;font-size:12.5px;" onclick="return cgEffacerFiltres()">
       <i class="bi bi-x"></i> Effacer
     </a>
-    {% endif %}
-    {% if page_obj.paginator.count != stats.total %}
-    <span style="font-size:11.5px;color:var(--cg-muted);margin-left:4px;">
+    <span style="font-size:11.5px;color:var(--cg-muted);margin-left:4px;" class="o-page-count">
       {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
     </span>
-    {% endif %}
   </form>
+
+  <div id="list-result">
+  <!-- ── KPIs cliquables ── -->
+  <div class="cl-kpis">
+    <a href="?q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
+       class="cl-kpi k-total cl-kpi-ajax {% if not f_statut %}active{% endif %}">
+      <div><div class="kv">{{ stats.total }}</div><div class="kl">Total</div></div>
+    </a>
+    <a href="?statut=approuve&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
+       class="cl-kpi k-venir cl-kpi-ajax {% if f_statut == 'approuve' %}active{% endif %}">
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--cg-600);flex-shrink:0;"></span>
+      <div><div class="kv">{{ stats.a_venir }}</div><div class="kl">À venir</div></div>
+    </a>
+    <a href="?statut=en_cours&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
+       class="cl-kpi k-cours cl-kpi-ajax {% if f_statut == 'en_cours' %}active{% endif %}">
+      <span style="width:8px;height:8px;border-radius:50%;background:#2d99db;flex-shrink:0;"></span>
+      <div><div class="kv">{{ stats.en_cours }}</div><div class="kl">En cours</div></div>
+    </a>
+    <a href="?statut=termine&q={{ q }}&type_conge={{ f_type }}&employe={{ f_employe }}&annee={{ f_annee }}"
+       class="cl-kpi k-fin cl-kpi-ajax {% if f_statut == 'termine' %}active{% endif %}">
+      <span style="width:8px;height:8px;border-radius:50%;background:#999;flex-shrink:0;"></span>
+      <div><div class="kv">{{ stats.termine }}</div><div class="kl">Terminés</div></div>
+    </a>
+  </div>
 
   <!-- ── Corps ── -->
   <div class="cl-body">
@@ -332,8 +332,8 @@ html[data-theme="dark"] .cl-footer { background:rgba(var(--cg-600-rgb),.04); }
     {% if page_obj.has_other_pages %}
     <div class="cl-pag">
       {% if page_obj.has_previous %}
-      <a href="?page=1&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-double-left"></i></a>
-      <a href="?page={{ page_obj.previous_page_number }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-left"></i></a>
+      <a class="o-pag-btn" href="?page=1&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-double-left"></i></a>
+      <a class="o-pag-btn" href="?page={{ page_obj.previous_page_number }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-left"></i></a>
       {% else %}
       <span class="dis"><i class="bi bi-chevron-double-left"></i></span>
       <span class="dis"><i class="bi bi-chevron-left"></i></span>
@@ -341,12 +341,12 @@ html[data-theme="dark"] .cl-footer { background:rgba(var(--cg-600-rgb),.04); }
       {% for num in page_obj.paginator.page_range %}
         {% if num == page_obj.number %}<span class="cur">{{ num }}</span>
         {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-          <a href="?page={{ num }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}">{{ num }}</a>
+          <a class="o-pag-btn" href="?page={{ num }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}">{{ num }}</a>
         {% endif %}
       {% endfor %}
       {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-right"></i></a>
-      <a href="?page={{ page_obj.paginator.num_pages }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-double-right"></i></a>
+      <a class="o-pag-btn" href="?page={{ page_obj.next_page_number }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-right"></i></a>
+      <a class="o-pag-btn" href="?page={{ page_obj.paginator.num_pages }}&statut={{ f_statut }}&type_conge={{ f_type }}&employe={{ f_employe }}&q={{ q }}&annee={{ f_annee }}"><i class="bi bi-chevron-double-right"></i></a>
       {% else %}
       <span class="dis"><i class="bi bi-chevron-right"></i></span>
       <span class="dis"><i class="bi bi-chevron-double-right"></i></span>
@@ -354,7 +354,50 @@ html[data-theme="dark"] .cl-footer { background:rgba(var(--cg-600-rgb),.04); }
     </div>
     {% endif %}
   </div>
+  </div><!-- /#list-result -->
 
 </div><!-- /cl-page -->
 </div><!-- /cl-wrap -->
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+function cgAppliquerFiltres() {
+  var params = new URLSearchParams(window.location.search);
+  var q = document.getElementById('search-input').value.trim();
+  if (q) { params.set('q', q); } else { params.delete('q'); }
+  ['type_conge', 'employe', 'annee'].forEach(function (name) {
+    var sel = document.querySelector('select[name="' + name + '"]');
+    if (sel && sel.value) { params.set(name, sel.value); } else { params.delete(name); }
+  });
+  params.delete('page');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+/* Pastilles KPI : pas de classe o-pag-btn ici, son style de bouton carré
+   26x26 écrase le padding de .cl-kpi (constaté visuellement — pastilles
+   réduites à des carrés minuscules). On intercepte juste leur clic nous-même. */
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('.cl-kpi-ajax');
+  if (!a) return;
+  e.preventDefault();
+  window.listeRafraichir(a.getAttribute('href'), true);
+});
+
+function cgEffacerFiltres() {
+  document.getElementById('search-input').value = '';
+  ['type_conge', 'employe', 'annee'].forEach(function (name) {
+    var sel = document.querySelector('select[name="' + name + '"]');
+    if (sel) sel.value = '';
+  });
+  // Le statut (via les pastilles KPI) vit dans l'URL, pas dans le champ caché
+  // du formulaire (hors de #list-result, jamais resynchronisé après un clic
+  // sur une pastille) : on le relit depuis window.location pour ne pas
+  // effacer un filtre de statut déjà appliqué.
+  var statut = new URLSearchParams(window.location.search).get('statut') || '';
+  window.listeRafraichir(window.location.pathname + (statut ? '?statut=' + statut : ''), true);
+  return false;
+}
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}
