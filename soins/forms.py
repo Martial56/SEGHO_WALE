@@ -1,5 +1,6 @@
 from django import forms
 from django.db.models import Q
+from django.utils import timezone
 from .models import Soin, ProcedureSoin
 from patients.models import Patient, RendezVous, Pathologie
 from employer.models import Employe
@@ -219,6 +220,19 @@ class ProcedureSoinForm(forms.ModelForm):
         for nom in figes:
             if nom in self.fields:
                 self.fields[nom].disabled = True
+
+    def clean_date(self):
+        """Plafonne à l'heure serveur.
+
+        Le sélecteur est pré-rempli côté navigateur depuis l'horloge du poste
+        (voir `date-inp` dans procedure/form.html) : une horloge de poste en
+        avance enregistrerait sinon une procédure datée dans le futur, sans
+        qu'aucun contrôle ne le détecte.
+        """
+        date = self.cleaned_data.get('date')
+        if date and date > timezone.now():
+            date = timezone.now()
+        return date
 
     class Meta:
         model = ProcedureSoin

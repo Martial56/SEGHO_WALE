@@ -54,19 +54,28 @@ def _parse_prix(val):
 
 
 def _parse_date_ligne(date_str):
-    """Date d'une ligne du tableau, à défaut l'instant présent."""
+    """Date d'une ligne du tableau, à défaut l'instant présent.
+
+    Plafonnée à l'heure serveur : ce champ est rempli côté navigateur à partir
+    de l'horloge du poste (voir todayVal() dans soins/form.html), qu'aucune
+    vérification ne recoupe avec l'heure réelle. Une horloge de poste en avance
+    enregistrerait sinon une procédure — et donc potentiellement un soin
+    « terminé » — avec une date future.
+    """
     if not date_str:
         return timezone.now()
+    now = timezone.now()
     # Les secondes d'abord : le champ les poste depuis qu'il porte `step=1`.
     # Les formats sans seconde restent en second rang pour les valeurs déjà
     # enregistrées et les navigateurs qui ignoreraient `step`.
     for fmt in ('%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M',
                 '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
         try:
-            return timezone.make_aware(datetime.strptime(date_str, fmt))
+            dt = timezone.make_aware(datetime.strptime(date_str, fmt))
+            return min(dt, now)
         except ValueError:
             pass
-    return timezone.now()
+    return now
 
 
 def _statut_apres_enregistrement(statut_initial, action):
