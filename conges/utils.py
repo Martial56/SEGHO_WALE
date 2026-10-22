@@ -216,18 +216,22 @@ def types_deductibles() -> set:
     return set(TypeConge.objects.filter(deductible=True).values_list('code', flat=True))
 
 
-def jours_pris_annee(employe, annee) -> float:
+def jours_pris_annee(employe, annee, statuts=('approuve', 'en_cours', 'termine')) -> float:
     """
-    Jours ouvrés déductibles pris par l'employé pour `annee`.
+    Jours ouvrés déductibles pris (ou planifiés, selon `statuts`) par l'employé
+    pour `annee`.
     Un congé à cheval sur deux années civiles (ex: 22/12 → 06/01) n'est compté
     que pour sa portion réellement dans `annee`, pas pour la totalité de sa durée.
+    `statuts` par défaut ne compte que les congés confirmés (approuvé/en cours/
+    terminé) ; un appelant voulant inclure les demandes pas encore validées
+    (ex. solde prévisionnel) passe son propre tuple de statuts.
     """
     from employer.models import Conge
     jan1  = date(annee, 1, 1)
     dec31 = date(annee, 12, 31)
     conges = Conge.objects.filter(
         employe=employe,
-        statut__in=['approuve', 'en_cours', 'termine'],
+        statut__in=statuts,
         deduit_du_solde=True,
         date_debut__lte=dec31,
         date_fin__gte=jan1,

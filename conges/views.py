@@ -19,7 +19,7 @@ from conges.models import TypeConge, ReglesConge, PalierAnciennete
 from core.permissions import utilisateurs_avec
 from conges.utils import (
     compter_jours_ouvres, detecter_conflits, get_or_create_solde,
-    jours_feries_ivoire, jours_feries_labels, quota_annuel,
+    jours_feries_ivoire, jours_feries_labels, jours_pris_annee, quota_annuel,
     types_deductibles, durees_exceptionnelles,
 )
 
@@ -43,6 +43,33 @@ def _employes_eligibles():
     return Employe.objects.filter(statut='actif').filter(
         _Q(type_contrat__isnull=True) | _Q(type_contrat__droit_au_conge=True)
     ).select_related('type_contrat')
+
+
+def _jours_ouvres_mois_employe(y, m, date_embauche, today):
+    """Jours ouvrés d'un mois pour UN employé, prorata de sa date d'embauche
+    si elle tombe dans ce mois (0 s'il n'était pas encore embauché, le mois
+    entier s'il l'était déjà). Le mois/l'année en cours ne compte que
+    jusqu'à aujourd'hui inclus : sans ça, un taux d'absentéisme pour l'année
+    en cours serait mécaniquement sous-estimé tant qu'elle n'est pas
+    terminée (dénominateur sur des mois complets, numérateur ne pouvant
+    porter que sur les jours déjà passés)."""
+    ld = calendar.monthrange(y, m)[1]
+    if (y, m) == (today.year, today.month):
+        ld = min(ld, today.day)
+    elif (y, m) > (today.year, today.month):
+        ld = 0
+    debut = 1
+    if date_embauche:
+        if (date_embauche.year, date_embauche.month) > (y, m):
+            return 0
+        if date_embauche.year == y and date_embauche.month == m:
+            debut = date_embauche.day
+    return sum(1 for d in range(debut, ld + 1) if _d(y, m, d).weekday() < 5)
+
+
+def _capacite_mois(emps, y, m, today):
+    """Capacité (jours-ouvrés × employés) d'un mois, prorata embauche comprise."""
+    return sum(_jours_ouvres_mois_employe(y, m, e.date_embauche, today) for e in emps)
 
 
 def _rh_users():
@@ -192,6 +219,8 @@ def _can_validate_service(user, employe):
 # ── Liste ─────────────────────────────────────────────────────────────────────
 @login_required(login_url='login')
 def conge_list(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     _auto_approuve_vers_en_cours()
     qs = Conge.objects.select_related('employe', 'approuve_par').order_by('-date_debut')
 
@@ -204,8 +233,6 @@ def conge_list(request):
     f_date_fin   = request.GET.get('date_fin', '').strip()
     q            = request.GET.get('q', '').strip()
 
-    if f_statut:
-        qs = qs.filter(statut=f_statut)
     if f_type:
         qs = qs.filter(type_conge=f_type)
     if f_employe:
@@ -227,14 +254,21 @@ def conge_list(request):
             Q(employe__nom__icontains=q) | Q(employe__prenoms__icontains=q)
         )
 
+    # Les pastilles KPI (Total/À venir/En cours/Terminés) portent elles-mêmes
+    # un statut : calculées ici, sur ce qs déjà filtré par type/employé/année/
+    # recherche mais PAS encore par statut, elles disent "combien dans CE
+    # sous-ensemble" plutôt qu'un total global sans rapport avec le filtre actif.
     from django.db.models import Count
-    stats = Conge.objects.aggregate(
+    stats = qs.aggregate(
         total=Count('pk'),
         demande=Count('pk', filter=Q(statut__in=['demande', 'valide_service'])),
         a_venir=Count('pk', filter=Q(statut='approuve')),
         en_cours=Count('pk', filter=Q(statut='en_cours')),
         termine=Count('pk', filter=Q(statut='termine')),
     )
+
+    if f_statut:
+        qs = qs.filter(statut=f_statut)
 
     # Années disponibles pour le filtre
     annees = list(
@@ -1041,6 +1075,8 @@ def conge_suivi_retours(request):
 # ── Dashboard ─────────────────────────────────────────────────────────────────
 @login_required(login_url='login')
 def conge_dashboard(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     _auto_approuve_vers_en_cours()
     today = _d.today()
     annee = today.year
@@ -1148,6 +1184,8 @@ def conge_dashboard(request):
 # ── Calendrier ────────────────────────────────────────────────────────────────
 @login_required(login_url='login')
 def conge_calendrier(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     today = _d.today()
     vue   = request.GET.get('vue', 'mois')  # jour | semaine | mois | annee
     try:
@@ -1352,13 +1390,16 @@ def conge_soldes(request):
     soldes_data = []
     for emp in emp_page:
         s = get_or_create_solde(emp, year)
-        # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette année
-        total_planifie = Conge.objects.filter(
-            employe=emp,
-            statut__in=['demande', 'valide_service', 'approuve', 'en_cours', 'termine'],
-            date_debut__year=year,
-            deduit_du_solde=True,
-        ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
+        # Solde prévisionnel : quota + reportés - total congés planifiés/pris/en cours cette
+        # année. Même découpage que jours_pris_annee() (utilisé pour "Solde actuel") pour un
+        # congé à cheval sur deux années civiles — sinon un congé fin décembre→janvier comptait
+        # ici pour sa durée ENTIÈRE sur l'année de son début, au lieu de sa seule portion dans
+        # `year`, et un congé commençant l'année précédente mais débordant sur `year` n'était
+        # pas compté du tout (son date_debut__year ne vaut pas `year`).
+        total_planifie = jours_pris_annee(
+            emp, year,
+            statuts=('demande', 'valide_service', 'approuve', 'en_cours', 'termine'),
+        )
         previsionnel = round(
             float(s.quota) + float(s.jours_reporter)
             - float(total_planifie) - float(s.jours_deja_pris_avant_saisie), 1
@@ -1568,24 +1609,21 @@ def conge_stats_service(request):
     from medecins.models import Service
     from django.db.models import Count
 
-    # Jours ouvrables dans l'année (approximation : 52 semaines * 5 jours - fériés)
-    feries_year = jours_feries_ivoire(year)
-    total_jours_ouvres_annee = 0
-    d = _d(year, 1, 1)
-    while d.year == year:
-        if d.weekday() < 5 and d not in feries_year:
-            total_jours_ouvres_annee += 1
-        d += timedelta(days=1)
+    # Même base que conge_direction : employés réellement éligibles au congé
+    # (exclut vacataires/prestataires), capacité proratée à la date d'embauche
+    # et au mois/année en cours (pas de capacité sur des jours pas encore
+    # vécus), numérateur restreint aux mêmes employés que le dénominateur.
+    employes_qs   = _employes_eligibles()
+    employes_list = list(employes_qs)
 
-    services = Service.objects.annotate(
-        nb_employes=Count('employes', filter=Q(employes__statut='actif'), distinct=True)
-    ).order_by('nom')
+    services = Service.objects.order_by('nom')
 
     # Un seul aller-retour DB pour les congés de tous les services, groupés par service,
     # au lieu d'une requête count()+aggregate() par service.
     conges_par_service = {
         row['employe__service']: row
         for row in Conge.objects.filter(
+            employe__in=employes_qs,
             employe__service__isnull=False,
             statut__in=['approuve', 'en_cours', 'termine'],
             date_debut__year=year,
@@ -1594,17 +1632,19 @@ def conge_stats_service(request):
 
     stats_services = []
     for service in services:
-        if not service.nb_employes:
+        emps = [e for e in employes_list if e.service_id == service.pk]
+        nb_e = len(emps)
+        if not nb_e:
             continue
         row = conges_par_service.get(service.pk, {})
         nb_conges   = row.get('nb_conges', 0)
         total_jours = row.get('total_jours') or 0
-        # Taux absentéisme = jours_conge / (nb_employes * jours_ouvrables) * 100
-        capacite = service.nb_employes * total_jours_ouvres_annee
+        # Taux absentéisme = jours_conge / (capacité proratée) * 100
+        capacite = sum(_capacite_mois(emps, year, m, today) for m in range(1, 13))
         taux = round(float(total_jours) / capacite * 100, 1) if capacite else 0
         stats_services.append({
             'service':       service,
-            'nb_employes':   service.nb_employes,
+            'nb_employes':   nb_e,
             'nb_conges':     nb_conges,
             'total_jours':   total_jours,
             'taux':          taux,
@@ -1643,6 +1683,8 @@ def conge_stats_service(request):
 # ── Planning équipe ───────────────────────────────────────────────────────────
 @login_required(login_url='login')
 def conge_planning_equipe(request):
+    if not can_manage_rh(request.user):
+        raise PermissionDenied
     today = _d.today()
     try:
         year = int(request.GET.get('year', today.year))
@@ -1941,14 +1983,13 @@ def conge_direction(request):
     from medecins.models import Service
     from collections import defaultdict
 
-    services    = list(Service.objects.order_by('nom'))
-    employes_qs = _employes_eligibles()
-    nb_employes_total = employes_qs.count()
+    services      = list(Service.objects.order_by('nom'))
+    employes_qs   = _employes_eligibles()
+    employes_list = list(employes_qs)
+    nb_employes_total = len(employes_list)
 
-    # Jours ouvrés théoriques par mois (sans fériés exacts pour simplifier)
-    def jours_ouvres_mois(y, m):
-        ld = calendar.monthrange(y, m)[1]
-        return sum(1 for d in range(1, ld + 1) if _d(y, m, d).weekday() < 5)
+    def capacite_mois(emps, y, m):
+        return _capacite_mois(emps, y, m, today)
 
     # ── Evolution mensuelle (12 mois) ──
     mois_labels = []
@@ -1957,13 +1998,14 @@ def conge_direction(request):
     maladies_mois_data = []
 
     for m in range(1, 13):
-        jo = jours_ouvres_mois(year, m)
-        capacite = nb_employes_total * jo or 1
+        capacite = capacite_mois(employes_list, year, m) or 1
         jours_conge = Conge.objects.filter(
+            employe__in=employes_qs,
             date_debut__year=year, date_debut__month=m,
             statut__in=['approuve', 'en_cours', 'termine'],
         ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
         jours_maladie = Conge.objects.filter(
+            employe__in=employes_qs,
             date_debut__year=year, date_debut__month=m,
             statut__in=['approuve', 'en_cours', 'termine'],
             type_conge='maladie',
@@ -1976,22 +2018,22 @@ def conge_direction(request):
     # ── Par service ──
     services_stats = []
     for svc in services:
-        emps = employes_qs.filter(service=svc)
-        nb_e = emps.count()
+        emps = [e for e in employes_list if e.service_id == svc.pk]
+        nb_e = len(emps)
         if not nb_e:
             continue
         jours_total = Conge.objects.filter(
-            employe__in=emps,
+            employe__in=[e.pk for e in emps],
             date_debut__year=year,
             statut__in=['approuve', 'en_cours', 'termine'],
         ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
         jours_maladie = Conge.objects.filter(
-            employe__in=emps,
+            employe__in=[e.pk for e in emps],
             date_debut__year=year,
             statut__in=['approuve', 'en_cours', 'termine'],
             type_conge='maladie',
         ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
-        capacite = nb_e * sum(jours_ouvres_mois(year, m) for m in range(1, 13)) or 1
+        capacite = sum(capacite_mois(emps, year, m) for m in range(1, 13)) or 1
         services_stats.append({
             'service':       svc,
             'nb_employes':   nb_e,
@@ -2014,13 +2056,14 @@ def conge_direction(request):
     soldes_critiques.sort(key=lambda x: float(x['solde'].solde))
 
     # ── KPIs globaux ──
-    jo_annee = sum(jours_ouvres_mois(year, m) for m in range(1, 13))
-    capacite_annee = nb_employes_total * jo_annee or 1
+    capacite_annee = sum(capacite_mois(employes_list, year, m) for m in range(1, 13)) or 1
     total_jours = Conge.objects.filter(
+        employe__in=employes_qs,
         date_debut__year=year,
         statut__in=['approuve', 'en_cours', 'termine'],
     ).aggregate(t=Sum('nb_jours_ouvres'))['t'] or 0
     total_maladie = Conge.objects.filter(
+        employe__in=employes_qs,
         date_debut__year=year,
         statut__in=['approuve', 'en_cours', 'termine'],
         type_conge='maladie',
