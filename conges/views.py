@@ -2247,6 +2247,7 @@ def conge_regles_calcul(request):
         'regles': regles,
         'paliers': PalierAnciennete.objects.all(),
         'nav_active': 'config',
+        'can_manage': True,
     })
 
 

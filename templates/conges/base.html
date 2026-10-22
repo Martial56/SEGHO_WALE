@@ -76,6 +76,40 @@ html[data-theme="dark"] .cg-more-popup { background: var(--surface); border-colo
 html[data-theme="dark"] .cg-more-item { color: var(--text-strong); }
 html[data-theme="dark"] .cg-more-item:hover { background:rgba(122,184,208,.1); color:#7ab8d0; }
 
+/* ── Menu déroulant "Configuration" (même pattern que le module Employés) ── */
+.o-nav-dropdown { position: relative; display: flex; align-items: stretch; }
+.o-nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  min-width: 180px;
+  z-index: 600;
+  padding: 6px;
+}
+.o-nav-dropdown-menu.open { display: block; }
+.o-nav-dropdown-menu a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 7px;
+  transition: background 0.12s, color 0.12s;
+}
+.o-nav-dropdown-menu a:hover { background: var(--surface-muted); color: var(--accent-text-soft); }
+.o-nav-dropdown-menu a.active { color: var(--accent-text-soft); font-weight: 600; }
+html[data-theme="dark"] .o-nav-dropdown-menu { background: var(--surface); border-color: rgba(255,255,255,.1); }
+html[data-theme="dark"] .o-nav-dropdown-menu a { color: var(--text); }
+html[data-theme="dark"] .o-nav-dropdown-menu a:hover { background: rgba(var(--teal-500-rgb), .1); }
+
 /* ── Boutons ── */
 .btn-cg {
   background: var(--cg-600);
@@ -274,6 +308,22 @@ html[data-theme="dark"] .cg-back-btn:hover { background:rgba(var(--teal-400-rgb)
     if(!wrap.contains(e.target) && !popup.contains(e.target)) popup.classList.remove('open');
   });
 })();
+</script>
+<script>
+function toggleCgNavDropdown(e, btn) {
+  e.stopPropagation();
+  var menu = document.getElementById('cg-nav-config-dropdown');
+  menu.classList.toggle('open');
+  if (menu.classList.contains('open')) {
+    function close(ev) {
+      if (!btn.closest('.o-nav-dropdown').contains(ev.target)) {
+        menu.classList.remove('open');
+        document.removeEventListener('click', close);
+      }
+    }
+    setTimeout(function () { document.addEventListener('click', close); }, 0);
+  }
+}
 </script>
 <script>
 (function () {
