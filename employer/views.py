@@ -603,13 +603,37 @@ def _save_employe(request, employe):
 
     nom_norm = _normalize_nom(nom)
     prenoms_norm = _normalize_nom(prenoms)
+    date_naissance_str = p.get('date_naissance') or ''
     qs_dup = Employe.objects.all()
     if employe is not None and employe.pk:
         qs_dup = qs_dup.exclude(pk=employe.pk)
-    for autre in qs_dup:
-        if _normalize_nom(autre.nom) == nom_norm and _normalize_nom(autre.prenoms) == prenoms_norm:
-            msg = f'Un employé nommé « {nom} {prenoms} » existe déjà (matricule {autre.matricule}).'
+    homonymes = [
+        autre for autre in qs_dup
+        if _normalize_nom(autre.nom) == nom_norm and _normalize_nom(autre.prenoms) == prenoms_norm
+    ]
+    if homonymes:
+        # Deux personnes différentes peuvent légitimement porter le même nom :
+        # seule une date de naissance identique confirme un vrai doublon. Sans
+        # cette confirmation (date différente, ou l'une des deux inconnue), on
+        # avertit mais on laisse créer — bloquer aurait empêché d'enregistrer
+        # un homonyme réel.
+        meme_naissance = next(
+            (autre for autre in homonymes
+             if autre.date_naissance and date_naissance_str
+             and autre.date_naissance.isoformat() == date_naissance_str),
+            None,
+        )
+        if meme_naissance:
+            msg = (f'Un employé nommé « {nom} {prenoms} », né(e) le même jour, existe déjà '
+                   f'(matricule {meme_naissance.matricule}).')
             return None, {'nom': msg, 'prenoms': msg}
+        matricules = ', '.join(autre.matricule for autre in homonymes)
+        messages.warning(
+            request,
+            f'Un ou plusieurs employés portent déjà le nom « {nom} {prenoms} » '
+            f'(matricule {matricules}) — vérifiez qu\'il ne s\'agit pas de la même '
+            f'personne avant de confirmer qu\'il s\'agit bien d\'un homonyme.'
+        )
 
     is_creation = employe is None
     if employe is None:
@@ -1059,13 +1083,21 @@ def employe_import(request):
 
                     nom_norm = _normalize_nom(nom)
                     prenoms_norm = _normalize_nom(prenoms)
-                    doublon = any(
-                        _normalize_nom(e.nom) == nom_norm and _normalize_nom(e.prenoms) == prenoms_norm
-                        for e in Employe.objects.all()
-                    )
-                    if doublon:
-                        errors.append(f'Ligne {i} : un employé nommé « {nom} {prenoms} » existe déjà.')
-                        continue
+                    homonymes_import = [
+                        e for e in Employe.objects.all()
+                        if _normalize_nom(e.nom) == nom_norm and _normalize_nom(e.prenoms) == prenoms_norm
+                    ]
+                    # Le modèle Excel ne porte pas de date de naissance pour
+                    # trancher un vrai doublon d'un simple homonyme (voir
+                    # _save_employe) : on importe quand même, en signalant la
+                    # collision pour vérification manuelle plutôt que de risquer
+                    # de perdre un employé réel.
+                    if homonymes_import:
+                        matricules = ', '.join(e.matricule for e in homonymes_import)
+                        errors.append(
+                            f'Ligne {i} : « {nom} {prenoms} » importé(e), mais porte le même nom '
+                            f'qu\'un employé existant (matricule {matricules}) — à vérifier.'
+                        )
 
                     service = None
                     if service_nom:
