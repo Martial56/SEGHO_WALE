@@ -1,0 +1,39 @@
+{% load humanize %}
+{% comment %}Indicateurs d'une session : partagé par la fiche et la clôture.{% endcomment %}
+<div class="cpt-kpis">
+  <div class="cpt-kpi"><div class="l">Fonds remis</div><div class="v">{{ resume.fonds_initial|floatformat:0|intcomma }} F</div></div>
+  <div class="cpt-kpi"><div class="l">Espèces encaissées</div><div class="v">{{ resume.especes_encaissees|floatformat:0|intcomma }} F</div></div>
+  <div class="cpt-kpi"><div class="l">Remboursements</div><div class="v">− {{ resume.especes_remboursees|floatformat:0|intcomma }} F</div><div class="s">espèces rendues</div></div>
+  <div class="cpt-kpi"><div class="l">Sorties de caisse</div><div class="v">− {{ resume.sorties_payees|floatformat:0|intcomma }} F</div>{% if resume.sorties_en_attente %}<div class="s">{{ resume.sorties_en_attente|length }} en attente</div>{% endif %}</div>
+  <div class="cpt-kpi accent"><div class="l">Espèces attendues</div><div class="v">{{ resume.especes_attendues|floatformat:0|intcomma }} F</div><div class="s">dans la pochette</div></div>
+  <div class="cpt-kpi"><div class="l">Autres modes</div><div class="v">{{ resume.autres_modes|floatformat:0|intcomma }} F</div><div class="s">hors pochette</div></div>
+</div>
+
+<div class="cpt-grid2">
+  <div class="cpt-card">
+    <h2>Par mode de paiement</h2>
+    {% if resume.par_mode %}
+    <table class="cpt-table">
+      <thead><tr><th>Mode</th><th class="num">Nb</th><th class="num">Montant</th></tr></thead>
+      <tbody>
+        {% for m in resume.par_mode %}
+        <tr><td>{{ m.libelle }}</td><td class="num">{{ m.nb }}</td><td class="num">{{ m.montant|floatformat:0|intcomma }} F</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td>Total</td><td class="num">{{ resume.nb_paiements }}</td><td class="num">{{ resume.total_encaisse|floatformat:0|intcomma }} F</td></tr></tfoot>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun encaissement.</div>{% endif %}
+  </div>
+  <div class="cpt-card">
+    <h2>Par nature de prestation</h2>
+    {% if resume.par_nature %}
+    <table class="cpt-table">
+      <tbody>
+        {% for nature, total in resume.par_nature %}
+        <tr><td>{{ nature }}</td><td class="num">{{ total|floatformat:0|intcomma }} F</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun encaissement.</div>{% endif %}
+  </div>
+</div>

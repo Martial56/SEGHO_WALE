@@ -4,10 +4,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, permission_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, F, Q, Sum
+from django.db.models import Count, F, ProtectedError, Q, Sum
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.urls import reverse
+from django.utils.http import urlencode
 from core import memoire_listing
 from core.export_listing import contexte as contexte_export
 
@@ -169,11 +170,19 @@ def facturation_list(request):
 def facture_create(request):
     from patients.models import Patient, RendezVous
     from services.models import Articleservice
+    from comptabilite.caisse import doit_ouvrir_sa_caisse
+
+    # Une facture au guichet s'encaisse dans la foulée : la caissière ouvre sa
+    # caisse avant. Les autres profils (accueil, médecins…) ne sont pas
+    # concernés — ils n'encaissent pas.
+    if doit_ouvrir_sa_caisse(request.user):
+        messages.info(request, "Ouvrez votre caisse avant de facturer.")
+        return redirect(f"{reverse('comptabilite:ouvrir')}?{urlencode({'next': request.get_full_path()})}")
 
     patient_pk = request.GET.get('patient') or request.POST.get('patient_id')
     patient    = get_object_or_404(Patient.all_objects, pk=patient_pk) if patient_pk else None
     actes      = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
-    caisses    = Caisse.objects.filter(actif=True).order_by('nom')
+    caisses    = _caisses_de_la_session(request.user)
     services   = _designations_proposees(request)
 
     hosp_obj = None
@@ -287,8 +296,9 @@ def facture_create(request):
         if ordonnance_obj and Facture.objects.filter(ordonnance=ordonnance_obj).exclude(statut='annulee').exists():
             messages.error(request, 'Cette ordonnance a déjà été facturée.')
             return redirect('ordonnance_detail', pk=ordonnance_obj.pk)
-        if form.is_valid():
+        if form.is_valid() and not _remises_refusees(form, request):
             facture = form.save(commit=False)
+            _poser_motif_remise(facture, request.POST)
             facture.patient  = patient
             facture.cree_par = request.user
             if hosp_obj:
@@ -403,9 +413,10 @@ def facture_detail(request, pk):
         # La modale d'encaissement de cet écran proposait cinq journaux écrits
         # en dur — « CAISSE ACCUEIL », « BANQUE »… — dont aucun n'existait en
         # base. Elle lit désormais les mêmes caisses que l'écran de création.
-        'caisses':   Caisse.objects.filter(actif=True).order_by('nom'),
+        'caisses':   _caisses_de_la_session(request.user),
         'modes_paiement': Paiement.MODE,
         'back_url':  back_url,
+        'avoirs':    facture.avoirs.select_related('cree_par', 'session__journee__caisse'),
     })
 
 
@@ -457,9 +468,31 @@ def facture_annuler(request, pk):
         messages.error(request, "La cause d'annulation est requise.")
         return redirect(detour)
 
+    # Une facture émise ou payée est une vente : on l'annule par un avoir, et
+    # si le patient avait payé, l'argent rendu sort de la pochette de la
+    # personne qui rembourse (module Comptabilité). Un brouillon n'a jamais
+    # été une vente : il s'annule sans avoir.
+    from comptabilite.caisse import ErreurCaisse, creer_avoir, preparer_remboursement
+    avoir = None
+    if facture.statut != 'brouillon':
+        mode = request.POST.get('mode_remboursement') or 'especes'
+        try:
+            session = preparer_remboursement(request.user, facture.montant_paye or 0, mode)
+        except ErreurCaisse as e:
+            messages.error(request, f"Facture non annulée — {e}")
+            return redirect(detour)
+        avoir = creer_avoir(facture, request.user, motif, mode,
+                            request.POST.get('reference_remboursement', '').strip(), session)
+
     facture.statut = 'annulee'
     facture.save(update_fields=['statut'])
     log_event(facture, request.user, f'Facture annulée. Cause : {motif}', type='statut')
+    if avoir is not None:
+        texte = f'Avoir {avoir.numero} établi'
+        if avoir.montant_rembourse:
+            texte += (f' — {int(avoir.montant_rembourse):,} FCFA remboursés '
+                      f'({avoir.mode_remboursement_libelle})').replace(',', ' ')
+        log_event(facture, request.user, texte + '.', type='modif')
 
     # Les produits déjà sortis retournent en rayon : la facture annulée ne les
     # a finalement pas remis au patient.
@@ -468,7 +501,12 @@ def facture_annuler(request, pk):
         log_event(facture, request.user,
                   f'{rendus} produit(s) remis en stock.', type='modif')
 
-    messages.success(request, f'Facture {facture.numero} annulée.')
+    if avoir is not None and avoir.montant_rembourse:
+        messages.success(request, f"Facture {facture.numero} annulée — avoir {avoir.numero}, "
+                                  f"{int(avoir.montant_rembourse):,} F à rendre au patient "
+                                  f"({avoir.mode_remboursement_libelle}).".replace(',', ' '))
+    else:
+        messages.success(request, f'Facture {facture.numero} annulée.')
     return redirect(detour)
 
 
@@ -540,7 +578,7 @@ def facture_edit(request, pk):
         messages.error(request, "Une facture payée ou annulée ne peut être modifiée que par un administrateur.")
         return redirect(retour)
     actes    = Acte.objects.filter(actif=True).order_by('categorie', 'libelle')
-    caisses  = Caisse.objects.filter(actif=True).order_by('nom')
+    caisses  = _caisses_de_la_session(request.user)
     services = _designations_proposees(request)
     is_admin = request.user.is_superuser
     back_url = request.GET.get('next', reverse('facturation:detail', kwargs={'pk': pk}))
@@ -601,8 +639,9 @@ def facture_edit(request, pk):
 
         # ── Sauvegarde ──────────────────────────────────────────────────────
         form = FactureForm(request.POST, instance=facture, is_admin=is_admin)
-        if form.is_valid():
+        if form.is_valid() and not _remises_refusees(form, request):
             facture = form.save(commit=False)
+            _poser_motif_remise(facture, request.POST)
             facture.lignes.all().delete()
             total = _save_lignes(
                 facture, request.POST, pharmacie_active(request),
@@ -659,21 +698,42 @@ def _parse_float(value, default=0):
         return default
 
 
-def _caisse_choisie(POST):
-    """Caisse désignée par le champ « Journal » de l'écran d'encaissement.
+def _remises_refusees(form, request):
+    """Vrai si les remises saisies ne sont pas couvertes par un motif (ou
+    dépassent son plafond) : l'erreur est posée sur le formulaire et annoncée.
 
-    Tolérante à dessein : un identifiant vide, illisible ou pointant sur une
-    caisse supprimée rend None, et le paiement s'enregistre quand même sans
-    caisse. Perdre un encaissement parce qu'un journal a été désactivé entre
-    l'affichage du formulaire et sa validation serait pire que de l'ignorer.
+    Toute remise porte désormais un motif de gratuité (module Comptabilité) :
+    le prix plein reste sur la facture, le motif dit pourquoi le patient paie
+    moins.
     """
-    brut = (POST.get('pay_journal') or '').strip()
-    if not brut:
-        return None
-    try:
-        return Caisse.objects.filter(pk=int(brut)).first()
-    except (TypeError, ValueError):
-        return None
+    from comptabilite.gratuites import controler_remises
+    erreur = controler_remises(request.POST, form.cleaned_data.get('motif_remise'), request.user)
+    if erreur:
+        form.add_error('motif_remise', erreur)
+        messages.error(request, erreur)
+        return True
+    return False
+
+
+def _poser_motif_remise(facture, POST):
+    """Pas de remise, pas de motif : un motif resté sélectionné ne doit pas
+    faire compter la facture parmi les gratuités."""
+    from comptabilite.gratuites import remises_postees
+    if not remises_postees(POST):
+        facture.motif_remise = None
+
+
+def _caisses_de_la_session(user):
+    """Caisse proposée à l'encaissement : celle de la session en cours.
+
+    Le champ « Journal » laissait choisir n'importe quelle caisse, et un choix
+    absent ou illisible enregistrait le paiement sans caisse. La caisse vient
+    désormais de la session ouverte par la caissière (module Comptabilité) :
+    il n'y a plus rien à choisir, donc plus rien à oublier.
+    """
+    from comptabilite.caisse import session_pour_encaisser
+    session = session_pour_encaisser(user)
+    return [session.caisse] if session else []
 
 
 def _montant_recu(POST, mode):
@@ -1032,6 +1092,15 @@ def _handle_paiement(facture, POST, user, total, request=None):
     if pay_montant is None:
         return facture
 
+    # Pas d'encaissement hors session : l'argent doit pouvoir être attribué à
+    # une caissière et à sa pochette (voir comptabilite/models.py).
+    from comptabilite.caisse import message_sans_session, session_pour_encaisser
+    session = session_pour_encaisser(user)
+    if session is None:
+        if request is not None:
+            messages.error(request, "Paiement non enregistré — " + message_sans_session(user))
+        return facture
+
     # Facturer un produit, c'est le remettre au patient : on refuse d'encaisser
     # ce que la pharmacie ne peut plus servir. La dernière boîte a pu partir
     # entre la saisie de la ligne et l'encaissement — prendre l'argent quand
@@ -1059,7 +1128,8 @@ def _handle_paiement(facture, POST, user, total, request=None):
         facture=facture,
         montant=pay_montant,
         mode_paiement=mode,
-        caisse=_caisse_choisie(POST),
+        caisse=session.caisse,
+        session=session,
         montant_recu=_montant_recu(POST, mode),
         reference=reference,
         notes=memo,
@@ -1218,7 +1288,17 @@ def caisse_delete(request, pk):
     if request.method != 'POST':
         return redirect('facturation:caisses_list')
     nom = caisse.nom
-    caisse.delete()
+    try:
+        caisse.delete()
+    except ProtectedError:
+        # Une caisse qui a servi porte des journées et des sessions de caisse :
+        # la supprimer effacerait l'histoire de qui a encaissé quoi.
+        refus = ("La caisse « %s » a déjà été utilisée en session : elle ne peut pas "
+                 "être supprimée. Désactivez-la plutôt." % nom)
+        if _est_ajax(request):
+            return JsonResponse({'ok': False, 'message': refus}, status=400)
+        messages.error(request, refus)
+        return redirect('facturation:caisses_list')
     if _est_ajax(request):
         return JsonResponse({'ok': True, 'message': 'Caisse « %s » supprimée.' % nom})
     messages.success(request, 'Caisse « %s » supprimée.' % nom)

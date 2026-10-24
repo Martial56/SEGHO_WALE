@@ -1,0 +1,61 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Gratuités{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Remises et gratuités — {{ debut|date:"F Y" }}</h1>
+      <div class="cpt-sub">Ce que les patients n'ont pas payé, par rapport au tarif plein. Factures annulées exclues.</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="?mois={{ precedent|date:'Y-m' }}" class="cpt-btn" title="Mois précédent"><i class="bi bi-chevron-left"></i></a>
+      {% if suivant %}<a href="?mois={{ suivant|date:'Y-m' }}" class="cpt-btn" title="Mois suivant"><i class="bi bi-chevron-right"></i></a>{% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi accent"><div class="l">Effort consenti</div><div class="v">{{ etat.total|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Factures concernées</div><div class="v">{{ etat.lignes|length }}</div></div>
+  </div>
+
+  <div class="cpt-card">
+    <h2>Par motif</h2>
+    {% if etat.par_motif %}
+    <table class="cpt-table">
+      <thead><tr><th>Motif</th><th class="num">Factures</th><th class="num">Montant</th></tr></thead>
+      <tbody>{% for g in etat.par_motif %}<tr><td>{{ g.motif }}</td><td class="num">{{ g.nb }}</td><td class="num">{{ g.montant|floatformat:0|intcomma }} F</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td>Total</td><td class="num">{{ etat.lignes|length }}</td><td class="num">{{ etat.total|floatformat:0|intcomma }} F</td></tr></tfoot>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune remise accordée ce mois-ci.</div>{% endif %}
+  </div>
+
+  {% if etat.lignes %}
+  <div class="cpt-card">
+    <h2>Détail des factures</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Facture</th><th>Patient</th><th>Motif</th><th class="num">Prix plein</th><th class="num">Remise</th><th class="num">Facturé</th></tr></thead>
+      <tbody>
+        {% for l in etat.lignes %}
+        <tr class="lien" onclick="location.href='{% url 'facturation:detail' l.facture.pk %}'">
+          <td>{{ l.facture.date_emission|date:"d/m/Y" }}</td>
+          <td>{{ l.facture.numero }}</td>
+          <td>{{ l.facture.patient.nom }} {{ l.facture.patient.prenoms }}</td>
+          <td>{{ l.motif }}</td>
+          <td class="num">{{ l.prix_plein|floatformat:0|intcomma }}</td>
+          <td class="num">{{ l.montant|floatformat:0|intcomma }}</td>
+          <td class="num">{{ l.facture.montant_total|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

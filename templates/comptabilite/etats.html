@@ -1,0 +1,35 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}États{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.etats-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.etat-carte { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; text-decoration: none; color: var(--text); transition: border-color .12s, transform .12s; }
+.etat-carte:hover { border-color: var(--teal-500); transform: translateY(-1px); }
+.etat-carte b { display: block; font-size: 14px; margin-bottom: 4px; }
+.etat-carte span { font-size: 12px; color: var(--text-muted); }
+.etats-groupe { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 6px 0 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">États</h1>
+      <div class="cpt-sub">Chaque état se consulte sur la période de votre choix (jour, semaine, mois, année ou dates libres), s'imprime ou s'exporte en Excel.</div>
+    </div>
+  </div>
+  {% for titre, liste in groupes %}
+  <div class="etats-groupe">{{ titre }}</div>
+  <div class="etats-grille">
+    {% for code, e in liste %}
+    <a class="etat-carte" href="{% url 'comptabilite:etat' code %}"><b>{{ e.titre }}</b><span>{{ e.description }}</span></a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="cpt-note">Le bilan de session, l'état des gratuités et les journées de caisse restent dans leurs menus.</div>
+</div>
+{% endblock %}

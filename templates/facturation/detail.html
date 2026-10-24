@@ -638,6 +638,34 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
         Aucun paiement enregistré pour cette facture.
       </div>
       {% endif %}
+
+      {% comment %}Avoir établi à l'annulation (module Comptabilité) : la vente
+      est reprise, et l'argent rendu sort de la pochette de qui a remboursé.{% endcomment %}
+      {% if avoirs %}
+      <div class="fac-section-title" style="margin-top:18px;"><i class="bi bi-arrow-counterclockwise"></i> Avoir</div>
+      <div class="fac-table-wrap">
+        <table class="fac-ro-table">
+          <thead>
+            <tr><th>Numéro</th><th class="td-right">Montant (CFA)</th><th class="td-right">Remboursé</th>
+              <th>Mode</th><th>Caisse</th><th>Établi par</th><th>Date</th><th>Cause</th></tr>
+          </thead>
+          <tbody>
+            {% for av in avoirs %}
+            <tr>
+              <td style="font-family: var(--font-mono);font-weight:600;color:var(--accent-text-soft);">{{ av.numero }}</td>
+              <td class="td-right td-accent">{{ av.montant|floatformat:0 }}</td>
+              <td class="td-right">{{ av.montant_rembourse|floatformat:0 }}</td>
+              <td>{% if av.montant_rembourse %}{{ av.mode_remboursement_libelle }}{% else %}—{% endif %}</td>
+              <td>{{ av.session.journee.caisse.nom|default:"—" }}</td>
+              <td>{{ av.cree_par.get_full_name|default:av.cree_par.username }}</td>
+              <td style="white-space:nowrap;">{{ av.date_creation|date:"d/m/Y H:i" }}</td>
+              <td>{{ av.motif }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
     </div>
 
     <!-- ── Onglet 5 : Info de l'hôpital ── -->
@@ -718,7 +746,7 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
               <option value="{{ caisse.pk }}"
                       data-modes="{{ caisse.modes|join:',' }}">{{ caisse.nom|upper }}</option>
               {% empty %}
-              <option value="">Aucune caisse configurée</option>
+              <option value="">Caisse non ouverte — ouvrez votre session</option>
               {% endfor %}
             </select>
           </div>
@@ -963,6 +991,8 @@ html[data-theme="dark"] .am-hint{color:rgba(255,255,255,.55);}
 html[data-theme="dark"] .am-lbl{color:var(--text);}
 html[data-theme="dark"] .am-textarea{background:var(--surface);border-color:var(--border-strong);color:var(--text);}
 html[data-theme="dark"] .am-footer{border-top-color:var(--border);}
+.am-rembourse{margin:4px 0 12px;padding:10px 12px;border:1px solid rgba(217,147,15,.35);background:rgba(217,147,15,.08);border-radius:8px;}
+.am-rembourse-titre{font-weight:700;font-size:13px;margin-bottom:8px;color:var(--text);}
 </style>
 
 <div class="am-overlay" id="annuler-facture-modal" style="display:none;">
@@ -978,9 +1008,20 @@ html[data-theme="dark"] .am-footer{border-top-color:var(--border);}
         <p class="am-hint">
           La facture cessera de compter dans le total facturé et dans l'encaissé,
           et les produits déjà sortis reviennent en stock.
-          {% if facture.montant_paye %}Le patient a réglé
-          {{ facture.montant_paye|floatformat:0 }} F : pensez au remboursement.{% endif %}
+          {% if facture.statut != 'brouillon' %}Un avoir sera établi.{% endif %}
         </p>
+        {% if facture.montant_paye and facture.statut != 'brouillon' %}
+        <div class="am-rembourse">
+          <div class="am-rembourse-titre">Remboursement : {{ facture.montant_paye|floatformat:0 }} F à rendre au patient</div>
+          <label class="am-lbl" for="am-mode">Mode de remboursement</label>
+          <select name="mode_remboursement" id="am-mode" class="am-textarea" style="min-height:0;">
+            {% for code, libelle in modes_paiement %}<option value="{{ code }}">{{ libelle }}</option>{% endfor %}
+          </select>
+          <label class="am-lbl" for="am-ref" style="margin-top:8px;">Référence (n° de transaction…)</label>
+          <input type="text" name="reference_remboursement" id="am-ref" class="am-textarea" style="min-height:0;">
+          <div class="am-hint" style="margin-top:6px;">En espèces, l'argent sort de <b>votre</b> pochette : votre caisse doit être ouverte.</div>
+        </div>
+        {% endif %}
         <label class="am-lbl" for="am-motif">Cause d'annulation <span style="color:var(--rose-text);">*</span></label>
         <textarea name="motif_annulation" id="am-motif" class="am-textarea" rows="3" required
                   placeholder="Précisez la raison de l'annulation…"></textarea>

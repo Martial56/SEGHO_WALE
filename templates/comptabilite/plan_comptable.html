@@ -1,0 +1,65 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Plan comptable{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.pc-classe td { background: rgba(var(--teal-500-rgb), .06); font-weight: 800; }
+.pc-num { font-family: var(--font-mono, monospace); font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:1150px;">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Plan comptable SYCEBNL</h1>
+      <div class="cpt-sub">Structure OHADA des entités à but non lucratif. Les écritures automatiques n'utilisent que les comptes désignés dans les <a href="{% url 'comptabilite:correspondances' %}">correspondances</a>.</div>
+    </div>
+    <form method="get" class="cpt-actions">
+      <input type="search" name="q" value="{{ q }}" class="cpt-input" placeholder="Numéro ou intitulé" style="font-size:13px;padding:6px 8px;">
+      <button class="cpt-btn">Chercher</button>
+    </form>
+  </div>
+
+  {% if nb_a_valider %}
+  <div class="cpt-alerte"><b>{{ nb_a_valider }} compte{{ nb_a_valider|pluralize }} à confirmer par l'expert-comptable</b> (marqués ⚠) : ce sont les comptes propres au non-lucratif — fonds associatifs, dons, subventions, partenaires — dont la numérotation SYCEBNL exacte doit être vérifiée avant la première clôture.</div>
+  {% endif %}
+
+  <div class="cpt-grid2" style="grid-template-columns:2fr 1fr;align-items:start;">
+    <div class="cpt-card">
+      <table class="cpt-table">
+        <thead><tr><th>Numéro</th><th>Intitulé</th><th>État</th></tr></thead>
+        <tbody>
+          {% for c in comptes %}
+          {% ifchanged c.classe %}<tr class="pc-classe"><td colspan="3">Classe {{ c.classe }}</td></tr>{% endifchanged %}
+          <tr {% if peut_modifier %}class="lien" onclick="location.href='{% url 'comptabilite:compte_modifier' c.pk %}'"{% endif %}>
+            <td class="pc-num">{{ c.numero }}</td>
+            <td>{{ c.intitule }}{% if c.a_valider %} <span title="À confirmer par l'expert-comptable">⚠</span>{% endif %}</td>
+            <td>{% if c.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
+          </tr>
+          {% empty %}<tr><td colspan="3" class="cpt-vide">Aucun compte.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if peut_modifier %}
+    <form method="post" class="cpt-card">
+      {% csrf_token %}
+      <h2>{% if objet %}Modifier le compte {{ objet.numero }}{% else %}Nouveau compte{% endif %}</h2>
+      <div class="cpt-field"><label for="{{ form.numero.id_for_label }}">Numéro</label>{{ form.numero }}
+        {% if form.numero.errors %}<div class="ecart-neg" style="font-size:12px;">{{ form.numero.errors.0 }}</div>{% endif %}</div>
+      <div class="cpt-field"><label for="{{ form.intitule.id_for_label }}">Intitulé</label>{{ form.intitule }}
+        {% if form.intitule.errors %}<div class="ecart-neg" style="font-size:12px;">{{ form.intitule.errors.0 }}</div>{% endif %}</div>
+      <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.actif }} Compte actif</label></div>
+      <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.a_valider }} À confirmer par l'expert-comptable</label></div>
+      <div class="cpt-actions">
+        <button class="cpt-btn primaire">{% if objet %}Enregistrer{% else %}Ajouter{% endif %}</button>
+        {% if objet %}<a href="{% url 'comptabilite:plan_comptable' %}" class="cpt-btn">Nouveau compte</a>{% endif %}
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

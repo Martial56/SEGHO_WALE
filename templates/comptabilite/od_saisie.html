@@ -1,0 +1,85 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Opération diverse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.od-table input { width: 100%; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; }
+.od-table input.num { text-align: right; }
+.od-table td { padding: 4px 6px; }
+.od-total { font-weight: 800; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:1100px;">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Opération diverse</h1>
+      <div class="cpt-sub">Salaires, loyers, régularisations… L'opération est enregistrée en brouillon, puis validée au passage des écritures.</div>
+    </div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:ecritures' %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  <form method="post" class="cpt-card" id="form-od">
+    {% csrf_token %}
+    <div class="cpt-grid2" style="grid-template-columns:repeat(4,1fr);">
+      <div class="cpt-field"><label>Journal</label>
+        <select name="journal" class="cpt-input">
+          {% for j in journaux %}<option value="{{ j.pk }}" {% if post.journal == j.pk|stringformat:'s' or not post.journal and j == journal_defaut %}selected{% endif %}>{{ j.code }} — {{ j.libelle }}</option>{% endfor %}
+        </select></div>
+      <div class="cpt-field"><label>Date</label><input type="date" name="date" class="cpt-input" value="{% if post.date %}{{ post.date }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}"></div>
+      <div class="cpt-field"><label>Pièce</label><input type="text" name="piece" class="cpt-input" value="{{ post.piece }}" placeholder="N° de pièce"></div>
+      <div class="cpt-field"><label>Libellé</label><input type="text" name="libelle" class="cpt-input" value="{{ post.libelle }}" required placeholder="Ex. Salaires d'octobre"></div>
+    </div>
+
+    <datalist id="liste-comptes">{% for c in comptes %}<option value="{{ c.numero }} {{ c.intitule }}">{% endfor %}</datalist>
+    <table class="cpt-table od-table">
+      <thead><tr><th style="width:30%;">Compte</th><th>Libellé de ligne</th><th>Tiers</th><th class="num" style="width:13%;">Débit</th><th class="num" style="width:13%;">Crédit</th></tr></thead>
+      <tbody id="od-lignes">
+        {% for l in lignes %}
+        <tr>
+          <td><input list="liste-comptes" name="compte_{{ forloop.counter0 }}" value="{{ l.compte }}" placeholder="Numéro ou intitulé"></td>
+          <td><input name="libelle_{{ forloop.counter0 }}" value="{{ l.libelle }}"></td>
+          <td><input name="tiers_{{ forloop.counter0 }}" value="{{ l.tiers }}"></td>
+          <td><input class="num montant" data-sens="debit" name="debit_{{ forloop.counter0 }}" value="{{ l.debit }}" inputmode="decimal"></td>
+          <td><input class="num montant" data-sens="credit" name="credit_{{ forloop.counter0 }}" value="{{ l.credit }}" inputmode="decimal"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="3"><button type="button" class="cpt-btn" id="ajouter">+ Ligne</button> <span id="od-equilibre" class="cpt-note"></span></td>
+        <td class="num od-total" id="total-debit">0</td><td class="num od-total" id="total-credit">0</td></tr></tfoot>
+    </table>
+    <div style="margin-top:12px;"><button class="cpt-btn primaire">Enregistrer en brouillon</button></div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR');
+  var corps = document.getElementById('od-lignes');
+  function nombre(v) { return parseFloat(String(v || '0').replace(/\s/g, '').replace(',', '.')) || 0; }
+  function totaliser() {
+    var d = 0, c = 0;
+    corps.querySelectorAll('.montant').forEach(function (i) { if (i.dataset.sens === 'debit') d += nombre(i.value); else c += nombre(i.value); });
+    document.getElementById('total-debit').textContent = fmt.format(d);
+    document.getElementById('total-credit').textContent = fmt.format(c);
+    var e = document.getElementById('od-equilibre');
+    e.textContent = d === c ? (d ? 'Équilibrée' : '') : 'Écart : ' + fmt.format(Math.abs(d - c));
+    e.className = d === c ? 'ecart-nul' : 'ecart-neg';
+  }
+  corps.addEventListener('input', totaliser);
+  document.getElementById('ajouter').addEventListener('click', function () {
+    var n = corps.querySelectorAll('tr').length;
+    var tr = corps.querySelector('tr').cloneNode(true);
+    tr.querySelectorAll('input').forEach(function (i) { i.name = i.name.replace(/_\d+$/, '_' + n); i.value = ''; });
+    corps.appendChild(tr);
+  });
+  totaliser();
+})();
+</script>
+{% endblock %}

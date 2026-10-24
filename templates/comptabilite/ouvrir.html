@@ -1,0 +1,91 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Ouvrir ma caisse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.caisse-choix { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.caisse-opt { position: relative; display: block; cursor: pointer; }
+.caisse-opt input { position: absolute; opacity: 0; }
+.caisse-opt .boite { display: block; background: var(--surface); border: 2px solid var(--border); border-radius: 10px; padding: 14px 16px; transition: border-color .12s, background .12s; }
+.caisse-opt:hover .boite { border-color: var(--teal-400); }
+.caisse-opt input:checked + .boite { border-color: var(--teal-600); background: rgba(var(--teal-500-rgb), .07); }
+.caisse-opt input:focus-visible + .boite { outline: 2px solid var(--teal-500); outline-offset: 2px; }
+.caisse-nom { font-size: 15px; font-weight: 800; color: var(--text); }
+.caisse-etat { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.caisse-etat b { color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:760px;">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Ouvrir ma caisse</h1>
+      <div class="cpt-sub">{{ user.get_full_name|default:user.username }} — {{ aujourdhui|date:"l j F Y" }}</div>
+    </div>
+  </div>
+
+  {% if choix %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ suite }}">
+
+    <div class="cpt-card">
+      <h2>1. Caisse utilisée</h2>
+      <div class="caisse-choix">
+        {% for c in choix %}
+        <label class="caisse-opt">
+          <input type="radio" name="caisse" value="{{ c.caisse.pk }}" data-fonds="{{ c.fonds|floatformat:0 }}"
+                 {% if forloop.first and choix|length == 1 %}checked{% endif %} required>
+          <span class="boite">
+            <span class="caisse-nom">{{ c.caisse.nom }}</span>
+            <span class="caisse-etat" style="display:block;">
+              {% if c.journee and c.journee.statut == 'cloturee' %}
+                Journée clôturée
+              {% elif c.presentes %}
+                En service avec <b>{{ c.presentes|join:", " }}</b>
+              {% else %}
+                Personne n'est encore sur cette caisse aujourd'hui
+              {% endif %}
+            </span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="cpt-note">Plusieurs caissières peuvent travailler sur la même caisse : chacune garde ses espèces dans sa propre pochette et clôture sa propre session.</div>
+    </div>
+
+    <div class="cpt-card">
+      <h2>2. Fonds de caisse</h2>
+      <div class="cpt-field" style="max-width:280px;">
+        <label for="fonds">Monnaie reçue dans votre pochette (F CFA)</label>
+        <input class="cpt-input" type="number" min="0" step="5" id="fonds" name="fonds_initial" value="0" required>
+      </div>
+      <div class="cpt-note">Comptez la monnaie remise avant de commencer : elle sera retirée de votre comptage à la clôture.</div>
+    </div>
+
+    <button type="submit" class="cpt-btn primaire"><i class="bi bi-unlock"></i> Ouvrir ma session</button>
+  </form>
+  {% else %}
+  <div class="cpt-card cpt-vide">
+    Aucune caisse active ne vous est attribuée.<br>
+    Demandez à un administrateur de vous désigner sur une caisse (Comptabilité → Configuration → Caisses).
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Le fonds proposé est celui de votre dernière session sur la caisse choisie.
+document.querySelectorAll('input[name="caisse"]').forEach(function (r) {
+  function poser() { if (r.checked) document.getElementById('fonds').value = r.dataset.fonds || 0; }
+  r.addEventListener('change', poser);
+  poser();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Écriture comptable{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ ecriture.libelle }}
+        <span class="cpt-badge {% if ecriture.statut == 'validee' %}validee{% else %}cloturee{% endif %}">{{ ecriture.get_statut_display }}</span></h1>
+      <div class="cpt-sub">{{ ecriture.reference }} · journal {{ ecriture.journal }} · {{ ecriture.date|date:"d/m/Y" }}{% if ecriture.piece %} · pièce {{ ecriture.piece }}{% endif %} · exercice {{ ecriture.exercice }}</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:ecritures' %}" class="cpt-btn">Toutes les écritures</a>
+      {% if peut_passer %}
+        {% if ecriture.statut == 'brouillon' %}
+        <form method="post" action="{% url 'comptabilite:ecriture_action' ecriture.pk %}">{% csrf_token %}
+          <button name="action" value="valider" class="cpt-btn primaire" onclick="return confirm('Valider cette écriture ? Elle sera numérotée et ne pourra plus être modifiée.');"><i class="bi bi-check2"></i> Valider</button>
+          <button name="action" value="supprimer" class="cpt-btn danger" onclick="return confirm('Supprimer ce brouillon ?');">Supprimer</button>
+        </form>
+        {% elif not contre_passee_par %}
+        <form method="post" action="{% url 'comptabilite:ecriture_action' ecriture.pk %}">{% csrf_token %}
+          <button name="action" value="contre_passer" class="cpt-btn danger" onclick="return confirm('Préparer la contre-passation de cette écriture ?');"><i class="bi bi-arrow-counterclockwise"></i> Contre-passer</button>
+        </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% if ecriture.contre_passation_de %}<div class="cpt-alerte">Contre-passation de <a href="{% url 'comptabilite:ecriture' ecriture.contre_passation_de.pk %}">{{ ecriture.contre_passation_de.reference }}</a>.</div>{% endif %}
+  {% if contre_passee_par %}<div class="cpt-alerte">Cette écriture a été contre-passée par <a href="{% url 'comptabilite:ecriture' contre_passee_par.pk %}">{{ contre_passee_par.reference }}</a>.</div>{% endif %}
+
+  <div class="cpt-card">
+    <table class="cpt-table">
+      <thead><tr><th>Compte</th><th>Intitulé</th><th>Libellé</th><th>Tiers</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr><td><b>{{ l.compte.numero }}</b></td><td>{{ l.compte.intitule }}</td><td>{{ l.libelle }}</td><td>{{ l.tiers }}</td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td>
+          <td class="num">{% if l.credit %}{{ l.credit|floatformat:0|intcomma }}{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="4">Totaux (F CFA)</td><td class="num">{{ debit|floatformat:0|intcomma }}</td><td class="num">{{ credit|floatformat:0|intcomma }}</td></tr></tfoot>
+    </table>
+  </div>
+
+  <div class="cpt-card cpt-note">
+    {% if ecriture.origine %}Générée automatiquement depuis « {{ ecriture.origine }} ».{% else %}Saisie par {{ ecriture.cree_par.get_full_name|default:ecriture.cree_par.username|default:"—" }}.{% endif %}
+    Créée le {{ ecriture.date_creation|date:"d/m/Y à H:i" }}.
+    {% if ecriture.validee_par %}Validée par {{ ecriture.validee_par.get_full_name|default:ecriture.validee_par.username }} le {{ ecriture.date_validation|date:"d/m/Y à H:i" }}.{% endif %}
+  </div>
+</div>
+{% endblock %}

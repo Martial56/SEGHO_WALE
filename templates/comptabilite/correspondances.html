@@ -1,0 +1,39 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Correspondances comptables{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Correspondances comptables</h1>
+      <div class="cpt-sub">Le compte utilisé par les écritures automatiques pour chaque événement. Un changement vaut pour les écritures générées ensuite ; celles déjà créées gardent leur compte.</div>
+    </div>
+  </div>
+
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <table class="cpt-table">
+      <thead><tr><th>Événement</th><th>Clé</th><th style="width:45%;">Compte</th></tr></thead>
+      <tbody>
+        {% for corr in lignes %}
+        <tr>
+          <td>{{ corr.libelle }}</td>
+          <td class="cpt-note">{{ corr.cle }}</td>
+          <td>{% if peut_modifier %}
+            <select name="corr_{{ corr.pk }}" class="cpt-input" style="width:100%;font-size:13px;padding:6px 8px;">
+              {% for c in comptes %}<option value="{{ c.pk }}" {% if c.pk == corr.compte_id %}selected{% endif %}>{{ c.numero }} — {{ c.intitule }}</option>{% endfor %}
+            </select>
+            {% else %}{{ corr.compte }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if peut_modifier %}<div style="margin-top:12px;"><button class="cpt-btn primaire">Enregistrer</button></div>{% endif %}
+  </form>
+</div>
+{% endblock %}

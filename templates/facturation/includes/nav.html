@@ -1,14 +1,24 @@
-{% load static %}
+{% load static comptabilite_menu %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
-{% with uname=request.resolver_match.url_name %}
+{% with uname=request.resolver_match.url_name ns=request.resolver_match.namespace %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
     <i class="bi bi-grid-3x3-gap-fill"></i>
   </a>
   <span class="o-nav-brand">
-    <i class="bi bi-receipt"></i>
-    Facturation
+    <i class="bi bi-calculator"></i>
+    Comptabilité
   </span>
+
+  {% comment %}Ma caisse : la session de la caissière (module Comptabilité).
+  Les entrées suivent les droits — encaisser, superviser — et la case de
+  masquage par groupe, comme les autres menus.{% endcomment %}
+  {% if perms.facturation.can_encaisser and 'comptabilite.caisse' not in hidden_navitem_codes %}
+  <a href="{% url 'comptabilite:ma_caisse' %}"
+    class="o-nav-link {% if ns == 'comptabilite' and uname != 'journees' and uname != 'journee' %}active{% endif %}">
+    Ma caisse
+  </a>
+  {% endif %}
   {% if 'facturation.list' not in hidden_navitem_codes %}
   {% comment %}
   Marqué actif sur tout ce qui n'est pas un écran de caisse, plutôt que sur une
@@ -17,30 +27,111 @@
   l'onglet éteint. Écrit ainsi, toute route ajoutée au module l'allume d'office.
   {% endcomment %}
   <a href="{% url 'facturation:list' %}"
-    class="o-nav-link {% if uname|slice:':6' != 'caisse' %}active{% endif %}">
+    class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' != 'caisse' %}active{% endif %}">
     Factures
   </a>
+  {% endif %}
+
+  {% if perms.facturation.can_encaisser or perms.comptabilite.superviser_caisse %}
+  {% if 'comptabilite.journees' not in hidden_navitem_codes %}
+  <a href="{% url 'comptabilite:journees' %}"
+    class="o-nav-link {% if uname == 'journees' or uname == 'journee' %}active{% endif %}">
+    Journées de caisse
+  </a>
+  {% endif %}
+  {% endif %}
+
+  {% if perms.facturation.view_facture or perms.comptabilite.superviser_caisse %}
+  {% if 'comptabilite.gratuites' not in hidden_navitem_codes %}
+  <a href="{% url 'comptabilite:gratuites' %}"
+    class="o-nav-link {% if uname == 'gratuites' %}active{% endif %}">
+    Gratuités
+  </a>
+  {% endif %}
+  {% endif %}
+
+  {% if perms.comptabilite.view_ecriture and 'comptabilite.ecritures' not in hidden_navitem_codes %}
+  <a href="{% url 'comptabilite:ecritures' %}"
+    class="o-nav-link {% if uname == 'ecritures' or uname == 'ecriture' or uname == 'od_saisie' %}active{% endif %}">
+    Écritures
+  </a>
+  {% endif %}
+
+  {% comment %}Sous-menu « États », construit depuis le registre des états
+  (comptabilite.etats.ETATS) : chaque entrée suit les droits de son écran, et
+  le menu disparaît si l'utilisateur n'en voit aucun.{% endcomment %}
+  {% if 'comptabilite.etats' not in hidden_navitem_codes %}
+  {% menu_etats request.user as groupes_etats %}
+  {% if groupes_etats %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname == 'etats' or uname == 'etat' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      États
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      {% for titre_groupe, etats_groupe in groupes_etats %}
+      <div class="o-nav-dd-section">{{ titre_groupe }}</div>
+      {% for code, e in etats_groupe %}
+      <a href="{% url 'comptabilite:etat' code %}"
+         class="{% if uname == 'etat' and request.resolver_match.kwargs.code == code %}active{% endif %}">
+        <i class="bi {{ e.icone }}" style="font-size:12px;"></i> {{ e.titre }}
+      </a>
+      {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
   {% endif %}
 
   {% comment %}Menu Configuration, sur le modèle de l'hospitalisation : chaque
   entrée suit la permission de consultation du modèle qu'elle ouvre, et le menu
   disparaît entièrement quand aucune n'est accordée.{% endcomment %}
-  {% if perms.facturation.view_caisse %}
+  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
   {% if 'facturation.config' not in hidden_navitem_codes %}
-  <div class="o-nav-dropdown" id="fac-config-wrap">
+  <div class="o-nav-dropdown" data-nav-dropdown>
     <button type="button"
-            class="o-nav-link {% if uname|slice:':6' == 'caisse' %}active{% endif %}"
-            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;"
-            onclick="toggleFacConfig(event)">
+            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
       Configuration
       <i class="bi bi-chevron-down" style="font-size:10px;"></i>
     </button>
-    <div class="o-nav-dropdown-menu" id="fac-config-dropdown">
+    <div class="o-nav-dropdown-menu">
       <div class="o-nav-dd-section">Encaissement</div>
+      {% if perms.facturation.view_caisse %}
       <a href="{% url 'facturation:caisses_list' %}"
-         class="{% if uname|slice:':6' == 'caisse' %}active{% endif %}">
+         class="{% if ns == 'facturation' and uname|slice:':6' == 'caisse' %}active{% endif %}">
         <i class="bi bi-cash-stack" style="font-size:12px;"></i> Caisses
       </a>
+      {% endif %}
+      {% if perms.comptabilite.change_motifsortie %}
+      <a href="{% url 'comptabilite:motifs' 'sortie' %}"
+         class="{% if uname|slice:':5' == 'motif' and request.resolver_match.kwargs.nature == 'sortie' %}active{% endif %}">
+        <i class="bi bi-box-arrow-up-right" style="font-size:12px;"></i> Motifs de sortie de caisse
+      </a>
+      {% endif %}
+      {% if perms.comptabilite.change_motifgratuite %}
+      <a href="{% url 'comptabilite:motifs' 'gratuite' %}"
+         class="{% if uname|slice:':5' == 'motif' and request.resolver_match.kwargs.nature == 'gratuite' %}active{% endif %}">
+        <i class="bi bi-heart" style="font-size:12px;"></i> Motifs de gratuité
+      </a>
+      {% endif %}
+      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
+      <div class="o-nav-dd-section">Comptabilité générale</div>
+      {% if perms.comptabilite.view_compte %}
+      <a href="{% url 'comptabilite:plan_comptable' %}"
+         class="{% if uname == 'plan_comptable' or uname == 'compte_modifier' %}active{% endif %}">
+        <i class="bi bi-list-ol" style="font-size:12px;"></i> Plan comptable
+      </a>
+      {% endif %}
+      {% if perms.comptabilite.view_correspondance %}
+      <a href="{% url 'comptabilite:correspondances' %}"
+         class="{% if uname == 'correspondances' %}active{% endif %}">
+        <i class="bi bi-diagram-3" style="font-size:12px;"></i> Correspondances
+      </a>
+      {% endif %}
+      {% endif %}
     </div>
   </div>
   {% endif %}
@@ -49,16 +140,25 @@
 {% endwith %}
 
 <script>
+// Menus déroulants de la barre (États, Configuration) : un clic ouvre le sien
+// et referme les autres ; un clic ailleurs les referme tous.
 (function () {
-  var wrap     = document.getElementById('fac-config-wrap');
-  var dropdown = document.getElementById('fac-config-dropdown');
-  if (!wrap || !dropdown) return;
-  window.toggleFacConfig = function (e) {
-    e.stopPropagation();
-    dropdown.classList.toggle('open');
-  };
-  document.addEventListener('click', function (e) {
-    if (!wrap.contains(e.target)) dropdown.classList.remove('open');
+  var menus = document.querySelectorAll('.o-nav [data-nav-dropdown]');
+  function fermer(sauf) {
+    menus.forEach(function (m) {
+      if (m !== sauf) m.querySelector('.o-nav-dropdown-menu').classList.remove('open');
+    });
+  }
+  menus.forEach(function (menu) {
+    menu.querySelector('button').addEventListener('click', function (e) {
+      e.stopPropagation();
+      fermer(menu);
+      menu.querySelector('.o-nav-dropdown-menu').classList.toggle('open');
+    });
   });
+  document.addEventListener('click', function (e) {
+    menus.forEach(function (m) { if (!m.contains(e.target)) fermer(null); });
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') fermer(null); });
 })();
 </script>

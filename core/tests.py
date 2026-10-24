@@ -880,8 +880,16 @@ class TestLesLignesArriventAuDepliage(TestCase):
         requête de comptage des réceptions d'achats à intégrer (module
         Achats rendu indépendant de Stock) — une requête en moins sur
         chaque page, sans rapport avec le balayage surveillé ici.
+
+        Remonté de 24 à 25 avec les sessions de caisse (module Comptabilité) :
+        pour qui a le droit d'encaisser, chaque page cherche la session ouverte
+        afin de l'afficher dans la barre du haut. Même requête qu'on déplie un
+        parent ou une feuille — l'écart surveillé reste nul.
+
+        Puis de 25 à 26 avec le motif de remise (`Facture.motif_remise`) : un
+        champ lié de plus, dont le filtre personnalisé propose les valeurs.
         """
-        with self.assertNumQueries(24):
+        with self.assertNumQueries(26):
             self.client.get(self.url + '&group=type&_groupe=0')
 
     def test_un_sous_groupe_rend_bien_les_siennes(self):

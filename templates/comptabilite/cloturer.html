@@ -1,0 +1,112 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Clôture de session{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.bil-table td input { width: 90px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 14px; text-align: right; }
+.bil-table td input:focus { outline: none; border-color: var(--teal-500); }
+.bil-bilan { position: sticky; top: calc(var(--header-h, 0px) + 60px); }
+.bil-ligne { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); }
+.bil-ligne:last-child { border-bottom: none; }
+.bil-ligne b { font-variant-numeric: tabular-nums; }
+.bil-ecart { font-size: 22px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Clôturer la session — {{ session.nom_caissiere }}</h1>
+      <div class="cpt-sub">{{ session.caisse.nom }} · session {{ session.numero }} · ouverte le {{ session.date_ouverture|date:"d/m/Y à H:i" }}</div>
+    </div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:session' session.pk %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  {% include 'comptabilite/includes/resume_session.html' %}
+
+  {% if resume.sorties_en_attente %}
+  <div class="cpt-alerte">{{ resume.sorties_en_attente|length }} sortie(s) de caisse attendent la décision du superviseur.
+    Faites-les valider ou annulez-les depuis la <a href="{% url 'comptabilite:session' session.pk %}">fiche de la session</a> avant de clôturer.</div>
+  {% endif %}
+
+  <form method="post" id="form-cloture">
+    {% csrf_token %}
+    <div class="cpt-grid2">
+      <div class="cpt-card">
+        <h2>Comptage de la pochette</h2>
+        <table class="cpt-table bil-table">
+          <thead><tr><th>Coupure</th><th>Nombre</th><th class="num">Montant</th></tr></thead>
+          <tbody>
+            {% for c in coupures %}
+            <tr>
+              <td>{{ c.libelle }}</td>
+              <td><input type="number" min="0" step="1" inputmode="numeric" name="n_{{ c.cle }}" value="{{ c.saisi }}" data-valeur="{{ c.valeur }}" placeholder="0"></td>
+              <td class="num" data-sous-total>0 F</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div>
+        <div class="cpt-card bil-bilan">
+          <h2>Bilan</h2>
+          <div class="bil-ligne"><span>Espèces attendues</span><b id="attendu" data-montant="{{ resume.especes_attendues|floatformat:0 }}">{{ resume.especes_attendues|floatformat:0|intcomma }} F</b></div>
+          <div class="bil-ligne"><span>Espèces comptées</span><b id="compte">0 F</b></div>
+          <div class="bil-ligne"><span>Écart</span><b id="ecart" class="bil-ecart">0 F</b></div>
+
+          <div class="cpt-field" style="margin-top:14px;">
+            <label for="justification">Justification de l'écart</label>
+            <textarea class="cpt-textarea" id="justification" name="justification" placeholder="Obligatoire si le comptage ne tombe pas juste">{{ justification }}</textarea>
+          </div>
+
+          {% if d_office %}
+          <div class="cpt-field">
+            <label for="motif_office">Motif de la clôture d'office <span style="color:#dc2626;">*</span></label>
+            <textarea class="cpt-textarea" id="motif_office" name="motif_office" required placeholder="Caissière absente, comptage fait devant témoin…">{{ motif_office }}</textarea>
+          </div>
+          {% endif %}
+
+          <button type="submit" class="cpt-btn primaire" style="width:100%;justify-content:center;"
+                  onclick="return confirm('Clôturer la session ? Les montants seront figés.');">
+            <i class="bi bi-lock"></i> Clôturer la session
+          </button>
+          <div class="cpt-note" style="margin-top:8px;">Après clôture, imprimez le bilan et remettez votre pochette au superviseur.</div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR');
+  var attendu = parseInt(document.getElementById('attendu').dataset.montant, 10) || 0;
+  var champs = document.querySelectorAll('input[data-valeur]');
+  function calculer() {
+    var total = 0;
+    champs.forEach(function (c) {
+      var n = parseInt(c.value, 10) || 0;
+      var st = n * parseInt(c.dataset.valeur, 10);
+      total += st;
+      c.closest('tr').querySelector('[data-sous-total]').textContent = fmt.format(st) + ' F';
+    });
+    var ecart = total - attendu;
+    document.getElementById('compte').textContent = fmt.format(total) + ' F';
+    var e = document.getElementById('ecart');
+    e.textContent = (ecart > 0 ? '+' : '') + fmt.format(ecart) + ' F';
+    e.className = 'bil-ecart ' + (ecart < 0 ? 'ecart-neg' : ecart > 0 ? 'ecart-pos' : 'ecart-nul');
+    document.getElementById('justification').required = ecart !== 0;
+  }
+  champs.forEach(function (c) { c.addEventListener('input', calculer); });
+  calculer();
+})();
+</script>
+{% endblock %}

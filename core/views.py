@@ -44,6 +44,11 @@ def login_view(request):
         if user is not None:
             login(request, user)
             next_url = _resolve_next_url(request, request.POST.get('next'))
+            # Une caissière choisit sa caisse avant toute chose : l'écran
+            # d'ouverture la renvoie ensuite là où elle voulait aller.
+            from comptabilite.caisse import doit_ouvrir_sa_caisse
+            if doit_ouvrir_sa_caisse(user):
+                next_url = f"{reverse('comptabilite:ouvrir')}?{urlencode({'next': next_url})}"
             return redirect(f"{reverse('intro')}?{urlencode({'next': next_url})}")
         else:
             error = "Identifiant ou mot de passe incorrect."

@@ -57,6 +57,33 @@ classes du corps et du pied sont ceux qu'attend mdBindConfigForm.
   </div>
 
   <div class="form-field">
+    <label class="field-label" for="{{ form.seuil_sortie.id_for_label }}">Seuil de validation des sorties (F CFA)</label>
+    {{ form.seuil_sortie }}
+    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+      Une sortie de caisse (petite dépense) au-delà de ce montant attend la
+      validation d'un superviseur avant de quitter la pochette.
+    </div>
+    {% if form.seuil_sortie.errors %}<div class="field-error">{{ form.seuil_sortie.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
+    <label class="field-label">Caissières habilitées</label>
+    <div class="cfg-modes">
+      {% for choix in form.caissiers %}
+      <label class="cfg-mode">{{ choix.tag }} {{ choix.choice_label }}</label>
+      {% empty %}
+      <div style="font-size:12px;color:var(--text-muted);">Aucun utilisateur n'a encore le droit d'encaisser.</div>
+      {% endfor %}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+      Plusieurs caissières peuvent travailler en même temps sur la même caisse,
+      chacune avec sa propre session et sa propre pochette. Aucune cochée :
+      toute personne ayant le droit d'encaisser peut l'utiliser.
+    </div>
+    {% if form.caissiers.errors %}<div class="field-error">{{ form.caissiers.errors.0 }}</div>{% endif %}
+  </div>
+
+  <div class="form-field">
     <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
       {{ form.actif }} Caisse active
     </label>

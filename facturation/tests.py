@@ -41,7 +41,7 @@ def _acte(suffix=''):
     )
 
 
-def _caisse_user(username):
+def _caisse_user(username, avec_session=True):
     """Utilisateur habilité à encaisser.
 
     Le groupe porte volontairement un nom fantaisiste : c'est la permission qui
@@ -58,7 +58,33 @@ def _caisse_user(username):
         Permission.objects.get(content_type__app_label='facturation',
                                codename='add_facture'))
     user.groups.add(groupe)
+    if avec_session:
+        _ouvrir_session(user)
     return user
+
+
+def _ouvrir_session(user, caisse=None):
+    """Ouvre la session de caisse sans laquelle aucun encaissement ne passe
+    (module Comptabilité). Par défaut sur une caisse de test commune."""
+    from comptabilite.caisse import ouvrir_session
+    if caisse is None:
+        caisse, _ = Caisse.objects.get_or_create(code='TEST', defaults={'nom': 'Caisse test'})
+    # Objet neuf : le cache des permissions ne verrait pas le groupe ajouté.
+    return ouvrir_session(User.objects.get(pk=user.pk), caisse, Decimal('0'))
+
+
+def _session_sur(username, caisse):
+    """Place la caissière sur `caisse` : elle clôture sa session en cours si
+    elle est sur une autre caisse, puis en ouvre une sur celle-ci — c'est ainsi
+    qu'on change de caisse depuis les sessions."""
+    from comptabilite.caisse import cloturer_session, session_ouverte
+    user = User.objects.get(username=username)
+    session = session_ouverte(user)
+    if session and session.journee.caisse_id == caisse.pk:
+        return session
+    if session:
+        cloturer_session(session, user, {}, Decimal('0'), justification='changement de caisse')
+    return _ouvrir_session(user, caisse)
 
 
 # ─── Tests can_manage_paiement ──────────────────────────────────────────────────
@@ -607,13 +633,13 @@ class TestConfigurationCaisses(TestCase):
     # ── Ce que voit l'écran de facturation ──
     def test_seules_les_caisses_actives_sont_proposees_a_l_encaissement(self):
         Caisse.objects.create(nom='Caisse fermée', code='OLD1', actif=False)
+        # La caisse se choisit à l'ouverture de session : une caisse
+        # désactivée n'y est plus proposée.
         client = self._client('u_cfg_gest')
         client.force_login(User.objects.create_superuser('su_cfg', password='x'))
-        contenu = client.get(
-            reverse('facturation:create') + '?patient=%s' % _patient('CFG').pk
-        ).content.decode()
-        self.assertIn('CAISSE PRINCIPALE', contenu)
-        self.assertNotIn('CAISSE FERMÉE', contenu)
+        contenu = client.get(reverse('comptabilite:ouvrir')).content.decode()
+        self.assertIn('Caisse principale', contenu)
+        self.assertNotIn('Caisse fermée', contenu)
 
     def test_les_permissions_sont_en_francais(self):
         # Le libellé est ce que lit la personne qui compose un groupe.
@@ -635,12 +661,17 @@ class TestCaisseDuPaiement(TestCase):
     Le champ « Journal » existait sur les deux écrans d'encaissement, mais le
     navigateur ne le transmettait pas et le serveur ne le lisait pas : le choix
     du caissier était perdu, et `Paiement` n'avait aucun lien vers une caisse.
+
+    Depuis les sessions de caisse (module Comptabilité), la caisse n'est plus
+    choisie à chaque paiement : c'est celle de la session ouverte par la
+    caissière. Le champ posté est ignoré.
     """
 
     def setUp(self):
         self.patient = _patient('CAI')
         self.caisse = Caisse.objects.create(nom='Caisse Toumbokro', code='CTB1')
-        self.caissier = _caisse_user('u_pay_caisse')
+        self.caissier = _caisse_user('u_pay_caisse', avec_session=False)
+        self.session = _ouvrir_session(self.caissier, self.caisse)
 
     def _client(self):
         client = Client()
@@ -650,10 +681,10 @@ class TestCaisseDuPaiement(TestCase):
     def test_la_modale_de_la_fiche_enregistre_la_caisse(self):
         facture = _facture(self.patient, statut='emise', montant_total=Decimal('3000'))
         self._client().post(reverse('facturation:payer', args=[facture.pk]),
-                            {'pay_journal': str(self.caisse.pk),
-                             'pay_montant': '3000', 'pay_mode': 'especes'})
+                            {'pay_montant': '3000', 'pay_mode': 'especes'})
         paiement = Paiement.objects.get(facture=facture)
         self.assertEqual(paiement.caisse, self.caisse)
+        self.assertEqual(paiement.session, self.session)
 
     def test_la_creation_de_facture_enregistre_la_caisse(self):
         self._client().post(
@@ -662,38 +693,28 @@ class TestCaisseDuPaiement(TestCase):
              'ticket_moderateur': '0', 'notes': '',
              'ligne_libelle_0': 'Consultation', 'ligne_qte_0': '1',
              'ligne_prix_0': '5000', 'ligne_remise_0': '0',
-             'pay_journal': str(self.caisse.pk), 'pay_montant': '5000',
-             'pay_mode': 'especes'})
+             'pay_montant': '5000', 'pay_mode': 'especes'})
         self.assertEqual(Paiement.objects.first().caisse, self.caisse)
 
-    def test_un_journal_illisible_n_empeche_pas_l_encaissement(self):
-        # Perdre un encaissement parce qu'un identifiant est malformé serait
-        # pire que d'enregistrer le paiement sans caisse.
-        facture = _facture(self.patient, statut='emise', montant_total=Decimal('1000'))
-        self._client().post(reverse('facturation:payer', args=[facture.pk]),
-                            {'pay_journal': 'nimporte-quoi',
-                             'pay_montant': '1000', 'pay_mode': 'especes'})
-        paiement = Paiement.objects.get(facture=facture)
-        self.assertIsNone(paiement.caisse)
+    def test_un_journal_poste_ne_detourne_pas_le_paiement(self):
+        # Une autre caisse postée à la main (ou un identifiant illisible) ne
+        # change rien : l'argent est dans la pochette de la session.
+        autre = Caisse.objects.create(nom='Caisse Pharmacie', code='PHA')
+        for journal in (str(autre.pk), 'nimporte-quoi'):
+            facture = _facture(self.patient, statut='emise', montant_total=Decimal('1000'))
+            self._client().post(reverse('facturation:payer', args=[facture.pk]),
+                                {'pay_journal': journal, 'pay_montant': '1000',
+                                 'pay_mode': 'especes'})
+            self.assertEqual(Paiement.objects.get(facture=facture).caisse, self.caisse)
 
-    def test_une_caisse_inexistante_n_empeche_pas_l_encaissement(self):
-        facture = _facture(self.patient, statut='emise', montant_total=Decimal('500'))
-        self._client().post(reverse('facturation:payer', args=[facture.pk]),
-                            {'pay_journal': '999999',
-                             'pay_montant': '500', 'pay_mode': 'especes'})
-        self.assertIsNone(Paiement.objects.get(facture=facture).caisse)
-
-    def test_supprimer_une_caisse_ne_supprime_pas_ses_paiements(self):
-        # SET_NULL et non CASCADE : l'historique comptable survit au ménage
-        # dans la configuration.
-        facture = _facture(self.patient, statut='emise', montant_total=Decimal('2000'))
-        self._client().post(reverse('facturation:payer', args=[facture.pk]),
-                            {'pay_journal': str(self.caisse.pk),
-                             'pay_montant': '2000', 'pay_mode': 'especes'})
-        self.caisse.delete()
-        paiement = Paiement.objects.get(facture=facture)
-        self.assertEqual(paiement.montant, Decimal('2000'))
-        self.assertIsNone(paiement.caisse)
+    def test_une_caisse_utilisee_ne_se_supprime_pas(self):
+        # L'historique des sessions survit au ménage dans la configuration :
+        # une caisse qui a servi se désactive, elle ne se supprime pas.
+        su = User.objects.create_superuser('su_del_cai', password='x')
+        client = Client()
+        client.force_login(su)
+        client.post(reverse('facturation:caisse_delete', args=[self.caisse.pk]))
+        self.assertTrue(Caisse.objects.filter(pk=self.caisse.pk).exists())
 
     def test_la_fiche_facture_propose_les_vraies_caisses(self):
         # L'écran proposait cinq journaux écrits en dur, dont aucun n'existait
@@ -749,6 +770,7 @@ class TestTotalEncaisse(TestCase):
 
     def _encaisser(self, montant, caisse):
         facture = _facture(self.patient, statut='emise', montant_total=Decimal(montant))
+        _session_sur('u_tot_caisse', caisse)
         client = Client()
         client.login(username='u_tot_caisse', password='x')
         client.post(reverse('facturation:payer', args=[facture.pk]),
@@ -858,7 +880,7 @@ class TestPeriodeDesCaisses(TestCase):
         self.patient = _patient('PER')
         self.caisse = Caisse.objects.create(nom='Caisse accueil', code='CAC1')
         self.dormante = Caisse.objects.create(nom='Caisse pharmacie', code='CPH2')
-        _caisse_user('u_per_caisse')
+        _caisse_user('u_per_caisse', avec_session=False)
         self.client = Client()
         self.client.force_login(User.objects.create_superuser('su_per', password='x'))
 
@@ -869,6 +891,7 @@ class TestPeriodeDesCaisses(TestCase):
         le modèle ne retouche pas, et non par `save`.
         """
         facture = _facture(self.patient, statut='emise', montant_total=Decimal(montant))
+        _session_sur('u_per_caisse', caisse)
         client = Client()
         client.login(username='u_per_caisse', password='x')
         client.post(reverse('facturation:payer', args=[facture.pk]),
@@ -1067,7 +1090,9 @@ class TestModesParCaisse(TestCase):
         self.caisse.save()
         facture = _facture(self.patient, statut='emise', montant_total=Decimal('1000'))
         client = self._client()
-        client.force_login(User.objects.create_superuser('su_mod', password='x'))
+        su = User.objects.create_superuser('su_mod', password='x')
+        _ouvrir_session(su, self.caisse)
+        client.force_login(su)
         contenu = client.get(reverse('facturation:detail', args=[facture.pk])).content.decode()
         self.assertIn('data-modes="especes,bon"', contenu)
 
@@ -1110,6 +1135,7 @@ class TestMonnaieARendre(TestCase):
 
     def _encaisser(self, montant, **extra):
         facture = _facture(self.patient, statut='emise', montant_total=Decimal(montant))
+        _session_sur('u_mon_caisse', self.caisse)
         client = Client()
         client.login(username='u_mon_caisse', password='x')
         donnees = {'pay_journal': str(self.caisse.pk), 'pay_montant': str(montant),
@@ -1603,9 +1629,15 @@ class TestOngletActifDuModule(TestCase):
         """(Factures actif ?, Configuration actif ?) lus dans le balisage."""
         html = self.client.get(url).content.decode()
         nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
-        etats = re.findall(r'class="(o-nav-link ?[a-z]*)"', nav)
-        self.assertEqual(len(etats), 2, nav)
-        return tuple('active' in e for e in etats)
+        # Lus par libellé : le module Comptabilité ajoute « Ma caisse » et
+        # « Journées de caisse » autour des deux onglets de la facturation.
+        etats = {libelle.strip(): 'active' in classe for classe, libelle in re.findall(
+            r'class="(o-nav-link ?[a-z]*)"[^>]*>\s*([^<]+?)\s*<', nav)}
+        self.assertIn('Factures', etats, nav)
+        self.assertIn('Configuration', etats, nav)
+        actifs = [nom for nom, actif in etats.items() if actif]
+        self.assertLessEqual(len(actifs), 1, nav)
+        return etats['Factures'], etats['Configuration']
 
     def test_l_onglet_factures_est_allume_sur_la_liste(self):
         self.assertEqual(self._onglets(reverse('facturation:list')), (True, False))
@@ -1703,6 +1735,7 @@ class TestProduitsSurLaFacture(TestCase):
             code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
 
         self.user = User.objects.create_superuser('su_prod', password='x')
+        _ouvrir_session(self.user)
         profil = self.user.profile
         profil.centres.add(self.toumbokro, self.yamoussoukro)
         profil.centre_actif = self.toumbokro
@@ -2282,11 +2315,11 @@ class TestAnnulationDUneFacture(TestCase):
             Permission.objects.get(content_type__app_label='facturation',
                                    codename='can_annuler_facture'))
 
-    def _annuler(self, username, motif='Patient remboursé'):
+    def _annuler(self, username, motif='Patient remboursé', **extra):
         client = Client()
         client.login(username=username, password='x')
         return client.post(reverse('facturation:annuler', args=[self.facture.pk]),
-                           {'motif_annulation': motif}, follow=True)
+                           {'motif_annulation': motif, **extra}, follow=True)
 
     # ── La porte ───────────────────────────────────────────────────────────
 
@@ -2346,7 +2379,9 @@ class TestAnnulationDUneFacture(TestCase):
         self.facture.montant_paye = Decimal('10000')
         self.facture.save(update_fields=['montant_paye'])
         self.assertEqual(self._stats()['montant_recu'], 10000)
-        self._annuler('u_an_avec')
+        # Montant posé à la main : aucune espèce n'est entrée dans la pochette,
+        # le remboursement passe donc par un autre mode (voir comptabilite).
+        self._annuler('u_an_avec', mode_remboursement='mobile_money')
         self.assertEqual(self._stats()['montant_recu'], 0)
 
     def test_la_facture_reste_comptee_dans_le_nombre(self):

@@ -69,6 +69,7 @@ urlpatterns = [
     path('laboratoire/', views.laboratoire_list, name='laboratoire_list'),
     path('hospitalisation/', include('hospitalisation.urls')),
     path('facturation/', include('facturation.urls')),
+    path('comptabilite/', include('comptabilite.urls')),
     path('laboratoire/nouvelle/', views.laboratoire_create, name='laboratoire_create'),
     path('laboratoire/<int:pk>/', views.laboratoire_detail, name='laboratoire_detail'),
     path('laboratoire/<int:pk>/bulletin/', views.laboratoire_bulletin, name='laboratoire_bulletin'),

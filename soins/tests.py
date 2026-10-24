@@ -378,6 +378,10 @@ class TestPaiementDemarreLesProcedures(TestCase):
         self.caissier = User.objects.create_superuser('su_pay', password='x')
         self.client = Client()
         self.client.login(username='su_pay', password='x')
+        # Pas d'encaissement hors session de caisse (module Comptabilité).
+        from comptabilite.caisse import ouvrir_session
+        from facturation.models import Caisse
+        ouvrir_session(self.caissier, Caisse.objects.create(nom='Caisse test', code='TEST'), Decimal('0'))
 
     def _soin_facture(self, montant=Decimal('3000'), nb_lignes=2):
         facture = _facture(self.patient, statut='emise', montant_total=montant)

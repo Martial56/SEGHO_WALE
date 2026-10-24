@@ -1,0 +1,36 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Sortie de caisse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:680px;">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Sortie de caisse</h1>
+      <div class="cpt-sub">{{ session.caisse.nom }} · session {{ session.numero }} · disponible dans votre pochette : <b>{{ disponible|floatformat:0|intcomma }} F</b></div>
+    </div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:session' session.pk %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="cpt-card">
+    {% csrf_token %}
+    {% for champ in form %}
+    <div class="cpt-field">
+      <label for="{{ champ.id_for_label }}">{{ champ.label }}{% if champ.field.required %} <span style="color:#dc2626;">*</span>{% endif %}</label>
+      {{ champ }}
+      {% if champ.errors %}<div class="ecart-neg" style="font-size:12px;">{{ champ.errors.0 }}</div>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="cpt-note" style="margin-bottom:12px;">
+      Jusqu'à <b>{{ session.caisse.seuil_sortie|floatformat:0|intcomma }} F</b>, la sortie est payée tout de suite.
+      Au-delà, elle attend la validation du superviseur : ne remettez pas l'argent avant.
+    </div>
+    <button type="submit" class="cpt-btn primaire"><i class="bi bi-box-arrow-up-right"></i> Enregistrer la sortie</button>
+  </form>
+</div>
+{% endblock %}

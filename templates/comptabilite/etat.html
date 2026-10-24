@@ -1,0 +1,105 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}{{ etat.titre }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.et-barre { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.et-barre .cpt-field { margin: 0; }
+.et-barre .cpt-input { font-size: 13px; padding: 6px 8px; }
+.et-chip { padding: 6px 11px; border-radius: 7px; border: 1px solid var(--border); font-size: 12.5px; font-weight: 700; color: var(--text); text-decoration: none; background: var(--surface); }
+.et-chip.active { background: var(--teal-600); border-color: var(--teal-600); color: #fff; }
+.et-table tr.groupe td { background: rgba(var(--teal-500-rgb), .07); font-weight: 800; }
+.et-table tr.sous_total td { font-weight: 700; border-top: 1px solid var(--border); }
+.et-table tr.total td { font-weight: 800; border-top: 2px solid var(--text-muted); }
+.et-entete-impr { display: none; }
+@media print {
+  .o-nav, .topbar, .no-print, .django-messages, .messages { display: none !important; }
+  body { padding-top: 0 !important; background: #fff !important; }
+  .cpt-page { max-width: none; padding: 0; }
+  .cpt-card { border: none; padding: 0; margin-bottom: 12px; break-inside: auto; }
+  .et-table { font-size: 10.5px; }
+  .et-table td, .et-table th { padding: 3px 6px; }
+  .et-entete-impr { display: block; margin-bottom: 10px; }
+  a { color: inherit; text-decoration: none; }
+  @page { size: A4 {% if code == 'balance' or code == 'recettes' %}landscape{% endif %}; margin: 12mm; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:1300px;">
+  <div class="et-entete-impr">
+    <b>Centre Médico-Social WALÉ</b> — {{ etat.titre }}<br>
+    Période du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }} · imprimé le {{ imprime_le|date:"d/m/Y à H:i" }}
+  </div>
+
+  <div class="cpt-head no-print">
+    <div>
+      <h1 class="cpt-title">{{ etat.titre }}</h1>
+      <div class="cpt-sub">Du {{ debut|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }} · {{ definition.description }}</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:etats' %}" class="cpt-btn">Tous les états</a>
+      <button type="button" class="cpt-btn" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer / PDF</button>
+      <a href="?{{ request.GET.urlencode }}{% if request.GET %}&{% endif %}format=xlsx" class="cpt-btn primaire"><i class="bi bi-file-earmark-excel"></i> Excel</a>
+    </div>
+  </div>
+
+  <form method="get" class="cpt-card et-barre no-print">
+    {% for cle, libelle in periodes %}
+    <a class="et-chip {% if periode == cle %}active{% endif %}" href="?periode={{ cle }}{% if params.caisse %}&caisse={{ params.caisse }}{% endif %}{% if params.journal %}&journal={{ params.journal }}{% endif %}{% if params.compte %}&compte={{ params.compte }}{% endif %}{% if params.brouillons %}&brouillons=1{% endif %}">{{ libelle }}</a>
+    {% endfor %}
+    <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
+    {% if etat.choix_caisse %}
+    <div class="cpt-field"><label>Caisse</label>
+      <select name="caisse" class="cpt-input">{% for c in etat.choix_caisse.caisses %}<option value="{{ c.pk }}" {% if c.pk == etat.choix_caisse.actuelle %}selected{% endif %}>{{ c.nom }}</option>{% endfor %}</select></div>
+    {% endif %}
+    {% if etat.choix_journal %}
+    <div class="cpt-field"><label>Journal</label>
+      <select name="journal" class="cpt-input"><option value="">Tous</option>{% for j in etat.choix_journal.journaux %}<option value="{{ j.code }}" {% if j.code == etat.choix_journal.actuel %}selected{% endif %}>{{ j.code }} — {{ j.libelle }}</option>{% endfor %}</select></div>
+    {% endif %}
+    {% if code == 'grand_livre' or code == 'balance' %}
+    <div class="cpt-field"><label>Comptes commençant par</label><input type="text" name="compte" class="cpt-input" value="{{ params.compte }}" placeholder="ex. 4, 571, 706" style="width:140px;"></div>
+    {% endif %}
+    {% if comptable %}
+    <label class="cpt-note" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="brouillons" value="1" {% if params.brouillons %}checked{% endif %}> Inclure les brouillons</label>
+    {% endif %}
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  {% for t in etat.tableaux %}
+  <div class="cpt-card">
+    <h2>{{ t.titre }}</h2>
+    {% if t.lignes %}
+    <div style="overflow-x:auto;">
+    <table class="cpt-table et-table">
+      <thead><tr>{% for libelle, genre in t.colonnes %}<th {% if genre != 'texte' %}class="num"{% endif %}>{{ libelle }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for l in t.lignes %}
+        <tr class="{{ l.type }}{% if l.lien %} lien{% endif %}" {% if l.lien %}onclick="location.href='{{ l.lien }}'"{% endif %}>
+          {% if l.type == 'groupe' %}
+          <td colspan="{{ t.colonnes|length }}">{{ l.cellules.0 }}</td>
+          {% else %}
+          {% for valeur, genre in l.paires %}
+          <td {% if genre != 'texte' %}class="num"{% endif %}>{% if valeur is None or valeur == '' %}{% elif genre == 'montant' %}{{ valeur|floatformat:0|intcomma }}{% elif genre == 'nombre' %}{{ valeur|intcomma }}{% else %}{{ valeur }}{% endif %}</td>
+          {% endfor %}
+          {% if l.vide_apres > 0 %}<td colspan="{{ l.vide_apres }}"></td>{% endif %}
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}<div class="cpt-vide">{{ t.vide }}</div>{% endif %}
+  </div>
+  {% empty %}
+  <div class="cpt-card cpt-vide">Rien à afficher.</div>
+  {% endfor %}
+
+  {% if etat.notes %}<div class="cpt-card cpt-note">{% for n in etat.notes %}<div>{{ n }}</div>{% endfor %}</div>{% endif %}
+</div>
+{% endblock %}

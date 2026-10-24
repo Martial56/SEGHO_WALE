@@ -1,0 +1,152 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Session de caisse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ session.caisse.nom }} — {{ session.nom_caissiere }}
+        <span class="cpt-badge {{ session.statut }}">{{ session.get_statut_display }}</span></h1>
+      <div class="cpt-sub">
+        Session {{ session.numero }} · journée du {{ session.journee.date_journee|date:"d/m/Y" }}
+        · ouverte à {{ session.date_ouverture|date:"H:i" }}
+        {% if session.date_cloture %}· clôturée à {{ session.date_cloture|date:"H:i" }}{% endif %}
+      </div>
+    </div>
+    <div class="cpt-actions">
+      {% if session.est_ouverte %}
+        {% if est_la_mienne and session.est_du_jour %}
+        <a href="{% url 'facturation:list' %}" class="cpt-btn"><i class="bi bi-receipt"></i> Factures à encaisser</a>
+        <a href="{% url 'comptabilite:sortie_creer' session.pk %}" class="cpt-btn"><i class="bi bi-box-arrow-up-right"></i> Sortie de caisse</a>
+        {% endif %}
+        {% if est_la_mienne or peut_superviser %}
+        <a href="{% url 'comptabilite:cloturer' session.pk %}" class="cpt-btn primaire"><i class="bi bi-lock"></i> Clôturer{% if not est_la_mienne %} d'office{% endif %}</a>
+        {% endif %}
+      {% else %}
+        <a href="{% url 'comptabilite:imprimer' session.pk %}" target="_blank" class="cpt-btn"><i class="bi bi-printer"></i> Imprimer le bilan</a>
+      {% endif %}
+      <a href="{% url 'comptabilite:journee' session.journee.pk %}" class="cpt-btn"><i class="bi bi-calendar3"></i> Journée de la caisse</a>
+    </div>
+  </div>
+
+  {% if session.est_ouverte and not session.est_du_jour %}
+  <div class="cpt-alerte">Cette session date du {{ session.journee.date_journee|date:"d/m/Y" }}. Elle doit être clôturée avant tout nouvel encaissement.</div>
+  {% endif %}
+
+  {% if not session.est_ouverte %}
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Espèces attendues</div><div class="v">{{ session.montant_theorique|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Espèces comptées</div><div class="v">{{ session.montant_compte|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi accent"><div class="l">Écart</div>
+      <div class="v {% if session.ecart < 0 %}ecart-neg{% elif session.ecart > 0 %}ecart-pos{% else %}ecart-nul{% endif %}">{% if session.ecart > 0 %}+{% endif %}{{ session.ecart|floatformat:0|intcomma }} F</div>
+      {% if session.justification_ecart %}<div class="s">{{ session.justification_ecart }}</div>{% endif %}
+    </div>
+    <div class="cpt-kpi"><div class="l">Clôturée par</div><div class="v" style="font-size:14px;">{{ session.cloturee_par.get_full_name|default:session.cloturee_par.username }}</div>
+      {% if session.cloture_d_office %}<div class="s">D'office : {{ session.motif_cloture_d_office }}</div>{% endif %}</div>
+  </div>
+  {% endif %}
+
+  {% include 'comptabilite/includes/resume_session.html' %}
+
+  {% if billetage %}
+  <div class="cpt-card">
+    <h2>Comptage de la pochette</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Coupure</th><th class="num">Nombre</th><th class="num">Montant</th></tr></thead>
+      <tbody>{% for b in billetage %}<tr><td>{{ b.libelle }}</td><td class="num">{{ b.nombre }}</td><td class="num">{{ b.total|intcomma }} F</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td colspan="2">Total compté</td><td class="num">{{ session.montant_compte|floatformat:0|intcomma }} F</td></tr></tfoot>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="cpt-card">
+    <h2>Encaissements de la session</h2>
+    {% if resume.paiements %}
+    <table class="cpt-table">
+      <thead><tr><th>Heure</th><th>Paiement</th><th>Facture</th><th>Patient</th><th>Mode</th><th class="num">Montant</th></tr></thead>
+      <tbody>
+        {% for p in resume.paiements %}
+        <tr class="lien" onclick="location.href='{% url 'facturation:detail' p.facture_id %}'">
+          <td>{{ p.date_paiement|date:"H:i" }}</td>
+          <td>{{ p.numero }}</td>
+          <td>{{ p.facture.numero }}{% if p.facture.statut == 'annulee' %} <span class="cpt-badge cloturee">annulée</span>{% endif %}</td>
+          <td>{{ p.facture.patient.nom }} {{ p.facture.patient.prenoms }}</td>
+          <td>{{ p.get_mode_paiement_display }}</td>
+          <td class="num">{{ p.montant|floatformat:0|intcomma }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun encaissement pour l'instant.</div>{% endif %}
+  </div>
+
+  {% if resume.sorties %}
+  <div class="cpt-card">
+    <h2>Sorties de caisse</h2>
+    <table class="cpt-table">
+      <thead><tr><th>N°</th><th>Heure</th><th>Motif</th><th>Objet</th><th>Bénéficiaire</th><th>État</th><th class="num">Montant</th><th></th></tr></thead>
+      <tbody>
+        {% for s in resume.sorties %}
+        <tr>
+          <td>{{ s.numero }}</td>
+          <td>{{ s.date_demande|date:"H:i" }}</td>
+          <td>{{ s.motif }}</td>
+          <td>{{ s.libelle }}{% if s.justificatif %} · <a href="{{ s.justificatif.url }}" target="_blank">justificatif</a>{% endif %}
+            {% if s.observation %}<div class="cpt-note">{{ s.observation }}</div>{% endif %}</td>
+          <td>{{ s.beneficiaire|default:"—" }}</td>
+          <td><span class="cpt-badge {% if s.statut == 'payee' %}validee{% elif s.statut == 'en_attente' %}cloturee{% else %}ouverte{% endif %}">{{ s.get_statut_display }}</span></td>
+          <td class="num">{{ s.montant|floatformat:0|intcomma }} F</td>
+          <td>{% if s.statut == 'en_attente' and est_la_mienne %}
+            <form method="post" action="{% url 'comptabilite:sortie_annuler' s.pk %}" onsubmit="return confirm('Annuler cette demande ?');">{% csrf_token %}<button class="cpt-btn" style="padding:3px 8px;font-size:11px;">Annuler</button></form>
+          {% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if resume.avoirs %}
+  <div class="cpt-card">
+    <h2>Remboursements (avoirs)</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Avoir</th><th>Heure</th><th>Facture</th><th>Patient</th><th>Mode</th><th class="num">Remboursé</th></tr></thead>
+      <tbody>
+        {% for a in resume.avoirs %}
+        <tr class="lien" onclick="location.href='{% url 'facturation:detail' a.facture_id %}'">
+          <td>{{ a.numero }}</td><td>{{ a.date_creation|date:"H:i" }}</td><td>{{ a.facture.numero }}</td>
+          <td>{{ a.facture.patient.nom }} {{ a.facture.patient.prenoms }}</td>
+          <td>{{ a.mode_remboursement_libelle|default:"—" }}</td>
+          <td class="num">{{ a.montant_rembourse|floatformat:0|intcomma }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if session.statut == 'cloturee' and peut_superviser %}
+  <div class="cpt-card">
+    <h2>Validation du superviseur</h2>
+    <form method="post" action="{% url 'comptabilite:valider' session.pk %}">
+      {% csrf_token %}
+      <div class="cpt-field"><label for="obs">Observation (facultative)</label>
+        <textarea class="cpt-textarea" id="obs" name="observation" placeholder="Pochette reçue, comptage vérifié…"></textarea></div>
+      <button type="submit" class="cpt-btn primaire"><i class="bi bi-check2-circle"></i> Valider la session</button>
+    </form>
+  </div>
+  {% elif session.statut == 'validee' %}
+  <div class="cpt-card">
+    <h2>Validation</h2>
+    <div>Validée par <b>{{ session.validee_par.get_full_name|default:session.validee_par.username }}</b> le {{ session.date_validation|date:"d/m/Y à H:i" }}.</div>
+    {% if session.observation_validation %}<div class="cpt-note" style="margin-top:6px;">{{ session.observation_validation }}</div>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

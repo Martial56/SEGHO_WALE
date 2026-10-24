@@ -1,0 +1,63 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}{{ titre }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ titre }}</h1>
+      <div class="cpt-sub">
+        {% if nature == 'sortie' %}Raisons pour lesquelles de l'argent sort d'une pochette de caisse.
+        {% else %}Raisons d'une remise ou d'une gratuité, avec la remise maximale permise.{% endif %}
+        Un motif déjà utilisé se désactive, il ne se supprime pas.
+      </div>
+    </div>
+  </div>
+
+  <div class="cpt-grid2">
+    <div class="cpt-card">
+      <h2>Motifs</h2>
+      <table class="cpt-table">
+        <thead><tr><th>Libellé</th>{% if nature == 'gratuite' %}<th class="num">Remise max.</th>{% endif %}<th>État</th></tr></thead>
+        <tbody>
+          {% for m in motifs %}
+          <tr class="lien" onclick="location.href='{% url 'comptabilite:motif_modifier' nature m.pk %}'">
+            <td>{{ m.libelle }}</td>
+            {% if nature == 'gratuite' %}<td class="num">{{ m.remise_max|floatformat:"-2" }} %</td>{% endif %}
+            <td>{% if m.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="cpt-vide">Aucun motif.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <form method="post" class="cpt-card">
+      {% csrf_token %}
+      <h2>{% if objet %}Modifier « {{ objet }} »{% else %}Nouveau motif{% endif %}</h2>
+      {% for champ in form %}
+      <div class="cpt-field">
+        {% if champ.field.widget.input_type == 'checkbox' %}
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--text);">{{ champ }} {{ champ.label }}</label>
+        {% else %}
+        <label for="{{ champ.id_for_label }}">{{ champ.label }}</label>
+        {{ champ }}
+        {% endif %}
+        {% if champ.help_text %}<div class="cpt-note">{{ champ.help_text }}</div>{% endif %}
+        {% if champ.errors %}<div class="ecart-neg" style="font-size:12px;">{{ champ.errors.0 }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="cpt-actions">
+        <button type="submit" class="cpt-btn primaire">{% if objet %}Enregistrer{% else %}Ajouter{% endif %}</button>
+        {% if objet %}<a href="{% url 'comptabilite:motifs' nature %}" class="cpt-btn">Nouveau motif</a>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

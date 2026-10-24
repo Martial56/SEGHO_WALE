@@ -1,0 +1,117 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Écritures comptables{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.ecr-filtres { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.ecr-filtres .cpt-field { margin: 0; }
+.ecr-filtres .cpt-input { font-size: 13px; padding: 6px 8px; }
+.ecr-lignes td { font-size: 12px; padding: 3px 10px; color: var(--text-muted); border-bottom: none; }
+.ecr-lignes td.cpte { font-family: var(--font-mono, monospace); color: var(--text); }
+.ecr-tete td { border-bottom: none; padding-top: 10px; }
+.ecr-sep td { padding: 0; border-bottom: 1px solid var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:1250px;">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Écritures comptables</h1>
+      <div class="cpt-sub">{{ nb_brouillons }} écriture{{ nb_brouillons|pluralize }} en brouillon au total, en attente du passage.</div>
+    </div>
+    <div class="cpt-actions">
+      {% if perms.comptabilite.add_ecriture %}<a href="{% url 'comptabilite:od_saisie' %}" class="cpt-btn"><i class="bi bi-plus-lg"></i> Opération diverse</a>{% endif %}
+    </div>
+  </div>
+
+  {% if peut_passer %}
+  <form method="post" class="cpt-card ecr-filtres">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="generer">
+    <div style="flex-basis:100%;"><h2 style="margin:0;">Générer les écritures</h2>
+      <div class="cpt-note">Crée en brouillon les écritures des factures, paiements, avoirs, remboursements, sorties et écarts de caisse de la période. Relancer ne crée jamais de doublon.</div></div>
+    <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut_exercice|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ aujourdhui|date:'Y-m-d' }}"></div>
+    <button class="cpt-btn primaire"><i class="bi bi-gear"></i> Générer</button>
+  </form>
+  {% endif %}
+
+  <form method="get" class="cpt-card ecr-filtres">
+    <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Journal</label>
+      <select name="journal" class="cpt-input"><option value="">Tous</option>
+        {% for j in journaux %}<option value="{{ j.code }}" {% if j.code == code_journal %}selected{% endif %}>{{ j.code }} — {{ j.libelle }}</option>{% endfor %}
+      </select></div>
+    <div class="cpt-field"><label>État</label>
+      <select name="statut" class="cpt-input">
+        <option value="brouillon" {% if statut == 'brouillon' %}selected{% endif %}>Brouillons</option>
+        <option value="validee" {% if statut == 'validee' %}selected{% endif %}>Validées</option>
+        <option value="tout" {% if statut == 'tout' %}selected{% endif %}>Toutes</option>
+      </select></div>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="valider">
+    <div class="cpt-head" style="margin-bottom:8px;">
+      <h2 style="margin:0;">{{ page.paginator.count }} écriture{{ page.paginator.count|pluralize }}</h2>
+      {% if peut_passer and statut != 'validee' %}
+      <div class="cpt-actions">
+        <label class="cpt-note" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="tout-cocher"> Tout cocher</label>
+        <button class="cpt-btn primaire" onclick="return confirm('Valider les écritures cochées ? Elles seront numérotées et ne pourront plus être modifiées.');"><i class="bi bi-check2-all"></i> Valider la sélection</button>
+      </div>
+      {% endif %}
+    </div>
+    {% if page.object_list %}
+    <table class="cpt-table">
+      <thead><tr><th></th><th>Date</th><th>Journal</th><th>N°</th><th>Pièce</th><th>Libellé / comptes</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead>
+      <tbody>
+        {% for e in page.object_list %}
+        <tr class="ecr-tete">
+          <td>{% if peut_passer and e.statut == 'brouillon' %}<input type="checkbox" name="ecriture" value="{{ e.pk }}" class="case-ecr">{% endif %}</td>
+          <td>{{ e.date|date:"d/m/Y" }}</td>
+          <td><b>{{ e.journal.code }}</b></td>
+          <td>{% if e.numero %}{{ e.numero }}{% else %}<span class="cpt-badge cloturee">brouillon</span>{% endif %}</td>
+          <td>{{ e.piece }}</td>
+          <td><a href="{% url 'comptabilite:ecriture' e.pk %}"><b>{{ e.libelle }}</b></a></td>
+          <td class="num"><b>{{ e.total|floatformat:0|intcomma }}</b></td><td class="num"><b>{{ e.total|floatformat:0|intcomma }}</b></td>
+        </tr>
+        {% for l in e.lignes.all %}
+        <tr class="ecr-lignes"><td></td><td></td><td></td><td></td><td></td>
+          <td class="cpte">{{ l.compte.numero }} <span style="font-family:inherit;color:var(--text-muted);">{{ l.compte.intitule }}</span></td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td>
+          <td class="num">{% if l.credit %}{{ l.credit|floatformat:0|intcomma }}{% endif %}</td></tr>
+        {% endfor %}
+        <tr class="ecr-sep"><td colspan="8"></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if page.has_other_pages %}
+    <div class="cpt-actions" style="margin-top:10px;">
+      {% if page.has_previous %}<a class="cpt-btn" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page.previous_page_number }}">Précédent</a>{% endif %}
+      <span class="cpt-note">Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+      {% if page.has_next %}<a class="cpt-btn" href="?{% if request.GET.urlencode %}{{ request.GET.urlencode }}&{% endif %}page={{ page.next_page_number }}">Suivant</a>{% endif %}
+    </div>
+    {% endif %}
+    {% else %}<div class="cpt-vide">Aucune écriture pour ces critères.</div>{% endif %}
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var tout = document.getElementById('tout-cocher');
+  if (tout) tout.addEventListener('change', function () {
+    document.querySelectorAll('.case-ecr').forEach(function (c) { c.checked = tout.checked; });
+  });
+})();
+</script>
+{% endblock %}

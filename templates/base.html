@@ -1065,6 +1065,19 @@
             <!--{% block topbar_title %}{% endblock %}-->
         </div>
         <div class="topbar-right">
+            {% comment %}Session de caisse (module Comptabilité) : où va l'argent
+            encaissé, ou l'invitation à ouvrir sa caisse.{% endcomment %}
+            {% if session_caisse and not doit_ouvrir_caisse %}
+            <a href="{% url 'comptabilite:session' session_caisse.pk %}" class="top-alert-badge" title="Ma session de caisse">
+                <span class="dot" style="background:#16a96b;">F</span>
+                {{ session_caisse.caisse.nom }} · depuis {{ session_caisse.date_ouverture|date:"H:i" }}
+            </a>
+            {% elif doit_ouvrir_caisse %}
+            <a href="{% if session_caisse %}{% url 'comptabilite:cloturer' session_caisse.pk %}{% else %}{% url 'comptabilite:ouvrir' %}{% endif %}" class="top-alert-badge" title="Aucun encaissement possible sans session de caisse">
+                <span class="dot dot-amber">!</span>
+                {% if session_caisse %}Clôturer ma session de la veille{% else %}Ouvrir ma caisse{% endif %}
+            </a>
+            {% endif %}
             <!-- Messagerie -->
             <button class="icon-btn" title="Messagerie">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

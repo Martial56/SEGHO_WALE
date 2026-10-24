@@ -384,7 +384,12 @@ function confirmDelete() {
     method: 'POST',
     headers: {'X-Requested-With': 'XMLHttpRequest'},
     body: fd,
-  }).then(function () { window.location.reload(); });
+  }).then(function (r) { return r.json().catch(function () { return {}; }); })
+    .then(function (data) {
+      // Une caisse déjà utilisée en session ne se supprime pas : on le dit.
+      if (data && data.ok === false && data.message) { closeDeleteModal(); alert(data.message); return; }
+      window.location.reload();
+    });
 }
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') closeDeleteModal();

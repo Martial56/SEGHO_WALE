@@ -81,6 +81,12 @@ class Facture(ModeleCentre):
     statut = models.CharField(max_length=20, choices=STATUT, default='brouillon')
     notes = models.TextField(blank=True)
     cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    # Obligatoire dès qu'une ligne porte une remise (voir
+    # comptabilite.gratuites) : la facture garde le prix plein, le motif dit
+    # pourquoi le patient paie moins.
+    motif_remise = models.ForeignKey(
+        'comptabilite.MotifGratuite', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='factures', verbose_name="Motif de remise / gratuité")
 
     def save(self, *args, **kwargs):
         if not self.numero:
@@ -245,6 +251,12 @@ class Paiement(ModeleCentre):
     caisse = models.ForeignKey(
         'facturation.Caisse', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='paiements', verbose_name="Caisse")
+    # Session de la caissière qui a encaissé (comptabilite.SessionCaissiere) :
+    # c'est elle qui dit, pour une caisse partagée, qui a reçu l'argent. Vide
+    # pour les paiements antérieurs aux sessions de caisse.
+    session = models.ForeignKey(
+        'comptabilite.SessionCaissiere', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='paiements', verbose_name="Session de caisse")
     # Ce que le patient a tendu, quand il a payé en espèces. `montant` reste ce
     # qui était dû : compter le billet entier gonflerait la caisse de la monnaie
     # rendue. Nul sur les autres modes, où il n'y a pas de monnaie.
@@ -313,6 +325,17 @@ class Caisse(models.Model):
     modes_paiement = models.CharField(
         max_length=200, blank=True, default='especes',
         verbose_name="Modes de paiement acceptés")
+    # Personnes habilitées à ouvrir une session sur cette caisse. Aucune
+    # désignée : toute personne ayant le droit d'encaisser peut l'utiliser
+    # (voir comptabilite.caisse.caisses_autorisees).
+    caissiers = models.ManyToManyField(
+        User, blank=True, related_name='caisses_habilitees',
+        verbose_name="Caissières habilitées")
+    # Une sortie de caisse (petite dépense) au-delà de ce montant attend la
+    # validation d'un superviseur avant de quitter la pochette.
+    seuil_sortie = models.DecimalField(
+        max_digits=15, decimal_places=2, default=10000,
+        verbose_name="Seuil de validation des sorties (F)")
 
     def __str__(self): return self.nom
 

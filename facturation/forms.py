@@ -1,4 +1,6 @@
 from django import forms
+from django.contrib.auth.models import User
+from django.db.models import Q
 from .models import Facture, Caisse, Paiement
 
 
@@ -6,7 +8,7 @@ class FactureForm(forms.ModelForm):
     class Meta:
         model = Facture
         fields = ['type_facture', 'date_echeance', 'montant_assurance',
-                  'ticket_moderateur', 'notes']
+                  'ticket_moderateur', 'notes', 'motif_remise']
         widgets = {
             'date_echeance': forms.DateInput(
                 attrs={'type': 'date'},
@@ -31,6 +33,16 @@ class FactureForm(forms.ModelForm):
             self.fields['type_facture'].widget.attrs['autocomplete'] = 'off'
         if not is_admin:
             self.fields.pop('type_facture', None)
+        # Motifs actifs, plus celui déjà posé sur la facture s'il a été
+        # désactivé depuis : le rouvrir ne doit pas le perdre.
+        from django.db.models import Q
+        from comptabilite.models import MotifGratuite
+        actuel = Q(pk=self.instance.motif_remise_id) if self.instance.motif_remise_id else Q(pk__in=[])
+        champ = self.fields['motif_remise']
+        champ.queryset = MotifGratuite.objects.filter(Q(actif=True) | actuel)
+        champ.empty_label = '— Aucune remise —'
+        champ.label_from_instance = lambda m: (f'{m.libelle} (max {m.remise_max:g} %)'
+                                               if m.remise_max < 100 else m.libelle)
 
 
 class CaisseForm(forms.ModelForm):
@@ -48,7 +60,8 @@ class CaisseForm(forms.ModelForm):
 
     class Meta:
         model = Caisse
-        fields = ['nom', 'code', 'actif', 'modes_paiement']
+        fields = ['nom', 'code', 'actif', 'modes_paiement', 'caissiers', 'seuil_sortie']
+        widgets = {'caissiers': forms.CheckboxSelectMultiple}
         labels = {
             'nom':   "Nom de la caisse",
             'code':  "Code",
@@ -63,10 +76,35 @@ class CaisseForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for nom, champ in self.fields.items():
-            if nom not in ('actif', 'modes_paiement'):
+            if nom not in ('actif', 'modes_paiement', 'caissiers'):
                 champ.widget.attrs.setdefault('class', 'field-ul')
         if self.instance.pk and self.instance.modes_paiement:
             self.initial['modes_paiement'] = self.instance.modes_paiement.split(',')
+        # Ne proposer que les personnes qui ont le droit d'encaisser — plus
+        # celles déjà désignées, pour qu'un droit retiré ne les efface pas en
+        # silence à l'enregistrement suivant.
+        droit = Q(groups__permissions__codename='can_encaisser',
+                  groups__permissions__content_type__app_label='facturation') | Q(
+                  user_permissions__codename='can_encaisser',
+                  user_permissions__content_type__app_label='facturation')
+        deja = Q(pk__in=self.instance.caissiers.values('pk')) if self.instance.pk else Q(pk__in=[])
+        champ = self.fields['caissiers']
+        champ.queryset = (User.objects.filter(is_active=True)
+                          .filter(droit | deja).distinct().order_by('first_name', 'last_name', 'username'))
+        champ.label_from_instance = lambda u: u.get_full_name() or u.username
+        champ.help_text = ("Personnes autorisées à ouvrir une session sur cette caisse. "
+                           "Aucune cochée : toute personne ayant le droit d'encaisser peut l'utiliser.")
+        # Laissé vide, le seuil garde sa valeur : une caisse se configure sans
+        # avoir à le ressaisir à chaque modification.
+        self.fields['seuil_sortie'].required = False
+
+    def clean_seuil_sortie(self):
+        valeur = self.cleaned_data.get('seuil_sortie')
+        if valeur is None:
+            return self.instance.seuil_sortie if self.instance.pk else Caisse._meta.get_field('seuil_sortie').default
+        if valeur < 0:
+            raise forms.ValidationError("Le seuil ne peut pas être négatif.")
+        return valeur
 
     def clean_modes_paiement(self):
         codes = self.cleaned_data.get('modes_paiement') or []

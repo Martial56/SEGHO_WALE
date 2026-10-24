@@ -1,0 +1,134 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilan de caisse {{ session.numero }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
+  .barre { display: flex; align-items: center; gap: 10px; background: #1a5c4a; color: #fff; padding: 10px 24px; position: sticky; top: 0; }
+  .barre span { flex: 1; font-size: 13px; font-weight: 600; }
+  .barre button, .barre a { padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; background: #fff; color: #1a5c4a; }
+  .feuille { width: 210mm; min-height: 297mm; margin: 20px auto; background: #fff; padding: 14mm 14mm; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .entete { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #1a5c4a; padding-bottom: 10px; margin-bottom: 14px; }
+  .entete img { width: 54px; height: 54px; object-fit: contain; }
+  .entete h1 { font-size: 16px; color: #1a5c4a; }
+  .entete p { font-size: 11px; color: #555; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #1a5c4a; margin: 14px 0 6px; }
+  .infos { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 20px; }
+  .infos div b { display: inline-block; min-width: 120px; color: #555; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #cfd6dd; padding: 5px 7px; text-align: left; }
+  th { background: #f1f4f6; font-size: 11px; }
+  .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .total td { font-weight: 800; background: #f7f9fa; }
+  .bilan td { font-size: 13px; }
+  .bilan .ecart td { font-weight: 800; font-size: 14px; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+  .signatures div { border-top: 1px solid #333; padding-top: 6px; text-align: center; height: 70px; }
+  .pied { margin-top: 18px; font-size: 10px; color: #777; }
+  @media print {
+    body { background: #fff; }
+    .barre { display: none; }
+    .feuille { margin: 0; box-shadow: none; width: auto; min-height: 0; padding: 0; }
+    @page { size: A4; margin: 12mm; }
+  }
+</style>
+</head>
+<body>
+<div class="barre">
+  <span>Bilan de caisse — {{ session.numero }}</span>
+  <button onclick="window.print()">Imprimer</button>
+  <a href="{% url 'comptabilite:session' session.pk %}">Retour</a>
+</div>
+
+<div class="feuille">
+  <div class="entete">
+    <img src="{% static 'img/logo.png' %}" alt="Logo">
+    <div>
+      <h1>Bilan de session de caisse</h1>
+      <p>Centre Médico-Social WALÉ{% if session.centre %} — {{ session.centre }}{% endif %}</p>
+    </div>
+  </div>
+
+  <div class="infos">
+    <div><b>Caisse</b> {{ session.caisse.nom }}</div>
+    <div><b>Session</b> {{ session.numero }}</div>
+    <div><b>Caissière</b> {{ session.nom_caissiere }}</div>
+    <div><b>Journée</b> {{ session.journee.date_journee|date:"d/m/Y" }}</div>
+    <div><b>Ouverture</b> {{ session.date_ouverture|date:"d/m/Y H:i" }}</div>
+    <div><b>Clôture</b> {% if session.date_cloture %}{{ session.date_cloture|date:"d/m/Y H:i" }}{% else %}session en cours{% endif %}</div>
+    {% if session.cloture_d_office %}<div style="grid-column:1/-1;"><b>Clôture d'office</b> par {{ session.cloturee_par.get_full_name|default:session.cloturee_par.username }} — {{ session.motif_cloture_d_office }}</div>{% endif %}
+  </div>
+
+  <h2>Encaissements par mode</h2>
+  <table>
+    <tr><th>Mode</th><th class="num">Nombre</th><th class="num">Montant (F CFA)</th></tr>
+    {% for m in resume.par_mode %}<tr><td>{{ m.libelle }}</td><td class="num">{{ m.nb }}</td><td class="num">{{ m.montant|floatformat:0|intcomma }}</td></tr>
+    {% empty %}<tr><td colspan="3">Aucun encaissement.</td></tr>{% endfor %}
+    <tr class="total"><td>Total</td><td class="num">{{ resume.nb_paiements }}</td><td class="num">{{ resume.total_encaisse|floatformat:0|intcomma }}</td></tr>
+  </table>
+
+  {% if resume.par_nature %}
+  <h2>Encaissements par nature</h2>
+  <table>
+    {% for nature, total in resume.par_nature %}<tr><td>{{ nature }}</td><td class="num">{{ total|floatformat:0|intcomma }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  <h2>Espèces de la pochette</h2>
+  <table class="bilan">
+    <tr><td>Fonds de caisse remis</td><td class="num">{{ resume.fonds_initial|floatformat:0|intcomma }}</td></tr>
+    <tr><td>+ Espèces encaissées</td><td class="num">{{ resume.especes_encaissees|floatformat:0|intcomma }}</td></tr>
+    <tr><td>− Remboursements en espèces</td><td class="num">{{ resume.especes_remboursees|floatformat:0|intcomma }}</td></tr>
+    <tr><td>− Sorties de caisse payées</td><td class="num">{{ resume.sorties_payees|floatformat:0|intcomma }}</td></tr>
+    <tr class="total"><td>= Espèces attendues</td><td class="num">{% if session.montant_theorique is not None %}{{ session.montant_theorique|floatformat:0|intcomma }}{% else %}{{ resume.especes_attendues|floatformat:0|intcomma }}{% endif %}</td></tr>
+    <tr><td>Espèces comptées</td><td class="num">{% if session.montant_compte is not None %}{{ session.montant_compte|floatformat:0|intcomma }}{% else %}—{% endif %}</td></tr>
+    <tr class="ecart"><td>Écart</td><td class="num">{% if session.ecart is not None %}{{ session.ecart|floatformat:0|intcomma }}{% else %}—{% endif %}</td></tr>
+  </table>
+  {% if session.justification_ecart %}<p style="margin-top:6px;"><b>Justification :</b> {{ session.justification_ecart }}</p>{% endif %}
+
+  {% if resume.sorties %}
+  <h2>Sorties de caisse</h2>
+  <table>
+    <tr><th>N°</th><th>Motif</th><th>Objet</th><th>État</th><th class="num">Montant</th></tr>
+    {% for s in resume.sorties %}<tr><td>{{ s.numero }}</td><td>{{ s.motif }}</td><td>{{ s.libelle }}{% if s.beneficiaire %} ({{ s.beneficiaire }}){% endif %}</td><td>{{ s.get_statut_display }}</td><td class="num">{{ s.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  {% if resume.avoirs %}
+  <h2>Remboursements</h2>
+  <table>
+    <tr><th>Avoir</th><th>Facture</th><th>Patient</th><th>Mode</th><th class="num">Montant</th></tr>
+    {% for a in resume.avoirs %}<tr><td>{{ a.numero }}</td><td>{{ a.facture.numero }}</td><td>{{ a.facture.patient.nom }} {{ a.facture.patient.prenoms }}</td><td>{{ a.mode_remboursement_libelle }}</td><td class="num">{{ a.montant_rembourse|floatformat:0|intcomma }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  {% if billetage %}
+  <h2>Comptage (billetage)</h2>
+  <table>
+    <tr><th>Coupure</th><th class="num">Nombre</th><th class="num">Montant</th></tr>
+    {% for b in billetage %}<tr><td>{{ b.libelle }}</td><td class="num">{{ b.nombre }}</td><td class="num">{{ b.total|intcomma }}</td></tr>{% endfor %}
+  </table>
+  {% endif %}
+
+  <h2>Détail des encaissements</h2>
+  <table>
+    <tr><th>Heure</th><th>Facture</th><th>Patient</th><th>Mode</th><th class="num">Montant</th></tr>
+    {% for p in resume.paiements %}
+    <tr><td>{{ p.date_paiement|date:"H:i" }}</td><td>{{ p.facture.numero }}{% if p.facture.statut == 'annulee' %} (annulée){% endif %}</td>
+      <td>{{ p.facture.patient.nom }} {{ p.facture.patient.prenoms }}</td><td>{{ p.get_mode_paiement_display }}</td>
+      <td class="num">{{ p.montant|floatformat:0|intcomma }}</td></tr>
+    {% empty %}<tr><td colspan="5">Aucun encaissement.</td></tr>{% endfor %}
+  </table>
+
+  <div class="signatures">
+    <div>La caissière<br>{{ session.nom_caissiere }}</div>
+    <div>Le superviseur{% if session.validee_par %}<br>{{ session.validee_par.get_full_name|default:session.validee_par.username }}{% endif %}</div>
+  </div>
+  <div class="pied">Imprimé le {{ imprime_le|date:"d/m/Y à H:i" }} — SEGHO-WALÉ</div>
+</div>
+</body>
+</html>

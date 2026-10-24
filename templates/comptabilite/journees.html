@@ -1,0 +1,100 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Journées de caisse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Journées de caisse</h1>
+      <div class="cpt-sub">{{ jour|date:"l j F Y" }}</div>
+    </div>
+    <form class="cpt-actions" method="get">
+      <a href="?date={{ veille|date:'Y-m-d' }}" class="cpt-btn" title="Jour précédent"><i class="bi bi-chevron-left"></i></a>
+      <input type="date" name="date" value="{{ jour|date:'Y-m-d' }}" class="cpt-input" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+      {% if jour < aujourdhui %}<a href="?date={{ lendemain|date:'Y-m-d' }}" class="cpt-btn" title="Jour suivant"><i class="bi bi-chevron-right"></i></a>{% endif %}
+      {% if jour != aujourdhui %}<a href="?" class="cpt-btn">Aujourd'hui</a>{% endif %}
+    </form>
+  </div>
+
+  <div class="cpt-card">
+    {% if lignes %}
+    <table class="cpt-table">
+      <thead><tr><th>Caisse</th><th>État</th><th class="num">Sessions</th><th class="num">Paiements</th>
+        <th class="num">Espèces</th><th class="num">Autres modes</th><th class="num">Écart</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:journee' l.journee.pk %}'">
+          <td><b>{{ l.journee.caisse.nom }}</b></td>
+          <td><span class="cpt-badge {{ l.journee.statut }}">{{ l.journee.get_statut_display }}</span></td>
+          <td class="num">{{ l.resume.lignes|length }}</td>
+          <td class="num">{{ l.resume.totaux.nb_paiements }}</td>
+          <td class="num">{{ l.resume.totaux.especes|floatformat:0|intcomma }} F</td>
+          <td class="num">{{ l.resume.totaux.autres|floatformat:0|intcomma }} F</td>
+          <td class="num {% if l.resume.totaux.ecart < 0 %}ecart-neg{% elif l.resume.totaux.ecart > 0 %}ecart-pos{% endif %}">{{ l.resume.totaux.ecart|floatformat:0|intcomma }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cpt-vide">Aucune caisse ouverte ce jour-là.</div>
+    {% endif %}
+  </div>
+
+  {% if sorties_a_valider %}
+  <div class="cpt-card">
+    <h2>Sorties de caisse à valider</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Demande</th><th>Caisse</th><th>Caissière</th><th>Motif / objet</th><th class="num">Montant</th><th>Décision</th></tr></thead>
+      <tbody>
+        {% for s in sorties_a_valider %}
+        <tr>
+          <td>{{ s.numero }}<div class="cpt-note">{{ s.date_demande|date:"d/m H:i" }}</div></td>
+          <td>{{ s.session.caisse.nom }}</td>
+          <td>{{ s.session.nom_caissiere }}</td>
+          <td><b>{{ s.motif }}</b> — {{ s.libelle }}{% if s.beneficiaire %} ({{ s.beneficiaire }}){% endif %}
+            {% if s.justificatif %} · <a href="{{ s.justificatif.url }}" target="_blank">justificatif</a>{% endif %}</td>
+          <td class="num">{{ s.montant|floatformat:0|intcomma }} F</td>
+          <td>
+            <form method="post" action="{% url 'comptabilite:sortie_decider' s.pk %}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <input type="text" name="observation" class="cpt-input" placeholder="Observation (obligatoire si refus)" style="font-size:12px;padding:5px 7px;min-width:180px;">
+              <button name="decision" value="accepter" class="cpt-btn primaire" style="padding:5px 10px;font-size:12px;">Accepter</button>
+              <button name="decision" value="refuser" class="cpt-btn danger" style="padding:5px 10px;font-size:12px;">Refuser</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if a_valider %}
+  <div class="cpt-card">
+    <h2>Sessions clôturées à valider</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Caisse</th><th>Caissière</th><th class="num">Attendu</th><th class="num">Compté</th><th class="num">Écart</th></tr></thead>
+      <tbody>
+        {% for s in a_valider %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:session' s.pk %}'">
+          <td>{{ s.journee.date_journee|date:"d/m/Y" }}</td>
+          <td>{{ s.caisse.nom }}</td>
+          <td>{{ s.nom_caissiere }}</td>
+          <td class="num">{{ s.montant_theorique|floatformat:0|intcomma }} F</td>
+          <td class="num">{{ s.montant_compte|floatformat:0|intcomma }} F</td>
+          <td class="num {% if s.ecart < 0 %}ecart-neg{% elif s.ecart > 0 %}ecart-pos{% else %}ecart-nul{% endif %}">{{ s.ecart|floatformat:0|intcomma }} F</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

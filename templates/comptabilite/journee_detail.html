@@ -1,0 +1,106 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Journée de caisse{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+{% endblock %}
+
+{% block content %}
+{% with t=resume.totaux %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ journee.caisse.nom }} — {{ journee.date_journee|date:"l j F Y" }}
+        <span class="cpt-badge {{ journee.statut }}">{{ journee.get_statut_display }}</span></h1>
+      <div class="cpt-sub">
+        {% if journee.statut == 'cloturee' %}Clôturée le {{ journee.date_cloture|date:"d/m/Y à H:i" }} par {{ journee.cloturee_par.get_full_name|default:journee.cloturee_par.username }}{% else %}Journée en cours{% endif %}
+      </div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:journees' %}?date={{ journee.date_journee|date:'Y-m-d' }}" class="cpt-btn">Toutes les caisses</a>
+      {% if journee.statut == 'cloturee' and peut_superviser %}
+      <form method="post" action="{% url 'comptabilite:journee_rouvrir' journee.pk %}" onsubmit="return confirm('Rouvrir cette journée ?');">
+        {% csrf_token %}<button class="cpt-btn danger"><i class="bi bi-unlock"></i> Rouvrir</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Paiements</div><div class="v">{{ t.nb_paiements }}</div></div>
+    <div class="cpt-kpi"><div class="l">Total encaissé</div><div class="v">{{ t.total_encaisse|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Dont espèces</div><div class="v">{{ t.especes|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Autres modes</div><div class="v">{{ t.autres|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi accent"><div class="l">Écart total</div><div class="v {% if t.ecart < 0 %}ecart-neg{% elif t.ecart > 0 %}ecart-pos{% else %}ecart-nul{% endif %}">{{ t.ecart|floatformat:0|intcomma }} F</div></div>
+  </div>
+
+  <div class="cpt-card">
+    <h2>Par caissière</h2>
+    {% if resume.lignes %}
+    <div style="overflow-x:auto;">
+    <table class="cpt-table">
+      <thead><tr>
+        <th>Caissière</th><th>Session</th><th>Horaires</th><th>État</th>
+        <th class="num">Paiements</th><th class="num">Espèces</th><th class="num">Autres modes</th>
+        <th class="num">Remboursés</th><th class="num">Sorties</th><th class="num">Fonds</th><th class="num">Attendu</th><th class="num">Compté</th><th class="num">Écart</th>
+      </tr></thead>
+      <tbody>
+        {% for l in resume.lignes %}{% with s=l.session r=l.resume %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:session' s.pk %}'">
+          <td><b>{{ s.nom_caissiere }}</b></td>
+          <td>{{ s.numero }}</td>
+          <td>{{ s.date_ouverture|date:"H:i" }} → {% if s.date_cloture %}{{ s.date_cloture|date:"H:i" }}{% else %}…{% endif %}</td>
+          <td><span class="cpt-badge {{ s.statut }}">{{ s.get_statut_display }}</span></td>
+          <td class="num">{{ r.nb_paiements }}</td>
+          <td class="num">{{ r.especes_encaissees|floatformat:0|intcomma }}</td>
+          <td class="num">{{ r.autres_modes|floatformat:0|intcomma }}</td>
+          <td class="num">− {{ r.especes_remboursees|floatformat:0|intcomma }}</td>
+          <td class="num">− {{ r.sorties_payees|floatformat:0|intcomma }}</td>
+          <td class="num">{{ s.fonds_initial|floatformat:0|intcomma }}</td>
+          <td class="num">{{ l.attendu|floatformat:0|intcomma }}</td>
+          <td class="num">{% if s.montant_compte is not None %}{{ s.montant_compte|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+          <td class="num {% if s.ecart < 0 %}ecart-neg{% elif s.ecart > 0 %}ecart-pos{% elif s.ecart is not None %}ecart-nul{% endif %}">{% if s.ecart is not None %}{{ s.ecart|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+        </tr>
+        {% endwith %}{% endfor %}
+      </tbody>
+      <tfoot><tr>
+        <td colspan="4">Total de la caisse (F CFA)</td>
+        <td class="num">{{ t.nb_paiements }}</td>
+        <td class="num">{{ t.especes|floatformat:0|intcomma }}</td>
+        <td class="num">{{ t.autres|floatformat:0|intcomma }}</td>
+        <td class="num">− {{ t.rembourse|floatformat:0|intcomma }}</td>
+        <td class="num">− {{ t.sorties|floatformat:0|intcomma }}</td>
+        <td class="num">{{ t.fonds|floatformat:0|intcomma }}</td>
+        <td class="num">{{ t.attendu|floatformat:0|intcomma }}</td>
+        <td class="num">{{ t.compte|floatformat:0|intcomma }}</td>
+        <td class="num">{{ t.ecart|floatformat:0|intcomma }}</td>
+      </tr></tfoot>
+    </table>
+    </div>
+    <div class="cpt-note" style="margin-top:8px;">Chaque caissière a sa pochette : son écart est le sien. Les autres modes (Mobile Money, chèque…) ne sont pas dans les pochettes.</div>
+    {% else %}
+    <div class="cpt-vide">Aucune session sur cette journée.</div>
+    {% endif %}
+  </div>
+
+  {% if peut_cloturer %}
+  <div class="cpt-card">
+    <h2>Clôturer la journée</h2>
+    {% if resume.toutes_closes %}
+    <form method="post" action="{% url 'comptabilite:journee_cloturer' journee.pk %}" onsubmit="return confirm('Clôturer la journée de cette caisse ?');">
+      {% csrf_token %}
+      <div class="cpt-field"><label for="obs">Observations (facultatives)</label>
+        <textarea class="cpt-textarea" id="obs" name="observations"></textarea></div>
+      <button class="cpt-btn primaire"><i class="bi bi-lock"></i> Clôturer la journée</button>
+    </form>
+    {% else %}
+    <div class="cpt-alerte" style="margin:0;">Toutes les sessions doivent être clôturées avant la journée.</div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if journee.observations %}<div class="cpt-card"><h2>Observations</h2>{{ journee.observations|linebreaksbr }}</div>{% endif %}
+</div>
+{% endwith %}
+{% endblock %}

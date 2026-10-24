@@ -578,6 +578,17 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 {{ form.ticket_moderateur }}
             </div>
 
+            {% comment %}Toute remise porte un motif (module Comptabilité) : le
+            prix plein reste sur la ligne, le motif dit pourquoi le patient paie
+            moins. Obligatoire dès qu'une remise est saisie.{% endcomment %}
+            <div class="field-row">
+                <label for="{{ form.motif_remise.id_for_label }}">Motif de remise</label>
+                {{ form.motif_remise }}
+            </div>
+            {% if form.motif_remise.errors %}
+            <div class="field-error" style="color:var(--rose-text);font-size:12px;margin:-4px 0 6px;">{{ form.motif_remise.errors.0 }}</div>
+            {% endif %}
+
             <div class="field-row" style="align-items:flex-start;padding-top:4px;">
                 <label for="{{ form.notes.id_for_label }}">Notes</label>
                 {{ form.notes }}
@@ -738,7 +749,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                     <option value="{{ caisse.pk }}"
                             data-modes="{{ caisse.modes|join:',' }}">{{ caisse.nom|upper }}</option>
                     {% empty %}
-                    <option value="">Aucune caisse configurée</option>
+                    <option value="">Caisse non ouverte — ouvrez votre session</option>
                     {% endfor %}
                 </select>
             </div>
