@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Avoir, Bailleur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
+from .models import (Avoir, Bailleur, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
                      LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse)
 
 
@@ -124,7 +124,10 @@ class CorrespondanceAdmin(admin.ModelAdmin):
 
 @admin.register(Exercice)
 class ExerciceAdmin(admin.ModelAdmin):
-    list_display = ['libelle', 'date_debut', 'date_fin', 'statut']
+    list_display = ['libelle', 'date_debut', 'date_fin', 'statut', 'resultat']
+    # La clôture et la réouverture passent par l'écran de clôture, qui fait les
+    # à-nouveaux : changer le statut ici les contournerait.
+    readonly_fields = ['statut', 'resultat', 'date_cloture', 'cloture_par']
 
 
 class LigneEcritureInline(admin.TabularInline):
@@ -249,6 +252,58 @@ class RejetAssuranceAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return RejetAssurance.all_objects.select_related('assurance', 'facture')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class LigneFactureFournisseurInline(admin.TabularInline):
+    model = LigneFactureFournisseur
+    extra = 0
+    can_delete = False
+    fields = ['compte', 'libelle', 'montant']
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FactureFournisseur)
+class FactureFournisseurAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'fournisseur', 'reference', 'montant_total']
+    search_fields = ['numero', 'fournisseur', 'reference']
+    inlines = [LigneFactureFournisseurInline]
+
+    def get_queryset(self, request):
+        return FactureFournisseur.all_objects.all()
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ReglementFournisseur)
+class ReglementFournisseurAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'facture', 'mode', 'montant']
+
+    def get_queryset(self, request):
+        return ReglementFournisseur.all_objects.select_related('facture')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LigneDon)
+class LigneDonAdmin(admin.ModelAdmin):
+    list_display = ['don', 'produit', 'quantite', 'valeur_unitaire', 'numero_lot']
 
     def has_change_permission(self, request, obj=None):
         return False

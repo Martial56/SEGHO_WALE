@@ -1,0 +1,67 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Facture fournisseur{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Facture {{ facture.numero }} — {{ facture.fournisseur }}</h1>
+      <div class="cpt-sub">{% if facture.reference %}Facture n° {{ facture.reference }} du {% else %}Du {% endif %}{{ facture.date|date:"d/m/Y" }}{% if facture.date_echeance %} · échéance le {{ facture.date_echeance|date:"d/m/Y" }}{% endif %}{% if facture.objet %} · {{ facture.objet }}{% endif %}</div></div>
+    <div class="cpt-actions">
+      {% if peut_modifier %}<a href="{% url 'comptabilite:facture_fournisseur_modifier' facture.pk %}" class="cpt-btn">Modifier</a>{% endif %}
+      {% if facture.justificatif %}<a href="{{ facture.justificatif.url }}" class="cpt-btn" target="_blank" rel="noopener">Justificatif</a>{% endif %}
+      <a href="{% url 'comptabilite:factures_fournisseurs' %}" class="cpt-btn">Retour</a>
+    </div>
+  </div>
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Montant</div><div class="v">{{ facture.montant_total|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Réglé</div><div class="v">{{ facture.montant_regle|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi accent"><div class="l">Reste à régler</div><div class="v">{{ facture.reste|floatformat:0|intcomma }} F</div>
+      {% if facture.convention %}<div class="s">Convention {{ facture.convention.code }}</div>{% endif %}</div>
+  </div>
+  <div class="cpt-grid2" style="align-items:start;">
+    <div>
+      <div class="cpt-card">
+        <h2>Lignes</h2>
+        <table class="cpt-table"><thead><tr><th>Compte</th><th>Libellé</th><th class="num">Montant</th></tr></thead>
+          <tbody>{% for l in facture.lignes.all %}<tr><td>{{ l.compte.numero }} — {{ l.compte.intitule }}</td><td>{{ l.libelle }}</td><td class="num">{{ l.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
+        {% if facture.commande_stock %}<div class="cpt-note" style="margin-top:8px;">Commande de stock {{ facture.commande_stock.numero }}</div>{% endif %}
+        {% if facture.commande_achat %}<div class="cpt-note" style="margin-top:8px;">Commande d'achat {{ facture.commande_achat.numero }}</div>{% endif %}
+      </div>
+      <div class="cpt-card">
+        <h2>Règlements</h2>
+        {% if facture.reglements.all %}
+        <table class="cpt-table"><thead><tr><th>Date</th><th>N°</th><th>Mode</th><th class="num">Montant</th></tr></thead>
+          <tbody>{% for r in facture.reglements.all %}<tr><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}{% if r.reference %}<div class="cpt-note">{{ r.reference }}</div>{% endif %}</td>
+            <td>{{ r.get_mode_display }}{% if r.compte_tresorerie %}<div class="cpt-note">{{ r.compte_tresorerie }}</div>{% endif %}</td><td class="num">{{ r.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
+        {% else %}<div class="cpt-vide">Aucun règlement.</div>{% endif %}
+      </div>
+      <div class="cpt-card">
+        <h2>Écritures</h2>
+        {% if ecritures %}
+        <table class="cpt-table"><tbody>{% for e in ecritures %}<tr class="lien" onclick="location.href='{% url 'comptabilite:ecriture' e.pk %}'">
+          <td>{{ e.date|date:"d/m/Y" }}</td><td>{{ e.journal.code }}</td><td>{{ e.libelle }}</td>
+          <td><span class="cpt-badge {% if e.statut == 'validee' %}validee{% else %}cloturee{% endif %}">{{ e.get_statut_display }}</span></td></tr>{% endfor %}</tbody></table>
+        {% else %}<div class="cpt-vide">Aucune écriture (vérifiez les correspondances).</div>{% endif %}
+      </div>
+    </div>
+    {% if peut_regler %}
+    <form method="post" class="cpt-card">{% csrf_token %}
+      <h2>Enregistrer un règlement</h2>
+      <div class="cpt-grid2">
+        <div class="cpt-field"><label>Date</label><input type="date" name="date" class="cpt-input" value="{{ aujourdhui|date:'Y-m-d' }}"></div>
+        <div class="cpt-field"><label>Montant (F CFA)</label><input type="number" min="1" name="montant" class="cpt-input" value="{{ facture.reste|floatformat:0 }}" required></div>
+      </div>
+      <div class="cpt-field"><label>Mode</label><select name="mode" class="cpt-input">{% for v, l in modes %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></div>
+      <div class="cpt-field"><label>Payé depuis</label><select name="compte_tresorerie" class="cpt-input">
+        <option value="">— Compte par défaut du mode —</option>
+        {% for c in comptes_tresorerie %}<option value="{{ c.pk }}">{{ c.libelle }} ({{ c.compte.numero }})</option>{% endfor %}</select>
+        <div class="cpt-note">Une dépense payée en espèces au guichet passe plutôt par une sortie de caisse.</div></div>
+      <div class="cpt-field"><label>Référence (n° de chèque, de virement…)</label><input type="text" name="reference" class="cpt-input"></div>
+      <button class="cpt-btn primaire">Enregistrer le règlement</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

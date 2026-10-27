@@ -128,6 +128,30 @@
   {% endif %}
   {% endif %}
 
+  {% comment %}Menu « Achats » (lot 8) : factures des fournisseurs et ce qui
+  leur reste dû.{% endcomment %}
+  {% if perms.comptabilite.view_facturefournisseur and 'comptabilite.achats' not in hidden_navitem_codes %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname|slice:':19' == 'facture_fournisseur' or uname == 'factures_fournisseurs' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Achats
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Fournisseurs</div>
+      <a href="{% url 'comptabilite:factures_fournisseurs' %}" class="{% if uname == 'factures_fournisseurs' or uname == 'facture_fournisseur' %}active{% endif %}">
+        <i class="bi bi-receipt" style="font-size:12px;"></i> Factures fournisseurs</a>
+      {% if perms.comptabilite.add_facturefournisseur %}
+      <a href="{% url 'comptabilite:facture_fournisseur_nouvelle' %}" class="{% if uname == 'facture_fournisseur_nouvelle' %}active{% endif %}">
+        <i class="bi bi-plus-circle" style="font-size:12px;"></i> Nouvelle facture</a>
+      {% endif %}
+      <a href="{% url 'comptabilite:etat' 'dettes_fournisseurs' %}">
+        <i class="bi bi-truck" style="font-size:12px;"></i> Dettes fournisseurs</a>
+    </div>
+  </div>
+  {% endif %}
+
   {% comment %}Menu « Financements » : bailleurs, conventions, dons, budget,
   fonds dédiés (lot 5). Chaque entrée suit le droit de consultation de ce
   qu'elle ouvre.{% endcomment %}
@@ -201,11 +225,11 @@
   {% comment %}Menu Configuration, sur le modèle de l'hospitalisation : chaque
   entrée suit la permission de consultation du modèle qu'elle ouvre, et le menu
   disparaît entièrement quand aucune n'est accordée.{% endcomment %}
-  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
+  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
   {% if 'facturation.config' not in hidden_navitem_codes %}
   <div class="o-nav-dropdown" data-nav-dropdown>
     <button type="button"
-            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' %}active{% endif %}"
+            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' or uname == 'exercices' or uname == 'exercice' %}active{% endif %}"
             style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
       Configuration
       <i class="bi bi-chevron-down" style="font-size:10px;"></i>
@@ -230,8 +254,14 @@
         <i class="bi bi-heart" style="font-size:12px;"></i> Motifs de gratuité
       </a>
       {% endif %}
-      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
+      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
       <div class="o-nav-dd-section">Comptabilité générale</div>
+      {% if perms.comptabilite.view_exercice %}
+      <a href="{% url 'comptabilite:exercices' %}"
+         class="{% if uname == 'exercices' or uname == 'exercice' %}active{% endif %}">
+        <i class="bi bi-calendar-check" style="font-size:12px;"></i> Exercices et clôture
+      </a>
+      {% endif %}
       {% if perms.comptabilite.view_compte %}
       <a href="{% url 'comptabilite:plan_comptable' %}"
          class="{% if uname == 'plan_comptable' or uname == 'compte_modifier' %}active{% endif %}">

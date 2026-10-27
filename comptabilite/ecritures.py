@@ -14,6 +14,8 @@ régularisations…) se saisissent à la main.
 | Remboursement                 | caisse / MM / BQ | Patient                    | Trésorerie                    |
 | Sortie de caisse payée        | caisse        | Compte de charge du motif     | Caisse                        |
 | Écart de clôture de session   | caisse        | Manquant / Caisse             | Caisse / Excédent             |
+| Facture fournisseur           | ACH           | Charge ou immobilisation      | Fournisseur (401)             |
+| Règlement fournisseur         | BQ / MM / CAI | Fournisseur                   | Trésorerie                    |
 
 Aucun numéro de compte n'est écrit ici : tout passe par les correspondances
 (`Correspondance`), modifiables à l'écran. Chaque écriture porte la clé de
@@ -98,6 +100,14 @@ def exercice_pour(jour):
 
 def _jour(dt):
     return timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
+
+
+def exclure_exercices_clos(qs, jour, champ='ecriture__exercice'):
+    """Cumul arrêté à `jour` : les exercices clos avant lui sont résumés par
+    les à-nouveaux de l'exercice suivant — leurs lignes ne comptent plus,
+    sans quoi chaque solde de bilan serait compté deux fois."""
+    clos = Exercice.objects.filter(statut='cloture', date_fin__lt=jour)
+    return qs.exclude(**{f'{champ}__in': clos})
 
 
 # ─── Création ──────────────────────────────────────────────────────────────────
@@ -314,15 +324,25 @@ def ecriture_don(don):
     origine = f'don:{don.pk}'
     if _deja(origine) or not don.montant:
         return None
-    if don.nature == 'nature':
-        debit, journal_ = don.compte_actif or compte('don_nature_actif'), journal('OD')
+    tiers = don.nom_donateur
+    produits = list(don.lignes.select_related('produit')) if don.nature == 'nature' else []
+    if produits:
+        # Produits entrés en stock : chacun à l'actif de son type (lot 8).
+        par_compte = {}
+        for l in produits:
+            c = compte(f'stock:{l.produit.type}')
+            par_compte[c] = par_compte.get(c, ZERO) + l.montant
+        debits = [(c, None, m, ZERO, tiers) for c, m in par_compte.items()]
+        journal_ = journal('OD')
+    elif don.nature == 'nature':
+        debits = [(don.compte_actif or compte('don_nature_actif'), None, don.montant, ZERO, tiers)]
+        journal_ = journal('OD')
     else:
         debit, journal_ = _tresorerie_recue(don.nature)
+        debits = [(debit, None, don.montant, ZERO, tiers)]
     credit = don.convention.compte_ressource if don.convention_id else compte('don')
-    tiers = don.nom_donateur
     return creer_ecriture(journal_, don.date, f'Don {don.numero} — {tiers}',
-                          [(debit, None, don.montant, ZERO, tiers),
-                           (credit, None, ZERO, don.montant, tiers, don.convention)],
+                          debits + [(credit, None, ZERO, don.montant, tiers, don.convention)],
                           piece=don.reference or don.numero, origine=origine, centre=don.centre)
 
 
@@ -354,6 +374,40 @@ def ecriture_rejet(rejet):
                           [(debit, None, rejet.montant, ZERO, _nom_patient(facture)),
                            (compte('tiers_payant'), None, ZERO, rejet.montant, tiers)],
                           piece=rejet.numero, origine=origine, centre=rejet.centre)
+
+
+# ─── Achats (lot 8) ────────────────────────────────────────────────────────────
+
+def ecriture_facture_fournisseur(facture):
+    """Charges (ou immobilisations) au débit, dette fournisseur au crédit."""
+    origine = f'facture_fournisseur:{facture.pk}'
+    if _deja(origine) or not facture.montant_total:
+        return None
+    tiers = facture.fournisseur
+    convention = facture.convention
+    lignes = [(l.compte, l.libelle, l.montant, ZERO, tiers, convention) for l in facture.lignes.all()]
+    lignes.append((compte('fournisseur'), None, ZERO, facture.montant_total, tiers))
+    return creer_ecriture(journal('ACH'), facture.date,
+                          f'Facture {facture.reference or facture.numero} — {tiers}', lignes,
+                          piece=facture.reference or facture.numero, origine=origine, centre=facture.centre)
+
+
+def ecriture_reglement_fournisseur(reglement):
+    origine = f'reglement_fournisseur:{reglement.pk}'
+    if _deja(origine):
+        return None
+    ct = reglement.compte_tresorerie
+    if ct:
+        tresorerie, journal_ = ct.compte, journal('MM' if ct.type == 'mobile_money' else 'BQ')
+    else:
+        tresorerie, journal_ = _tresorerie_recue(reglement.mode)
+    tiers = reglement.facture.fournisseur
+    return creer_ecriture(journal_, reglement.date,
+                          f'Règlement {reglement.numero} — {tiers} (facture {reglement.facture.numero})',
+                          [(compte('fournisseur'), None, reglement.montant, ZERO, tiers),
+                           (tresorerie, None, ZERO, reglement.montant, tiers)],
+                          piece=reglement.reference or reglement.numero, origine=origine,
+                          centre=reglement.centre)
 
 
 # ─── Génération d'une période ──────────────────────────────────────────────────
@@ -400,6 +454,13 @@ def generer(debut, fin):
         taches.append((f'Versement {v.numero}', ecriture_versement, v))
     for d in Don.all_objects.filter(date__range=[debut, fin]).select_related('donateur', 'convention'):
         taches.append((f'Don {d.numero}', ecriture_don, d))
+    from .models import FactureFournisseur, ReglementFournisseur
+    for f in (FactureFournisseur.all_objects.filter(date__range=[debut, fin])
+              .select_related('convention').prefetch_related('lignes__compte')):
+        taches.append((f'Facture fournisseur {f.numero}', ecriture_facture_fournisseur, f))
+    for r in (ReglementFournisseur.all_objects.filter(date__range=[debut, fin])
+              .select_related('facture', 'compte_tresorerie__compte')):
+        taches.append((f'Règlement fournisseur {r.numero}', ecriture_reglement_fournisseur, r))
     for s in (SessionCaissiere.all_objects.filter(date_cloture__date__range=[debut, fin])
               .exclude(statut='ouverte').select_related('journee__caisse', 'caissiere')):
         taches.append((f'Session {s.numero}', ecriture_ecart, s))

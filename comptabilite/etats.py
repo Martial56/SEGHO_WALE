@@ -263,6 +263,28 @@ def _lignes_ecriture(debut, fin, params):
     return LigneEcriture.objects.filter(ecriture__in=_ecritures(debut, fin, params).values('pk'))
 
 
+def _ouverture(debut, fin, params):
+    """Lignes du solde d'ouverture au `debut` : tout ce qui le précède, et les
+    à-nouveaux de son exercice même s'ils tombent dans la période. Un exercice
+    clos avant `debut` ne compte que par ses à-nouveaux (lot 8)."""
+    from .ecritures import exclure_exercices_clos
+    an = Q(ecriture__journal__type='an', ecriture__date__range=[debut, fin],
+           ecriture__exercice__date_debut__lte=debut, ecriture__exercice__date_fin__gte=debut)
+    qs = _lignes_ecriture(None, fin, params).filter(Q(ecriture__date__lt=debut) | an)
+    return exclure_exercices_clos(qs, debut)
+
+
+def _mouvements(debut, fin, params):
+    """Lignes de la période, à-nouveaux à part (ils sont dans l'ouverture)."""
+    return _lignes_ecriture(debut, fin, params).exclude(ecriture__journal__type='an')
+
+
+def _cumul(fin, params):
+    """Toutes les lignes arrêtées au `fin`, exercices clos résumés par leurs à-nouveaux."""
+    from .ecritures import exclure_exercices_clos
+    return exclure_exercices_clos(_lignes_ecriture(None, fin, params), fin)
+
+
 def _note_brouillons(params):
     return ("Écritures validées et brouillons (situation provisoire)." if params.get('brouillons')
             else "Écritures validées seulement.")
@@ -302,10 +324,10 @@ def _comptes_filtres(params):
 
 def grand_livre(debut, fin, params):
     """Pour chaque compte mouvementé : solde antérieur, mouvements, solde cumulé."""
-    anterieur = (_lignes_ecriture(None, debut - timedelta(days=1), params)
+    anterieur = (_ouverture(debut, fin, params)
                  .values('compte_id').annotate(d=Sum('debit'), c=Sum('credit')))
     soldes_av = {a['compte_id']: (a['d'] or ZERO) - (a['c'] or ZERO) for a in anterieur}
-    mouvements = (_lignes_ecriture(debut, fin, params)
+    mouvements = (_mouvements(debut, fin, params)
                   .select_related('ecriture__journal', 'compte').order_by('compte__numero', 'ecriture__date', 'pk'))
     comptes = {c.pk: c for c in _comptes_filtres(params)}
     par_compte = OrderedDict()
@@ -349,10 +371,10 @@ def _soldes_dc(solde):
 def balance(debut, fin, params):
     """Balance générale à six colonnes, sous-totaux par classe."""
     anterieur = {a['compte_id']: (a['d'] or ZERO) - (a['c'] or ZERO) for a in
-                 _lignes_ecriture(None, debut - timedelta(days=1), params)
+                 _ouverture(debut, fin, params)
                  .values('compte_id').annotate(d=Sum('debit'), c=Sum('credit'))}
     periode = {a['compte_id']: (a['d'] or ZERO, a['c'] or ZERO) for a in
-               _lignes_ecriture(debut, fin, params).values('compte_id').annotate(d=Sum('debit'), c=Sum('credit'))}
+               _mouvements(debut, fin, params).values('compte_id').annotate(d=Sum('debit'), c=Sum('credit'))}
     comptes = [c for c in _comptes_filtres(params) if c.pk in anterieur or c.pk in periode]
     lignes = []
     tot = [ZERO] * 6
@@ -389,7 +411,7 @@ def balance(debut, fin, params):
 
 def balance_tiers(debut, fin, params):
     """Balance des patients et des assurances (comptes 411), par tiers."""
-    lignes_qs = _lignes_ecriture(None, fin, params).filter(compte__numero__startswith='411')
+    lignes_qs = _cumul(fin, params).filter(compte__numero__startswith='411')
     donnees = OrderedDict()
     for row in (lignes_qs.values('compte__numero', 'compte__intitule', 'tiers')
                 .annotate(d=Sum('debit'), c=Sum('credit')).order_by('compte__numero', 'tiers')):
@@ -712,6 +734,266 @@ def rejets_assurances(debut, fin, params):
         'notes': []}
 
 
+# ─── Achats (lot 8) ────────────────────────────────────────────────────────────
+
+def dettes_fournisseurs(debut, fin, params):
+    """Factures fournisseurs non soldées au `fin`, par fournisseur, avec leur retard."""
+    from .models import FactureFournisseur
+    qs = (FactureFournisseur.objects.filter(date__lte=fin).prefetch_related('reglements')
+          .order_by('fournisseur', 'date'))
+    par_fournisseur = OrderedDict()
+    for f in qs:
+        regle = sum((r.montant for r in f.reglements.all() if r.date <= fin), ZERO)
+        reste = f.montant_total - regle
+        if reste > 0:
+            par_fournisseur.setdefault(f.fournisseur, []).append((f, regle, reste))
+    lignes, total = [], ZERO
+    for fournisseur, factures in par_fournisseur.items():
+        lignes.append(_ligne(fournisseur, type_='groupe'))
+        sous = ZERO
+        for f, regle, reste in factures:
+            retard = (fin - f.date_echeance).days if f.date_echeance and f.date_echeance < fin else None
+            lignes.append(_ligne(f.date.strftime('%d/%m/%Y'), f'{f.numero} {f.reference}'.strip(),
+                                 f.date_echeance.strftime('%d/%m/%Y') if f.date_echeance else '',
+                                 retard, f.montant_total, regle or None, reste,
+                                 lien=reverse('comptabilite:facture_fournisseur', args=[f.pk])))
+            sous += reste
+        lignes.append(_ligne(f'Reste dû à {fournisseur}', '', '', None, None, None, sous, type_='sous_total'))
+        total += sous
+    if lignes:
+        lignes.append(_ligne('Total dû aux fournisseurs', '', '', None, None, None, total, type_='total'))
+    return {'titre': f'Dettes fournisseurs au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Factures non soldées', [('Date', 'texte'), ('Facture', 'texte'), ('Échéance', 'texte'),
+                                 ('Jours de retard', 'nombre'), ('Montant', 'montant'), ('Réglé', 'montant'),
+                                 ('Reste dû', 'montant')], lignes, vide="Aucune dette fournisseur.")],
+        'notes': []}
+
+
+# ─── États financiers SYCEBNL (lot 8) ──────────────────────────────────────────
+#
+# Présentation par rubriques du SYCEBNL (structure OHADA). Le classement suit
+# les deux premiers chiffres des comptes ; les comptes de tiers et de
+# trésorerie vont à l'actif ou au passif selon le sens de leur solde. La
+# maquette est à faire confirmer par l'expert-comptable avant le dépôt.
+
+def _soldes_cumules(fin, params):
+    """{(numéro, tiers): solde débiteur(+)/créditeur(−)} au `fin`."""
+    soldes = {}
+    for s in (_cumul(fin, params).values('compte__numero', 'tiers')
+              .annotate(d=Sum('debit'), c=Sum('credit'))):
+        numero = s['compte__numero']
+        tiers = s['tiers'] if numero[:1] == '4' else ''
+        cle = (numero, tiers)
+        soldes[cle] = soldes.get(cle, ZERO) + (s['d'] or ZERO) - (s['c'] or ZERO)
+    return soldes
+
+
+_ACTIF_IMMOBILISE = [('1', 'Immobilisations incorporelles'), ('2345', 'Immobilisations corporelles'),
+                     ('67', 'Immobilisations financières')]
+
+
+def _rubrique_actif_circulant(numero):
+    if numero.startswith('41'):
+        return 'Usagers et organismes de prise en charge'
+    if numero.startswith('45'):
+        return 'Bailleurs, subventions à recevoir'
+    return 'Autres créances'
+
+
+def _rubrique_passif_circulant(numero):
+    if numero.startswith('40'):
+        return 'Fournisseurs'
+    if numero.startswith('41'):
+        return 'Usagers créditeurs (avances reçues)'
+    if numero[:2] in ('42', '43', '44'):
+        return 'Dettes sociales et fiscales'
+    return 'Autres dettes'
+
+
+_FONDS_PROPRES = [('10', 'Fonds associatifs et réserves'), ('11', 'Réserves'), ('12', 'Report à nouveau'),
+                  ('13', "Résultat de l'exercice"), ('14', "Subventions d'investissement"),
+                  ('15', 'Provisions réglementées')]
+
+
+def bilan(debut, fin, params):
+    soldes = _soldes_cumules(fin, params)
+    # Le résultat des exercices non clôturés n'est pas encore sur 13 : il se
+    # calcule sur les classes 6 à 8 et prend sa place au passif.
+    resultat_ouvert = -sum((s for (n, _), s in soldes.items() if n[:1] in '678'), ZERO)
+
+    immo = {cle: [ZERO, ZERO] for cle, _ in _ACTIF_IMMOBILISE}
+    stocks = [ZERO, ZERO]
+    creances, tresorerie_actif = OrderedDict(), ZERO
+    fonds = OrderedDict((p, ZERO) for p, _ in _FONDS_PROPRES)
+    fonds_dedies = dettes_fin = tresorerie_passif = ZERO
+    dettes = OrderedDict()
+    for (numero, _), s in soldes.items():
+        classe = numero[:1]
+        if classe == '2':
+            if numero[:2] in ('28', '29'):
+                cible = next((c for c, _ in _ACTIF_IMMOBILISE if numero[2:3] in c), '2345')
+                immo[cible][1] += -s
+            else:
+                cible = next((c for c, _ in _ACTIF_IMMOBILISE if numero[1:2] in c), '2345')
+                immo[cible][0] += s
+        elif classe == '3':
+            if numero.startswith('39'):
+                stocks[1] -= s          # dépréciation des stocks, créditrice
+            else:
+                stocks[0] += s
+        elif classe == '4':
+            if s > 0:
+                r = _rubrique_actif_circulant(numero)
+                creances[r] = creances.get(r, ZERO) + s
+            elif s < 0:
+                r = _rubrique_passif_circulant(numero)
+                dettes[r] = dettes.get(r, ZERO) - s
+        elif classe == '5':
+            if s >= 0:
+                tresorerie_actif += s
+            else:
+                tresorerie_passif -= s
+        elif classe == '1':
+            if numero.startswith('19'):
+                fonds_dedies -= s
+            elif numero[:2] in ('16', '17', '18'):
+                dettes_fin -= s
+            else:
+                fonds[numero[:2] if numero[:2] in fonds else '10'] -= s
+    fonds['13'] += resultat_ouvert
+
+    actif, total_brut, total_amort = [], ZERO, ZERO
+
+    def _actif(libelle, brut, amort, type_='ligne'):
+        actif.append(_ligne(libelle, brut or None, amort or None, (brut - amort) or None, type_=type_))
+
+    actif.append(_ligne('Actif immobilisé', type_='groupe'))
+    sb = sa = ZERO
+    for cle, libelle in _ACTIF_IMMOBILISE:
+        brut, amort = immo[cle]
+        if brut or amort:
+            _actif(libelle, brut, amort)
+        sb, sa = sb + brut, sa + amort
+    _actif('Total actif immobilisé', sb, sa, 'sous_total')
+    total_brut, total_amort = total_brut + sb, total_amort + sa
+    actif.append(_ligne('Actif circulant', type_='groupe'))
+    cb, ca = stocks[0], stocks[1]
+    if stocks[0] or stocks[1]:
+        _actif('Stocks (médicaments, consommables)', stocks[0], stocks[1])
+    for libelle, m in creances.items():
+        _actif(libelle, m, ZERO)
+        cb += m
+    _actif('Total actif circulant', cb, ca, 'sous_total')
+    total_brut, total_amort = total_brut + cb, total_amort + ca
+    actif.append(_ligne('Trésorerie — actif', type_='groupe'))
+    _actif('Banques, Mobile Money, caisses', tresorerie_actif, ZERO)
+    total_brut += tresorerie_actif
+    _actif('Total actif', total_brut, total_amort, 'total')
+    total_actif = total_brut - total_amort
+
+    passif = [_ligne('Fonds propres et ressources assimilées', type_='groupe')]
+    sous = ZERO
+    for prefixe, libelle in _FONDS_PROPRES:
+        if fonds[prefixe]:
+            passif.append(_ligne(libelle + (' (non clôturé)' if prefixe == '13' and resultat_ouvert else ''),
+                                 fonds[prefixe]))
+            sous += fonds[prefixe]
+    passif.append(_ligne('Total fonds propres', sous, type_='sous_total'))
+    total_passif = sous
+    passif.append(_ligne('Fonds dédiés', type_='groupe'))
+    passif.append(_ligne('Fonds dédiés sur ressources affectées', fonds_dedies or None))
+    passif.append(_ligne('Dettes financières', type_='groupe'))
+    passif.append(_ligne('Emprunts et dettes financières', dettes_fin or None))
+    total_passif += fonds_dedies + dettes_fin
+    passif.append(_ligne('Passif circulant', type_='groupe'))
+    sous = ZERO
+    for libelle, m in dettes.items():
+        passif.append(_ligne(libelle, m))
+        sous += m
+    passif.append(_ligne('Total passif circulant', sous, type_='sous_total'))
+    total_passif += sous
+    passif.append(_ligne('Trésorerie — passif', type_='groupe'))
+    passif.append(_ligne('Découverts et crédits de trésorerie', tresorerie_passif or None))
+    total_passif += tresorerie_passif
+    passif.append(_ligne('Total passif', total_passif, type_='total'))
+
+    notes = [_note_brouillons(params), "Présentation SYCEBNL à faire confirmer par l'expert-comptable."]
+    if total_actif != total_passif:
+        notes.append(f"Attention : l'actif ({total_actif:,.0f}) et le passif ({total_passif:,.0f}) diffèrent — "
+                     "une écriture incomplète ou un compte hors plan est à examiner (Contrôle de cohérence)."
+                     .replace(',', ' '))
+    return {'titre': f'Bilan au {fin:%d/%m/%Y}', 'tableaux': [
+        _tableau('Actif', [('Rubrique', 'texte'), ('Brut', 'montant'), ('Amortissements et dépréciations', 'montant'),
+                           ('Net', 'montant')], actif),
+        _tableau('Passif', [('Rubrique', 'texte'), ('Montant', 'montant')], passif)],
+        'notes': notes}
+
+
+# (libellé, préfixes des comptes) ; les produits se lisent au crédit, les charges au débit.
+_EXPLOITATION_PRODUITS = [
+    ('Prestations de soins et ventes de médicaments', ('700', '701', '702', '703', '704', '705', '706', '707', '708')),
+    ('Remises et gratuités accordées', ('709',)),
+    ("Subventions d'exploitation", ('71',)),
+    ('Dons, cotisations et autres produits', ('72', '73', '74', '75', '76')),
+    ('Reports de ressources affectées et transferts de charges', ('78',)),
+    ('Reprises de provisions et dépréciations', ('79',)),
+]
+_EXPLOITATION_CHARGES = [
+    ('Achats consommés (achats et variation des stocks)', ('60',)),
+    ('Transports', ('61',)),
+    ('Services extérieurs', ('62', '63')),
+    ('Impôts et taxes', ('64',)),
+    ('Autres charges (dont pertes sur créances, manquants)', ('65',)),
+    ('Charges de personnel', ('66',)),
+    ('Dotations aux amortissements et provisions, engagements sur ressources affectées', ('68', '69')),
+]
+
+
+def compte_resultat_sycebnl(debut, fin, params):
+    """Compte de résultat par rubriques : exploitation, financier, hors activités ordinaires."""
+    soldes = {}
+    for s in (_mouvements(debut, fin, params).filter(compte__numero__regex=r'^[678]')
+              .values('compte__numero').annotate(d=Sum('debit'), c=Sum('credit'))):
+        soldes[s['compte__numero']] = (s['c'] or ZERO) - (s['d'] or ZERO)   # produit net (+)
+
+    def _somme(prefixes):
+        return sum((m for n, m in soldes.items() if n.startswith(prefixes)), ZERO)
+
+    lignes = [_ligne("Activité ordinaire — ressources", type_='groupe')]
+    produits = ZERO
+    for libelle, prefixes in _EXPLOITATION_PRODUITS:
+        m = _somme(prefixes)
+        if m:
+            lignes.append(_ligne(libelle, m))
+            produits += m
+    lignes.append(_ligne('Total des ressources', produits, type_='sous_total'))
+    lignes.append(_ligne("Activité ordinaire — charges", type_='groupe'))
+    charges = ZERO
+    for libelle, prefixes in _EXPLOITATION_CHARGES:
+        m = -_somme(prefixes)
+        if m:
+            lignes.append(_ligne(libelle, m))
+            charges += m
+    lignes.append(_ligne('Total des charges', charges, type_='sous_total'))
+    exploitation = produits - charges
+    lignes.append(_ligne("Résultat d'exploitation", exploitation, type_='sous_total'))
+    financier = _somme(('77',)) + _somme(('67',))
+    lignes.append(_ligne('Résultat financier (produits 77 − charges 67)', financier or None))
+    hao = _somme(('82', '84', '86', '88')) + _somme(('81', '83', '85', '87'))
+    lignes.append(_ligne('Résultat hors activités ordinaires (classe 8)', hao or None))
+    impot = _somme(('89',))
+    if impot:
+        lignes.append(_ligne('Impôt sur le résultat', impot))
+    net = exploitation + financier + hao + impot
+    lignes.append(_ligne('Excédent net' if net >= 0 else 'Déficit net', net, type_='total'))
+    return {'titre': 'Compte de résultat (SYCEBNL)', 'tableaux': [_tableau(
+        'Par rubrique', [('Rubrique', 'texte'), ('Montant', 'montant')], lignes)],
+        'notes': [_note_brouillons(params),
+                  "Les remises et gratuités (709) viennent en diminution des ressources.",
+                  "Détail compte par compte : état « Compte de résultat » de la comptabilité générale.",
+                  "Présentation SYCEBNL à faire confirmer par l'expert-comptable."]}
+
+
 # ─── Registre ──────────────────────────────────────────────────────────────────
 
 PERM_CAISSE = 'caisse'        # facturation.view_facture ou superviseur de caisse
@@ -719,7 +1001,8 @@ PERM_COMPTA = 'comptabilite.view_ecriture'
 
 # Sections du sous-menu « États » et du sommaire, dans cet ordre.
 GROUPES = [('caisse', 'Caisse et recettes'), ('comptabilite', 'Comptabilité générale'),
-           ('tresorerie', 'Trésorerie'), ('assurances', 'Assurances et mutuelles'),
+           ('financiers', 'États financiers SYCEBNL'), ('tresorerie', 'Trésorerie'),
+           ('assurances', 'Assurances et mutuelles'), ('achats', 'Achats et fournisseurs'),
            ('financements', 'Financements et dons')]
 
 ETATS = OrderedDict([
@@ -743,6 +1026,15 @@ ETATS = OrderedDict([
                   'description': "Ressources, charges et excédent ou déficit de la période."}),
     ('controle', {'groupe': 'comptabilite', 'icone': 'bi-shield-check', 'titre': 'Contrôle de cohérence', 'fonction': controle, 'perm': PERM_COMPTA, 'periode': 'mois',
                   'description': "Ce qui n'est pas comptabilisé, validé ou clôturé."}),
+    ('bilan', {'groupe': 'financiers', 'icone': 'bi-bank2', 'titre': 'Bilan', 'fonction': bilan,
+               'perm': PERM_COMPTA, 'periode': 'annee',
+               'description': "Actif et passif à la date de fin choisie, par rubriques SYCEBNL."}),
+    ('compte_resultat', {'groupe': 'financiers', 'icone': 'bi-clipboard2-pulse', 'titre': 'Compte de résultat SYCEBNL',
+                         'fonction': compte_resultat_sycebnl, 'perm': PERM_COMPTA, 'periode': 'annee',
+                         'description': "Ressources et charges par rubriques, résultat d'exploitation et net."}),
+    ('dettes_fournisseurs', {'groupe': 'achats', 'icone': 'bi-truck', 'titre': 'Dettes fournisseurs',
+                             'fonction': dettes_fournisseurs, 'perm': 'comptabilite.view_facturefournisseur',
+                             'periode': 'jour', 'description': "Factures fournisseurs non soldées et leur retard."}),
     ('position_tresorerie', {'groupe': 'tresorerie', 'icone': 'bi-wallet2', 'titre': 'Position de trésorerie',
                              'fonction': position_tresorerie, 'perm': 'comptabilite.view_comptetresorerie',
                              'periode': 'jour', 'description': "Solde de chaque caisse, banque et Mobile Money."}),

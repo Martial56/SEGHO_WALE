@@ -47,7 +47,10 @@ def _lignes(compte, fin=None, debut=None):
 
 
 def solde_comptable(compte, fin=None):
-    t = _lignes(compte, fin).aggregate(d=Sum('debit'), c=Sum('credit'))
+    from django.utils import timezone
+    from .ecritures import exclure_exercices_clos
+    qs = exclure_exercices_clos(_lignes(compte, fin), fin or timezone.localdate())
+    t = qs.aggregate(d=Sum('debit'), c=Sum('credit'))
     return (t['d'] or ZERO) - (t['c'] or ZERO)
 
 
@@ -189,7 +192,10 @@ def _montant_ligne(ligne):
 
 
 def ecritures_non_rapprochees(compte_tresorerie, fin=None):
+    # Les à-nouveaux reprennent un solde, pas une opération de la banque : les
+    # lignes d'origine, même d'un exercice clos, restent celles à pointer.
     return (_lignes(compte_tresorerie.compte, fin).filter(ligne_releve__isnull=True)
+            .exclude(ecriture__journal__type='an')
             .select_related('ecriture__journal').order_by('ecriture__date', 'pk'))
 
 

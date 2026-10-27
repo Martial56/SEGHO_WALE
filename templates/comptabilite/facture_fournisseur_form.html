@@ -1,0 +1,79 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Facture fournisseur{% endblock %}
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.ff-lignes input, .ff-lignes select { width: 100%; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; }
+.ff-lignes input.num { text-align: right; }
+.ff-lignes td { padding: 4px 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:960px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">{% if objet %}Modifier la facture {{ objet.numero }}{% else %}Nouvelle facture fournisseur{% endif %}</h1>
+      <div class="cpt-sub">Chaque ligne va au compte de la dépense : achats de médicaments (601), consommables (604), équipement (24x)… L'écriture d'achat est préparée en brouillon.</div></div>
+    <div class="cpt-actions"><a href="{% if objet %}{% url 'comptabilite:facture_fournisseur' objet.pk %}{% else %}{% url 'comptabilite:factures_fournisseurs' %}{% endif %}" class="cpt-btn">Retour</a></div>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% if commande_stock %}<input type="hidden" name="commande_stock" value="{{ commande_stock.pk }}">
+    <div class="cpt-alerte">Lignes reprises de la valeur reçue de la commande de stock {{ commande_stock.numero }} : vérifiez-les avec la facture.</div>{% endif %}
+    {% if commande_achat %}<input type="hidden" name="commande_achat" value="{{ commande_achat.pk }}">
+    <div class="cpt-alerte">Lignes reprises de la valeur reçue de la commande d'achat {{ commande_achat.numero }} : vérifiez-les avec la facture.</div>{% endif %}
+    <datalist id="liste-fournisseurs">{% for n in fournisseurs %}<option value="{{ n }}">{% endfor %}</datalist>
+    <div class="cpt-card">
+      <div class="cpt-grid2">{% include 'comptabilite/includes/champs.html' %}</div>
+    </div>
+    <div class="cpt-card">
+      <h2>Lignes</h2>
+      <input type="hidden" name="nb_lignes" id="nb-lignes" value="{{ lignes|length }}">
+      <table class="cpt-table ff-lignes">
+        <thead><tr><th style="width:38%;">Compte</th><th>Libellé</th><th class="num" style="width:18%;">Montant (F CFA)</th></tr></thead>
+        <tbody id="ff-corps">
+          {% for l in lignes %}
+          <tr>
+            <td><select name="compte_{{ forloop.counter0 }}"><option value="">—</option>
+              {% for c in comptes %}<option value="{{ c.pk }}" {% if l.compte == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.numero }} — {{ c.intitule }}</option>{% endfor %}</select></td>
+            <td><input name="libelle_{{ forloop.counter0 }}" value="{{ l.libelle|default:'' }}"></td>
+            <td><input class="num montant" name="montant_{{ forloop.counter0 }}" value="{{ l.montant|default:'' }}" inputmode="decimal"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><td><button type="button" class="cpt-btn" id="ajouter">+ Ligne</button></td><td>Total</td><td class="num" id="ff-total">0</td></tr></tfoot>
+      </table>
+    </div>
+    <button class="cpt-btn primaire">Enregistrer la facture</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR');
+  var corps = document.getElementById('ff-corps');
+  function nombre(v) { return parseFloat(String(v || '0').replace(/\s/g, '').replace(',', '.')) || 0; }
+  function totaliser() {
+    var t = 0;
+    corps.querySelectorAll('.montant').forEach(function (i) { t += nombre(i.value); });
+    document.getElementById('ff-total').textContent = fmt.format(t);
+  }
+  corps.addEventListener('input', totaliser);
+  document.getElementById('ajouter').addEventListener('click', function () {
+    var n = corps.querySelectorAll('tr').length;
+    var tr = corps.querySelector('tr').cloneNode(true);
+    tr.querySelectorAll('input, select').forEach(function (el) {
+      el.name = el.name.replace(/_\d+$/, '_' + n);
+      el.value = '';
+    });
+    corps.appendChild(tr);
+    document.getElementById('nb-lignes').value = n + 1;
+  });
+  totaliser();
+})();
+</script>
+{% endblock %}

@@ -138,6 +138,10 @@ def don_form(request, pk=None):
                                               ecriture__statut='validee').exists():
         messages.error(request, "Ce don est déjà comptabilisé et validé : il ne se modifie plus.")
         return redirect('comptabilite:dons')
+    if objet and objet.lignes.exists():
+        messages.error(request, "Les produits de ce don sont entrés en stock : sa valeur est la leur, "
+                                "il ne se modifie plus.")
+        return redirect('comptabilite:dons')
     form = DonForm(request.POST or None, instance=objet, initial={'date': timezone.localdate()})
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():

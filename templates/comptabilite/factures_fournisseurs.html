@@ -1,0 +1,47 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Factures fournisseurs{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Factures fournisseurs</h1>
+      <div class="cpt-sub">La dette envers le fournisseur naît à la réception de sa facture et s'éteint par ses règlements.</div></div>
+    <div class="cpt-actions">
+      {% if perms.comptabilite.add_facturefournisseur %}<a href="{% url 'comptabilite:facture_fournisseur_nouvelle' %}" class="cpt-btn primaire">+ Nouvelle facture</a>{% endif %}
+    </div>
+  </div>
+  <form method="get" class="cpt-card" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div class="cpt-field" style="margin:0;"><label>Afficher</label>
+      <select name="filtre" class="cpt-input" onchange="this.form.submit()">
+        <option value="a_regler" {% if filtre == 'a_regler' %}selected{% endif %}>Restant à régler</option>
+        <option value="toutes" {% if filtre == 'toutes' %}selected{% endif %}>Toutes</option>
+      </select></div>
+    <div class="cpt-field" style="margin:0;flex:1;min-width:200px;"><label>Rechercher</label>
+      <input type="search" name="q" value="{{ q }}" class="cpt-input" placeholder="Fournisseur, n° de facture…"></div>
+    <button class="cpt-btn">Filtrer</button>
+  </form>
+  <div class="cpt-card">
+    {% if factures %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>N°</th><th>Fournisseur</th><th>Objet</th><th>Échéance</th><th class="num">Montant</th><th class="num">Reste à régler</th></tr></thead>
+      <tbody>
+        {% for f in factures %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:facture_fournisseur' f.pk %}'">
+          <td>{{ f.date|date:"d/m/Y" }}</td>
+          <td>{{ f.numero }}{% if f.reference %}<div class="cpt-note">{{ f.reference }}</div>{% endif %}</td>
+          <td>{{ f.fournisseur }}</td>
+          <td>{{ f.objet }}</td>
+          <td>{{ f.date_echeance|date:"d/m/Y" }}</td>
+          <td class="num">{{ f.montant_total|floatformat:0|intcomma }}</td>
+          <td class="num">{% if f.reste > 0 %}<span class="ecart-neg">{{ f.reste|floatformat:0|intcomma }}</span>{% else %}<span class="cpt-badge validee">Réglée</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="6">Total restant à régler</td><td class="num">{{ total_reste|floatformat:0|intcomma }}</td></tr></tfoot>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune facture.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

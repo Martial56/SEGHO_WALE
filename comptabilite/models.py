@@ -21,6 +21,8 @@ se reconnectant, sur n'importe quel poste. Une caissière n'a jamais qu'une
 session ouverte à la fois — sinon on ne saurait plus dans quelle pochette est
 l'argent.
 """
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Q
@@ -366,6 +368,12 @@ class Exercice(models.Model):
     date_debut = models.DateField()
     date_fin = models.DateField()
     statut = models.CharField(max_length=10, choices=STATUT, default='ouvert')
+    # Lot 8 : la clôture fige l'exercice et reporte ses soldes en à-nouveaux.
+    resultat = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True,
+                                   help_text="Excédent (positif) ou déficit (négatif) constaté à la clôture.")
+    date_cloture = models.DateTimeField(null=True, blank=True)
+    cloture_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='exercices_clotures')
 
     def __str__(self):
         return self.libelle
@@ -373,6 +381,9 @@ class Exercice(models.Model):
     class Meta:
         verbose_name = "Exercice comptable"
         ordering = ['-date_debut']
+        permissions = [
+            ('cloturer_exercice', "Peut clôturer et rouvrir un exercice comptable"),
+        ]
 
 
 class Ecriture(ModeleCentre):
@@ -785,3 +796,112 @@ class RejetAssurance(ModeleCentre):
         verbose_name = "Refus d'assurance"
         verbose_name_plural = "Refus d'assurance"
         ordering = ['-date', '-pk']
+
+
+
+# ─── Lot 8 : achats, dons en nature en stock ───────────────────────────────────
+
+class FactureFournisseur(ModeleCentre):
+    """Facture reçue d'un fournisseur : la dette (401) naît à sa réception,
+    elle s'éteint par ses règlements. Chaque ligne dit le compte de charge ou
+    d'immobilisation, et peut être imputée à une convention."""
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    fournisseur = models.CharField(max_length=150)
+    reference = models.CharField(max_length=100, blank=True, verbose_name="N° de la facture du fournisseur")
+    date = models.DateField(verbose_name="Date de la facture")
+    date_echeance = models.DateField(null=True, blank=True, verbose_name="Échéance")
+    objet = models.CharField(max_length=255, blank=True)
+    convention = models.ForeignKey(Convention, on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='factures_fournisseur', verbose_name="Financée par la convention")
+    commande_stock = models.ForeignKey('stock.CommandeStock', on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='factures_fournisseur', verbose_name="Commande de stock")
+    commande_achat = models.ForeignKey('achats.CommandeAchat', on_delete=models.SET_NULL, null=True, blank=True,
+                                       related_name='factures_fournisseur', verbose_name="Commande d'achat")
+    montant_total = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    justificatif = models.FileField(upload_to='comptabilite/factures_fournisseurs/%Y/', blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(FactureFournisseur.all_objects, 'numero', f'FFO{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    @property
+    def montant_regle(self):
+        return sum((r.montant for r in self.reglements.all()), Decimal('0'))
+
+    @property
+    def reste(self):
+        return self.montant_total - self.montant_regle
+
+    def __str__(self):
+        return f"{self.numero} — {self.fournisseur}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Facture fournisseur"
+        verbose_name_plural = "Factures fournisseurs"
+        ordering = ['-date', '-pk']
+
+
+class LigneFactureFournisseur(models.Model):
+    facture = models.ForeignKey(FactureFournisseur, on_delete=models.CASCADE, related_name='lignes')
+    compte = models.ForeignKey(Compte, on_delete=models.PROTECT, related_name='lignes_achat',
+                               help_text="Charge (classe 6) ou immobilisation (classe 2).")
+    libelle = models.CharField(max_length=255, verbose_name="Libellé")
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Ligne de facture fournisseur"
+        ordering = ['pk']
+
+
+class ReglementFournisseur(ModeleCentre):
+    MODE = [('virement', 'Virement'), ('cheque', 'Chèque'), ('mobile_money', 'Mobile Money'), ('especes', 'Espèces')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    facture = models.ForeignKey(FactureFournisseur, on_delete=models.PROTECT, related_name='reglements')
+    date = models.DateField()
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    mode = models.CharField(max_length=15, choices=MODE, default='virement')
+    compte_tresorerie = models.ForeignKey(CompteTresorerie, on_delete=models.PROTECT, null=True, blank=True,
+                                          related_name='reglements_fournisseurs', verbose_name="Payé depuis",
+                                          help_text="Vide : le compte par défaut du mode de paiement.")
+    reference = models.CharField(max_length=100, blank=True, verbose_name="Référence (n° de chèque, de virement…)")
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(ReglementFournisseur.all_objects, 'numero', f'RGF{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — {self.facture.fournisseur}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Règlement fournisseur"
+        verbose_name_plural = "Règlements fournisseurs"
+        ordering = ['-date', '-pk']
+
+
+class LigneDon(models.Model):
+    """Produit reçu dans un don en nature, entré dans le stock central."""
+    don = models.ForeignKey(Don, on_delete=models.CASCADE, related_name='lignes')
+    produit = models.ForeignKey('stock.Produit', on_delete=models.PROTECT, related_name='lignes_don')
+    quantite = models.DecimalField(max_digits=12, decimal_places=2)
+    valeur_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
+    numero_lot = models.CharField(max_length=50, blank=True)
+    date_peremption = models.DateField(null=True, blank=True)
+    mouvement = models.OneToOneField('stock.MouvementStock', on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='ligne_don')
+
+    @property
+    def montant(self):
+        return (self.quantite * self.valeur_unitaire).quantize(Decimal('0.01'))
+
+    class Meta:
+        verbose_name = "Produit reçu en don"
+        verbose_name_plural = "Produits reçus en don"
+        ordering = ['pk']
