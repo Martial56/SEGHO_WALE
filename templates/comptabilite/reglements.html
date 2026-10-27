@@ -1,0 +1,23 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Règlements des assurances{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Règlements des assurances</h1><div class="cpt-sub">Argent reçu des assureurs, réparti sur leurs factures.</div></div>
+    <div class="cpt-actions">{% if perms.comptabilite.add_reglementassurance %}<a href="{% url 'comptabilite:reglement_nouveau' %}" class="cpt-btn primaire"><i class="bi bi-plus-lg"></i> Nouveau règlement</a>{% endif %}</div>
+  </div>
+  <div class="cpt-card">
+    {% if reglements %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>N°</th><th>Assureur</th><th>Bordereau</th><th>Mode</th><th>Référence</th><th class="num">Montant</th><th class="num">Factures</th></tr></thead>
+      <tbody>{% for r in reglements %}<tr {% if r.bordereau %}class="lien" onclick="location.href='{% url 'comptabilite:bordereau' r.bordereau.pk %}'"{% endif %}>
+        <td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}</td><td>{{ r.assurance.nom }}</td><td>{{ r.bordereau.numero|default:"—" }}</td>
+        <td>{{ r.get_mode_display }}</td><td>{{ r.reference }}</td><td class="num">{{ r.montant|floatformat:0|intcomma }}</td><td class="num">{{ r.paiements.count }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun règlement reçu.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Bailleurs et partenaires{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Bailleurs et partenaires</h1>
+      <div class="cpt-sub">Bailleurs de fonds, État, ONG, fondations, entreprises et donateurs réguliers.</div>
+    </div>
+  </div>
+  <div class="cpt-grid2" style="grid-template-columns:3fr 2fr;align-items:start;">
+    <div class="cpt-card">
+      <table class="cpt-table">
+        <thead><tr><th>Nom</th><th>Type</th><th>Contact</th><th class="num">Conventions</th><th>État</th></tr></thead>
+        <tbody>
+          {% for b in bailleurs %}
+          <tr {% if peut_modifier %}class="lien" onclick="location.href='{% url 'comptabilite:bailleur_modifier' b.pk %}'"{% endif %}>
+            <td><b>{{ b }}</b></td><td>{{ b.get_type_display }}</td>
+            <td>{{ b.contact }}{% if b.telephone %} · {{ b.telephone }}{% endif %}</td>
+            <td class="num">{{ b.conventions.count }}</td>
+            <td>{% if b.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
+          </tr>
+          {% empty %}<tr><td colspan="5" class="cpt-vide">Aucun partenaire.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if peut_modifier %}
+    <form method="post" class="cpt-card">
+      {% csrf_token %}
+      <h2>{% if objet %}Modifier « {{ objet }} »{% else %}Nouveau partenaire{% endif %}</h2>
+      {% include 'comptabilite/includes/champs.html' %}
+      <div class="cpt-actions">
+        <button class="cpt-btn primaire">{% if objet %}Enregistrer{% else %}Ajouter{% endif %}</button>
+        {% if objet %}<a href="{% url 'comptabilite:bailleurs' %}" class="cpt-btn">Nouveau partenaire</a>{% endif %}
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

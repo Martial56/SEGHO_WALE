@@ -23,7 +23,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Max
+from django.db.models import Max, Sum
 from django.utils import timezone
 
 from .models import Compte, Correspondance, Ecriture, Exercice, Journal, LigneEcriture
@@ -104,7 +104,8 @@ def _jour(dt):
 
 def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, centre=None, par=None,
                    contre_passation_de=None):
-    """Écriture en brouillon. `lignes` : [(compte, libellé, débit, crédit, tiers)].
+    """Écriture en brouillon. `lignes` : [(compte, libellé, débit, crédit, tiers)],
+    avec en option un sixième élément : la convention qui finance la ligne.
 
     Les lignes à zéro sont écartées ; l'ensemble doit être équilibré.
     """
@@ -121,9 +122,10 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
             piece=piece[:60], origine=origine, centre=centre, cree_par=par,
             contre_passation_de=contre_passation_de)
         LigneEcriture.objects.bulk_create([
-            LigneEcriture(ecriture=ecriture, compte=c, libelle=(lib or libelle)[:255],
-                          debit=d or ZERO, credit=cr or ZERO, tiers=(t or '')[:150])
-            for c, lib, d, cr, t in lignes])
+            LigneEcriture(ecriture=ecriture, compte=l[0], libelle=(l[1] or libelle)[:255],
+                          debit=l[2] or ZERO, credit=l[3] or ZERO, tiers=(l[4] or '')[:150],
+                          convention=l[5] if len(l) > 5 else None)
+            for l in lignes])
     return ecriture
 
 
@@ -167,10 +169,18 @@ def lignes_de_vente(facture):
         nature = facture.type_facture if facture.type_facture not in ('mixte', 'autre') else 'autre'
         produits[nature] = facture.montant_total
     total = sum(produits.values(), ZERO) - remises
-    part_assurance = min(facture.montant_assurance or ZERO, total)
+    # Part de l'assureur : seulement si la facture désigne un assureur
+    # (Facture.part_assurance) ; la créance porte alors son nom.
+    # Une part refusée puis reportée sur le patient (lot 7) a quitté
+    # `montant_assurance` ; la vente, elle, la reconnaît telle qu'elle était,
+    # l'écriture du refus la faisant ensuite passer au patient.
+    reportee = facture.rejets_assurance.filter(decision='patient').aggregate(s=Sum('montant'))['s'] or ZERO
+    part_initiale = facture.part_assurance + reportee if facture.assurance_id else ZERO
+    part_assurance = min(part_initiale, total)
     lignes = [(compte('patient'), 'Créance patient', total - part_assurance, ZERO, tiers)]
     if part_assurance:
-        lignes.append((compte('tiers_payant'), 'Part assurance', part_assurance, ZERO, tiers))
+        lignes.append((compte('tiers_payant'), f'Part assurance — {tiers}', part_assurance, ZERO,
+                       facture.assurance.nom))
     if remises:
         motif = facture.motif_remise.libelle if facture.motif_remise_id else 'remise'
         lignes.append((compte('remise'), f'Remise — {motif}', remises, ZERO, tiers))
@@ -232,6 +242,8 @@ def ecriture_paiement(paiement):
     origine = f'paiement:{paiement.pk}'
     if _deja(origine) or not paiement.montant:
         return None
+    if paiement.reglement_assurance_id:
+        return None          # compté avec le règlement de l'assureur (ecriture_reglement)
     facture = paiement.facture
     tresorerie, journal_ = _tresorerie(paiement.mode_paiement, paiement.caisse)
     tiers = _nom_patient(facture)
@@ -250,7 +262,7 @@ def ecriture_sortie(sortie):
     charge = sortie.motif.compte or compte('sortie_defaut')
     libelle = f'Sortie {sortie.numero} — {sortie.libelle}'
     return creer_ecriture(journal_de_caisse(caisse), _jour(sortie.date_paiement), libelle,
-                          [(charge, None, sortie.montant, ZERO, sortie.beneficiaire),
+                          [(charge, None, sortie.montant, ZERO, sortie.beneficiaire, sortie.convention),
                            (compte_de_caisse(caisse), None, ZERO, sortie.montant, sortie.beneficiaire)],
                           piece=sortie.numero, origine=origine, centre=sortie.centre)
 
@@ -272,6 +284,76 @@ def ecriture_ecart(session):
         libelle = f'Excédent de caisse — session {session.numero}'
     return creer_ecriture(journal_de_caisse(caisse), _jour(session.date_cloture), libelle, lignes,
                           piece=session.numero, origine=origine, centre=session.centre)
+
+
+# ─── Financements : versements des bailleurs, dons ─────────────────────────────
+
+def _tresorerie_recue(mode):
+    """(compte, journal) de l'argent reçu hors caisse de guichet."""
+    if mode == 'especes':
+        return compte('caisse'), journal('CAI')
+    return compte(f'mode:{mode}'), journal(JOURNAL_DU_MODE.get(mode, 'BQ'))
+
+
+def ecriture_versement(versement):
+    origine = f'versement:{versement.pk}'
+    if _deja(origine):
+        return None
+    convention = versement.convention
+    tresorerie, journal_ = _tresorerie_recue(versement.mode)
+    tiers = str(convention.bailleur)
+    return creer_ecriture(journal_, versement.date,
+                          f'Versement {versement.numero} — {convention.code} {convention.intitule}',
+                          [(tresorerie, None, versement.montant, ZERO, tiers),
+                           (convention.compte_ressource, None, ZERO, versement.montant, tiers, convention)],
+                          piece=versement.reference or versement.numero, origine=origine,
+                          centre=versement.centre)
+
+
+def ecriture_don(don):
+    origine = f'don:{don.pk}'
+    if _deja(origine) or not don.montant:
+        return None
+    if don.nature == 'nature':
+        debit, journal_ = don.compte_actif or compte('don_nature_actif'), journal('OD')
+    else:
+        debit, journal_ = _tresorerie_recue(don.nature)
+    credit = don.convention.compte_ressource if don.convention_id else compte('don')
+    tiers = don.nom_donateur
+    return creer_ecriture(journal_, don.date, f'Don {don.numero} — {tiers}',
+                          [(debit, None, don.montant, ZERO, tiers),
+                           (credit, None, ZERO, don.montant, tiers, don.convention)],
+                          piece=don.reference or don.numero, origine=origine, centre=don.centre)
+
+
+def ecriture_reglement(reglement):
+    """Règlement d'un assureur : trésorerie au débit, créance sur l'assureur au crédit."""
+    origine = f'reglement:{reglement.pk}'
+    if _deja(origine):
+        return None
+    tresorerie, journal_ = _tresorerie_recue(reglement.mode)
+    tiers = reglement.assurance.nom
+    return creer_ecriture(journal_, reglement.date, f'Règlement {reglement.numero} — {tiers}',
+                          [(tresorerie, None, reglement.montant, ZERO, tiers),
+                           (compte('tiers_payant'), None, ZERO, reglement.montant, tiers)],
+                          piece=reglement.reference or reglement.numero, origine=origine,
+                          centre=reglement.centre)
+
+
+def ecriture_rejet(rejet):
+    """Refus de l'assureur : la créance sur lui passe au patient, ou en perte."""
+    origine = f'rejet:{rejet.pk}'
+    if _deja(origine):
+        return None
+    facture = rejet.facture
+    ecriture_facture(facture)            # la vente d'abord, si elle manque
+    debit = compte('patient') if rejet.decision == 'patient' else compte('perte_creance')
+    tiers = rejet.assurance.nom
+    return creer_ecriture(journal('OD'), rejet.date,
+                          f'Refus {rejet.numero} de {tiers} — facture {facture.numero} ({rejet.get_decision_display().lower()})',
+                          [(debit, None, rejet.montant, ZERO, _nom_patient(facture)),
+                           (compte('tiers_payant'), None, ZERO, rejet.montant, tiers)],
+                          piece=rejet.numero, origine=origine, centre=rejet.centre)
 
 
 # ─── Génération d'une période ──────────────────────────────────────────────────
@@ -306,6 +388,18 @@ def generer(debut, fin):
     for s in (SortieCaisse.all_objects.filter(statut='payee', date_paiement__date__range=[debut, fin])
               .select_related('session__journee__caisse', 'motif__compte')):
         taches.append((f'Sortie {s.numero}', ecriture_sortie, s))
+    from .models import Don, ReglementAssurance, RejetAssurance, RemiseBanque, Versement
+    for r in RejetAssurance.all_objects.filter(date__range=[debut, fin]).select_related('facture', 'assurance'):
+        taches.append((f'Refus {r.numero}', ecriture_rejet, r))
+    from .tresorerie import ecritures_remise
+    for r in RemiseBanque.all_objects.filter(date__range=[debut, fin]).select_related('caisse', 'compte_tresorerie'):
+        taches.append((f'Remise {r.numero}', ecritures_remise, r))
+    for r in ReglementAssurance.all_objects.filter(date__range=[debut, fin]).select_related('assurance'):
+        taches.append((f'Règlement {r.numero}', ecriture_reglement, r))
+    for v in Versement.all_objects.filter(date__range=[debut, fin]).select_related('convention__bailleur'):
+        taches.append((f'Versement {v.numero}', ecriture_versement, v))
+    for d in Don.all_objects.filter(date__range=[debut, fin]).select_related('donateur', 'convention'):
+        taches.append((f'Don {d.numero}', ecriture_don, d))
     for s in (SessionCaissiere.all_objects.filter(date_cloture__date__range=[debut, fin])
               .exclude(statut='ouverte').select_related('journee__caisse', 'caissiere')):
         taches.append((f'Session {s.numero}', ecriture_ecart, s))
@@ -314,8 +408,9 @@ def generer(debut, fin):
     for nom, fonction, objet in taches:
         try:
             with transaction.atomic():
-                if fonction(objet) is not None:
-                    crees += 1
+                cree = fonction(objet)
+                # Une remise en banque produit deux écritures (une liste).
+                crees += len(cree) if isinstance(cree, list) else int(cree is not None)
         except ErreurCompta as e:
             erreurs.append(f'{nom} : {e}')
     return {'crees': crees, 'erreurs': erreurs}
@@ -358,7 +453,7 @@ def contre_passer(ecriture, par, jour=None):
         raise ErreurCompta("Seule une écriture validée se contre-passe ; un brouillon se supprime.")
     if hasattr(ecriture, 'contre_passee_par'):
         raise ErreurCompta("Cette écriture a déjà été contre-passée.")
-    lignes = [(l.compte, l.libelle, l.credit, l.debit, l.tiers) for l in ecriture.lignes.all()]
+    lignes = [(l.compte, l.libelle, l.credit, l.debit, l.tiers, l.convention) for l in ecriture.lignes.all()]
     return creer_ecriture(ecriture.journal, jour or timezone.localdate(),
                           f'Contre-passation de {ecriture.reference} — {ecriture.libelle}', lignes,
                           piece=ecriture.piece, centre=ecriture.centre, par=par,

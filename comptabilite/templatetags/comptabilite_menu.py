@@ -18,3 +18,11 @@ def menu_etats(user):
         if etats:
             groupes.append((titre, etats))
     return groupes
+
+
+
+@register.simple_tag
+def menu_tresorerie():
+    """Comptes de trésorerie actifs, une entrée de rapprochement chacun."""
+    from comptabilite.models import CompteTresorerie
+    return list(CompteTresorerie.objects.filter(actif=True).order_by('libelle'))

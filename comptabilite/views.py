@@ -278,7 +278,8 @@ def sortie_creer(request, pk):
         d = form.cleaned_data
         try:
             sortie = regles.creer_sortie(session, request.user, d['motif'], d['libelle'],
-                                         d['montant'], d['beneficiaire'], d['justificatif'])
+                                         d['montant'], d['beneficiaire'], d['justificatif'],
+                                         d.get('convention'))
         except regles.ErreurCaisse as e:
             messages.error(request, str(e))
         else:

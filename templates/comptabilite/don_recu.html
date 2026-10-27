@@ -1,0 +1,52 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reçu de don {{ don.numero }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #e5e7eb; color: #1a1a2e; font-size: 13px; }
+  .barre { display: flex; align-items: center; gap: 10px; background: #1a5c4a; color: #fff; padding: 10px 24px; }
+  .barre span { flex: 1; font-weight: 600; }
+  .barre button, .barre a { padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; background: #fff; color: #1a5c4a; }
+  .feuille { width: 190mm; margin: 20px auto; background: #fff; padding: 14mm; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .entete { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #1a5c4a; padding-bottom: 10px; margin-bottom: 18px; }
+  .entete img { width: 56px; height: 56px; object-fit: contain; }
+  .entete h1 { font-size: 17px; color: #1a5c4a; }
+  .num { margin-left: auto; text-align: right; font-weight: 700; }
+  p { margin-bottom: 10px; line-height: 1.6; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0 18px; }
+  td { border: 1px solid #cfd6dd; padding: 7px 9px; }
+  td:first-child { width: 35%; background: #f1f4f6; font-weight: 600; }
+  .montant { font-size: 18px; font-weight: 800; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 40px; }
+  .signatures div { border-top: 1px solid #333; padding-top: 6px; text-align: center; height: 70px; }
+  .pied { margin-top: 20px; font-size: 10px; color: #777; }
+  @media print { body { background: #fff; } .barre { display: none; } .feuille { margin: 0; box-shadow: none; width: auto; padding: 0; } @page { size: A4; margin: 15mm; } }
+</style>
+</head>
+<body>
+<div class="barre"><span>Reçu de don {{ don.numero }}</span><button onclick="window.print()">Imprimer</button><a href="{% url 'comptabilite:dons' %}">Retour</a></div>
+<div class="feuille">
+  <div class="entete">
+    <img src="{% static 'img/logo.png' %}" alt="Logo">
+    <div><h1>Reçu de don</h1><div>Centre Médico-Social WALÉ{% if don.centre %} — {{ don.centre }}{% endif %} · Yamoussoukro</div></div>
+    <div class="num">N° {{ don.numero }}<br><span style="font-weight:400;">{{ don.date|date:"d/m/Y" }}</span></div>
+  </div>
+  <p>Le Centre Médico-Social WALÉ, organisation à but non lucratif, reconnaît avoir reçu le don suivant et en remercie chaleureusement le donateur.</p>
+  <table>
+    <tr><td>Donateur</td><td>{{ don.nom_donateur }}</td></tr>
+    <tr><td>Date du don</td><td>{{ don.date|date:"d F Y" }}</td></tr>
+    <tr><td>Nature</td><td>{{ don.get_nature_display }}</td></tr>
+    {% if don.description %}<tr><td>Description</td><td>{{ don.description|linebreaksbr }}</td></tr>{% endif %}
+    <tr><td>{% if don.nature == 'nature' %}Valeur estimée{% else %}Montant{% endif %}</td><td class="montant">{{ don.montant|floatformat:0|intcomma }} F CFA</td></tr>
+    {% if don.convention %}<tr><td>Affectation</td><td>{{ don.convention }}</td></tr>{% endif %}
+    {% if don.reference %}<tr><td>Référence</td><td>{{ don.reference }}</td></tr>{% endif %}
+  </table>
+  <div class="signatures"><div>Le donateur</div><div>Pour le Centre, la Direction</div></div>
+  <div class="pied">Imprimé le {{ imprime_le|date:"d/m/Y à H:i" }} — SEGHO-WALÉ</div>
+</div>
+</body>
+</html>

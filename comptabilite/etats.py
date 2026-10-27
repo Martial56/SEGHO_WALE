@@ -500,13 +500,227 @@ def controle(debut, fin, params):
     return {'titre': 'Contrôle de cohérence', 'tableaux': tableaux, 'notes': []}
 
 
+# ─── Financements (lot 5) ──────────────────────────────────────────────────────
+
+def conventions(debut, fin, params):
+    """Suivi de toutes les conventions à la date de fin."""
+    from . import financements
+    from .models import Convention
+    lignes = []
+    tot = [ZERO] * 5
+    for c in Convention.objects.select_related('bailleur').exclude(date_debut__gt=fin).order_by('code'):
+        s = financements.suivi(c, fin=fin)
+        valeurs = [s['accorde'], s['recu'], s['depense'], s['reste_a_recevoir'], s['disponible']]
+        tot = [a + b for a, b in zip(tot, valeurs)]
+        lignes.append(_ligne(c.code, c.intitule, str(c.bailleur), *valeurs,
+                             f"{s['taux']:.0f} %" if s['taux'] is not None else '',
+                             lien=reverse('comptabilite:convention', args=[c.pk])))
+    if lignes:
+        lignes.append(_ligne('Total', '', '', *tot, '', type_='total'))
+    return {'titre': f'Suivi des conventions au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Conventions', [('Code', 'texte'), ('Projet', 'texte'), ('Bailleur', 'texte'), ('Accordé', 'montant'),
+                        ('Reçu', 'montant'), ('Dépensé', 'montant'), ('Reste à recevoir', 'montant'),
+                        ('Disponible', 'montant'), ('Exécution', 'texte')], lignes,
+        vide="Aucune convention.")],
+        'notes': ["Dépensé : charges imputées à la convention (brouillons compris). "
+                  "Disponible : reçu et dons affectés, moins le dépensé."]}
+
+
+def rapport_convention(debut, fin, params):
+    """Rapport financier d'une convention, pour le bailleur."""
+    from . import financements
+    from .models import Convention, LigneEcriture
+    convention = Convention.objects.filter(pk=params.get('convention')).select_related('bailleur').first() \
+        if params.get('convention') else Convention.objects.order_by('-date_debut').first()
+    choix = {'actuelle': convention.pk if convention else None,
+             'conventions': list(Convention.objects.order_by('code'))}
+    if convention is None:
+        return {'titre': 'Rapport financier de convention', 'tableaux': [], 'notes': ['Aucune convention.'],
+                'choix_convention': choix}
+    s = financements.suivi(convention, fin=fin)
+    synthese = _tableau('Synthèse', [('', 'texte'), ('Montant', 'montant')], [
+        _ligne('Montant accordé', s['accorde']),
+        _ligne('Versements reçus', s['recu']),
+        _ligne('Dons affectés', s['dons']),
+        _ligne('Dépenses réalisées', s['depense']),
+        _ligne('Reste à recevoir', s['reste_a_recevoir']),
+        _ligne('Disponible (reçu − dépensé)', s['disponible'], type_='total'),
+    ])
+    lignes = [_ligne(l['ligne'].libelle, l['ligne'].compte.numero, l['prevu'], l['realise'], l['reste'],
+                     f"{l['taux']:.0f} %" if l['taux'] is not None else '') for l in s['lignes_budget']]
+    if s['hors_budget']:
+        lignes.append(_ligne('Dépenses hors lignes budgétaires', '', None, s['hors_budget'], None, ''))
+    if lignes:
+        lignes.append(_ligne('Total', '', s['budget_prevu'], s['depense'], s['budget_prevu'] - s['depense'], '',
+                             type_='total'))
+    budget = _tableau('Budget prévu / réalisé', [('Ligne', 'texte'), ('Compte', 'texte'), ('Prévu', 'montant'),
+                                                 ('Réalisé', 'montant'), ('Reste', 'montant'), ('Taux', 'texte')],
+                      lignes, vide="Aucune ligne budgétaire saisie.")
+    versements = _tableau('Versements reçus', [('Date', 'texte'), ('N°', 'texte'), ('Mode', 'texte'),
+                                               ('Référence', 'texte'), ('Montant', 'montant')],
+                          [_ligne(v.date.strftime('%d/%m/%Y'), v.numero, v.get_mode_display(), v.reference, v.montant)
+                           for v in convention.versements.filter(date__lte=fin).order_by('date')],
+                          vide="Aucun versement.")
+    depenses = (LigneEcriture.objects.filter(convention=convention, compte__numero__startswith='6',
+                                             ecriture__date__range=[debut, fin])
+                .select_related('ecriture__journal', 'compte').order_by('ecriture__date'))
+    detail = _tableau(f'Dépenses du {debut:%d/%m/%Y} au {fin:%d/%m/%Y}',
+                      [('Date', 'texte'), ('Pièce', 'texte'), ('Compte', 'texte'), ('Libellé', 'texte'),
+                       ('Montant', 'montant')],
+                      [_ligne(l.ecriture.date.strftime('%d/%m/%Y'), l.ecriture.piece, l.compte.numero, l.libelle,
+                              l.debit - l.credit, lien=reverse('comptabilite:ecriture', args=[l.ecriture_id]))
+                       for l in depenses], vide="Aucune dépense sur la période.")
+    return {'titre': f'Rapport financier — {convention.code} {convention.intitule}',
+            'tableaux': [synthese, budget, versements, detail],
+            'notes': [f"Bailleur : {convention.bailleur}. Convention du {convention.date_debut:%d/%m/%Y} "
+                      f"au {convention.date_fin:%d/%m/%Y}. Situation au {fin:%d/%m/%Y}."],
+            'choix_convention': choix}
+
+
+def budget(debut, fin, params):
+    """Budget annuel et réalisé de l'exercice qui contient la date de fin."""
+    from . import financements
+    from .models import Exercice
+    exercice = Exercice.objects.filter(date_debut__lte=fin, date_fin__gte=fin).first()
+    if exercice is None:
+        return {'titre': 'Budget / réalisé', 'tableaux': [], 'notes': ["Aucun exercice ne contient cette date."]}
+    lignes, groupe = [], None
+    totaux = {'6': [ZERO, ZERO], '7': [ZERO, ZERO]}
+    for l in financements.budget_realise(exercice, fin):
+        classe = l['ligne'].compte.classe
+        if classe != groupe:
+            groupe = classe
+            lignes.append(_ligne('Charges' if classe == '6' else 'Ressources', type_='groupe'))
+        totaux[classe][0] += l['prevu']
+        totaux[classe][1] += l['realise']
+        lignes.append(_ligne(l['ligne'].compte.numero, l['ligne'].compte.intitule, l['prevu'], l['realise'],
+                             l['ecart'], f"{l['taux']:.0f} %" if l['taux'] is not None else ''))
+    for classe, nom in (('7', 'ressources'), ('6', 'charges')):
+        p, r = totaux[classe]
+        if p or r:
+            lignes.append(_ligne(f'Total des {nom}', '', p, r, r - p, '', type_='sous_total'))
+    return {'titre': f'Budget / réalisé — exercice {exercice} au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Par compte', [('Compte', 'texte'), ('Intitulé', 'texte'), ('Budget annuel', 'montant'),
+                       ('Réalisé', 'montant'), ('Écart', 'montant'), ('Taux', 'texte')], lignes,
+        vide="Aucun budget saisi pour cet exercice (Financements → Budget annuel).")],
+        'notes': ["Réalisé cumulé depuis le début de l'exercice, brouillons compris.",
+                  "Le taux se lit au regard de l'avancement de l'année."]}
+
+
+def dons(debut, fin, params):
+    from .models import Don
+    qs = Don.objects.filter(date__range=[debut, fin]).select_related('donateur', 'convention').order_by('date')
+    lignes = [_ligne(d.date.strftime('%d/%m/%Y'), d.numero, d.nom_donateur, d.get_nature_display(),
+                     d.convention.code if d.convention_id else 'Fonds propres', d.montant,
+                     lien=reverse('comptabilite:don_recu', args=[d.pk])) for d in qs]
+    if lignes:
+        lignes.append(_ligne('Total', '', '', '', '', sum((d.montant for d in qs), ZERO), type_='total'))
+    return {'titre': 'Dons reçus', 'tableaux': [_tableau(
+        'Dons', [('Date', 'texte'), ('N°', 'texte'), ('Donateur', 'texte'), ('Nature', 'texte'),
+                 ('Affectation', 'texte'), ('Montant / valeur', 'montant')], lignes)],
+        'notes': ["Dons en nature à leur valeur estimée."]}
+
+
+# ─── Assurances (lot 6) ────────────────────────────────────────────────────────
+
+def creances_assurances(debut, fin, params):
+    """Balance âgée des tiers payants : ce que doit chaque assureur, par ancienneté."""
+    from . import assurances
+    lignes, tot = [], [ZERO] * len(assurances.TRANCHES)
+    for l in assurances.balance_agee(fin):
+        tot = [a + b for a, b in zip(tot, l['tranches'])]
+        lignes.append(_ligne(l['assurance'].nom, *l['tranches'], sum(l['tranches'], ZERO),
+                             lien=reverse('comptabilite:creances_assureur', args=[l['assurance'].pk])))
+    if lignes:
+        lignes.append(_ligne('Total', *tot, sum(tot, ZERO), type_='total'))
+    return {'titre': f'Créances des assurances au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Balance âgée par assureur', [('Assureur', 'texte')] + [(t, 'montant') for _, t in assurances.TRANCHES]
+        + [('Total dû', 'montant')], lignes, vide="Aucune créance sur les assurances.")],
+        'notes': ["Âge compté depuis la date de la facture. Part assurance restant due à la date de fin."]}
+
+
+def reglements_assurances(debut, fin, params):
+    from .models import ReglementAssurance
+    qs = (ReglementAssurance.objects.filter(date__range=[debut, fin])
+          .select_related('assurance', 'bordereau').order_by('date'))
+    lignes = [_ligne(r.date.strftime('%d/%m/%Y'), r.numero, r.assurance.nom,
+                     r.bordereau.numero if r.bordereau_id else '', r.get_mode_display(), r.reference, r.montant)
+              for r in qs]
+    if lignes:
+        lignes.append(_ligne('Total', '', '', '', '', '', sum((r.montant for r in qs), ZERO), type_='total'))
+    return {'titre': 'Règlements des assurances', 'tableaux': [_tableau(
+        'Règlements', [('Date', 'texte'), ('N°', 'texte'), ('Assureur', 'texte'), ('Bordereau', 'texte'),
+                       ('Mode', 'texte'), ('Référence', 'texte'), ('Montant', 'montant')], lignes)],
+        'notes': []}
+
+
+# ─── Trésorerie (lot 7) ────────────────────────────────────────────────────────
+
+def position_tresorerie(debut, fin, params):
+    from . import tresorerie
+    lignes = [_ligne(l['compte'].numero, l['compte'].intitule, l['solde']) for l in tresorerie.position(fin)]
+    if lignes:
+        lignes.append(_ligne('Total', '', sum((l['cellules'][2] for l in lignes), ZERO), type_='total'))
+    return {'titre': f'Position de trésorerie au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Comptes de trésorerie', [('Compte', 'texte'), ('Intitulé', 'texte'), ('Solde', 'montant')], lignes,
+        vide="Aucun mouvement de trésorerie comptabilisé.")],
+        'notes': ["Soldes selon les comptes, écritures en brouillon comprises."]}
+
+
+def etat_rapprochement(debut, fin, params):
+    from . import tresorerie
+    from .models import CompteTresorerie
+    ct = (CompteTresorerie.objects.filter(pk=params.get('compte_tresorerie')).first()
+          if params.get('compte_tresorerie') else CompteTresorerie.objects.filter(actif=True).first())
+    choix = {'actuel': ct.pk if ct else None, 'comptes': list(CompteTresorerie.objects.order_by('libelle'))}
+    if ct is None:
+        return {'titre': 'État de rapprochement', 'tableaux': [], 'notes': ['Aucun compte de trésorerie.'],
+                'choix_tresorerie': choix}
+    e = tresorerie.etat_rapprochement(ct, fin)
+    synthese = _tableau('Synthèse', [('', 'texte'), ('Montant', 'montant')], [
+        _ligne(f'Solde selon les comptes ({ct.compte.numero})', e['solde_compta']),
+        _ligne('− Écritures absentes du relevé', e['total_ecritures']),
+        _ligne('+ Opérations du relevé non comptabilisées', e['total_releve']),
+        _ligne('= Solde attendu sur le relevé', e['solde_explique'], type_='sous_total'),
+        _ligne('Solde du relevé', e['solde_releve']),
+        _ligne('Écart inexpliqué', e['solde_releve'] - e['solde_explique'], type_='total'),
+    ])
+    ecritures = _tableau('Écritures absentes du relevé', [('Date', 'texte'), ('Libellé', 'texte'), ('Montant', 'montant')],
+                         [_ligne(l.ecriture.date.strftime('%d/%m/%Y'), l.ecriture.libelle, l.debit - l.credit,
+                                 lien=reverse('comptabilite:ecriture', args=[l.ecriture_id]))
+                          for l in e['ecritures_seules']], vide="Aucune.")
+    releve = _tableau('Opérations du relevé non comptabilisées', [('Date', 'texte'), ('Libellé', 'texte'),
+                                                                  ('Montant', 'montant')],
+                      [_ligne(l.date.strftime('%d/%m/%Y'), l.libelle, l.montant) for l in e['releve_seul']],
+                      vide="Aucune.")
+    return {'titre': f'État de rapprochement — {ct.libelle} au {fin:%d/%m/%Y}',
+            'tableaux': [synthese, ecritures, releve], 'notes': [], 'choix_tresorerie': choix}
+
+
+def rejets_assurances(debut, fin, params):
+    from .models import RejetAssurance
+    qs = (RejetAssurance.objects.filter(date__range=[debut, fin])
+          .select_related('facture__patient', 'assurance').order_by('date'))
+    lignes = [_ligne(r.date.strftime('%d/%m/%Y'), r.numero, r.assurance.nom, r.facture.numero,
+                     f'{r.facture.patient.nom} {r.facture.patient.prenoms}', r.get_decision_display(), r.motif, r.montant,
+                     lien=reverse('facturation:detail', args=[r.facture_id])) for r in qs]
+    if lignes:
+        lignes.append(_ligne('Total', '', '', '', '', '', '', sum((r.montant for r in qs), ZERO), type_='total'))
+    return {'titre': 'Refus des assurances', 'tableaux': [_tableau(
+        'Refus', [('Date', 'texte'), ('N°', 'texte'), ('Assureur', 'texte'), ('Facture', 'texte'), ('Patient', 'texte'),
+                  ('Décision', 'texte'), ('Motif', 'texte'), ('Montant', 'montant')], lignes)],
+        'notes': []}
+
+
 # ─── Registre ──────────────────────────────────────────────────────────────────
 
 PERM_CAISSE = 'caisse'        # facturation.view_facture ou superviseur de caisse
 PERM_COMPTA = 'comptabilite.view_ecriture'
 
 # Sections du sous-menu « États » et du sommaire, dans cet ordre.
-GROUPES = [('caisse', 'Caisse et recettes'), ('comptabilite', 'Comptabilité générale')]
+GROUPES = [('caisse', 'Caisse et recettes'), ('comptabilite', 'Comptabilité générale'),
+           ('tresorerie', 'Trésorerie'), ('assurances', 'Assurances et mutuelles'),
+           ('financements', 'Financements et dons')]
 
 ETATS = OrderedDict([
     ('recettes', {'groupe': 'caisse', 'icone': 'bi-graph-up-arrow', 'titre': 'Recettes', 'fonction': recettes, 'perm': PERM_CAISSE, 'periode': 'jour',
@@ -529,6 +743,35 @@ ETATS = OrderedDict([
                   'description': "Ressources, charges et excédent ou déficit de la période."}),
     ('controle', {'groupe': 'comptabilite', 'icone': 'bi-shield-check', 'titre': 'Contrôle de cohérence', 'fonction': controle, 'perm': PERM_COMPTA, 'periode': 'mois',
                   'description': "Ce qui n'est pas comptabilisé, validé ou clôturé."}),
+    ('position_tresorerie', {'groupe': 'tresorerie', 'icone': 'bi-wallet2', 'titre': 'Position de trésorerie',
+                             'fonction': position_tresorerie, 'perm': 'comptabilite.view_comptetresorerie',
+                             'periode': 'jour', 'description': "Solde de chaque caisse, banque et Mobile Money."}),
+    ('rapprochement', {'groupe': 'tresorerie', 'icone': 'bi-check2-square', 'titre': 'État de rapprochement',
+                       'fonction': etat_rapprochement, 'perm': 'comptabilite.view_lignereleve', 'periode': 'mois',
+                       'description': "Écart entre le relevé et les comptes, et ce qui l'explique."}),
+    ('rejets_assurances', {'groupe': 'assurances', 'icone': 'bi-x-octagon', 'titre': 'Refus des assurances',
+                           'fonction': rejets_assurances, 'perm': 'comptabilite.view_rejetassurance',
+                           'periode': 'annee', 'description': "Parts refusées par les assureurs, et leur suite."}),
+    ('creances_assurances', {'groupe': 'assurances', 'icone': 'bi-shield-plus',
+                             'titre': 'Créances des assurances (balance âgée)', 'fonction': creances_assurances,
+                             'perm': 'comptabilite.view_bordereauassurance', 'periode': 'jour',
+                             'description': "Ce que doit chaque assureur, par ancienneté."}),
+    ('reglements_assurances', {'groupe': 'assurances', 'icone': 'bi-cash', 'titre': 'Règlements des assurances',
+                               'fonction': reglements_assurances, 'perm': 'comptabilite.view_reglementassurance',
+                               'periode': 'mois', 'description': "Argent reçu des assureurs sur la période."}),
+    ('conventions', {'groupe': 'financements', 'icone': 'bi-briefcase', 'titre': 'Suivi des conventions',
+                     'fonction': conventions, 'perm': 'comptabilite.view_convention', 'periode': 'annee',
+                     'description': "Accordé, reçu, dépensé et disponible de chaque convention."}),
+    ('rapport_convention', {'groupe': 'financements', 'icone': 'bi-file-earmark-text',
+                            'titre': 'Rapport financier de convention', 'fonction': rapport_convention,
+                            'perm': 'comptabilite.view_convention', 'periode': 'annee',
+                            'description': "Le rapport d'une convention pour son bailleur."}),
+    ('budget', {'groupe': 'financements', 'icone': 'bi-clipboard-data', 'titre': 'Budget / réalisé',
+                'fonction': budget, 'perm': 'comptabilite.view_lignebudget', 'periode': 'annee',
+                'description': "Budget annuel et réalisé cumulé, compte par compte."}),
+    ('dons', {'groupe': 'financements', 'icone': 'bi-gift', 'titre': 'Dons reçus', 'fonction': dons,
+              'perm': 'comptabilite.view_don', 'periode': 'annee',
+              'description': "Les dons de la période, par donateur et affectation."}),
 ])
 
 

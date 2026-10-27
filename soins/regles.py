@@ -52,7 +52,9 @@ def demarrer_soin_de_facture(facture):
     """
     from soins.models import Soin
 
-    if facture is None or facture.statut != 'payee':
+    # « Réglée » côté patient : payée, ou part patient payée quand une
+    # assurance doit le reste (tiers payant, module Comptabilité).
+    if facture is None or not facture.reglee_par_le_patient:
         return None
     # all_objects : le geste suit la facture, pas le centre actif.
     soin = Soin.all_objects.filter(facture=facture).first()

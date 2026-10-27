@@ -36,19 +36,21 @@
 
     <datalist id="liste-comptes">{% for c in comptes %}<option value="{{ c.numero }} {{ c.intitule }}">{% endfor %}</datalist>
     <table class="cpt-table od-table">
-      <thead><tr><th style="width:30%;">Compte</th><th>Libellé de ligne</th><th>Tiers</th><th class="num" style="width:13%;">Débit</th><th class="num" style="width:13%;">Crédit</th></tr></thead>
+      <thead><tr><th style="width:30%;">Compte</th><th>Libellé de ligne</th><th>Tiers</th><th>Convention</th><th class="num" style="width:12%;">Débit</th><th class="num" style="width:12%;">Crédit</th></tr></thead>
       <tbody id="od-lignes">
         {% for l in lignes %}
         <tr>
           <td><input list="liste-comptes" name="compte_{{ forloop.counter0 }}" value="{{ l.compte }}" placeholder="Numéro ou intitulé"></td>
           <td><input name="libelle_{{ forloop.counter0 }}" value="{{ l.libelle }}"></td>
           <td><input name="tiers_{{ forloop.counter0 }}" value="{{ l.tiers }}"></td>
+          <td><select name="convention_{{ forloop.counter0 }}" class="cpt-input" style="font-size:12px;padding:5px 6px;width:100%;">
+            <option value="">—</option>{% for c in conventions %}<option value="{{ c.pk }}" {% if l.convention == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select></td>
           <td><input class="num montant" data-sens="debit" name="debit_{{ forloop.counter0 }}" value="{{ l.debit }}" inputmode="decimal"></td>
           <td><input class="num montant" data-sens="credit" name="credit_{{ forloop.counter0 }}" value="{{ l.credit }}" inputmode="decimal"></td>
         </tr>
         {% endfor %}
       </tbody>
-      <tfoot><tr><td colspan="3"><button type="button" class="cpt-btn" id="ajouter">+ Ligne</button> <span id="od-equilibre" class="cpt-note"></span></td>
+      <tfoot><tr><td colspan="4"><button type="button" class="cpt-btn" id="ajouter">+ Ligne</button> <span id="od-equilibre" class="cpt-note"></span></td>
         <td class="num od-total" id="total-debit">0</td><td class="num od-total" id="total-credit">0</td></tr></tfoot>
     </table>
     <div style="margin-top:12px;"><button class="cpt-btn primaire">Enregistrer en brouillon</button></div>
@@ -76,7 +78,7 @@
   document.getElementById('ajouter').addEventListener('click', function () {
     var n = corps.querySelectorAll('tr').length;
     var tr = corps.querySelector('tr').cloneNode(true);
-    tr.querySelectorAll('input').forEach(function (i) { i.name = i.name.replace(/_\d+$/, '_' + n); i.value = ''; });
+    tr.querySelectorAll('input, select').forEach(function (i) { i.name = i.name.replace(/_\d+$/, '_' + n); i.value = ''; });
     corps.appendChild(tr);
   });
   totaliser();

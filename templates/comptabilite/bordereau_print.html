@@ -1,0 +1,56 @@
+{% load static humanize %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bordereau {{ b.numero }}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #e5e7eb; color: #1a1a2e; font-size: 12px; }
+  .barre { display: flex; align-items: center; gap: 10px; background: #1a5c4a; color: #fff; padding: 10px 24px; }
+  .barre span { flex: 1; font-weight: 600; }
+  .barre button, .barre a { padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; text-decoration: none; background: #fff; color: #1a5c4a; }
+  .feuille { width: 277mm; margin: 20px auto; background: #fff; padding: 12mm; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .entete { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #1a5c4a; padding-bottom: 10px; margin-bottom: 14px; }
+  .entete img { width: 54px; height: 54px; object-fit: contain; }
+  .entete h1 { font-size: 16px; color: #1a5c4a; }
+  .num { margin-left: auto; text-align: right; font-weight: 700; }
+  .infos { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 20px; margin-bottom: 12px; }
+  .infos b { display: inline-block; min-width: 110px; color: #555; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #cfd6dd; padding: 5px 7px; text-align: left; }
+  th { background: #f1f4f6; font-size: 11px; }
+  .m { text-align: right; white-space: nowrap; }
+  tfoot td { font-weight: 800; background: #f7f9fa; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 30px; }
+  .signatures div { border-top: 1px solid #333; padding-top: 6px; text-align: center; height: 60px; }
+  @media print { body { background: #fff; } .barre { display: none; } .feuille { margin: 0; box-shadow: none; width: auto; padding: 0; } @page { size: A4 landscape; margin: 10mm; } }
+</style>
+</head>
+<body>
+<div class="barre"><span>Bordereau {{ b.numero }}</span><button onclick="window.print()">Imprimer</button><a href="{% url 'comptabilite:bordereau' b.pk %}">Retour</a></div>
+<div class="feuille">
+  <div class="entete">
+    <img src="{% static 'img/logo.png' %}" alt="Logo">
+    <div><h1>Bordereau de facturation — tiers payant</h1><div>Centre Médico-Social WALÉ{% if b.centre %} — {{ b.centre }}{% endif %} · Yamoussoukro</div></div>
+    <div class="num">N° {{ b.numero }}</div>
+  </div>
+  <div class="infos">
+    <div><b>Assureur</b> {{ b.assurance.nom }} ({{ b.assurance.code }})</div>
+    <div><b>Période</b> du {{ b.date_debut|date:"d/m/Y" }} au {{ b.date_fin|date:"d/m/Y" }}</div>
+    <div><b>Taux de prise en charge</b> {{ b.assurance.taux_prise_en_charge|floatformat:"-2" }} %</div>
+    <div><b>Établi le</b> {{ b.cree_le|date:"d/m/Y" }}</div>
+  </div>
+  <table>
+    <thead><tr><th>N°</th><th>Date</th><th>Facture</th><th>Patient</th><th>N° assuré</th><th class="m">Total facture</th><th class="m">Part patient</th><th class="m">Part assurance</th></tr></thead>
+    <tbody>{% for l in contenu.lignes %}{% with f=l.facture %}<tr><td>{{ forloop.counter }}</td><td>{{ f.date_emission|date:"d/m/Y" }}</td><td>{{ f.numero }}</td>
+      <td>{{ f.patient.nom }} {{ f.patient.prenoms }}</td><td>{{ f.patient.numero_assurance|default:"" }}</td>
+      <td class="m">{{ f.montant_total|floatformat:0|intcomma }}</td><td class="m">{{ f.part_patient|floatformat:0|intcomma }}</td><td class="m">{{ l.part|floatformat:0|intcomma }}</td></tr>{% endwith %}{% endfor %}</tbody>
+    <tfoot><tr><td colspan="7">Total à régler par {{ b.assurance.nom }} (F CFA)</td><td class="m">{{ contenu.total|floatformat:0|intcomma }}</td></tr></tfoot>
+  </table>
+  <div class="signatures"><div>Pour le Centre</div><div>Accusé de réception de l'assureur</div></div>
+  <div style="margin-top:14px;font-size:10px;color:#777;">Imprimé le {{ imprime_le|date:"d/m/Y à H:i" }} — SEGHO-WALÉ</div>
+</div>
+</body>
+</html>

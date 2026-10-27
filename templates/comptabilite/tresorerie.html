@@ -1,0 +1,34 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Trésorerie{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Position de trésorerie au {{ fin|date:"d/m/Y" }}</h1>
+      <div class="cpt-sub">Soldes des caisses, banques et Mobile Money selon les comptes (écritures en brouillon comprises).</div>
+    </div>
+    <form method="get" class="cpt-actions">
+      <input type="date" name="date" class="cpt-input" value="{{ fin|date:'Y-m-d' }}" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+    </form>
+  </div>
+
+  <div class="cpt-kpis"><div class="cpt-kpi accent"><div class="l">Trésorerie totale</div><div class="v">{{ total|floatformat:0|intcomma }} F</div></div></div>
+
+  <div class="cpt-card">
+    {% if lignes %}
+    <table class="cpt-table">
+      <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Solde</th><th></th></tr></thead>
+      <tbody>{% for l in lignes %}<tr>
+        <td><b>{{ l.compte.numero }}</b></td><td>{{ l.compte.intitule }}</td>
+        <td class="num {% if l.solde < 0 %}ecart-neg{% endif %}">{{ l.solde|floatformat:0|intcomma }}</td>
+        <td>{% if l.tresorerie %}<a class="cpt-btn" style="padding:3px 8px;font-size:11px;" href="{% url 'comptabilite:rapprochement' l.tresorerie.pk %}">Rapprocher</a>{% endif %}</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td colspan="2">Total</td><td class="num">{{ total|floatformat:0|intcomma }}</td><td></td></tr></tfoot>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun mouvement de trésorerie comptabilisé. Générez les écritures (menu Écritures).</div>{% endif %}
+  </div>
+  <div class="cpt-note">Un solde de caisse négatif signale des encaissements non comptabilisés ou une sortie en trop. Le 585 (virements internes) doit revenir à zéro une fois chaque remise arrivée en banque.</div>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Convention de financement{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:1000px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">{% if objet %}Modifier la convention {{ objet.code }}{% else %}Nouvelle convention{% endif %}</h1></div>
+    <div class="cpt-actions"><a href="{% if objet %}{% url 'comptabilite:convention' objet.pk %}{% else %}{% url 'comptabilite:conventions' %}{% endif %}" class="cpt-btn">Retour</a></div>
+  </div>
+  <form method="post">
+    {% csrf_token %}
+    <div class="cpt-card">{% include 'comptabilite/includes/champs.html' %}</div>
+    <div class="cpt-card">
+      <h2>Budget de la convention</h2>
+      <div class="cpt-note" style="margin-bottom:8px;">Les lignes autorisées par le bailleur. Les dépenses imputées à la convention sur un compte (ou un de ses sous-comptes) se rattachent à sa ligne.</div>
+      {{ budget.management_form }}
+      {% if budget.non_form_errors %}<div class="cpt-alerte">{{ budget.non_form_errors.0 }}</div>{% endif %}
+      <table class="cpt-table">
+        <thead><tr><th>Ligne budgétaire</th><th>Compte</th><th class="num">Montant prévu</th><th>Supprimer</th></tr></thead>
+        <tbody>
+          {% for f in budget %}
+          <tr>
+            <td>{{ f.id }}{{ f.libelle }}{% if f.libelle.errors %}<div class="ecart-neg" style="font-size:11px;">{{ f.libelle.errors.0 }}</div>{% endif %}</td>
+            <td>{{ f.compte }}{% if f.compte.errors %}<div class="ecart-neg" style="font-size:11px;">{{ f.compte.errors.0 }}</div>{% endif %}</td>
+            <td>{{ f.montant_prevu }}</td>
+            <td>{% if f.instance.pk %}{{ f.DELETE }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="cpt-note">Trois lignes vides sont proposées à chaque enregistrement : enregistrez pour en ajouter d'autres.</div>
+    </div>
+    <button class="cpt-btn primaire">Enregistrer</button>
+  </form>
+</div>
+{% endblock %}

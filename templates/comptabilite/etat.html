@@ -50,13 +50,21 @@
 
   <form method="get" class="cpt-card et-barre no-print">
     {% for cle, libelle in periodes %}
-    <a class="et-chip {% if periode == cle %}active{% endif %}" href="?periode={{ cle }}{% if params.caisse %}&caisse={{ params.caisse }}{% endif %}{% if params.journal %}&journal={{ params.journal }}{% endif %}{% if params.compte %}&compte={{ params.compte }}{% endif %}{% if params.brouillons %}&brouillons=1{% endif %}">{{ libelle }}</a>
+    <a class="et-chip {% if periode == cle %}active{% endif %}" href="?periode={{ cle }}{% if params.caisse %}&caisse={{ params.caisse }}{% endif %}{% if params.journal %}&journal={{ params.journal }}{% endif %}{% if params.compte %}&compte={{ params.compte }}{% endif %}{% if params.convention %}&convention={{ params.convention }}{% endif %}{% if params.brouillons %}&brouillons=1{% endif %}">{{ libelle }}</a>
     {% endfor %}
     <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
     <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
     {% if etat.choix_caisse %}
     <div class="cpt-field"><label>Caisse</label>
       <select name="caisse" class="cpt-input">{% for c in etat.choix_caisse.caisses %}<option value="{{ c.pk }}" {% if c.pk == etat.choix_caisse.actuelle %}selected{% endif %}>{{ c.nom }}</option>{% endfor %}</select></div>
+    {% endif %}
+    {% if etat.choix_tresorerie %}
+    <div class="cpt-field"><label>Compte de trésorerie</label>
+      <select name="compte_tresorerie" class="cpt-input">{% for c in etat.choix_tresorerie.comptes %}<option value="{{ c.pk }}" {% if c.pk == etat.choix_tresorerie.actuel %}selected{% endif %}>{{ c.libelle }}</option>{% endfor %}</select></div>
+    {% endif %}
+    {% if etat.choix_convention %}
+    <div class="cpt-field"><label>Convention</label>
+      <select name="convention" class="cpt-input">{% for c in etat.choix_convention.conventions %}<option value="{{ c.pk }}" {% if c.pk == etat.choix_convention.actuelle %}selected{% endif %}>{{ c.code }} — {{ c.intitule|truncatechars:40 }}</option>{% endfor %}</select></div>
     {% endif %}
     {% if etat.choix_journal %}
     <div class="cpt-field"><label>Journal</label>

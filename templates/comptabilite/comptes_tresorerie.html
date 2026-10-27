@@ -1,0 +1,34 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Comptes de trésorerie{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Comptes de trésorerie</h1>
+      <div class="cpt-sub">Comptes bancaires et porte-monnaie Mobile Money, chacun rattaché à son compte comptable. Le solde de départ du relevé sert au rapprochement.</div></div>
+  </div>
+  <div class="cpt-grid2" style="grid-template-columns:3fr 2fr;align-items:start;">
+    <div class="cpt-card">
+      <table class="cpt-table">
+        <thead><tr><th>Libellé</th><th>Type</th><th>Compte</th><th>Établissement / n°</th><th></th></tr></thead>
+        <tbody>{% for c in comptes %}<tr>
+          <td><b>{{ c.libelle }}</b>{% if not c.actif %} <span class="cpt-badge cloturee">inactif</span>{% endif %}</td>
+          <td>{{ c.get_type_display }}</td><td>{{ c.compte.numero }}</td><td>{{ c.etablissement }} {{ c.numero }}</td>
+          <td style="white-space:nowrap;"><a class="cpt-btn" style="padding:3px 8px;font-size:11px;" href="{% url 'comptabilite:rapprochement' c.pk %}">Rapprocher</a>
+            {% if peut_modifier %}<a class="cpt-btn" style="padding:3px 8px;font-size:11px;" href="{% url 'comptabilite:compte_tresorerie_modifier' c.pk %}">Modifier</a>{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="5" class="cpt-vide">Aucun compte.</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% if peut_modifier %}
+    <form method="post" class="cpt-card">{% csrf_token %}
+      <h2>{% if objet %}Modifier « {{ objet }} »{% else %}Nouveau compte de trésorerie{% endif %}</h2>
+      {% include 'comptabilite/includes/champs.html' %}
+      <div class="cpt-actions"><button class="cpt-btn primaire">Enregistrer</button>
+        {% if objet %}<a href="{% url 'comptabilite:comptes_tresorerie' %}" class="cpt-btn">Nouveau</a>{% endif %}</div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

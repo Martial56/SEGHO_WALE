@@ -358,7 +358,7 @@ def _francs(montant):
     return f"{montant:,.0f}".replace(',', ' ')
 
 
-def creer_sortie(session, par, motif, libelle, montant, beneficiaire='', justificatif=None):
+def creer_sortie(session, par, motif, libelle, montant, beneficiaire='', justificatif=None, convention=None):
     """Sous le seuil de la caisse, la sortie est payée tout de suite ; au-dessus,
     elle attend le superviseur et l'argent reste dans la pochette."""
     from .models import SortieCaisse
@@ -374,7 +374,7 @@ def creer_sortie(session, par, motif, libelle, montant, beneficiaire='', justifi
     immediate = montant <= session.caisse.seuil_sortie
     return SortieCaisse.objects.create(
         session=session, motif=motif, libelle=libelle.strip(), beneficiaire=beneficiaire.strip(),
-        montant=montant, justificatif=justificatif or '', demandee_par=par,
+        montant=montant, justificatif=justificatif or '', demandee_par=par, convention=convention,
         statut='payee' if immediate else 'en_attente',
         date_paiement=timezone.now() if immediate else None, centre=session.centre)
 

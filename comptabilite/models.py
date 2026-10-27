@@ -218,6 +218,9 @@ class SortieCaisse(ModeleCentre):
     montant = models.DecimalField(max_digits=15, decimal_places=2)
     justificatif = models.FileField(upload_to='caisse/justificatifs/%Y/%m/', blank=True,
                                     verbose_name="Justificatif")
+    convention = models.ForeignKey('Convention', on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='sorties_caisse',
+                                   verbose_name="Financée par la convention")
     statut = models.CharField(max_length=12, choices=STATUT, default='en_attente')
     demandee_par = models.ForeignKey(User, on_delete=models.PROTECT, related_name='sorties_demandees')
     date_demande = models.DateTimeField(auto_now_add=True)
@@ -433,7 +436,352 @@ class LigneEcriture(models.Model):
     tiers = models.CharField(max_length=150, blank=True, help_text="Patient, assureur, fournisseur…")
     debit = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     credit = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    # Axe « financement » : la convention qui porte cette charge ou cette
+    # ressource. Vide = fonds propres du centre.
+    convention = models.ForeignKey('Convention', on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='lignes_ecriture')
 
     class Meta:
         verbose_name = "Ligne d'écriture"
         ordering = ['pk']
+
+
+
+# ─── Lot 5 : bailleurs, conventions, dons, budget ──────────────────────────────
+
+class Bailleur(models.Model):
+    """Partenaire financier : bailleur, État, ONG, fondation, entreprise,
+    particulier donateur."""
+    TYPE = [('bailleur', 'Bailleur de fonds'), ('etat', 'État / collectivité'), ('ong', 'ONG / association'),
+            ('fondation', 'Fondation'), ('entreprise', 'Entreprise'), ('particulier', 'Particulier')]
+    nom = models.CharField(max_length=200, unique=True)
+    sigle = models.CharField(max_length=30, blank=True)
+    type = models.CharField(max_length=12, choices=TYPE, default='bailleur')
+    contact = models.CharField(max_length=150, blank=True, verbose_name="Personne de contact")
+    telephone = models.CharField(max_length=30, blank=True, verbose_name="Téléphone")
+    email = models.EmailField(blank=True)
+    adresse = models.TextField(blank=True)
+    actif = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.sigle} — {self.nom}" if self.sigle else self.nom
+
+    class Meta:
+        verbose_name = "Bailleur / partenaire"
+        verbose_name_plural = "Bailleurs et partenaires"
+        ordering = ['nom']
+
+
+class Convention(ModeleCentre):
+    """Financement accordé par un bailleur pour un projet, sur une période.
+
+    Les versements reçus sont des ressources de la convention ; les dépenses
+    lui sont imputées par l'axe « financement » des lignes d'écriture. Le reste
+    non utilisé en fin d'exercice devient un fonds dédié.
+    """
+    STATUT = [('active', 'Active'), ('suspendue', 'Suspendue'), ('terminee', 'Terminée')]
+
+    code = models.CharField(max_length=20, unique=True, editable=False)
+    bailleur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, related_name='conventions')
+    intitule = models.CharField(max_length=255, verbose_name="Projet / objet")
+    reference = models.CharField(max_length=80, blank=True, verbose_name="Référence du bailleur")
+    date_debut = models.DateField(verbose_name="Début")
+    date_fin = models.DateField(verbose_name="Fin")
+    montant_accorde = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant accordé")
+    compte_ressource = models.ForeignKey(
+        'Compte', on_delete=models.PROTECT, related_name='conventions',
+        verbose_name="Compte de ressource",
+        help_text="Compte crédité à chaque versement (subvention d'exploitation, d'équipement…).")
+    statut = models.CharField(max_length=10, choices=STATUT, default='active')
+    description = models.TextField(blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.code:
+            from core.numerotation import prochain_code
+            self.code = prochain_code(Convention.all_objects, 'code', f'CONV{timezone.now().year}', 3)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.code} — {self.intitule}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Convention de financement"
+        verbose_name_plural = "Conventions de financement"
+        ordering = ['-date_debut']
+
+
+class LigneBudgetaire(models.Model):
+    """Ligne du budget d'une convention : ce que le bailleur autorise à dépenser."""
+    convention = models.ForeignKey(Convention, on_delete=models.CASCADE, related_name='lignes_budget')
+    libelle = models.CharField(max_length=200, verbose_name="Ligne budgétaire")
+    compte = models.ForeignKey('Compte', on_delete=models.PROTECT, related_name='lignes_budgetaires',
+                               help_text="Les dépenses imputées sur ce compte (et ses sous-comptes) s'y rattachent.")
+    montant_prevu = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant prévu")
+
+    class Meta:
+        verbose_name = "Ligne budgétaire de convention"
+        ordering = ['compte__numero']
+
+
+class Versement(ModeleCentre):
+    """Argent reçu d'un bailleur au titre d'une convention."""
+    MODE = [('virement', 'Virement'), ('cheque', 'Chèque'), ('mobile_money', 'Mobile Money'),
+            ('especes', 'Espèces')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    convention = models.ForeignKey(Convention, on_delete=models.PROTECT, related_name='versements')
+    date = models.DateField()
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    mode = models.CharField(max_length=15, choices=MODE, default='virement')
+    reference = models.CharField(max_length=100, blank=True, verbose_name="Référence (n° de virement…)")
+    observation = models.TextField(blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(Versement.all_objects, 'numero', f'VER{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — {self.montant:,.0f} F".replace(',', ' ')
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Versement de bailleur"
+        ordering = ['-date', '-pk']
+
+
+class Don(ModeleCentre):
+    """Don reçu, en argent ou en nature (médicaments, matériel…).
+
+    Un don en nature est valorisé : il entre dans les comptes comme un
+    actif (stock, matériel) en contrepartie d'une ressource. Un don peut être
+    affecté à une convention.
+    """
+    NATURE = [('especes', 'Espèces'), ('cheque', 'Chèque'), ('virement', 'Virement'),
+              ('mobile_money', 'Mobile Money'), ('nature', 'En nature')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    donateur = models.ForeignKey(Bailleur, on_delete=models.PROTECT, null=True, blank=True, related_name='dons',
+                                 help_text="Vide : donateur anonyme ou ponctuel (nom ci-dessous).")
+    donateur_nom = models.CharField(max_length=200, blank=True, verbose_name="Nom du donateur")
+    date = models.DateField()
+    nature = models.CharField(max_length=15, choices=NATURE, default='especes')
+    montant = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant ou valeur estimée")
+    description = models.TextField(blank=True, help_text="Pour un don en nature : ce qui a été reçu, quantités.")
+    compte_actif = models.ForeignKey(
+        'Compte', on_delete=models.PROTECT, null=True, blank=True, related_name='dons_en_nature',
+        verbose_name="Compte de l'actif reçu", help_text="Don en nature : stock de médicaments, matériel…")
+    convention = models.ForeignKey(Convention, on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='dons', verbose_name="Affecté à la convention")
+    reference = models.CharField(max_length=100, blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(Don.all_objects, 'numero', f'DON{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    @property
+    def nom_donateur(self):
+        return str(self.donateur) if self.donateur_id else (self.donateur_nom or 'Donateur anonyme')
+
+    def __str__(self):
+        return f"{self.numero} — {self.nom_donateur}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Don"
+        ordering = ['-date', '-pk']
+
+
+class LigneBudget(models.Model):
+    """Budget annuel du centre, par compte (charges et ressources)."""
+    exercice = models.ForeignKey('Exercice', on_delete=models.CASCADE, related_name='budget')
+    compte = models.ForeignKey('Compte', on_delete=models.PROTECT, related_name='lignes_budget')
+    montant = models.DecimalField(max_digits=15, decimal_places=2, verbose_name="Montant annuel prévu")
+
+    class Meta:
+        verbose_name = "Ligne du budget annuel"
+        ordering = ['compte__numero']
+        constraints = [models.UniqueConstraint(fields=['exercice', 'compte'], name='une_ligne_de_budget_par_compte')]
+
+
+
+# ─── Lot 6 : tiers payants (assurances, mutuelles) ─────────────────────────────
+
+class BordereauAssurance(ModeleCentre):
+    """Envoi groupé à un assureur des factures d'une période, pour qu'il règle
+    sa part. Une facture ne figure que sur un seul bordereau."""
+    STATUT = [('prepare', 'Préparé'), ('envoye', 'Envoyé'), ('regle_partiel', 'Réglé en partie'),
+              ('regle', 'Réglé')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    assurance = models.ForeignKey('patients.Assurance', on_delete=models.PROTECT, related_name='bordereaux')
+    date_debut = models.DateField(verbose_name="Factures du")
+    date_fin = models.DateField(verbose_name="au")
+    statut = models.CharField(max_length=15, choices=STATUT, default='prepare')
+    date_envoi = models.DateField(null=True, blank=True, verbose_name="Envoyé le")
+    observation = models.TextField(blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(BordereauAssurance.all_objects, 'numero', f'BOR{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — {self.assurance}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Bordereau d'assurance"
+        verbose_name_plural = "Bordereaux d'assurance"
+        ordering = ['-cree_le']
+
+
+class ReglementAssurance(ModeleCentre):
+    """Argent reçu d'un assureur. Il est réparti sur les factures (celles d'un
+    bordereau, ou les plus anciennes) sous forme de paiements « Assurance »."""
+    MODE = [('virement', 'Virement'), ('cheque', 'Chèque'), ('mobile_money', 'Mobile Money'),
+            ('especes', 'Espèces')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    assurance = models.ForeignKey('patients.Assurance', on_delete=models.PROTECT, related_name='reglements')
+    bordereau = models.ForeignKey(BordereauAssurance, on_delete=models.PROTECT, null=True, blank=True,
+                                  related_name='reglements')
+    date = models.DateField()
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    mode = models.CharField(max_length=15, choices=MODE, default='virement')
+    reference = models.CharField(max_length=100, blank=True, verbose_name="Référence (n° de virement, de chèque…)")
+    observation = models.TextField(blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(ReglementAssurance.all_objects, 'numero', f'REG{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — {self.assurance} — {self.montant:,.0f} F".replace(',', ' ')
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Règlement d'assurance"
+        verbose_name_plural = "Règlements d'assurance"
+        ordering = ['-date', '-pk']
+
+
+
+# ─── Lot 7 : trésorerie, rapprochements, refus des assureurs ───────────────────
+
+class CompteTresorerie(models.Model):
+    """Compte bancaire ou porte-monnaie Mobile Money du centre, rattaché à son
+    compte comptable (classe 5). C'est sur lui qu'on rapproche le relevé."""
+    TYPE = [('banque', 'Banque'), ('mobile_money', 'Mobile Money')]
+    libelle = models.CharField(max_length=120, unique=True, verbose_name="Libellé")
+    type = models.CharField(max_length=15, choices=TYPE, default='banque')
+    compte = models.OneToOneField('Compte', on_delete=models.PROTECT, related_name='compte_tresorerie',
+                                  verbose_name="Compte comptable")
+    etablissement = models.CharField(max_length=120, blank=True, verbose_name="Banque / opérateur")
+    numero = models.CharField(max_length=60, blank=True, verbose_name="N° de compte (RIB) ou de téléphone")
+    solde_initial = models.DecimalField(max_digits=15, decimal_places=2, default=0,
+                                        verbose_name="Solde du relevé au départ")
+    date_solde_initial = models.DateField(null=True, blank=True, verbose_name="à la date du")
+    actif = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.libelle
+
+    class Meta:
+        verbose_name = "Compte de trésorerie"
+        verbose_name_plural = "Comptes de trésorerie"
+        ordering = ['libelle']
+
+
+class RemiseBanque(ModeleCentre):
+    """Espèces d'une caisse déposées en banque. Passe par le compte de
+    virements internes (585) : sortie de la caisse, puis entrée en banque."""
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    date = models.DateField()
+    caisse = models.ForeignKey('facturation.Caisse', on_delete=models.PROTECT, related_name='remises_banque')
+    compte_tresorerie = models.ForeignKey(CompteTresorerie, on_delete=models.PROTECT, related_name='remises',
+                                          verbose_name="Déposé sur")
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    reference = models.CharField(max_length=100, blank=True, verbose_name="N° du bordereau de versement")
+    observation = models.TextField(blank=True)
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(RemiseBanque.all_objects, 'numero', f'REM{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — {self.montant:,.0f} F".replace(',', ' ')
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Remise d'espèces en banque"
+        verbose_name_plural = "Remises d'espèces en banque"
+        ordering = ['-date', '-pk']
+
+
+class LigneReleve(models.Model):
+    """Une ligne du relevé de la banque ou de l'opérateur Mobile Money.
+
+    Montant positif : argent entré sur le compte ; négatif : argent sorti.
+    Rapprochée, elle pointe la ligne d'écriture qui lui correspond.
+    """
+    compte_tresorerie = models.ForeignKey(CompteTresorerie, on_delete=models.CASCADE, related_name='releve')
+    date = models.DateField()
+    libelle = models.CharField(max_length=255, verbose_name="Libellé")
+    reference = models.CharField(max_length=100, blank=True)
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    ligne_ecriture = models.OneToOneField('LigneEcriture', on_delete=models.SET_NULL, null=True, blank=True,
+                                          related_name='ligne_releve', verbose_name="Rapprochée avec")
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def rapprochee(self):
+        return self.ligne_ecriture_id is not None
+
+    class Meta:
+        verbose_name = "Ligne de relevé"
+        verbose_name_plural = "Lignes de relevé"
+        ordering = ['date', 'pk']
+
+
+class RejetAssurance(ModeleCentre):
+    """Refus par un assureur de tout ou partie de sa part sur une facture.
+
+    Deux suites possibles : la somme passe à la charge du patient (sa part
+    augmente), ou elle est abandonnée et passée en perte.
+    """
+    DECISION = [('patient', 'Reportée sur le patient'), ('perte', 'Passée en perte')]
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    facture = models.ForeignKey('facturation.Facture', on_delete=models.PROTECT, related_name='rejets_assurance')
+    assurance = models.ForeignKey('patients.Assurance', on_delete=models.PROTECT, related_name='rejets')
+    date = models.DateField()
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    decision = models.CharField(max_length=10, choices=DECISION)
+    motif = models.TextField(verbose_name="Motif du refus")
+    cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(RejetAssurance.all_objects, 'numero', f'REJ{timezone.now().year}', 4)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.numero} — facture {self.facture.numero}"
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Refus d'assurance"
+        verbose_name_plural = "Refus d'assurance"
+        ordering = ['-date', '-pk']

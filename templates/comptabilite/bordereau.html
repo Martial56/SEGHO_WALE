@@ -1,0 +1,50 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Bordereau {{ b.numero }}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Bordereau {{ b.numero }} — {{ b.assurance.nom }}
+        <span class="cpt-badge {% if b.statut == 'regle' %}validee{% elif b.statut == 'prepare' %}ouverte{% else %}cloturee{% endif %}">{{ b.get_statut_display }}</span></h1>
+      <div class="cpt-sub">Factures du {{ b.date_debut|date:"d/m/Y" }} au {{ b.date_fin|date:"d/m/Y" }}{% if b.date_envoi %} · envoyé le {{ b.date_envoi|date:"d/m/Y" }}{% endif %}</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:bordereaux' %}" class="cpt-btn">Tous les bordereaux</a>
+      <a href="{% url 'comptabilite:bordereau_imprimer' b.pk %}" target="_blank" class="cpt-btn"><i class="bi bi-printer"></i> Imprimer</a>
+      {% if peut_modifier and b.statut == 'prepare' %}
+      <form method="post" action="{% url 'comptabilite:bordereau_action' b.pk %}" class="cpt-actions">{% csrf_token %}
+        <input type="date" name="date_envoi" class="cpt-input" value="{% now 'Y-m-d' %}" style="font-size:13px;padding:6px 8px;">
+        <button name="action" value="envoyer" class="cpt-btn primaire">Marquer envoyé</button></form>
+      {% endif %}
+      {% if peut_regler and b.statut != 'regle' %}<a href="{% url 'comptabilite:reglement_nouveau' %}?bordereau={{ b.pk }}" class="cpt-btn primaire">Enregistrer le règlement</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Montant du bordereau</div><div class="v">{{ contenu.total|floatformat:0|intcomma }} F</div><div class="s">{{ contenu.lignes|length }} facture{{ contenu.lignes|length|pluralize }}</div></div>
+    <div class="cpt-kpi accent"><div class="l">Reste dû</div><div class="v">{{ contenu.reste|floatformat:0|intcomma }} F</div></div>
+  </div>
+
+  <div class="cpt-card">
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Facture</th><th>Patient</th><th>N° assuré</th><th class="num">Total facture</th><th class="num">Part assurance</th><th class="num">Reste dû</th><th></th></tr></thead>
+      <tbody>{% for l in contenu.lignes %}{% with f=l.facture %}<tr>
+        <td>{{ f.date_emission|date:"d/m/Y" }}</td><td><a href="{% url 'facturation:detail' f.pk %}">{{ f.numero }}</a></td>
+        <td>{{ f.patient.nom }} {{ f.patient.prenoms }}</td><td>{{ f.patient.numero_assurance|default:"—" }}</td>
+        <td class="num">{{ f.montant_total|floatformat:0|intcomma }}</td><td class="num">{{ l.part|floatformat:0|intcomma }}</td>
+        <td class="num">{{ l.reste|floatformat:0|intcomma }}</td>
+        <td style="white-space:nowrap;">{% if b.statut != 'prepare' and l.reste and perms.comptabilite.add_rejetassurance %}<a href="{% url 'comptabilite:rejet_assurance' f.pk %}" class="cpt-btn danger" style="padding:3px 8px;font-size:11px;">Refus</a>{% endif %}{% if peut_modifier and b.statut == 'prepare' %}<form method="post" action="{% url 'comptabilite:bordereau_action' b.pk %}">{% csrf_token %}<input type="hidden" name="facture" value="{{ f.pk }}"><button name="action" value="retirer" class="cpt-btn" style="padding:3px 8px;font-size:11px;">Retirer</button></form>{% endif %}</td>
+      </tr>{% endwith %}{% endfor %}</tbody>
+    </table>
+  </div>
+
+  {% if reglements %}
+  <div class="cpt-card"><h2>Règlements reçus</h2>
+    <table class="cpt-table"><tbody>{% for r in reglements %}<tr><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}</td><td>{{ r.get_mode_display }}</td><td>{{ r.reference }}</td><td class="num">{{ r.montant|floatformat:0|intcomma }} F</td></tr>{% endfor %}</tbody></table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
