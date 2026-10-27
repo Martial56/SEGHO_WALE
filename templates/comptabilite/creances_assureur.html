@@ -1,0 +1,62 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}{{ assurance.nom }}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ assurance.nom }}</h1>
+      <div class="cpt-sub">Prise en charge {{ assurance.taux_prise_en_charge|floatformat:"-2" }} %{% if assurance.telephone %} · {{ assurance.telephone }}{% endif %}</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:assurances' %}" class="cpt-btn">Tous les assureurs</a>
+      {% if perms.comptabilite.add_reglementassurance %}<a href="{% url 'comptabilite:reglement_nouveau' %}?assurance={{ assurance.pk }}" class="cpt-btn primaire">Enregistrer un règlement</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-kpis"><div class="cpt-kpi accent"><div class="l">Dû par l'assureur</div><div class="v">{{ total|floatformat:0|intcomma }} F</div><div class="s">{{ creances|length }} facture{{ creances|length|pluralize }}</div></div></div>
+
+  {% if perms.comptabilite.add_bordereauassurance %}
+  <div class="cpt-card">
+    <h2>Préparer un bordereau</h2>
+    <form method="get" class="cpt-actions" style="margin-bottom:10px;">
+      <div class="cpt-field" style="margin:0;"><label>Factures du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
+      <div class="cpt-field" style="margin:0;"><label>au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
+      <button class="cpt-btn" style="align-self:flex-end;">Voir</button>
+    </form>
+    {% if a_envoyer %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Facture</th><th>Patient</th><th>N° assuré</th><th class="num">Total</th><th class="num">Part assurance</th></tr></thead>
+      <tbody>{% for f in a_envoyer %}<tr><td>{{ f.date_emission|date:"d/m/Y" }}</td><td>{{ f.numero }}</td><td>{{ f.patient.nom }} {{ f.patient.prenoms }}</td><td>{{ f.patient.numero_assurance|default:"—" }}</td><td class="num">{{ f.montant_total|floatformat:0|intcomma }}</td><td class="num">{{ f.reste_assurance|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <form method="post" style="margin-top:10px;">{% csrf_token %}
+      <input type="hidden" name="debut" value="{{ debut|date:'Y-m-d' }}"><input type="hidden" name="fin" value="{{ fin|date:'Y-m-d' }}">
+      <button class="cpt-btn primaire">Créer le bordereau ({{ a_envoyer|length }} facture{{ a_envoyer|length|pluralize }})</button>
+    </form>
+    {% else %}<div class="cpt-vide">Aucune facture à envoyer sur cette période.</div>{% endif %}
+  </div>
+  {% endif %}
+
+  <div class="cpt-card">
+    <h2>Toutes les factures dues</h2>
+    {% if creances %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Facture</th><th>Patient</th><th>Bordereau</th><th class="num">Part assurance</th><th class="num">Reste dû</th><th></th></tr></thead>
+      <tbody>{% for f, reste in creances %}<tr class="lien" onclick="location.href='{% url 'facturation:detail' f.pk %}'">
+        <td>{{ f.date_emission|date:"d/m/Y" }}</td><td>{{ f.numero }}</td><td>{{ f.patient.nom }} {{ f.patient.prenoms }}</td>
+        <td>{% if f.bordereau_assurance %}{{ f.bordereau_assurance.numero }}{% else %}<span class="cpt-badge cloturee">à envoyer</span>{% endif %}</td>
+        <td class="num">{{ f.part_assurance|floatformat:0|intcomma }}</td><td class="num"><b>{{ reste|floatformat:0|intcomma }}</b></td>
+        <td>{% if perms.comptabilite.add_rejetassurance %}<a href="{% url 'comptabilite:rejet_assurance' f.pk %}" class="cpt-btn danger" style="padding:3px 8px;font-size:11px;" onclick="event.stopPropagation();">Refus</a>{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Cet assureur ne doit rien.</div>{% endif %}
+  </div>
+
+  {% if bordereaux %}
+  <div class="cpt-card"><h2>Bordereaux récents</h2>
+    <table class="cpt-table"><tbody>{% for b in bordereaux %}<tr class="lien" onclick="location.href='{% url 'comptabilite:bordereau' b.pk %}'"><td><b>{{ b.numero }}</b></td><td>{{ b.date_debut|date:"d/m/Y" }} → {{ b.date_fin|date:"d/m/Y" }}</td><td><span class="cpt-badge {% if b.statut == 'regle' %}validee{% elif b.statut == 'prepare' %}ouverte{% else %}cloturee{% endif %}">{{ b.get_statut_display }}</span></td></tr>{% endfor %}</tbody></table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

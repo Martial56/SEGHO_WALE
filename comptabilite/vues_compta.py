@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import ecritures as moteur
-from .models import Compte, Correspondance, Ecriture, Journal
+from .models import Compte, Convention, Correspondance, Ecriture, Journal
 
 ZERO = Decimal('0')
 
@@ -141,7 +141,7 @@ def od_saisie(request):
         n = 0
         while f'compte_{n}' in request.POST:
             lignes_saisies.append({k: request.POST.get(f'{k}_{n}', '') for k in
-                                   ('compte', 'libelle', 'tiers', 'debit', 'credit')})
+                                   ('compte', 'libelle', 'tiers', 'debit', 'credit', 'convention')})
             n += 1
         try:
             jour = _date(request.POST.get('date'), None)
@@ -161,7 +161,9 @@ def od_saisie(request):
                 d, cr = _montant(l['debit']), _montant(l['credit'])
                 if d and cr:
                     raise moteur.ErreurCompta(f"Compte {c.numero} : une ligne est au débit ou au crédit, pas les deux.")
-                lignes.append((c, l['libelle'], d, cr, l['tiers']))
+                convention = (Convention.objects.filter(pk=l['convention']).first()
+                              if l['convention'].isdigit() else None)
+                lignes.append((c, l['libelle'], d, cr, l['tiers'], convention))
             ecriture = moteur.creer_ecriture(journal_, jour, libelle, lignes,
                                              piece=request.POST.get('piece', '').strip(), par=request.user)
         except moteur.ErreurCompta as e:
@@ -170,12 +172,14 @@ def od_saisie(request):
             messages.success(request, "Opération enregistrée en brouillon : validez-la au passage des écritures.")
             return redirect('comptabilite:ecriture', pk=ecriture.pk)
     while len(lignes_saisies) < 4:
-        lignes_saisies.append({'compte': '', 'libelle': '', 'tiers': '', 'debit': '', 'credit': ''})
+        lignes_saisies.append({'compte': '', 'libelle': '', 'tiers': '', 'debit': '', 'credit': '',
+                               'convention': ''})
     return render(request, 'comptabilite/od_saisie.html', {
         'journaux': Journal.objects.filter(actif=True).order_by('code'),
         'journal_defaut': Journal.objects.filter(code='OD').first(),
         'comptes': Compte.objects.filter(actif=True),
         'lignes': lignes_saisies, 'aujourdhui': aujourdhui, 'post': request.POST,
+        'conventions': Convention.objects.filter(statut='active'),
     })
 
 

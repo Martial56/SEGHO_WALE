@@ -57,6 +57,143 @@
   </a>
   {% endif %}
 
+  {% comment %}Menu « Assurances » : tiers payants (lot 6) — créances,
+  bordereaux, règlements, et la liste des assureurs (paramètres patients).{% endcomment %}
+  {% if perms.comptabilite.view_bordereauassurance or perms.comptabilite.view_reglementassurance %}
+  {% if 'comptabilite.assurances' not in hidden_navitem_codes %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname == 'assurances' or uname == 'creances_assureur' or uname|slice:':8' == 'assureur' or uname|slice:':9' == 'bordereau' or uname|slice:':9' == 'reglement' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Assurances
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Tiers payants</div>
+      {% if perms.comptabilite.view_bordereauassurance %}
+      <a href="{% url 'comptabilite:assurances' %}" class="{% if uname == 'assurances' or uname == 'creances_assureur' %}active{% endif %}">
+        <i class="bi bi-shield-plus" style="font-size:12px;"></i> Créances par assureur</a>
+      <a href="{% url 'comptabilite:bordereaux' %}" class="{% if uname|slice:':9' == 'bordereau' %}active{% endif %}">
+        <i class="bi bi-file-earmark-spreadsheet" style="font-size:12px;"></i> Bordereaux</a>
+      {% endif %}
+      {% if perms.comptabilite.view_reglementassurance %}
+      <a href="{% url 'comptabilite:reglements' %}" class="{% if uname|slice:':9' == 'reglement' %}active{% endif %}">
+        <i class="bi bi-cash" style="font-size:12px;"></i> Règlements reçus</a>
+      {% endif %}
+      {% if perms.patients.view_assurance %}
+      <div class="o-nav-dd-section">Paramètres</div>
+      <a href="{% url 'comptabilite:assureurs' %}" class="{% if uname == 'assureurs' or uname == 'assureur_modifier' %}active{% endif %}"><i class="bi bi-gear" style="font-size:12px;"></i> Assureurs et taux</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% comment %}Menu « Trésorerie » (lot 7) : position, remises en banque,
+  rapprochements des comptes bancaires et Mobile Money.{% endcomment %}
+  {% if perms.comptabilite.view_comptetresorerie or perms.comptabilite.view_remisebanque %}
+  {% if 'comptabilite.tresorerie' not in hidden_navitem_codes %}
+  {% menu_tresorerie as comptes_rapprochables %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname == 'tresorerie' or uname == 'remises' or uname == 'rapprochement' or uname|slice:':14' == 'comptes_tresor' or uname == 'compte_tresorerie_modifier' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Trésorerie
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Suivi</div>
+      {% if perms.comptabilite.view_comptetresorerie %}
+      <a href="{% url 'comptabilite:tresorerie' %}" class="{% if uname == 'tresorerie' %}active{% endif %}">
+        <i class="bi bi-wallet2" style="font-size:12px;"></i> Position de trésorerie</a>
+      {% endif %}
+      {% if perms.comptabilite.view_remisebanque %}
+      <a href="{% url 'comptabilite:remises' %}" class="{% if uname == 'remises' %}active{% endif %}">
+        <i class="bi bi-bank" style="font-size:12px;"></i> Remises en banque</a>
+      {% endif %}
+      {% if perms.comptabilite.view_lignereleve and comptes_rapprochables %}
+      <div class="o-nav-dd-section">Rapprochements</div>
+      {% for ct in comptes_rapprochables %}
+      <a href="{% url 'comptabilite:rapprochement' ct.pk %}" class="{% if uname == 'rapprochement' and request.resolver_match.kwargs.pk == ct.pk %}active{% endif %}">
+        <i class="bi bi-check2-square" style="font-size:12px;"></i> {{ ct.libelle }}</a>
+      {% endfor %}
+      {% endif %}
+      {% if perms.comptabilite.view_comptetresorerie %}
+      <div class="o-nav-dd-section">Paramètres</div>
+      <a href="{% url 'comptabilite:comptes_tresorerie' %}" class="{% if uname|slice:':14' == 'comptes_tresor' or uname == 'compte_tresorerie_modifier' %}active{% endif %}">
+        <i class="bi bi-gear" style="font-size:12px;"></i> Comptes de trésorerie</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% comment %}Menu « Achats » (lot 8) : factures des fournisseurs et ce qui
+  leur reste dû.{% endcomment %}
+  {% if perms.comptabilite.view_facturefournisseur and 'comptabilite.achats' not in hidden_navitem_codes %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname|slice:':19' == 'facture_fournisseur' or uname == 'factures_fournisseurs' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Achats
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Fournisseurs</div>
+      <a href="{% url 'comptabilite:factures_fournisseurs' %}" class="{% if uname == 'factures_fournisseurs' or uname == 'facture_fournisseur' %}active{% endif %}">
+        <i class="bi bi-receipt" style="font-size:12px;"></i> Factures fournisseurs</a>
+      {% if perms.comptabilite.add_facturefournisseur %}
+      <a href="{% url 'comptabilite:facture_fournisseur_nouvelle' %}" class="{% if uname == 'facture_fournisseur_nouvelle' %}active{% endif %}">
+        <i class="bi bi-plus-circle" style="font-size:12px;"></i> Nouvelle facture</a>
+      {% endif %}
+      <a href="{% url 'comptabilite:etat' 'dettes_fournisseurs' %}">
+        <i class="bi bi-truck" style="font-size:12px;"></i> Dettes fournisseurs</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% comment %}Menu « Financements » : bailleurs, conventions, dons, budget,
+  fonds dédiés (lot 5). Chaque entrée suit le droit de consultation de ce
+  qu'elle ouvre.{% endcomment %}
+  {% if perms.comptabilite.view_convention or perms.comptabilite.view_bailleur or perms.comptabilite.view_don or perms.comptabilite.view_lignebudget %}
+  {% if 'comptabilite.financements' not in hidden_navitem_codes %}
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname == 'conventions' or uname == 'convention' or uname == 'convention_nouvelle' or uname == 'convention_modifier' or uname == 'bailleurs' or uname == 'bailleur_modifier' or uname == 'dons' or uname == 'don_nouveau' or uname == 'don_modifier' or uname == 'budget' or uname == 'fonds_dedies' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Financements
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Partenaires</div>
+      {% if perms.comptabilite.view_convention %}
+      <a href="{% url 'comptabilite:conventions' %}" class="{% if uname|slice:':10' == 'convention' %}active{% endif %}">
+        <i class="bi bi-briefcase" style="font-size:12px;"></i> Conventions</a>
+      {% endif %}
+      {% if perms.comptabilite.view_bailleur %}
+      <a href="{% url 'comptabilite:bailleurs' %}" class="{% if uname|slice:':8' == 'bailleur' %}active{% endif %}">
+        <i class="bi bi-building" style="font-size:12px;"></i> Bailleurs et partenaires</a>
+      {% endif %}
+      {% if perms.comptabilite.view_don %}
+      <a href="{% url 'comptabilite:dons' %}" class="{% if uname|slice:':3' == 'don' %}active{% endif %}">
+        <i class="bi bi-gift" style="font-size:12px;"></i> Dons</a>
+      {% endif %}
+      {% if perms.comptabilite.view_lignebudget or perms.comptabilite.view_convention %}
+      <div class="o-nav-dd-section">Pilotage</div>
+      {% endif %}
+      {% if perms.comptabilite.view_lignebudget %}
+      <a href="{% url 'comptabilite:budget' %}" class="{% if uname == 'budget' %}active{% endif %}">
+        <i class="bi bi-clipboard-data" style="font-size:12px;"></i> Budget annuel</a>
+      {% endif %}
+      {% if perms.comptabilite.view_convention %}
+      <a href="{% url 'comptabilite:fonds_dedies' %}" class="{% if uname == 'fonds_dedies' %}active{% endif %}">
+        <i class="bi bi-safe" style="font-size:12px;"></i> Fonds dédiés</a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
   {% comment %}Sous-menu « États », construit depuis le registre des états
   (comptabilite.etats.ETATS) : chaque entrée suit les droits de son écran, et
   le menu disparaît si l'utilisateur n'en voit aucun.{% endcomment %}
@@ -88,11 +225,11 @@
   {% comment %}Menu Configuration, sur le modèle de l'hospitalisation : chaque
   entrée suit la permission de consultation du modèle qu'elle ouvre, et le menu
   disparaît entièrement quand aucune n'est accordée.{% endcomment %}
-  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
+  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
   {% if 'facturation.config' not in hidden_navitem_codes %}
   <div class="o-nav-dropdown" data-nav-dropdown>
     <button type="button"
-            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' %}active{% endif %}"
+            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' or uname == 'exercices' or uname == 'exercice' %}active{% endif %}"
             style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
       Configuration
       <i class="bi bi-chevron-down" style="font-size:10px;"></i>
@@ -117,8 +254,14 @@
         <i class="bi bi-heart" style="font-size:12px;"></i> Motifs de gratuité
       </a>
       {% endif %}
-      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance %}
+      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
       <div class="o-nav-dd-section">Comptabilité générale</div>
+      {% if perms.comptabilite.view_exercice %}
+      <a href="{% url 'comptabilite:exercices' %}"
+         class="{% if uname == 'exercices' or uname == 'exercice' %}active{% endif %}">
+        <i class="bi bi-calendar-check" style="font-size:12px;"></i> Exercices et clôture
+      </a>
+      {% endif %}
       {% if perms.comptabilite.view_compte %}
       <a href="{% url 'comptabilite:plan_comptable' %}"
          class="{% if uname == 'plan_comptable' or uname == 'compte_modifier' %}active{% endif %}">

@@ -1,6 +1,7 @@
 from django.urls import path
 
-from . import views, vues_compta, vues_etats
+from . import views, vues_compta, vues_etats, vues_financements as vf, vues_assurances as va, vues_tresorerie as vt
+from . import vues_achats as vac, vues_cloture as vcl
 
 app_name = 'comptabilite'
 
@@ -24,6 +25,41 @@ urlpatterns = [
     path('configuration/plan-comptable/', vues_compta.plan_comptable, name='plan_comptable'),
     path('configuration/plan-comptable/<int:pk>/', vues_compta.plan_comptable, name='compte_modifier'),
     path('configuration/correspondances/', vues_compta.correspondances, name='correspondances'),
+    path('financements/bailleurs/', vf.bailleurs, name='bailleurs'),
+    path('financements/bailleurs/<int:pk>/', vf.bailleurs, name='bailleur_modifier'),
+    path('financements/conventions/', vf.conventions, name='conventions'),
+    path('financements/conventions/nouvelle/', vf.convention_form, name='convention_nouvelle'),
+    path('financements/conventions/<int:pk>/', vf.convention_detail, name='convention'),
+    path('financements/conventions/<int:pk>/modifier/', vf.convention_form, name='convention_modifier'),
+    path('financements/dons/', vf.dons, name='dons'),
+    path('financements/dons/nouveau/', vf.don_form, name='don_nouveau'),
+    path('financements/dons/<int:pk>/modifier/', vf.don_form, name='don_modifier'),
+    path('financements/dons/<int:pk>/recu/', vf.don_recu, name='don_recu'),
+    path('financements/budget/', vf.budget, name='budget'),
+    path('financements/fonds-dedies/', vf.fonds_dedies, name='fonds_dedies'),
+    path('assurances/', va.assurances, name='assurances'),
+    path('assurances/<int:pk>/', va.creances_assureur, name='creances_assureur'),
+    path('assurances/assureurs/', va.assureurs, name='assureurs'),
+    path('assurances/assureurs/<int:pk>/', va.assureurs, name='assureur_modifier'),
+    path('assurances/bordereaux/', va.bordereaux, name='bordereaux'),
+    path('assurances/bordereaux/<int:pk>/', va.bordereau, name='bordereau'),
+    path('assurances/bordereaux/<int:pk>/imprimer/', va.bordereau_imprimer, name='bordereau_imprimer'),
+    path('assurances/bordereaux/<int:pk>/action/', va.bordereau_action, name='bordereau_action'),
+    path('assurances/reglements/', va.reglements, name='reglements'),
+    path('assurances/reglements/nouveau/', va.reglement_nouveau, name='reglement_nouveau'),
+    path('tresorerie/', vt.tresorerie, name='tresorerie'),
+    path('tresorerie/comptes/', vt.comptes_tresorerie, name='comptes_tresorerie'),
+    path('tresorerie/comptes/<int:pk>/', vt.comptes_tresorerie, name='compte_tresorerie_modifier'),
+    path('tresorerie/comptes/<int:pk>/rapprochement/', vt.rapprochement, name='rapprochement'),
+    path('tresorerie/remises/', vt.remises, name='remises'),
+    path('assurances/factures/<int:pk>/refus/', vt.rejet_assurance, name='rejet_assurance'),
+    path('achats/factures/', vac.factures_fournisseurs, name='factures_fournisseurs'),
+    path('achats/factures/nouvelle/', vac.facture_fournisseur_form, name='facture_fournisseur_nouvelle'),
+    path('achats/factures/<int:pk>/', vac.facture_fournisseur, name='facture_fournisseur'),
+    path('achats/factures/<int:pk>/modifier/', vac.facture_fournisseur_form, name='facture_fournisseur_modifier'),
+    path('financements/dons/<int:pk>/stock/', vac.don_stock, name='don_stock'),
+    path('exercices/', vcl.exercices, name='exercices'),
+    path('exercices/<int:pk>/', vcl.exercice, name='exercice'),
     path('etats/', vues_etats.etats, name='etats'),
     path('etats/<str:code>/', vues_etats.etat, name='etat'),
     path('journees/', views.journees, name='journees'),

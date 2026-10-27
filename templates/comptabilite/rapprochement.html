@@ -1,0 +1,119 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Rapprochement — {{ ct }}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>.rap-ligne td{font-size:12.5px}.rap-ligne input[type=radio]{accent-color:var(--teal-600)}.etat-rap td{font-size:13.5px}</style>{% endblock %}
+
+{% block content %}
+{% with e=etat %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Rapprochement — {{ ct.libelle }}</h1>
+      <div class="cpt-sub">Compte {{ ct.compte }}{% if ct.etablissement %} · {{ ct.etablissement }}{% endif %}{% if ct.numero %} · {{ ct.numero }}{% endif %}</div>
+    </div>
+    <form method="get" class="cpt-actions">
+      <label class="cpt-note">Au</label><input type="date" name="date" class="cpt-input" value="{{ fin|date:'Y-m-d' }}" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+      <a href="{% url 'comptabilite:tresorerie' %}" class="cpt-btn">Position</a>
+    </form>
+  </div>
+
+  <div class="cpt-card">
+    <h2>État de rapprochement au {{ fin|date:"d/m/Y" }}</h2>
+    <table class="cpt-table etat-rap">
+      <tbody>
+        <tr><td>Solde selon les comptes ({{ ct.compte.numero }})</td><td class="num">{{ e.solde_compta|floatformat:0|intcomma }}</td></tr>
+        <tr><td>− Écritures absentes du relevé ({{ e.ecritures_seules|length }})</td><td class="num">{{ e.total_ecritures|floatformat:0|intcomma }}</td></tr>
+        <tr><td>+ Opérations du relevé non comptabilisées ({{ e.releve_seul|length }})</td><td class="num">{{ e.total_releve|floatformat:0|intcomma }}</td></tr>
+        <tr><td><b>= Solde attendu sur le relevé</b></td><td class="num"><b>{{ e.solde_explique|floatformat:0|intcomma }}</b></td></tr>
+        <tr><td>Solde du relevé{% if ct.date_solde_initial %} (départ {{ ct.solde_initial|floatformat:0|intcomma }} F au {{ ct.date_solde_initial|date:"d/m/Y" }}){% endif %}</td><td class="num">{{ e.solde_releve|floatformat:0|intcomma }}</td></tr>
+      </tbody>
+      <tfoot><tr><td>Écart inexpliqué</td><td class="num {% if e.ecart_inexplique %}ecart-neg{% else %}ecart-nul{% endif %}">{{ e.ecart_inexplique|floatformat:0|intcomma }}</td></tr></tfoot>
+    </table>
+    {% if not ct.date_solde_initial %}<div class="cpt-note" style="margin-top:6px;">Renseignez le solde de départ du relevé dans la fiche du compte de trésorerie pour un écart juste.</div>{% endif %}
+  </div>
+
+  {% if peut_modifier %}
+  <div class="cpt-grid2" style="align-items:start;">
+    <form method="post" enctype="multipart/form-data" class="cpt-card">{% csrf_token %}
+      <input type="hidden" name="action" value="importer"><input type="hidden" name="date" value="{{ fin|date:'Y-m-d' }}">
+      <h2>Importer un relevé (CSV)</h2>
+      <div class="cpt-field"><label>Format des colonnes</label><select name="format" class="cpt-input">
+        <option value="montant">date ; libellé ; montant (+ entrée / − sortie) ; référence</option>
+        <option value="debit_credit">date ; libellé ; débit ; crédit ; référence</option></select></div>
+      <div class="cpt-field"><input type="file" name="fichier" accept=".csv,.txt" class="cpt-input"></div>
+      <button class="cpt-btn primaire">Importer</button>
+      <div class="cpt-note" style="margin-top:6px;">Une ligne déjà importée (même date, libellé et montant) n'est pas reprise.</div>
+    </form>
+    <form method="post" class="cpt-card">{% csrf_token %}
+      <input type="hidden" name="action" value="ajouter"><input type="hidden" name="date" value="{{ fin|date:'Y-m-d' }}">
+      <h2>Ajouter une ligne de relevé</h2>
+      <div class="cpt-grid2">
+        <div class="cpt-field"><label>Date</label><input type="date" name="ligne_date" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
+        <div class="cpt-field"><label>Montant (− pour une sortie)</label><input type="text" name="ligne_montant" class="cpt-input" inputmode="decimal"></div>
+      </div>
+      <div class="cpt-field"><label>Libellé</label><input type="text" name="ligne_libelle" class="cpt-input"></div>
+      <div class="cpt-field"><label>Référence</label><input type="text" name="ligne_reference" class="cpt-input"></div>
+      <button class="cpt-btn">Ajouter</button>
+    </form>
+  </div>
+
+  <form method="post" class="cpt-card">{% csrf_token %}
+    <input type="hidden" name="date" value="{{ fin|date:'Y-m-d' }}">
+    <div class="cpt-head" style="margin-bottom:8px;">
+      <h2 style="margin:0;">À pointer</h2>
+      <div class="cpt-actions">
+        <button name="action" value="auto" class="cpt-btn"><i class="bi bi-magic"></i> Rapprochement automatique</button>
+        <button name="action" value="pointer" class="cpt-btn primaire">Rapprocher la sélection</button>
+      </div>
+    </div>
+    <div class="cpt-note" style="margin-bottom:8px;">Automatique : même montant, à 7 jours près, sans ambiguïté. Manuel : cochez une ligne de chaque côté, de même montant.</div>
+    <div class="cpt-grid2" style="align-items:start;">
+      <div>
+        <h2>Relevé, non pointé ({{ e.releve_seul|length }})</h2>
+        <table class="cpt-table">
+          <thead><tr><th></th><th>Date</th><th>Libellé</th><th class="num">Montant</th></tr></thead>
+          <tbody>{% for l in e.releve_seul %}<tr class="rap-ligne"><td><input type="radio" name="releve" value="{{ l.pk }}"></td>
+            <td>{{ l.date|date:"d/m/Y" }}</td><td>{{ l.libelle }}{% if l.reference %}<div class="cpt-note">{{ l.reference }}</div>{% endif %}</td>
+            <td class="num {% if l.montant < 0 %}ecart-neg{% endif %}">{{ l.montant|floatformat:0|intcomma }}</td></tr>
+          {% empty %}<tr><td colspan="4" class="cpt-vide">Rien à pointer.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      <div>
+        <h2>Écritures, non pointées ({{ e.ecritures_seules|length }})</h2>
+        <table class="cpt-table">
+          <thead><tr><th></th><th>Date</th><th>Libellé</th><th class="num">Montant</th></tr></thead>
+          <tbody>{% for l in e.ecritures_seules %}<tr class="rap-ligne"><td><input type="radio" name="ecriture" value="{{ l.pk }}"></td>
+            <td>{{ l.ecriture.date|date:"d/m/Y" }}</td><td><a href="{% url 'comptabilite:ecriture' l.ecriture_id %}">{{ l.ecriture.libelle|truncatechars:60 }}</a>{% if l.ecriture.statut == 'brouillon' %} <span class="cpt-badge cloturee">brouillon</span>{% endif %}</td>
+            <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% else %}−{{ l.credit|floatformat:0|intcomma }}{% endif %}</td></tr>
+          {% empty %}<tr><td colspan="4" class="cpt-vide">Rien à pointer.</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+    </div>
+  </form>
+
+  {% if e.releve_seul and perms.comptabilite.add_ecriture %}
+  <form method="post" class="cpt-card">{% csrf_token %}
+    <input type="hidden" name="action" value="comptabiliser"><input type="hidden" name="date" value="{{ fin|date:'Y-m-d' }}">
+    <h2>Comptabiliser une opération vue seulement sur le relevé</h2>
+    <div class="cpt-note" style="margin-bottom:8px;">Frais bancaires, agios, frais Mobile Money, intérêts… L'écriture est préparée en brouillon et la ligne se rapproche aussitôt.</div>
+    <div class="cpt-actions">
+      <select name="releve" class="cpt-input">{% for l in e.releve_seul %}<option value="{{ l.pk }}">{{ l.date|date:"d/m/Y" }} — {{ l.libelle|truncatechars:40 }} — {{ l.montant|floatformat:0|intcomma }}</option>{% endfor %}</select>
+      <select name="contrepartie" class="cpt-input">{% for c in comptes %}<option value="{{ c.pk }}" {% if c.pk == frais %}selected{% endif %}>{{ c.numero }} — {{ c.intitule|truncatechars:40 }}</option>{% endfor %}</select>
+      <button class="cpt-btn primaire">Comptabiliser</button>
+    </div>
+  </form>
+  {% endif %}
+  {% endif %}
+
+  {% if rapprochees %}
+  <div class="cpt-card">
+    <h2>Déjà rapprochées (100 dernières)</h2>
+    <table class="cpt-table"><tbody>{% for l in rapprochees %}<tr><td>{{ l.date|date:"d/m/Y" }}</td><td>{{ l.libelle }}</td><td>↔ <a href="{% url 'comptabilite:ecriture' l.ligne_ecriture.ecriture_id %}">{{ l.ligne_ecriture.ecriture.libelle|truncatechars:50 }}</a></td>
+      <td class="num">{{ l.montant|floatformat:0|intcomma }}</td>
+      <td>{% if peut_modifier %}<form method="post">{% csrf_token %}<input type="hidden" name="date" value="{{ fin|date:'Y-m-d' }}"><input type="hidden" name="releve" value="{{ l.pk }}"><button name="action" value="defaire" class="cpt-btn" style="padding:3px 8px;font-size:11px;">Défaire</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+  </div>
+  {% endif %}
+</div>
+{% endwith %}
+{% endblock %}

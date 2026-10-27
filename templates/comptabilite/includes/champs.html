@@ -1,0 +1,14 @@
+{% comment %}Champs d'un formulaire au style des écrans de comptabilité.{% endcomment %}
+{% if form.non_field_errors %}<div class="cpt-alerte">{{ form.non_field_errors.0 }}</div>{% endif %}
+{% for champ in form %}
+<div class="cpt-field">
+  {% if champ.field.widget.input_type == 'checkbox' %}
+  <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:var(--text);">{{ champ }} {{ champ.label }}</label>
+  {% else %}
+  <label for="{{ champ.id_for_label }}">{{ champ.label }}{% if champ.field.required %} <span style="color:#dc2626;">*</span>{% endif %}</label>
+  {{ champ }}
+  {% endif %}
+  {% if champ.help_text %}<div class="cpt-note">{{ champ.help_text }}</div>{% endif %}
+  {% if champ.errors %}<div class="ecart-neg" style="font-size:12px;">{{ champ.errors.0 }}</div>{% endif %}
+</div>
+{% endfor %}

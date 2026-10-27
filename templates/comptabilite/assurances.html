@@ -1,0 +1,40 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Assurances{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Créances sur les assurances et mutuelles</h1>
+      <div class="cpt-sub">Part assurance des factures non encore réglée par l'assureur.</div>
+    </div>
+    <div class="cpt-actions">
+      {% if perms.comptabilite.add_reglementassurance %}<a href="{% url 'comptabilite:reglement_nouveau' %}" class="cpt-btn primaire"><i class="bi bi-cash"></i> Enregistrer un règlement</a>{% endif %}
+    </div>
+  </div>
+  <div class="cpt-card">
+    {% if lignes %}
+    <table class="cpt-table">
+      <thead><tr><th>Assureur</th><th class="num">Taux</th><th class="num">Factures dues</th><th class="num">Montant dû</th><th class="num">Pas encore envoyé</th><th></th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:creances_assureur' l.assurance.pk %}'">
+          <td><b>{{ l.assurance.nom }}</b> <span class="cpt-note">{{ l.assurance.code }}</span></td>
+          <td class="num">{{ l.assurance.taux_prise_en_charge|floatformat:"-2" }} %</td>
+          <td class="num">{{ l.nb }}</td>
+          <td class="num"><b>{{ l.du|floatformat:0|intcomma }}</b></td>
+          <td class="num">{% if l.hors_bordereau %}{{ l.hors_bordereau|floatformat:0|intcomma }} <span class="cpt-note">({{ l.nb_hors_bordereau }})</span>{% else %}—{% endif %}</td>
+          <td><span class="cpt-btn" style="padding:3px 8px;font-size:11px;">Détail</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="cpt-vide">Aucune assurance n'est configurée. Ajoutez-les dans Paramètres → Patients → Assurances.</div>
+    {% endif %}
+  </div>
+  <div class="cpt-note">Pour qu'une facture soit due par un assureur : le patient doit avoir son assurance sur sa fiche, et la facture une part assurance (proposée automatiquement d'après le taux de prise en charge).</div>
+</div>
+{% endblock %}

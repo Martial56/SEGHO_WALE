@@ -1,0 +1,48 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Fonds dédiés{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Fonds dédiés — exercice {{ exercice }}</h1>
+      <div class="cpt-sub">La part des ressources affectées (versements, dons affectés) non utilisée dans l'exercice est mise de côté pour le projet, et reprise l'année suivante.</div>
+    </div>
+    <form method="get" class="cpt-actions"><select name="exercice" class="cpt-input" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+      {% for e in exercices %}<option value="{{ e.pk }}" {% if e.pk == exercice.pk %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></form>
+  </div>
+
+  <div class="cpt-card">
+    {% if resultats %}
+    <table class="cpt-table">
+      <thead><tr><th>Convention</th><th>Bailleur</th><th class="num">Ressources de l'exercice</th><th class="num">Dépenses imputées</th><th class="num">Fonds dédiés</th></tr></thead>
+      <tbody>
+        {% for r in resultats %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:convention' r.convention.pk %}'">
+          <td><b>{{ r.convention.code }}</b> {{ r.convention.intitule }}</td><td>{{ r.convention.bailleur }}</td>
+          <td class="num">{{ r.ressources|floatformat:0|intcomma }}</td><td class="num">{{ r.depenses|floatformat:0|intcomma }}</td>
+          <td class="num"><b>{{ r.fonds_dedies|floatformat:0|intcomma }}</b></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune ressource ni dépense affectée sur cet exercice.</div>{% endif %}
+  </div>
+
+  {% if ecritures %}
+  <div class="cpt-card"><h2>Écritures déjà préparées</h2>
+    {% for e in ecritures %}<div><a href="{% url 'comptabilite:ecriture' e.pk %}">{{ e.reference }} — {{ e.libelle }}</a> ({{ e.get_statut_display|lower }})</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if peut_passer and resultats %}
+  <form method="post" class="cpt-card">
+    {% csrf_token %}<input type="hidden" name="exercice" value="{{ exercice.pk }}">
+    <div class="cpt-note" style="margin-bottom:10px;">Prépare en brouillon la constitution des fonds dédiés au {{ exercice.date_fin|date:"d/m/Y" }} et leur reprise le lendemain. À faire une fois l'exercice complet, avant sa clôture. Les comptes utilisés sont ceux des correspondances « Fonds dédiés » (à confirmer par l'expert-comptable).</div>
+    <button class="cpt-btn primaire" onclick="return confirm('Préparer les écritures de fonds dédiés ?');">Préparer les écritures</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

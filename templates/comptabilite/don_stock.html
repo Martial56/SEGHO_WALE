@@ -1,0 +1,69 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Don en nature — entrée en stock{% endblock %}
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.ds-table input { width: 100%; padding: 5px 7px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; }
+.ds-table input.num { text-align: right; }
+.ds-table td { padding: 4px 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Don {{ don.numero }} — {{ don.nom_donateur }}</h1>
+      <div class="cpt-sub">Saisissez les produits reçus : ils entrent dans le stock central (lot, péremption, mouvement « Don »), et leur valeur devient le montant du don.</div></div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:dons' %}" class="cpt-btn">Retour</a></div>
+  </div>
+  {% if lignes %}
+  <div class="cpt-card">
+    <h2>Produits entrés en stock</h2>
+    <table class="cpt-table"><thead><tr><th>Produit</th><th>Lot</th><th>Péremption</th><th class="num">Quantité</th><th class="num">Valeur unitaire</th><th class="num">Valeur</th></tr></thead>
+      <tbody>{% for l in lignes %}<tr><td>{{ l.produit.nom }}</td><td>{{ l.numero_lot }}</td><td>{{ l.date_peremption|date:"d/m/Y" }}</td>
+        <td class="num">{{ l.quantite|floatformat:"-2" }}</td><td class="num">{{ l.valeur_unitaire|floatformat:0|intcomma }}</td><td class="num">{{ l.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td colspan="5">Valeur du don</td><td class="num">{{ don.montant|floatformat:0|intcomma }}</td></tr></tfoot></table>
+  </div>
+  {% else %}
+  {% if don.description %}<div class="cpt-alerte">Reçu : {{ don.description }}</div>{% endif %}
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <div class="cpt-field" style="max-width:320px;"><label>Filtrer les produits</label><input type="search" id="filtre" class="cpt-input" placeholder="Nom du produit…"></div>
+    <table class="cpt-table ds-table">
+      <thead><tr><th>Produit</th><th class="num" style="width:11%;">Quantité reçue</th><th class="num" style="width:13%;">Valeur unitaire (F)</th><th style="width:16%;">N° de lot</th><th style="width:15%;">Péremption</th></tr></thead>
+      <tbody id="ds-corps">
+        {% for p in produits %}
+        <tr data-nom="{{ p.nom|lower }}">
+          <td>{{ p.nom }}<div class="cpt-note">{{ p.get_type_display }}{% if p.dosage %} · {{ p.dosage }}{% endif %}</div></td>
+          <td><input class="num" name="qte_{{ p.pk }}" inputmode="decimal"></td>
+          <td><input class="num" name="valeur_{{ p.pk }}" value="{{ p.prix_achat|floatformat:0 }}" inputmode="decimal"></td>
+          <td><input name="lot_{{ p.pk }}"></td>
+          <td><input type="date" name="peremption_{{ p.pk }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="cpt-note" style="margin:10px 0;">La valeur unitaire proposée est le prix d'achat du produit : ajustez-la à la valeur déclarée par le donateur si elle est connue. L'équipement reçu va en immobilisation, les médicaments et consommables en stock.</div>
+    <button class="cpt-btn primaire">Entrer en stock</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var f = document.getElementById('filtre');
+  if (!f) return;
+  f.addEventListener('input', function () {
+    var q = f.value.trim().toLowerCase();
+    document.querySelectorAll('#ds-corps tr').forEach(function (tr) {
+      tr.style.display = !q || tr.dataset.nom.indexOf(q) !== -1 ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}

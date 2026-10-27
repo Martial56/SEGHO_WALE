@@ -1,0 +1,44 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Conventions de financement{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>.jauge{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px;min-width:80px}.jauge span{display:block;height:100%;background:var(--teal-600)}</style>{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Conventions de financement</h1>
+      <div class="cpt-sub">Pour chaque financement : accordé, reçu, dépensé et ce qu'il reste.</div>
+    </div>
+    <div class="cpt-actions">
+      {% for code, libelle in statuts %}<a href="?statut={{ code }}" class="cpt-btn {% if statut == code %}primaire{% endif %}">{{ libelle }}s</a>{% endfor %}
+      <a href="?statut=tout" class="cpt-btn {% if statut == 'tout' %}primaire{% endif %}">Toutes</a>
+      {% if perms.comptabilite.add_convention %}<a href="{% url 'comptabilite:convention_nouvelle' %}" class="cpt-btn primaire"><i class="bi bi-plus-lg"></i> Nouvelle convention</a>{% endif %}
+    </div>
+  </div>
+  <div class="cpt-card">
+    {% if suivis %}
+    <table class="cpt-table">
+      <thead><tr><th>Convention</th><th>Bailleur</th><th>Période</th><th class="num">Accordé</th><th class="num">Reçu</th>
+        <th class="num">Dépensé</th><th class="num">Reste à recevoir</th><th class="num">Disponible</th><th>Exécution</th></tr></thead>
+      <tbody>
+        {% for s in suivis %}{% with c=s.convention %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:convention' c.pk %}'">
+          <td><b>{{ c.code }}</b><div class="cpt-note">{{ c.intitule }}</div></td>
+          <td>{{ c.bailleur }}</td>
+          <td style="white-space:nowrap;">{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}</td>
+          <td class="num">{{ s.accorde|floatformat:0|intcomma }}</td>
+          <td class="num">{{ s.recu|floatformat:0|intcomma }}</td>
+          <td class="num">{{ s.depense|floatformat:0|intcomma }}</td>
+          <td class="num">{{ s.reste_a_recevoir|floatformat:0|intcomma }}</td>
+          <td class="num {% if s.disponible < 0 %}ecart-neg{% endif %}">{{ s.disponible|floatformat:0|intcomma }}</td>
+          <td>{% if s.taux is not None %}{{ s.taux|floatformat:0 }} %<div class="jauge"><span style="width:{% if s.taux > 100 %}100{% else %}{{ s.taux|floatformat:0 }}{% endif %}%"></span></div>{% endif %}</td>
+        </tr>
+        {% endwith %}{% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune convention.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

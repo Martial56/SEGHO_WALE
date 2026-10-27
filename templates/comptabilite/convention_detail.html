@@ -1,0 +1,84 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}{{ convention.code }}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+{% with s=suivi %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">{{ convention.code }} — {{ convention.intitule }}
+        <span class="cpt-badge {% if convention.statut == 'active' %}ouverte{% else %}cloturee{% endif %}">{{ convention.get_statut_display }}</span></h1>
+      <div class="cpt-sub">{{ convention.bailleur }}{% if convention.reference %} · réf. {{ convention.reference }}{% endif %} · du {{ convention.date_debut|date:"d/m/Y" }} au {{ convention.date_fin|date:"d/m/Y" }} · ressource : {{ convention.compte_ressource }}</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:conventions' %}" class="cpt-btn">Toutes les conventions</a>
+      <a href="{% url 'comptabilite:etat' 'rapport_convention' %}?convention={{ convention.pk }}&periode=annee&debut={{ convention.date_debut|date:'Y-m-d' }}" class="cpt-btn"><i class="bi bi-file-earmark-text"></i> Rapport financier</a>
+      {% if peut_modifier %}<a href="{% url 'comptabilite:convention_modifier' convention.pk %}" class="cpt-btn primaire">Modifier</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Accordé</div><div class="v">{{ s.accorde|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Reçu</div><div class="v">{{ s.recu|floatformat:0|intcomma }} F</div>{% if s.dons %}<div class="s">+ {{ s.dons|floatformat:0|intcomma }} F de dons affectés</div>{% endif %}</div>
+    <div class="cpt-kpi"><div class="l">Dépensé</div><div class="v">{{ s.depense|floatformat:0|intcomma }} F</div>{% if s.taux is not None %}<div class="s">{{ s.taux|floatformat:0 }} % de l'accordé</div>{% endif %}</div>
+    <div class="cpt-kpi"><div class="l">Reste à recevoir</div><div class="v">{{ s.reste_a_recevoir|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi accent"><div class="l">Disponible</div><div class="v {% if s.disponible < 0 %}ecart-neg{% endif %}">{{ s.disponible|floatformat:0|intcomma }} F</div><div class="s">reçu − dépensé</div></div>
+  </div>
+
+  <div class="cpt-card">
+    <h2>Budget prévu / réalisé</h2>
+    {% if s.lignes_budget %}
+    <table class="cpt-table">
+      <thead><tr><th>Ligne</th><th>Compte</th><th class="num">Prévu</th><th class="num">Réalisé</th><th class="num">Reste</th><th class="num">Taux</th></tr></thead>
+      <tbody>{% for l in s.lignes_budget %}<tr><td>{{ l.ligne.libelle }}</td><td>{{ l.ligne.compte.numero }}</td>
+        <td class="num">{{ l.prevu|floatformat:0|intcomma }}</td><td class="num">{{ l.realise|floatformat:0|intcomma }}</td>
+        <td class="num {% if l.reste < 0 %}ecart-neg{% endif %}">{{ l.reste|floatformat:0|intcomma }}</td>
+        <td class="num">{% if l.taux is not None %}{{ l.taux|floatformat:0 }} %{% endif %}</td></tr>{% endfor %}
+        {% if s.hors_budget %}<tr><td colspan="3"><i>Dépenses hors lignes budgétaires</i></td><td class="num ecart-pos">{{ s.hors_budget|floatformat:0|intcomma }}</td><td colspan="2"></td></tr>{% endif %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune ligne budgétaire. {% if peut_modifier %}<a href="{% url 'comptabilite:convention_modifier' convention.pk %}">Saisir le budget</a>.{% endif %}</div>{% endif %}
+  </div>
+
+  <div class="cpt-grid2" style="align-items:start;">
+    <div class="cpt-card">
+      <h2>Versements reçus</h2>
+      {% if versements %}
+      <table class="cpt-table">
+        <thead><tr><th>Date</th><th>N°</th><th>Mode</th><th>Référence</th><th class="num">Montant</th></tr></thead>
+        <tbody>{% for v in versements %}<tr><td>{{ v.date|date:"d/m/Y" }}</td><td>{{ v.numero }}</td><td>{{ v.get_mode_display }}</td><td>{{ v.reference }}</td><td class="num">{{ v.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% else %}<div class="cpt-vide">Aucun versement reçu.</div>{% endif %}
+      {% if dons %}
+      <h2 style="margin-top:14px;">Dons affectés</h2>
+      <table class="cpt-table"><tbody>{% for d in dons %}<tr><td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.numero }}</td><td>{{ d.nom_donateur }}</td><td class="num">{{ d.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
+      {% endif %}
+    </div>
+    {% if peut_recevoir %}
+    <form method="post" class="cpt-card">
+      {% csrf_token %}
+      <h2>Enregistrer un versement</h2>
+      {% include 'comptabilite/includes/champs.html' %}
+      <button class="cpt-btn primaire">Enregistrer le versement</button>
+      <div class="cpt-note" style="margin-top:6px;">L'écriture (trésorerie au débit, {{ convention.compte_ressource.numero }} au crédit) est préparée en brouillon.</div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="cpt-card">
+    <h2>Dépenses imputées</h2>
+    {% if depenses %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>Journal</th><th>Compte</th><th>Libellé</th><th class="num">Montant</th></tr></thead>
+      <tbody>{% for l in depenses %}<tr class="lien" onclick="location.href='{% url 'comptabilite:ecriture' l.ecriture_id %}'">
+        <td>{{ l.ecriture.date|date:"d/m/Y" }}</td><td>{{ l.ecriture.journal.code }}</td><td>{{ l.compte.numero }}</td>
+        <td>{{ l.libelle }}{% if l.ecriture.statut == 'brouillon' %} <span class="cpt-badge cloturee">brouillon</span>{% endif %}</td>
+        <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% else %}− {{ l.credit|floatformat:0|intcomma }}{% endif %}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucune dépense imputée. Imputez-les depuis une sortie de caisse ou une opération diverse.</div>{% endif %}
+  </div>
+</div>
+{% endwith %}
+{% endblock %}

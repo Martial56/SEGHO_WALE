@@ -779,12 +779,12 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
               <input type="number" name="pay_montant" id="pay-montant"
                 min="{% if facture.solde_restant %}1{% else %}0{% endif %}"
                 max="{{ facture.solde_restant|floatformat:0 }}"
-                value="{{ facture.solde_restant|floatformat:0 }}"
+                value="{% if facture.part_assurance %}{{ facture.reste_patient|floatformat:0 }}{% else %}{{ facture.solde_restant|floatformat:0 }}{% endif %}"
                 style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-right:none;border-radius:5px 0 0 5px;font-size:14px;font-weight:700;background:var(--bg);color:var(--text);"
                 required>
               <span style="padding:8px 12px;background:var(--bg);border:1.5px solid var(--border);border-left:none;border-radius:0 5px 5px 0;font-size:12px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;">CFA</span>
             </div>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Solde : {{ facture.solde_restant|floatformat:0 }} CFA</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Solde : {{ facture.solde_restant|floatformat:0 }} CFA{% if facture.part_assurance %} — dont part patient {{ facture.reste_patient|floatformat:0 }} CFA, part {{ facture.assurance.nom }} {{ facture.reste_assurance|floatformat:0 }} CFA{% endif %}</div>
           </div>
           {% comment %}Reçu et monnaie n'ont de sens qu'en espèces : par mobile
           money ou virement, le compte est juste. Le script en bas de page masque

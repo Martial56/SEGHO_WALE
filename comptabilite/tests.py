@@ -785,3 +785,714 @@ class TestEtats(TestCase):
         nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
         self.assertIn(reverse('comptabilite:etat', args=['recettes']), nav)
         self.assertNotIn(reverse('comptabilite:etat', args=['balance']), nav)
+
+
+
+# ─── Lot 5 : financements ──────────────────────────────────────────────────────
+
+from . import financements  # noqa: E402
+from .models import Bailleur, Convention, Don, LigneBudget, LigneBudgetaire, Versement  # noqa: E402
+
+
+class TestFinancements(TestCase):
+    """Un projet financé de bout en bout : convention, budget, versement,
+    dépense imputée depuis la caisse, don affecté, suivi, fonds dédiés."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin5', password='x')
+        self.client_admin = _client(self.admin)
+        self.bailleur = Bailleur.objects.create(nom='Fonds mondial', sigle='FM')
+        self.jour = timezone.localdate()
+        self.convention = Convention.objects.create(
+            bailleur=self.bailleur, intitule='Prise en charge du paludisme', date_debut=self.jour.replace(month=1, day=1),
+            date_fin=self.jour.replace(month=12, day=31), montant_accorde=Decimal('1000000'),
+            compte_ressource=Compte.objects.get(numero='718'))
+        LigneBudgetaire.objects.create(convention=self.convention, libelle='Transport des agents',
+                                       compte=Compte.objects.get(numero='618'), montant_prevu=Decimal('100000'))
+
+    def _verser(self, montant):
+        v = Versement.objects.create(convention=self.convention, date=self.jour, montant=Decimal(montant), mode='virement')
+        return moteur.ecriture_versement(v)
+
+    def _depenser_en_caisse(self, montant):
+        caisse = Caisse.objects.create(nom='Caisse Projet', code='PRJ', seuil_sortie=Decimal('1000000'))
+        awa = _caissiere('awa_prj')
+        session = regles.ouvrir_session(awa, caisse, Decimal(montant))
+        sortie = regles.creer_sortie(session, awa, MotifSortie.objects.get(libelle='Transport / course'),
+                                     'Déplacement des relais', Decimal(montant), convention=self.convention)
+        return moteur.ecriture_sortie(sortie)
+
+    def test_code_de_convention(self):
+        self.assertTrue(self.convention.code.startswith('CONV'))
+
+    def test_versement_credite_le_compte_de_la_convention(self):
+        ecriture = self._verser(400000)
+        self.assertEqual(ecriture.journal.code, 'BQ')
+        lignes = {l.compte.numero: l for l in ecriture.lignes.all()}
+        self.assertEqual(lignes['521'].debit, Decimal('400000'))
+        self.assertEqual(lignes['718'].credit, Decimal('400000'))
+        self.assertEqual(lignes['718'].convention, self.convention)
+
+    def test_suivi_et_budget_prevu_realise(self):
+        self._verser(400000)
+        self._depenser_en_caisse(30000)
+        s = financements.suivi(self.convention)
+        self.assertEqual(s['recu'], Decimal('400000'))
+        self.assertEqual(s['depense'], Decimal('30000'))
+        self.assertEqual(s['reste_a_recevoir'], Decimal('600000'))
+        self.assertEqual(s['disponible'], Decimal('370000'))
+        ligne = s['lignes_budget'][0]
+        self.assertEqual((ligne['prevu'], ligne['realise'], ligne['reste']),
+                         (Decimal('100000'), Decimal('30000'), Decimal('70000')))
+        self.assertEqual(s['hors_budget'], Decimal('0'))
+
+    def test_don_en_nature_et_don_affecte(self):
+        don = Don.objects.create(donateur_nom='Pharmacie du Lac', date=self.jour, nature='nature',
+                                 montant=Decimal('50000'), description='Paracétamol, 200 boîtes')
+        lignes = {l.compte.numero: l for l in moteur.ecriture_don(don).lignes.all()}
+        self.assertEqual(lignes['311'].debit, Decimal('50000'))
+        self.assertEqual(lignes['7581'].credit, Decimal('50000'))
+        affecte = Don.objects.create(donateur=self.bailleur, date=self.jour, nature='especes',
+                                     montant=Decimal('20000'), convention=self.convention)
+        lignes = {l.compte.numero: l for l in moteur.ecriture_don(affecte).lignes.all()}
+        self.assertEqual(lignes['718'].convention, self.convention)
+        self.assertEqual(financements.suivi(self.convention)['dons'], Decimal('20000'))
+
+    def test_fonds_dedies(self):
+        self._verser(400000)
+        self._depenser_en_caisse(30000)
+        exercice = Exercice.objects.get(libelle=str(self.jour.year))
+        calcul = financements.calcul_fonds_dedies(exercice)
+        self.assertEqual(calcul[0]['fonds_dedies'], Decimal('370000'))
+        constitution, reprise = financements.ecritures_fonds_dedies(exercice, self.admin)
+        lignes = {l.compte.numero: l for l in constitution.lignes.all()}
+        self.assertEqual(lignes['689'].debit, Decimal('370000'))
+        self.assertEqual(lignes['195'].credit, Decimal('370000'))
+        self.assertEqual(reprise.date, exercice.date_fin + timedelta(days=1))
+        # La constitution ne compte pas comme une dépense du projet.
+        self.assertEqual(financements.suivi(self.convention)['depense'], Decimal('30000'))
+        self.assertEqual(financements.ecritures_fonds_dedies(exercice, self.admin), (None, None))
+
+    def test_budget_realise(self):
+        self._depenser_en_caisse(30000)
+        exercice = Exercice.objects.get(libelle=str(self.jour.year))
+        LigneBudget.objects.create(exercice=exercice, compte=Compte.objects.get(numero='618'), montant=Decimal('120000'))
+        ligne = financements.budget_realise(exercice, self.jour)[0]
+        self.assertEqual((ligne['prevu'], ligne['realise']), (Decimal('120000'), Decimal('30000')))
+
+    def test_ecrans(self):
+        self._verser(400000)
+        don = Don.objects.create(donateur_nom='Anonyme', date=self.jour, montant=Decimal('5000'))
+        for url in [reverse('comptabilite:bailleurs'), reverse('comptabilite:conventions'),
+                    reverse('comptabilite:convention_nouvelle'),
+                    reverse('comptabilite:convention', args=[self.convention.pk]),
+                    reverse('comptabilite:convention_modifier', args=[self.convention.pk]),
+                    reverse('comptabilite:dons'), reverse('comptabilite:don_nouveau'),
+                    reverse('comptabilite:don_recu', args=[don.pk]), reverse('comptabilite:budget'),
+                    reverse('comptabilite:fonds_dedies')]:
+            self.assertEqual(self.client_admin.get(url).status_code, 200, url)
+        for code in ('conventions', 'rapport_convention', 'budget', 'dons'):
+            reponse = self.client_admin.get(reverse('comptabilite:etat', args=[code]),
+                                            {'periode': 'annee', 'convention': self.convention.pk})
+            self.assertEqual(reponse.status_code, 200, code)
+
+    def test_creer_une_convention_avec_son_budget(self):
+        self.client_admin.post(reverse('comptabilite:convention_nouvelle'), {
+            'bailleur': self.bailleur.pk, 'intitule': 'Santé maternelle', 'date_debut': '2026-01-01',
+            'date_fin': '2027-12-31', 'montant_accorde': '500000', 'statut': 'active',
+            'compte_ressource': Compte.objects.get(numero='718').pk,
+            'budget-TOTAL_FORMS': '1', 'budget-INITIAL_FORMS': '0',
+            'budget-0-libelle': 'Médicaments', 'budget-0-compte': Compte.objects.get(numero='601').pk,
+            'budget-0-montant_prevu': '200000'})
+        convention = Convention.objects.get(intitule='Santé maternelle')
+        self.assertEqual(convention.lignes_budget.get().montant_prevu, Decimal('200000'))
+
+    def test_enregistrer_un_versement_depuis_la_fiche(self):
+        self.client_admin.post(reverse('comptabilite:convention', args=[self.convention.pk]),
+                               {'date': self.jour.isoformat(), 'montant': '250000', 'mode': 'virement'})
+        self.assertEqual(self.convention.versements.get().montant, Decimal('250000'))
+        self.assertTrue(Ecriture.objects.filter(origine__startswith='versement:').exists())
+
+    def test_operation_diverse_imputee(self):
+        od = Journal.objects.get(code='OD')
+        self.client_admin.post(reverse('comptabilite:od_saisie'), {
+            'journal': od.pk, 'date': self.jour.isoformat(), 'libelle': 'Prime des relais',
+            'compte_0': '661', 'debit_0': '45000', 'convention_0': str(self.convention.pk),
+            'compte_1': '521', 'credit_1': '45000'})
+        self.assertEqual(financements.suivi(self.convention)['depense'], Decimal('45000'))
+
+    def test_le_menu_financements(self):
+        html = self.client_admin.get(reverse('comptabilite:conventions')).content.decode()
+        nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
+        for nom in ('conventions', 'bailleurs', 'dons', 'budget', 'fonds_dedies'):
+            self.assertIn(reverse(f'comptabilite:{nom}'), nav)
+        self.assertIn('Financements et dons', nav)
+        caissiere = _caissiere('sans_fin')
+        html = _client(caissiere).get(reverse('facturation:list')).content.decode()
+        self.assertNotIn(reverse('comptabilite:conventions'), html)
+
+
+
+# ─── Lot 6 : tiers payants ─────────────────────────────────────────────────────
+
+from patients.models import Assurance  # noqa: E402
+
+from . import assurances as tiers  # noqa: E402
+from .models import BordereauAssurance, LigneEcriture, ReglementAssurance  # noqa: E402
+
+
+class TestAssurances(TestCase):
+    """Un patient assuré à 80 % : il paie sa part, l'assureur le reste."""
+
+    def setUp(self):
+        self.mugef = Assurance.objects.create(nom='MUGEF-CI', code='MUGEF', taux_prise_en_charge=Decimal('80'))
+        self.patient = _patient()
+        self.patient.assurance = self.mugef
+        self.patient.save()
+        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.awa = _caissiere('awa6')
+        regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        self.comptable = User.objects.create_superuser('comptable6', password='x')
+        self.client_c = _client(self.comptable)
+
+    def _facture(self, total=10000, assurance=8000):
+        f = Facture.objects.create(patient=self.patient, type_facture='consultation', statut='emise',
+                                   montant_total=Decimal(total), montant_assurance=Decimal(assurance))
+        return Facture.objects.get(pk=f.pk)
+
+    def test_la_facture_reprend_l_assureur_du_patient(self):
+        f = self._facture()
+        self.assertEqual(f.assurance, self.mugef)
+        self.assertEqual((f.part_assurance, f.part_patient), (Decimal('8000'), Decimal('2000')))
+
+    def test_le_patient_regle_sa_part_et_repart(self):
+        f = self._facture()
+        self.assertFalse(f.reglee_par_le_patient)
+        _payer(self.awa, f, 2000)
+        f = Facture.objects.get(pk=f.pk)
+        self.assertEqual(f.statut, 'emise')                 # l'assureur doit encore
+        self.assertTrue(f.reglee_par_le_patient)
+        self.assertEqual((f.reste_patient, f.reste_assurance), (Decimal('0'), Decimal('8000')))
+
+    def test_la_fiche_propose_la_part_patient(self):
+        f = self._facture()
+        html = _client(self.awa).get(reverse('facturation:detail', args=[f.pk])).content.decode()
+        self.assertIn('value="2000"', html)
+
+    def test_bordereau_puis_reglement(self):
+        f1, f2 = self._facture(), self._facture(5000, 4000)
+        for f in (f1, f2):
+            _payer(self.awa, f, f.part_patient)
+        jour = timezone.localdate()
+        bordereau = tiers.preparer_bordereau(self.mugef, jour.replace(day=1), jour, self.comptable)
+        self.assertTrue(bordereau.numero.startswith('BOR'))
+        self.assertEqual(tiers.contenu_bordereau(bordereau)['total'], Decimal('12000'))
+        with self.assertRaises(tiers.ErreurAssurance):        # déjà sur un bordereau
+            tiers.preparer_bordereau(self.mugef, jour.replace(day=1), jour, self.comptable)
+        tiers.marquer_envoye(bordereau)
+
+        reglement, affectations = tiers.enregistrer_reglement(self.mugef, Decimal('8000'), jour, 'virement',
+                                                              self.comptable, 'VIR-1', bordereau)
+        self.assertEqual(len(affectations), 1)
+        bordereau.refresh_from_db()
+        self.assertEqual(bordereau.statut, 'regle_partiel')
+        self.assertEqual(Facture.objects.get(pk=f1.pk).statut, 'payee')
+
+        tiers.enregistrer_reglement(self.mugef, Decimal('4000'), jour, 'virement', self.comptable, 'VIR-2', bordereau)
+        bordereau.refresh_from_db()
+        self.assertEqual(bordereau.statut, 'regle')
+        self.assertEqual(tiers.creances(self.mugef), [])
+
+    def test_un_reglement_trop_eleve_est_refuse(self):
+        self._facture()
+        with self.assertRaises(tiers.ErreurAssurance):
+            tiers.enregistrer_reglement(self.mugef, Decimal('9000'), timezone.localdate(), 'virement', self.comptable)
+        self.assertFalse(ReglementAssurance.objects.exists())
+
+    def test_ecritures_du_tiers_payant(self):
+        f = self._facture()
+        _payer(self.awa, f, 2000)
+        jour = timezone.localdate()
+        tiers.enregistrer_reglement(self.mugef, Decimal('8000'), jour, 'virement', self.comptable)
+        resultat = moteur.generer(jour, jour)
+        self.assertEqual(resultat['erreurs'], [])
+        vente = Ecriture.objects.get(origine=f'facture:{f.pk}')
+        lignes = {l.compte.numero: l for l in vente.lignes.all()}
+        self.assertEqual(lignes['4111'].debit, Decimal('2000'))
+        self.assertEqual(lignes['4112'].debit, Decimal('8000'))
+        self.assertEqual(lignes['4112'].tiers, 'MUGEF-CI')
+        reglement = Ecriture.objects.get(origine__startswith='reglement:')
+        lignes = {l.compte.numero: l for l in reglement.lignes.all()}
+        self.assertEqual((lignes['521'].debit, lignes['4112'].credit), (Decimal('8000'), Decimal('8000')))
+        # Le paiement « Assurance » issu du règlement n'est pas compté deux fois.
+        paiement_assurance = Paiement.objects.get(reglement_assurance__isnull=False)
+        self.assertFalse(Ecriture.objects.filter(origine=f'paiement:{paiement_assurance.pk}').exists())
+        # Plus rien dû : les comptes 4111 et 4112 de la facture sont soldés.
+        from django.db.models import Sum
+        for numero in ('4111', '4112'):
+            t = LigneEcriture.objects.filter(compte__numero=numero).aggregate(d=Sum('debit'), c=Sum('credit'))
+            self.assertEqual(t['d'], t['c'], numero)
+
+    def test_balance_agee(self):
+        self._facture()
+        lignes = tiers.balance_agee(timezone.localdate())
+        self.assertEqual(lignes[0]['tranches'][0], Decimal('8000'))
+
+    def test_ecrans_et_etats(self):
+        f = self._facture()
+        jour = timezone.localdate()
+        bordereau = tiers.preparer_bordereau(self.mugef, jour.replace(day=1), jour, self.comptable)
+        for url in [reverse('comptabilite:assurances'), reverse('comptabilite:creances_assureur', args=[self.mugef.pk]),
+                    reverse('comptabilite:bordereaux'), reverse('comptabilite:bordereau', args=[bordereau.pk]),
+                    reverse('comptabilite:bordereau_imprimer', args=[bordereau.pk]), reverse('comptabilite:reglements'),
+                    reverse('comptabilite:reglement_nouveau') + f'?bordereau={bordereau.pk}']:
+            self.assertEqual(self.client_c.get(url).status_code, 200, url)
+        for code in ('creances_assurances', 'reglements_assurances'):
+            self.assertEqual(self.client_c.get(reverse('comptabilite:etat', args=[code])).status_code, 200, code)
+        self.client_c.post(reverse('comptabilite:reglement_nouveau'), {
+            'assurance': self.mugef.pk, 'bordereau': bordereau.pk, 'date': jour.isoformat(),
+            'montant': '8000', 'mode': 'cheque', 'reference': 'CHQ-77'})
+        f = Facture.objects.get(pk=f.pk)
+        # L'assureur a réglé sa part ; le patient n'a pas encore payé la sienne.
+        self.assertEqual((f.reste_assurance, f.reste_patient, f.statut), (Decimal('0'), Decimal('2000'), 'emise'))
+        html = self.client_c.get(reverse('comptabilite:reglements')).content.decode()
+        self.assertIn('CHQ-77', html)
+
+
+class TestPermissionsEnFrancais(TestCase):
+    """Toutes les permissions du module Comptabilité se lisent en français
+    dans l'écran d'attribution des droits."""
+
+    def test_aucune_permission_en_anglais(self):
+        anglaises = list(Permission.objects.filter(
+            content_type__app_label__in=['comptabilite', 'facturation'], name__startswith='Can ')
+            .values_list('codename', flat=True))
+        self.assertEqual(anglaises, [])
+
+    def test_quelques_libelles(self):
+        noms = dict(Permission.objects.filter(content_type__app_label='comptabilite')
+                    .values_list('codename', 'name'))
+        self.assertEqual(noms['view_ecriture'], 'Peut consulter : écriture comptable')
+        self.assertEqual(noms['add_reglementassurance'], "Peut créer : règlement d'assurance")
+        self.assertTrue(noms['superviser_caisse'].startswith('Peut superviser les caisses'))
+        self.assertTrue(noms['passer_ecritures'].startswith('Peut valider'))
+
+
+
+# ─── Lot 7 : trésorerie, rapprochements, refus des assureurs ───────────────────
+
+from . import tresorerie as treso  # noqa: E402
+from .models import CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque  # noqa: E402
+
+
+class TestTresorerie(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin7', password='x')
+        self.client_admin = _client(self.admin)
+        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.awa = _caissiere('awa7')
+        regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        _payer(self.awa, _facture(Decimal('40000')), 40000)
+        self.jour = timezone.localdate()
+        self.banque = CompteTresorerie.objects.get(libelle='Banque')
+
+    def test_comptes_de_tresorerie_de_depart(self):
+        self.assertEqual(self.banque.compte.numero, '521')
+        self.assertEqual(CompteTresorerie.objects.get(libelle='Mobile Money').compte.numero, '552')
+
+    def test_remise_en_banque(self):
+        remise = treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin, 'BV-1')
+        self.assertTrue(remise.numero.startswith('REM'))
+        caisse = moteur.compte_de_caisse(self.caisse)
+        self.assertEqual(treso.solde_comptable(caisse), Decimal('10000'))
+        self.assertEqual(treso.solde_comptable(self.banque.compte), Decimal('30000'))
+        self.assertEqual(treso.solde_comptable(moteur.compte('virement_interne')), Decimal('0'))
+
+    def test_pas_de_remise_au_dela_de_la_caisse(self):
+        with self.assertRaises(treso.ErreurTresorerie):
+            treso.creer_remise(self.caisse, self.banque, Decimal('50000'), self.jour, self.admin)
+        self.assertFalse(RemiseBanque.objects.exists())
+
+    def test_import_du_releve_deux_formats(self):
+        crees, ignorees = treso.importer_releve(
+            self.banque, "Date;Libellé;Montant\n01/10/2026;Virement reçu;150 000\n02/10/2026;Agios;-1 200,50\n",
+            self.admin)
+        self.assertEqual((crees, ignorees), (2, [1]))
+        self.assertEqual(LigneReleve.objects.get(libelle='Agios').montant, Decimal('-1200.50'))
+        crees, _ = treso.importer_releve(self.banque, "2026-10-03,Frais SMS,500,,REF9\n", self.admin, 'debit_credit')
+        self.assertEqual(LigneReleve.objects.get(libelle='Frais SMS').montant, Decimal('-500'))
+        # Réimporter ne double rien.
+        crees, _ = treso.importer_releve(self.banque, "01/10/2026;Virement reçu;150 000\n", self.admin)
+        self.assertEqual(crees, 0)
+
+    def test_rapprochement_automatique_et_etat(self):
+        treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin, 'BV-1')
+        LigneReleve.objects.create(compte_tresorerie=self.banque, date=self.jour, libelle='Versement espèces',
+                                   montant=Decimal('30000'))
+        frais = LigneReleve.objects.create(compte_tresorerie=self.banque, date=self.jour, libelle='Frais',
+                                           montant=Decimal('-2000'))
+        self.assertEqual(treso.rapprochement_automatique(self.banque), 1)
+        e = treso.etat_rapprochement(self.banque, self.jour)
+        self.assertEqual(e['solde_releve'] - e['solde_explique'], Decimal('0'))
+        self.assertEqual(len(e['releve_seul']), 1)
+        treso.comptabiliser_ligne_releve(frais, moteur.compte('frais_bancaires'), self.admin)
+        e = treso.etat_rapprochement(self.banque, self.jour)
+        self.assertEqual((e['solde_releve'], e['solde_compta']), (Decimal('28000'), Decimal('28000')))
+        self.assertEqual(e['releve_seul'], [])
+
+    def test_rapprochement_manuel_refuse_un_montant_different(self):
+        treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin)
+        ligne = LigneReleve.objects.create(compte_tresorerie=self.banque, date=self.jour, libelle='X',
+                                           montant=Decimal('29000'))
+        ecriture = treso.ecritures_non_rapprochees(self.banque)[0]
+        with self.assertRaises(treso.ErreurTresorerie):
+            treso.rapprocher(ligne, ecriture)
+
+    def test_ecrans_et_etats(self):
+        for url in [reverse('comptabilite:tresorerie'), reverse('comptabilite:remises'),
+                    reverse('comptabilite:comptes_tresorerie'), reverse('comptabilite:rapprochement', args=[self.banque.pk])]:
+            self.assertEqual(self.client_admin.get(url).status_code, 200, url)
+        for code in ('position_tresorerie', 'rapprochement', 'rejets_assurances'):
+            self.assertEqual(self.client_admin.get(reverse('comptabilite:etat', args=[code])).status_code, 200, code)
+        self.client_admin.post(reverse('comptabilite:remises'), {
+            'caisse': self.caisse.pk, 'compte_tresorerie': self.banque.pk, 'montant': '10000',
+            'date': self.jour.isoformat(), 'reference': 'BV-9'})
+        self.assertTrue(RemiseBanque.objects.filter(reference='BV-9').exists())
+        html = self.client_admin.get(reverse('comptabilite:tresorerie')).content.decode()
+        nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
+        self.assertIn(reverse('comptabilite:rapprochement', args=[self.banque.pk]), nav)
+
+
+class TestRefusAssurance(TestCase):
+
+    def setUp(self):
+        self.mugef = Assurance.objects.create(nom='MUGEF-CI', code='MUGEF', taux_prise_en_charge=Decimal('80'))
+        self.patient = _patient()
+        self.patient.assurance = self.mugef
+        self.patient.save()
+        self.admin = User.objects.create_superuser('admin7b', password='x')
+        self.jour = timezone.localdate()
+        f = Facture.objects.create(patient=self.patient, type_facture='consultation', statut='emise',
+                                   montant_total=Decimal('10000'), montant_assurance=Decimal('8000'),
+                                   montant_paye=Decimal('2000'))
+        self.facture = Facture.objects.get(pk=f.pk)
+
+    def test_report_sur_le_patient(self):
+        tiers.rejeter(self.facture, Decimal('3000'), 'patient', 'Acte non couvert', self.jour, self.admin)
+        f = Facture.objects.get(pk=self.facture.pk)
+        self.assertEqual((f.reste_assurance, f.reste_patient), (Decimal('5000'), Decimal('3000')))
+        self.assertEqual(f.statut, 'emise')
+
+    def test_passage_en_perte_solde_la_facture(self):
+        tiers.rejeter(self.facture, Decimal('8000'), 'perte', 'Assuré hors droits', self.jour, self.admin)
+        f = Facture.objects.get(pk=self.facture.pk)
+        self.assertEqual((f.reste_assurance, f.solde_restant, f.statut), (Decimal('0'), Decimal('0'), 'payee'))
+
+    def test_pas_plus_que_le_du(self):
+        with self.assertRaises(tiers.ErreurAssurance):
+            tiers.rejeter(self.facture, Decimal('9000'), 'perte', 'x', self.jour, self.admin)
+        with self.assertRaises(tiers.ErreurAssurance):
+            tiers.rejeter(self.facture, Decimal('1000'), 'perte', '  ', self.jour, self.admin)
+
+    def test_ecritures_des_refus(self):
+        rejet = tiers.rejeter(self.facture, Decimal('3000'), 'patient', 'Acte non couvert', self.jour, self.admin)
+        ecriture = moteur.ecriture_rejet(rejet)
+        lignes = {l.compte.numero: l for l in ecriture.lignes.all()}
+        self.assertEqual((lignes['4111'].debit, lignes['4112'].credit), (Decimal('3000'), Decimal('3000')))
+        # La vente reconnaît la part d'origine (8 000), le refus en reporte 3 000 sur le patient.
+        vente = {l.compte.numero: l for l in Ecriture.objects.get(origine=f'facture:{self.facture.pk}').lignes.all()}
+        self.assertEqual(vente['4112'].debit, Decimal('8000'))
+        perte = tiers.rejeter(Facture.objects.get(pk=self.facture.pk), Decimal('5000'), 'perte', 'Forclusion',
+                              self.jour, self.admin)
+        lignes = {l.compte.numero: l for l in moteur.ecriture_rejet(perte).lignes.all()}
+        self.assertEqual(lignes['651'].debit, Decimal('5000'))
+
+    def test_ecran_de_refus(self):
+        client = _client(self.admin)
+        url = reverse('comptabilite:rejet_assurance', args=[self.facture.pk])
+        self.assertEqual(client.get(url).status_code, 200)
+        client.post(url, {'montant': '8000', 'decision': 'perte', 'motif': 'Hors délai', 'date': self.jour.isoformat()})
+        self.assertEqual(RejetAssurance.objects.get().montant, Decimal('8000'))
+
+
+
+# ─── Lot 8 : achats, dons en nature en stock, clôture, états financiers ────────
+
+from stock.models import CommandeStock, LigneCommande, MouvementStock, Produit  # noqa: E402
+
+from . import cloture  # noqa: E402
+from . import fournisseurs as achats  # noqa: E402
+from .models import FactureFournisseur, LigneDon, ReglementFournisseur  # noqa: E402
+
+
+def _compte(numero):
+    return Compte.objects.get(numero=numero)
+
+
+class TestAchats(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin8', password='x')
+        self.jour = timezone.localdate()
+
+    def _facture(self):
+        f = FactureFournisseur(fournisseur='LABOREX', reference='F-123', date=self.jour)
+        return achats.enregistrer_facture(f, [(_compte('601'), 'Médicaments', Decimal('100000')),
+                                              (_compte('604'), 'Gants', Decimal('20000'))], self.admin)
+
+    def test_facture_et_reglement(self):
+        f = self._facture()
+        self.assertTrue(f.numero.startswith('FFO'))
+        achat = Ecriture.objects.get(origine=f'facture_fournisseur:{f.pk}')
+        self.assertEqual(achat.journal.code, 'ACH')
+        self.assertEqual(_lignes(achat), {'601': (Decimal('100000'), Decimal('0')),
+                                          '604': (Decimal('20000'), Decimal('0')),
+                                          '401': (Decimal('0'), Decimal('120000'))})
+        r = achats.regler(f, Decimal('50000'), self.jour, 'virement', self.admin, reference='VIR-1')
+        self.assertEqual(_lignes(Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')),
+                         {'401': (Decimal('50000'), Decimal('0')), '521': (Decimal('0'), Decimal('50000'))})
+        self.assertEqual(FactureFournisseur.objects.get(pk=f.pk).reste, Decimal('70000'))
+        with self.assertRaises(achats.ErreurAchat):
+            achats.regler(f, Decimal('80000'), self.jour, 'virement', self.admin)
+
+    def test_reglement_depuis_un_compte_choisi(self):
+        f = self._facture()
+        mm = CompteTresorerie.objects.get(libelle='Mobile Money')
+        r = achats.regler(f, Decimal('1000'), self.jour, 'mobile_money', self.admin, compte_tresorerie=mm)
+        e = Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')
+        self.assertEqual((e.journal.code, _lignes(e)['552']), ('MM', (Decimal('0'), Decimal('1000'))))
+
+    def test_compte_hors_charges_refuse(self):
+        f = FactureFournisseur(fournisseur='X', date=self.jour)
+        with self.assertRaises(achats.ErreurAchat):
+            achats.enregistrer_facture(f, [(_compte('4111'), '', Decimal('100'))], self.admin)
+        with self.assertRaises(achats.ErreurAchat):
+            achats.enregistrer_facture(f, [], self.admin)
+
+    def test_reprise_d_une_commande_de_stock(self):
+        p = Produit.objects.create(nom='Paracétamol 500', type='medicament', prix_achat=Decimal('25'))
+        g = Produit.objects.create(nom='Gants', type='consommable', prix_achat=Decimal('50'))
+        cmd = CommandeStock.objects.create(statut='recu')
+        LigneCommande.objects.create(commande=cmd, produit=p, quantite_commandee=20, quantite_recue=10,
+                                     prix_unitaire=Decimal('500'))
+        LigneCommande.objects.create(commande=cmd, produit=g, quantite_commandee=4, quantite_recue=4,
+                                     prix_unitaire=Decimal('250'))
+        lignes = {c.numero: m for c, _, m in achats.lignes_commande_stock(cmd)}
+        self.assertEqual(lignes, {'601': Decimal('5000'), '604': Decimal('1000')})
+        reponse = _client(self.admin).get(reverse('comptabilite:facture_fournisseur_nouvelle') + f'?commande_stock={cmd.pk}')
+        self.assertContains(reponse, cmd.numero)
+
+    def test_ecrans(self):
+        client = _client(self.admin)
+        reponse = client.post(reverse('comptabilite:facture_fournisseur_nouvelle'), {
+            'fournisseur': 'UBIPHARM', 'reference': 'U-9', 'date': self.jour.isoformat(), 'objet': 'Réassort',
+            'nb_lignes': '2', 'compte_0': _compte('601').pk, 'libelle_0': 'Antibiotiques', 'montant_0': '45 000',
+            'compte_1': '', 'libelle_1': '', 'montant_1': ''})
+        f = FactureFournisseur.objects.get(reference='U-9')
+        self.assertRedirects(reponse, reverse('comptabilite:facture_fournisseur', args=[f.pk]))
+        self.assertEqual(f.montant_total, Decimal('45000'))
+        client.post(reverse('comptabilite:facture_fournisseur', args=[f.pk]),
+                    {'montant': '45000', 'mode': 'cheque', 'date': self.jour.isoformat(), 'reference': 'CHQ-1'})
+        self.assertEqual(ReglementFournisseur.objects.get().montant, Decimal('45000'))
+        for url in [reverse('comptabilite:factures_fournisseurs') + '?filtre=toutes',
+                    reverse('comptabilite:facture_fournisseur', args=[f.pk]),
+                    reverse('comptabilite:facture_fournisseur_modifier', args=[f.pk])]:
+            self.assertEqual(client.get(url).status_code, 200, url)
+        for code in ('dettes_fournisseurs', 'bilan', 'compte_resultat'):
+            self.assertEqual(client.get(reverse('comptabilite:etat', args=[code])).status_code, 200, code)
+
+    def test_dettes_fournisseurs(self):
+        f = self._facture()
+        achats.regler(f, Decimal('20000'), self.jour, 'virement', self.admin)
+        etat = ETATS['dettes_fournisseurs']['fonction'](self.jour, self.jour, {})
+        total = etat['tableaux'][0]['lignes'][-1]
+        self.assertEqual(total['cellules'][-1], Decimal('100000'))
+
+
+class TestDonEnStock(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin8b', password='x')
+        self.para = Produit.objects.create(nom='Paracétamol 500', type='medicament', prix_achat=Decimal('25'),
+                                           stock_actuel=Decimal('100'))
+        self.gants = Produit.objects.create(nom='Gants', type='consommable', prix_achat=Decimal('50'))
+        self.don = Don.objects.create(donateur_nom='ONG Santé Plus', date=timezone.localdate(), nature='nature',
+                                      montant=Decimal('1'), description='Médicaments et gants')
+
+    def test_entree_en_stock_et_ecriture(self):
+        achats.entrer_don_en_stock(self.don, [(self.para, Decimal('10'), Decimal('300'), 'L-1', None),
+                                              (self.gants, Decimal('5'), Decimal('100'), '', None)], self.admin)
+        self.assertEqual(Produit.objects.get(pk=self.para.pk).stock_actuel, Decimal('110'))
+        mvt = MouvementStock.objects.get(produit=self.para)
+        self.assertEqual((mvt.type, mvt.motif, mvt.reference), ('entree', 'don', self.don.numero))
+        self.assertEqual(mvt.lot.numero_lot, 'L-1')
+        self.assertEqual(Don.objects.get(pk=self.don.pk).montant, Decimal('3500'))
+        ecriture = Ecriture.objects.get(origine=f'don:{self.don.pk}')
+        self.assertEqual(_lignes(ecriture), {'311': (Decimal('3000'), Decimal('0')),
+                                             '331': (Decimal('500'), Decimal('0')),
+                                             '7581': (Decimal('0'), Decimal('3500'))})
+        with self.assertRaises(achats.ErreurAchat):
+            achats.entrer_don_en_stock(self.don, [(self.para, Decimal('1'), Decimal('1'), '', None)], self.admin)
+
+    def test_don_en_especes_refuse(self):
+        self.don.nature = 'especes'
+        self.don.save()
+        with self.assertRaises(achats.ErreurAchat):
+            achats.entrer_don_en_stock(self.don, [(self.para, Decimal('1'), Decimal('1'), '', None)], self.admin)
+
+    def test_ecran(self):
+        client = _client(self.admin)
+        url = reverse('comptabilite:don_stock', args=[self.don.pk])
+        self.assertEqual(client.get(url).status_code, 200)
+        client.post(url, {f'qte_{self.para.pk}': '4', f'valeur_{self.para.pk}': '250', f'lot_{self.para.pk}': 'X'})
+        self.assertEqual(LigneDon.objects.get().montant, Decimal('1000'))
+        # Entré en stock, le don ne se modifie plus.
+        reponse = client.get(reverse('comptabilite:don_modifier', args=[self.don.pk]))
+        self.assertRedirects(reponse, reverse('comptabilite:dons'))
+
+
+class TestCloture(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin8c', password='x')
+        self.e2025 = Exercice.objects.create(libelle='2025', date_debut=_date(2025, 1, 1), date_fin=_date(2025, 12, 31))
+        od = moteur.journal('OD')
+        ecritures = [
+            moteur.creer_ecriture(od, _date(2025, 3, 1), 'Subvention reçue',
+                                  [(_compte('521'), None, Decimal('100000'), Decimal('0'), ''),
+                                   (_compte('718'), None, Decimal('0'), Decimal('100000'), '')]),
+            moteur.creer_ecriture(moteur.journal('ACH'), _date(2025, 4, 1), 'Achat médicaments',
+                                  [(_compte('601'), None, Decimal('30000'), Decimal('0'), ''),
+                                   (_compte('401'), None, Decimal('0'), Decimal('30000'), 'LABOREX')]),
+        ]
+        moteur.valider(ecritures, self.admin)
+
+    def _cloturer(self):
+        return cloture.cloturer(self.e2025, self.admin, malgre_avertissements=True)
+
+    def test_inventaire(self):
+        e = cloture.comptabiliser_inventaire(self.e2025, None, {'medicament': Decimal('20000'),
+                                                                'consommable': Decimal('0')}, self.admin)
+        self.assertEqual(_lignes(e), {'311': (Decimal('20000'), Decimal('0')), '6031': (Decimal('0'), Decimal('20000'))})
+        self.assertEqual(e.date, _date(2025, 12, 31))
+        # Refaite tant qu'elle est en brouillon : la nouvelle remplace l'ancienne.
+        e = cloture.comptabiliser_inventaire(self.e2025, None, {'medicament': Decimal('15000')}, self.admin)
+        self.assertEqual(_lignes(e)['311'], (Decimal('15000'), Decimal('0')))
+        self.assertEqual(Ecriture.objects.filter(origine__startswith='inventaire:').count(), 1)
+
+    def test_controles(self):
+        verif = cloture.controles(self.e2025)
+        self.assertEqual(verif['bloquants'], [])
+        self.assertTrue(any('inventaire' in a for a in verif['avertissements']))
+        moteur.creer_ecriture(moteur.journal('OD'), _date(2025, 5, 1), 'Brouillon',
+                              [(_compte('521'), None, Decimal('1'), Decimal('0'), ''),
+                               (_compte('758'), None, Decimal('0'), Decimal('1'), '')])
+        self.assertTrue(any('brouillon' in b for b in cloture.controles(self.e2025)['bloquants']))
+        with self.assertRaises(moteur.ErreurCompta):
+            self._cloturer()
+
+    def test_avertissements_a_confirmer(self):
+        with self.assertRaises(moteur.ErreurCompta):
+            cloture.cloturer(self.e2025, self.admin)
+        self.assertEqual(Exercice.objects.get(pk=self.e2025.pk).statut, 'ouvert')
+
+    def test_cloture_et_a_nouveaux(self):
+        self._cloturer()
+        e = Exercice.objects.get(pk=self.e2025.pk)
+        self.assertEqual((e.statut, e.resultat), ('cloture', Decimal('70000')))
+        an = Ecriture.objects.get(origine__startswith=f'an:{e.pk}:')
+        self.assertEqual((an.journal.code, an.date, an.statut), ('AN', _date(2026, 1, 1), 'validee'))
+        self.assertEqual(_lignes(an), {'521': (Decimal('100000'), Decimal('0')),
+                                       '401': (Decimal('0'), Decimal('30000')),
+                                       '131': (Decimal('0'), Decimal('70000'))})
+        self.assertEqual(an.lignes.get(compte__numero='401').tiers, 'LABOREX')
+        # L'exercice clos est figé.
+        with self.assertRaises(moteur.ErreurCompta):
+            moteur.creer_ecriture(moteur.journal('OD'), _date(2025, 6, 1), 'Trop tard',
+                                  [(_compte('521'), None, Decimal('1'), Decimal('0'), ''),
+                                   (_compte('758'), None, Decimal('0'), Decimal('1'), '')])
+
+    def test_soldes_apres_cloture_sans_double_compte(self):
+        self._cloturer()
+        fin = _date(2026, 12, 31)
+        self.assertEqual(treso.solde_comptable(_compte('521'), fin), Decimal('100000'))
+        balance = ETATS['balance']['fonction'](_date(2026, 1, 1), fin, {})
+        ligne_521 = next(l for l in balance['tableaux'][0]['lignes'] if l['cellules'][0] == '521')
+        # À-nouveau en solde de début, pas en mouvement de la période.
+        self.assertEqual(ligne_521['cellules'][2:7], [Decimal('100000'), None, None, None, Decimal('100000')])
+        bilan = ETATS['bilan']['fonction'](_date(2026, 1, 1), fin, {})
+        self.assertFalse(any('Attention' in n for n in bilan['notes']))
+        actif = bilan['tableaux'][0]['lignes'][-1]['cellules']
+        passif = bilan['tableaux'][1]['lignes'][-1]['cellules']
+        self.assertEqual((actif[3], passif[1]), (Decimal('100000'), Decimal('100000')))
+        # Le bilan de 2025 reste lisible après sa clôture.
+        bilan_2025 = ETATS['bilan']['fonction'](_date(2025, 1, 1), _date(2025, 12, 31), {})
+        self.assertEqual(bilan_2025['tableaux'][1]['lignes'][-1]['cellules'][1], Decimal('100000'))
+
+    def test_compte_de_resultat(self):
+        cr = ETATS['compte_resultat']['fonction'](_date(2025, 1, 1), _date(2025, 12, 31), {})
+        self.assertEqual(cr['tableaux'][0]['lignes'][-1]['cellules'], ['Excédent net', Decimal('70000')])
+
+    def test_bilan_equilibre_avant_cloture(self):
+        bilan = ETATS['bilan']['fonction'](_date(2025, 1, 1), _date(2025, 12, 31), {})
+        self.assertFalse(any('Attention' in n for n in bilan['notes']))
+        passif = {l['cellules'][0]: l['cellules'][1] for l in bilan['tableaux'][1]['lignes'] if l['type'] == 'ligne'}
+        self.assertEqual(passif["Résultat de l'exercice (non clôturé)"], Decimal('70000'))
+        self.assertEqual(passif['Fournisseurs'], Decimal('30000'))
+
+    def test_rouvrir(self):
+        self._cloturer()
+        cloture.rouvrir(Exercice.objects.get(pk=self.e2025.pk), self.admin)
+        self.assertEqual(Exercice.objects.get(pk=self.e2025.pk).statut, 'ouvert')
+        self.assertFalse(Ecriture.objects.filter(origine__startswith='an:').exists())
+
+    def test_ecrans(self):
+        client = _client(self.admin)
+        self.assertEqual(client.get(reverse('comptabilite:exercices')).status_code, 200)
+        url = reverse('comptabilite:exercice', args=[self.e2025.pk])
+        self.assertEqual(client.get(url).status_code, 200)
+        self.assertContains(client.post(url, {'action': 'verifier'}), 'Points à examiner')
+        client.post(url, {'action': 'inventaire', 'valeur_medicament': '5000', 'valeur_consommable': '0'})
+        e = Ecriture.objects.get(origine__startswith='inventaire:')
+        moteur.valider([e], self.admin)
+        client.post(url, {'action': 'cloturer', 'malgre': '1'})
+        self.assertEqual(Exercice.objects.get(pk=self.e2025.pk).statut, 'cloture')
+        self.assertEqual(client.get(url).status_code, 200)
+
+    def test_cloture_reservee(self):
+        user = _perm(User.objects.create_user('compta8', password='x'), 'comptabilite', 'view_exercice')
+        client = _client(user)
+        url = reverse('comptabilite:exercice', args=[self.e2025.pk])
+        self.assertEqual(client.post(url, {'action': 'cloturer', 'malgre': '1'}).status_code, 403)
+        self.assertEqual(Exercice.objects.get(pk=self.e2025.pk).statut, 'ouvert')
+
+
+class TestEcranAssureurs(TestCase):
+    """« Assureurs et taux » s'ouvre dans le module, sans passer par l'admin."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_ass', password='x')
+
+    def test_ajout_modification_et_menu(self):
+        client = _client(self.admin)
+        url = reverse('comptabilite:assureurs')
+        self.assertEqual(client.get(url).status_code, 200)
+        client.post(url, {'nom': 'MUGEF-CI', 'code': 'mugef', 'telephone': '', 'taux_prise_en_charge': '80',
+                          'actif': 'on'})
+        a = Assurance.objects.get(code='MUGEF')
+        client.post(reverse('comptabilite:assureur_modifier', args=[a.pk]),
+                    {'nom': 'MUGEF-CI', 'code': 'MUGEF', 'taux_prise_en_charge': '70', 'actif': 'on'})
+        self.assertEqual(Assurance.objects.get(pk=a.pk).taux_prise_en_charge, Decimal('70'))
+        html = client.get(url).content.decode()
+        self.assertNotIn('/admin/patients/assurance/', html)
+
+    def test_taux_borne(self):
+        reponse = _client(self.admin).post(reverse('comptabilite:assureurs'),
+                                           {'nom': 'X', 'code': 'X', 'taux_prise_en_charge': '120'})
+        self.assertContains(reponse, 'entre 0 et 100')
+        self.assertFalse(Assurance.objects.filter(code='X').exists())
+
+    def test_reserve(self):
+        user = User.objects.create_user('sans_droit', password='x')
+        self.assertEqual(_client(user).get(reverse('comptabilite:assureurs')).status_code, 403)

@@ -57,7 +57,7 @@ def facturation_list(request):
                .prefetch_related('paiements__caisse')
                # `solde_restant` est une propriété Python : la colonne « Reste »
                # ne serait pas triable sans cette annotation.
-               .annotate(reste=F('montant_total') - F('montant_paye')))
+               .annotate(reste=F('montant_total') - F('montant_paye') - F('montant_perte')))
 
     # Dimensions déclarées, complétées par celles générées depuis les champs du
     # modèle : on peut regrouper sur n'importe lequel sans qu'on l'ait prévu. La
@@ -1138,7 +1138,8 @@ def _handle_paiement(facture, POST, user, total, request=None):
 
     total_paye = facture.paiements.aggregate(s=Sum('montant'))['s'] or 0
     facture.montant_paye = total_paye
-    if total_paye >= facture.montant_total:
+    # Une part assurance passée en perte solde aussi la facture.
+    if total_paye + (facture.montant_perte or 0) >= facture.montant_total:
         facture.statut = 'payee'
     elif total_paye > 0:
         facture.statut = 'emise'
@@ -1147,7 +1148,9 @@ def _handle_paiement(facture, POST, user, total, request=None):
     # Le stock bouge quand la facture est soldée, pas avant : un règlement
     # partiel ne donne pas droit à la marchandise. L'opération se relance sans
     # dommage — chaque mouvement porte le numéro de la facture.
-    if facture.statut == 'payee':
+    # Payée, ou part patient réglée quand un assureur doit le reste : le
+    # patient repart avec ses produits sans attendre le tiers payant.
+    if facture.reglee_par_le_patient:
         sortis = sortir_les_produits(facture, pharmacie, user)
         if sortis:
             log_event(facture, user,
@@ -1332,7 +1335,7 @@ def export_factures(request):
 
     today = date.today()
     base_qs = (Facture.objects.select_related('patient', 'centre')
-               .annotate(reste=F('montant_total') - F('montant_paye')))
+               .annotate(reste=F('montant_total') - F('montant_paye') - F('montant_perte')))
     listing, champs, _declarees, _perso = listing_factures()
     selection = listing.selection(request, base_qs, champs, {
         'aujourdhui': today,

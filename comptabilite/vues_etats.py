@@ -55,7 +55,7 @@ def etat(request, code):
     fin = _date(request.GET.get('fin')) or fin or aujourdhui
     if fin < debut:
         debut, fin = fin, debut
-    params = {cle: request.GET.get(cle, '').strip() for cle in ('caisse', 'journal', 'compte')}
+    params = {cle: request.GET.get(cle, '').strip() for cle in ('caisse', 'journal', 'compte', 'convention', 'compte_tresorerie')}
     params['brouillons'] = request.GET.get('brouillons') == '1'
 
     resultat = definition['fonction'](debut, fin, params)

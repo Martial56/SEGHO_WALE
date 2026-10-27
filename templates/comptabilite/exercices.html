@@ -1,0 +1,27 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Exercices comptables{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Exercices comptables</h1>
+      <div class="cpt-sub">Un exercice par année civile, créé avec sa première écriture. La clôture en arrête le résultat et reporte les soldes de bilan dans l'exercice suivant.</div></div>
+  </div>
+  <div class="cpt-card">
+    {% if exercices %}
+    <table class="cpt-table">
+      <thead><tr><th>Exercice</th><th>Du</th><th>Au</th><th>Statut</th><th class="num">Résultat</th><th>Clôturé</th></tr></thead>
+      <tbody>{% for e in exercices %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:exercice' e.pk %}'">
+          <td><strong>{{ e.libelle }}</strong></td><td>{{ e.date_debut|date:"d/m/Y" }}</td><td>{{ e.date_fin|date:"d/m/Y" }}</td>
+          <td><span class="cpt-badge {% if e.statut == 'ouvert' %}ouverte{% else %}validee{% endif %}">{{ e.get_statut_display }}</span></td>
+          <td class="num">{% if e.resultat is not None %}<span class="{% if e.resultat < 0 %}ecart-neg{% else %}ecart-nul{% endif %}">{{ e.resultat|floatformat:0|intcomma }}</span>{% endif %}</td>
+          <td>{% if e.date_cloture %}{{ e.date_cloture|date:"d/m/Y" }}{% if e.cloture_par %} par {{ e.cloture_par.get_full_name|default:e.cloture_par.username }}{% endif %}{% endif %}</td>
+        </tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun exercice : il sera créé avec la première écriture.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

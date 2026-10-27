@@ -1,0 +1,41 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Dons{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Dons reçus — {{ annee }}</h1>
+      <div class="cpt-sub">Dons en argent et en nature, chacun avec son reçu imprimable.</div>
+    </div>
+    <div class="cpt-actions">
+      <form method="get"><select name="annee" class="cpt-input" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+        {% for a in annees %}<option value="{{ a }}" {% if a == annee %}selected{% endif %}>{{ a }}</option>{% endfor %}</select></form>
+      {% if perms.comptabilite.add_don %}<a href="{% url 'comptabilite:don_nouveau' %}" class="cpt-btn primaire"><i class="bi bi-plus-lg"></i> Nouveau don</a>{% endif %}
+    </div>
+  </div>
+  <div class="cpt-kpis"><div class="cpt-kpi accent"><div class="l">Total {{ annee }}</div><div class="v">{{ total|floatformat:0|intcomma }} F</div><div class="s">{{ dons|length }} don{{ dons|length|pluralize }}</div></div></div>
+  <div class="cpt-card">
+    {% if dons %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>N°</th><th>Donateur</th><th>Nature</th><th>Affectation</th><th class="num">Montant / valeur</th><th></th></tr></thead>
+      <tbody>
+        {% for d in dons %}
+        <tr>
+          <td>{{ d.date|date:"d/m/Y" }}</td><td>{{ d.numero }}</td><td>{{ d.nom_donateur }}</td>
+          <td>{{ d.get_nature_display }}{% if d.description %}<div class="cpt-note">{{ d.description|truncatechars:60 }}</div>{% endif %}</td>
+          <td>{% if d.convention %}{{ d.convention.code }}{% else %}Fonds propres{% endif %}</td>
+          <td class="num">{{ d.montant|floatformat:0|intcomma }}</td>
+          <td style="white-space:nowrap;"><a href="{% url 'comptabilite:don_recu' d.pk %}" target="_blank" class="cpt-btn" style="padding:3px 8px;font-size:11px;">Reçu</a>
+            {% if perms.comptabilite.change_don %}<a href="{% url 'comptabilite:don_modifier' d.pk %}" class="cpt-btn" style="padding:3px 8px;font-size:11px;">Modifier</a>{% endif %}
+            {% if d.nature == 'nature' and perms.comptabilite.change_don and perms.stock.add_mouvementstock %}<a href="{% url 'comptabilite:don_stock' d.pk %}" class="cpt-btn" style="padding:3px 8px;font-size:11px;">Stock</a>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun don enregistré en {{ annee }}.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

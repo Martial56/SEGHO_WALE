@@ -1,0 +1,35 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Refus de l'assureur{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page cpt-etroite" style="max-width:760px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Refus de {{ facture.assurance.nom }} — facture {{ facture.numero }}</h1>
+      <div class="cpt-sub">{{ facture.patient.nom }} {{ facture.patient.prenoms }} · total {{ facture.montant_total|floatformat:0|intcomma }} F · part assurance {{ facture.part_assurance|floatformat:0|intcomma }} F · <b>encore due par l'assureur : {{ facture.reste_assurance|floatformat:0|intcomma }} F</b></div></div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:creances_assureur' facture.assurance_id %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  {% if facture.reste_assurance %}
+  <form method="post" class="cpt-card">{% csrf_token %}
+    <div class="cpt-grid2">
+      <div class="cpt-field"><label>Date du refus</label><input type="date" name="date" class="cpt-input" value="{{ aujourdhui|date:'Y-m-d' }}"></div>
+      <div class="cpt-field"><label>Montant refusé (F CFA)</label><input type="number" min="1" max="{{ facture.reste_assurance|floatformat:0 }}" name="montant" class="cpt-input" value="{{ facture.reste_assurance|floatformat:0 }}" required></div>
+    </div>
+    <div class="cpt-field"><label>Que faire de cette somme ?</label>
+      <label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);"><input type="radio" name="decision" value="patient" checked> La réclamer au patient (sa part augmente d'autant)</label>
+      <label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);"><input type="radio" name="decision" value="perte"> L'abandonner : passer en perte (la facture est soldée)</label>
+    </div>
+    <div class="cpt-field"><label>Motif du refus *</label><textarea name="motif" class="cpt-textarea" required placeholder="Acte non couvert, assuré hors droits, plafond atteint…"></textarea></div>
+    <button class="cpt-btn primaire">Enregistrer le refus</button>
+  </form>
+  {% else %}<div class="cpt-card cpt-vide">L'assureur ne doit plus rien sur cette facture.</div>{% endif %}
+
+  {% if rejets %}
+  <div class="cpt-card"><h2>Refus déjà enregistrés</h2>
+    <table class="cpt-table"><tbody>{% for r in rejets %}<tr><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}</td><td>{{ r.get_decision_display }}</td><td>{{ r.motif }}</td><td class="num">{{ r.montant|floatformat:0|intcomma }} F</td></tr>{% endfor %}</tbody></table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

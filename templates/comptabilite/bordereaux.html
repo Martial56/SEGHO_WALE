@@ -1,0 +1,29 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Bordereaux d'assurance{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Bordereaux d'assurance</h1>
+      <div class="cpt-sub">Un bordereau se prépare depuis la fiche d'un assureur (Assurances → Créances).</div></div>
+    <div class="cpt-actions">
+      <a href="?" class="cpt-btn {% if not statut %}primaire{% endif %}">Tous</a>
+      {% for code, libelle in statuts %}<a href="?statut={{ code }}" class="cpt-btn {% if statut == code %}primaire{% endif %}">{{ libelle }}</a>{% endfor %}
+    </div>
+  </div>
+  <div class="cpt-card">
+    {% if lignes %}
+    <table class="cpt-table">
+      <thead><tr><th>N°</th><th>Assureur</th><th>Période</th><th>État</th><th>Envoyé le</th><th class="num">Factures</th><th class="num">Montant</th><th class="num">Reste dû</th></tr></thead>
+      <tbody>{% for b, c in lignes %}<tr class="lien" onclick="location.href='{% url 'comptabilite:bordereau' b.pk %}'">
+        <td><b>{{ b.numero }}</b></td><td>{{ b.assurance.nom }}</td><td>{{ b.date_debut|date:"d/m/Y" }} → {{ b.date_fin|date:"d/m/Y" }}</td>
+        <td><span class="cpt-badge {% if b.statut == 'regle' %}validee{% elif b.statut == 'prepare' %}ouverte{% else %}cloturee{% endif %}">{{ b.get_statut_display }}</span></td>
+        <td>{{ b.date_envoi|date:"d/m/Y"|default:"—" }}</td><td class="num">{{ c.lignes|length }}</td>
+        <td class="num">{{ c.total|floatformat:0|intcomma }}</td><td class="num">{{ c.reste|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun bordereau.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

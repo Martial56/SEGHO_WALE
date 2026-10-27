@@ -87,6 +87,18 @@ class Facture(ModeleCentre):
     motif_remise = models.ForeignKey(
         'comptabilite.MotifGratuite', on_delete=models.PROTECT, null=True, blank=True,
         related_name='factures', verbose_name="Motif de remise / gratuité")
+    # Tiers payant : l'assureur qui doit `montant_assurance`. Repris de la fiche
+    # du patient quand une part assurance est saisie (voir `save`).
+    assurance = models.ForeignKey(
+        'patients.Assurance', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='factures', verbose_name="Assurance / mutuelle")
+    bordereau_assurance = models.ForeignKey(
+        'comptabilite.BordereauAssurance', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='factures', verbose_name="Bordereau d'assurance")
+    # Part assurance refusée et abandonnée (passée en perte) : elle ne sera
+    # jamais encaissée, mais la facture est soldée (comptabilite.RejetAssurance).
+    montant_perte = models.DecimalField(max_digits=15, decimal_places=2, default=0,
+                                        verbose_name="Montant passé en perte")
 
     def save(self, *args, **kwargs):
         if not self.numero:
@@ -103,11 +115,49 @@ class Facture(ModeleCentre):
                 count += 1
                 numero = f"VTES/{annee}/{date_part}{count:04d}"
             self.numero = numero
+        if self.montant_assurance and not self.assurance_id and self.patient_id:
+            self.assurance_id = self.patient.assurance_id
         super().save(*args, **kwargs)
+
+    # ── Part patient / part assurance (tiers payant) ─────────────────────────
+    @property
+    def part_assurance(self):
+        """Ce que l'assureur doit : la part saisie, jamais plus que la facture."""
+        if not self.assurance_id or not self.montant_assurance:
+            return Decimal('0')
+        return min(self.montant_assurance, self.montant_total)
+
+    @property
+    def part_patient(self):
+        return self.montant_total - self.part_assurance
+
+    def _paye_par(self, assurance):
+        from django.db.models import Sum
+        qs = self.paiements.filter(mode_paiement='assurance', reglement_assurance__isnull=False)
+        total = qs.aggregate(s=Sum('montant'))['s'] or Decimal('0')
+        return total if assurance else (self.montant_paye or Decimal('0')) - total
+
+    @property
+    def reste_assurance(self):
+        return max(self.part_assurance - self._paye_par(True) - (self.montant_perte or 0), Decimal('0'))
+
+    @property
+    def reste_patient(self):
+        return max(self.part_patient - self._paye_par(False), Decimal('0'))
+
+    @property
+    def reglee_par_le_patient(self):
+        """Le patient ne doit plus rien : la facture est payée, ou il a réglé sa
+        part et seul l'assureur reste dû. C'est ce qui lui donne droit aux
+        produits et au démarrage du soin, sans attendre l'assureur."""
+        if self.statut == 'payee':
+            return True
+        return (self.statut != 'annulee' and self.part_assurance > 0
+                and self.part_patient - self._paye_par(False) <= 0)
 
     @property
     def solde_restant(self):
-        return self.montant_total - self.montant_paye
+        return self.montant_total - self.montant_paye - (self.montant_perte or 0)
 
     def recalculer_total(self, save=True):
         """Recalcule montant_total en sommant montant_ligne de toutes les lignes.
@@ -257,6 +307,11 @@ class Paiement(ModeleCentre):
     session = models.ForeignKey(
         'comptabilite.SessionCaissiere', on_delete=models.PROTECT, null=True, blank=True,
         related_name='paiements', verbose_name="Session de caisse")
+    # Paiement de la part assurance, issu du règlement d'un assureur : il ne
+    # passe par aucune caisse, et sa trésorerie est comptée avec le règlement.
+    reglement_assurance = models.ForeignKey(
+        'comptabilite.ReglementAssurance', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='paiements', verbose_name="Règlement d'assurance")
     # Ce que le patient a tendu, quand il a payé en espèces. `montant` reste ce
     # qui était dû : compter le billet entier gonflerait la caisse de la monnaie
     # rendue. Nul sur les autres modes, où il n'y a pas de monnaie.

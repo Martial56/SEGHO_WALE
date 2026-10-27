@@ -1,0 +1,41 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Règlement d'assurance{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page cpt-etroite" style="max-width:720px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Enregistrer un règlement d'assurance</h1>
+      <div class="cpt-sub">Le règlement est réparti sur les factures du bordereau choisi, ou à défaut sur les plus anciennes factures dues par l'assureur.</div></div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:reglements' %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  <form method="get" class="cpt-card">
+    <div class="cpt-field"><label>Assureur</label>
+      <select name="assurance" class="cpt-input" onchange="this.form.submit()"><option value="">— Choisir —</option>
+        {% for a in assurances %}<option value="{{ a.pk }}" {% if assurance and a.pk == assurance.pk %}selected{% endif %}>{{ a.nom }}</option>{% endfor %}</select></div>
+    {% if assurance %}
+    <div class="cpt-field"><label>Bordereau (facultatif)</label>
+      <select name="bordereau" class="cpt-input" onchange="this.form.submit()"><option value="">— Toutes les factures dues —</option>
+        {% for b in bordereaux %}<option value="{{ b.pk }}" {% if bordereau and b.pk == bordereau.pk %}selected{% endif %}>{{ b.numero }} — {{ b.date_debut|date:"d/m/Y" }} au {{ b.date_fin|date:"d/m/Y" }} ({{ b.get_statut_display|lower }})</option>{% endfor %}</select></div>
+    {% endif %}
+  </form>
+
+  {% if assurance %}
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <input type="hidden" name="assurance" value="{{ assurance.pk }}">{% if bordereau %}<input type="hidden" name="bordereau" value="{{ bordereau.pk }}">{% endif %}
+    <div class="cpt-alerte" style="margin-bottom:12px;">Dû par {{ assurance.nom }}{% if bordereau %} sur le bordereau {{ bordereau.numero }}{% endif %} : <b>{{ du|floatformat:0|intcomma }} F</b></div>
+    <div class="cpt-grid2">
+      <div class="cpt-field"><label>Date du règlement *</label><input type="date" name="date" class="cpt-input" value="{% if saisie.date %}{{ saisie.date }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}" required></div>
+      <div class="cpt-field"><label>Montant reçu (F CFA) *</label><input type="number" min="1" name="montant" class="cpt-input" value="{{ saisie.montant|default:'' }}" required></div>
+      <div class="cpt-field"><label>Mode</label><select name="mode" class="cpt-input">{% for code, libelle in modes %}<option value="{{ code }}" {% if saisie.mode == code %}selected{% endif %}>{{ libelle }}</option>{% endfor %}</select></div>
+      <div class="cpt-field"><label>Référence</label><input type="text" name="reference" class="cpt-input" value="{{ saisie.reference|default:'' }}" placeholder="N° de virement ou de chèque"></div>
+    </div>
+    <div class="cpt-field"><label>Observation</label><textarea name="observation" class="cpt-textarea">{{ saisie.observation|default:'' }}</textarea></div>
+    <button class="cpt-btn primaire">Enregistrer et répartir</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

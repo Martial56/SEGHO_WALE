@@ -1,0 +1,96 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Exercice {{ exercice }}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Exercice {{ exercice }} <span class="cpt-badge {% if exercice.statut == 'ouvert' %}ouverte{% else %}validee{% endif %}">{{ exercice.get_statut_display }}</span></h1>
+      <div class="cpt-sub">Du {{ exercice.date_debut|date:"d/m/Y" }} au {{ exercice.date_fin|date:"d/m/Y" }}{% if centre %} · inventaire du centre {{ centre }}{% endif %}</div></div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:etat' 'bilan' %}?debut={{ exercice.date_debut|date:'Y-m-d' }}&fin={{ exercice.date_fin|date:'Y-m-d' }}" class="cpt-btn">Bilan</a>
+      <a href="{% url 'comptabilite:etat' 'compte_resultat' %}?debut={{ exercice.date_debut|date:'Y-m-d' }}&fin={{ exercice.date_fin|date:'Y-m-d' }}" class="cpt-btn">Compte de résultat</a>
+      <a href="{% url 'comptabilite:exercices' %}" class="cpt-btn">Retour</a>
+    </div>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi accent"><div class="l">{% if exercice.statut == 'ouvert' %}Résultat provisoire (écritures validées){% else %}Résultat de l'exercice{% endif %}</div>
+      <div class="v {% if resultat < 0 %}ecart-neg{% endif %}">{{ resultat|floatformat:0|intcomma }} F</div>
+      <div class="s">{% if resultat >= 0 %}Excédent{% else %}Déficit{% endif %}, tous centres</div></div>
+    {% if exercice.date_cloture %}<div class="cpt-kpi"><div class="l">Clôturé le</div><div class="v" style="font-size:16px;">{{ exercice.date_cloture|date:"d/m/Y H:i" }}</div>
+      <div class="s">{% if exercice.cloture_par %}par {{ exercice.cloture_par.get_full_name|default:exercice.cloture_par.username }}{% endif %}</div></div>{% endif %}
+  </div>
+
+  {% if exercice.statut == 'ouvert' %}
+  <div class="cpt-card">
+    <h2>1. Inventaire des stocks au {{ exercice.date_fin|date:"d/m/Y" }}</h2>
+    <div class="cpt-note" style="margin-bottom:10px;">Les achats de l'année sont en charge ; l'inventaire porte les comptes de stock à la valeur comptée, la différence allant en variation de stock. Valeur proposée : quantités présentes aujourd'hui au prix d'achat — à remplacer par la valeur de l'inventaire physique au {{ exercice.date_fin|date:"d/m/Y" }}.</div>
+    {% if ecriture_inventaire %}<div class="cpt-alerte">Écriture d'inventaire {{ ecriture_inventaire.get_statut_display|lower }} :
+      <a href="{% url 'comptabilite:ecriture' ecriture_inventaire.pk %}">voir l'écriture</a>{% if ecriture_inventaire.statut == 'brouillon' %} — une nouvelle saisie la remplace{% endif %}.</div>{% endif %}
+    {% if inventaire %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="inventaire">
+      <table class="cpt-table">
+        <thead><tr><th>Stock</th><th>Compte</th><th class="num">Solde actuel du compte</th><th class="num">Valeur proposée</th><th class="num" style="width:18%;">Valeur inventoriée</th></tr></thead>
+        <tbody>{% for l in inventaire %}<tr>
+          <td>{{ l.libelle }}{% for lieu, v in l.detail %}<div class="cpt-note">{{ lieu }} : {{ v|floatformat:0|intcomma }} F</div>{% endfor %}</td>
+          <td>{{ l.compte.numero }}</td>
+          <td class="num">{{ l.solde|floatformat:0|intcomma }}</td>
+          <td class="num">{{ l.propose|floatformat:0|intcomma }}</td>
+          <td class="num"><input type="number" min="0" step="1" name="valeur_{{ l.type }}" class="cpt-input" style="width:100%;text-align:right;" value="{{ l.propose|floatformat:0 }}" {% if not peut_inventorier %}disabled{% endif %}></td>
+        </tr>{% endfor %}</tbody>
+      </table>
+      {% if peut_inventorier %}<div style="margin-top:10px;"><button class="cpt-btn primaire">Comptabiliser l'inventaire</button></div>{% endif %}
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="cpt-card">
+    <h2>2. Contrôles avant clôture</h2>
+    {% if verif %}
+      {% if verif.generees %}<div class="cpt-note" style="margin-bottom:8px;">{{ verif.generees }} écriture(s) manquante(s) préparée(s) en brouillon.</div>{% endif %}
+      {% if verif.bloquants %}
+      <div class="cpt-alerte" style="border-color:rgba(192,57,43,.4);"><strong>À régler avant de clôturer :</strong>
+        <ul style="margin:6px 0 0 18px;">{% for b in verif.bloquants %}<li>{{ b }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      {% if verif.avertissements %}
+      <div class="cpt-alerte"><strong>Points à examiner :</strong>
+        <ul style="margin:6px 0 0 18px;">{% for a in verif.avertissements %}<li>{{ a }}</li>{% endfor %}</ul></div>
+      {% endif %}
+      {% if not verif.bloquants and not verif.avertissements %}<div class="ecart-nul" style="margin-bottom:8px;">Tout est en ordre.</div>{% endif %}
+    {% else %}
+      <div class="cpt-note" style="margin-bottom:10px;">Comptabilise les pièces de l'exercice encore sans écriture, puis vérifie : brouillons validés, journées de caisse closes, exercice précédent clos, inventaire, fonds dédiés.</div>
+    {% endif %}
+    <form method="post" style="display:inline;">{% csrf_token %}<input type="hidden" name="action" value="verifier">
+      <button class="cpt-btn">{% if verif %}Relancer les contrôles{% else %}Lancer les contrôles{% endif %}</button></form>
+  </div>
+
+  {% if peut_cloturer and verif and not verif.bloquants %}
+  <form method="post" class="cpt-card" onsubmit="return confirm('Clôturer l\'exercice {{ exercice }} ? Plus aucune écriture ne pourra y être passée.');">
+    {% csrf_token %}<input type="hidden" name="action" value="cloturer">
+    <h2>3. Clôture</h2>
+    <div class="cpt-note" style="margin-bottom:10px;">Le résultat est arrêté ; les soldes des comptes de bilan (classes 1 à 5) passent en à-nouveaux au {{ exercice.date_fin|date:"d/m/Y" }} + 1 jour, le résultat sur 131 (excédent) ou 139 (déficit). Son affectation (réserves, report à nouveau) se fait ensuite par une opération diverse, après décision de l'assemblée.</div>
+    {% if verif.avertissements %}<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px;"><input type="checkbox" name="malgre" value="1" required> J'ai examiné les points ci-dessus et je clôture malgré eux.</label>{% endif %}
+    <button class="cpt-btn primaire">Clôturer l'exercice {{ exercice }}</button>
+  </form>
+  {% endif %}
+
+  {% else %}
+  <div class="cpt-card">
+    <h2>À-nouveaux passés dans l'exercice suivant</h2>
+    {% if a_nouveaux %}
+    <table class="cpt-table"><tbody>{% for e in a_nouveaux %}<tr class="lien" onclick="location.href='{% url 'comptabilite:ecriture' e.pk %}'">
+      <td>{{ e.date|date:"d/m/Y" }}</td><td>{{ e.reference }}</td><td>{{ e.libelle }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<div class="cpt-vide">Aucun à-nouveau pour ce centre.</div>{% endif %}
+    {% if peut_cloturer %}
+    <form method="post" style="margin-top:12px;" onsubmit="return confirm('Rouvrir l\'exercice {{ exercice }} ? Ses à-nouveaux seront retirés et la clôture sera à refaire.');">
+      {% csrf_token %}<input type="hidden" name="action" value="rouvrir">
+      <button class="cpt-btn danger">Rouvrir l'exercice</button>
+      <span class="cpt-note">Pour une correction tardive : seul le dernier exercice clos se rouvre.</span>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Avoir, Compte, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
+from .models import (Avoir, Bailleur, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
                      LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse)
 
 
@@ -124,7 +124,10 @@ class CorrespondanceAdmin(admin.ModelAdmin):
 
 @admin.register(Exercice)
 class ExerciceAdmin(admin.ModelAdmin):
-    list_display = ['libelle', 'date_debut', 'date_fin', 'statut']
+    list_display = ['libelle', 'date_debut', 'date_fin', 'statut', 'resultat']
+    # La clôture et la réouverture passent par l'écran de clôture, qui fait les
+    # à-nouveaux : changer le statut ici les contournerait.
+    readonly_fields = ['statut', 'resultat', 'date_cloture', 'cloture_par']
 
 
 class LigneEcritureInline(admin.TabularInline):
@@ -153,6 +156,156 @@ class EcritureAdmin(admin.ModelAdmin):
         return False
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+
+@admin.register(Bailleur)
+class BailleurAdmin(admin.ModelAdmin):
+    list_display = ['nom', 'sigle', 'type', 'actif']
+    search_fields = ['nom', 'sigle']
+
+
+@admin.register(Convention)
+class ConventionAdmin(admin.ModelAdmin):
+    list_display = ['code', 'intitule', 'bailleur', 'date_debut', 'date_fin', 'montant_accorde', 'statut']
+    list_filter = ['statut', 'bailleur']
+
+    def get_queryset(self, request):
+        return Convention.all_objects.select_related('bailleur')
+
+
+@admin.register(Versement)
+class VersementAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'convention', 'date', 'montant', 'mode']
+
+    def get_queryset(self, request):
+        return Versement.all_objects.select_related('convention')
+
+
+@admin.register(Don)
+class DonAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'donateur', 'donateur_nom', 'nature', 'montant']
+
+    def get_queryset(self, request):
+        return Don.all_objects.select_related('donateur')
+
+
+
+@admin.register(BordereauAssurance)
+class BordereauAssuranceAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'assurance', 'date_debut', 'date_fin', 'statut', 'date_envoi']
+    list_filter = ['statut', 'assurance']
+
+    def get_queryset(self, request):
+        return BordereauAssurance.all_objects.select_related('assurance')
+
+
+@admin.register(ReglementAssurance)
+class ReglementAssuranceAdmin(admin.ModelAdmin):
+    """Consultation seule : un règlement se saisit et se répartit depuis l'écran
+    des assurances."""
+    list_display = ['numero', 'assurance', 'date', 'montant', 'mode', 'bordereau']
+
+    def get_queryset(self, request):
+        return ReglementAssurance.all_objects.select_related('assurance', 'bordereau')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+
+@admin.register(CompteTresorerie)
+class CompteTresorerieAdmin(admin.ModelAdmin):
+    list_display = ['libelle', 'type', 'compte', 'etablissement', 'actif']
+
+
+@admin.register(RemiseBanque)
+class RemiseBanqueAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'caisse', 'compte_tresorerie', 'montant']
+
+    def get_queryset(self, request):
+        return RemiseBanque.all_objects.select_related('caisse', 'compte_tresorerie')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LigneReleve)
+class LigneReleveAdmin(admin.ModelAdmin):
+    list_display = ['compte_tresorerie', 'date', 'libelle', 'montant', 'ligne_ecriture']
+    list_filter = ['compte_tresorerie']
+
+
+@admin.register(RejetAssurance)
+class RejetAssuranceAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'assurance', 'facture', 'decision', 'montant']
+
+    def get_queryset(self, request):
+        return RejetAssurance.all_objects.select_related('assurance', 'facture')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class LigneFactureFournisseurInline(admin.TabularInline):
+    model = LigneFactureFournisseur
+    extra = 0
+    can_delete = False
+    fields = ['compte', 'libelle', 'montant']
+    readonly_fields = fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FactureFournisseur)
+class FactureFournisseurAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'fournisseur', 'reference', 'montant_total']
+    search_fields = ['numero', 'fournisseur', 'reference']
+    inlines = [LigneFactureFournisseurInline]
+
+    def get_queryset(self, request):
+        return FactureFournisseur.all_objects.all()
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ReglementFournisseur)
+class ReglementFournisseurAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'date', 'facture', 'mode', 'montant']
+
+    def get_queryset(self, request):
+        return ReglementFournisseur.all_objects.select_related('facture')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(LigneDon)
+class LigneDonAdmin(admin.ModelAdmin):
+    list_display = ['don', 'produit', 'quantite', 'valeur_unitaire', 'numero_lot']
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):

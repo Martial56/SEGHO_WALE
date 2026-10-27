@@ -1,0 +1,19 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Don{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page cpt-etroite" style="max-width:720px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">{% if objet %}Modifier le don {{ objet.numero }}{% else %}Nouveau don{% endif %}</h1>
+      <div class="cpt-sub">Donateur : choisissez un partenaire enregistré, ou saisissez simplement son nom.</div></div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:dons' %}" class="cpt-btn">Retour</a></div>
+  </div>
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    {% include 'comptabilite/includes/champs.html' %}
+    <div class="cpt-note" style="margin-bottom:10px;">Don en nature : indiquez sa valeur estimée. S'il s'agit de médicaments, consommables ou matériel du catalogue, enregistrez le don puis utilisez le bouton « Stock » de la liste des dons : les produits entrent dans le stock central et leur valeur remplace l'estimation.</div>
+    <button class="cpt-btn primaire">Enregistrer</button>
+  </form>
+</div>
+{% endblock %}

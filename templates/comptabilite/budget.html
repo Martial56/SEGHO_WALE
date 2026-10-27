@@ -1,0 +1,40 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Budget annuel{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>.bud-input{width:150px;text-align:right;padding:5px 8px;border:1.5px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px}.pc-classe td{background:rgba(var(--teal-500-rgb),.06);font-weight:800}</style>{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Budget annuel — exercice {{ exercice }}</h1>
+      <div class="cpt-sub">Montant prévu pour l'année, compte par compte. Le suivi budget / réalisé est dans États → Budget / réalisé.</div>
+    </div>
+    <div class="cpt-actions">
+      <form method="get"><select name="exercice" class="cpt-input" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+        {% for e in exercices %}<option value="{{ e.pk }}" {% if e.pk == exercice.pk %}selected{% endif %}>{{ e }}</option>{% endfor %}</select></form>
+      <a href="{% url 'comptabilite:etat' 'budget' %}" class="cpt-btn">Budget / réalisé</a>
+    </div>
+  </div>
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Ressources prévues</div><div class="v">{{ total_ressources|floatformat:0|intcomma }} F</div></div>
+    <div class="cpt-kpi"><div class="l">Charges prévues</div><div class="v">{{ total_charges|floatformat:0|intcomma }} F</div></div>
+  </div>
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <input type="hidden" name="exercice" value="{{ exercice.pk }}">
+    <table class="cpt-table">
+      <thead><tr><th>Compte</th><th>Intitulé</th><th class="num">Prévu (F CFA)</th></tr></thead>
+      <tbody>
+        {% for c, montant in comptes %}
+        {% ifchanged c.classe %}<tr class="pc-classe"><td colspan="3">{% if c.classe == '6' %}Charges (classe 6){% else %}Ressources (classe 7){% endif %}</td></tr>{% endifchanged %}
+        <tr><td><b>{{ c.numero }}</b></td><td>{{ c.intitule }}</td>
+          <td class="num">{% if peut_modifier %}<input class="bud-input" name="budget_{{ c.pk }}" value="{% if montant %}{{ montant|floatformat:0 }}{% endif %}" inputmode="numeric">{% else %}{{ montant|floatformat:0|intcomma }}{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if peut_modifier %}<div style="margin-top:12px;"><button class="cpt-btn primaire">Enregistrer le budget</button></div>{% endif %}
+  </form>
+</div>
+{% endblock %}

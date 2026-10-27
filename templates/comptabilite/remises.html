@@ -1,0 +1,38 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Remises en banque{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Remises d'espèces en banque</h1>
+      <div class="cpt-sub">Les espèces d'une caisse déposées à la banque : elles sortent de la caisse et entrent sur le compte bancaire, via les virements internes (585).</div></div>
+  </div>
+  <div class="cpt-grid2" style="align-items:start;">
+    {% if perms.comptabilite.add_remisebanque %}
+    <form method="post" class="cpt-card">{% csrf_token %}
+      <h2>Nouvelle remise</h2>
+      <div class="cpt-field"><label>Caisse</label><select name="caisse" class="cpt-input">
+        {% for c, solde in caisses %}<option value="{{ c.pk }}" {% if post.caisse == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.nom }}{% if solde is not None %} — {{ solde|floatformat:0|intcomma }} F selon les comptes{% endif %}</option>{% endfor %}</select></div>
+      <div class="cpt-field"><label>Déposé sur</label><select name="compte_tresorerie" class="cpt-input">
+        {% for c in comptes %}<option value="{{ c.pk }}">{{ c.libelle }} ({{ c.compte.numero }})</option>{% endfor %}</select></div>
+      <div class="cpt-grid2">
+        <div class="cpt-field"><label>Date</label><input type="date" name="date" class="cpt-input" value="{% if post.date %}{{ post.date }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}"></div>
+        <div class="cpt-field"><label>Montant (F CFA)</label><input type="number" min="1" name="montant" class="cpt-input" value="{{ post.montant }}" required></div>
+      </div>
+      <div class="cpt-field"><label>N° du bordereau de versement</label><input type="text" name="reference" class="cpt-input" value="{{ post.reference }}"></div>
+      <div class="cpt-field"><label>Observation</label><textarea name="observation" class="cpt-textarea">{{ post.observation }}</textarea></div>
+      <button class="cpt-btn primaire">Enregistrer la remise</button>
+    </form>
+    {% endif %}
+    <div class="cpt-card">
+      <h2>Remises enregistrées</h2>
+      {% if remises %}
+      <table class="cpt-table"><thead><tr><th>Date</th><th>N°</th><th>Caisse</th><th>Banque</th><th class="num">Montant</th></tr></thead>
+        <tbody>{% for r in remises %}<tr><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}{% if r.reference %}<div class="cpt-note">{{ r.reference }}</div>{% endif %}</td><td>{{ r.caisse.nom }}</td><td>{{ r.compte_tresorerie }}</td><td class="num">{{ r.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
+      {% else %}<div class="cpt-vide">Aucune remise.</div>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

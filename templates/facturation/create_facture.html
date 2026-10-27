@@ -569,8 +569,11 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         <div class="field-group">
 
             <div class="field-row">
-                <label for="{{ form.montant_assurance.id_for_label }}">Part assurance (CFA)</label>
+                <label for="{{ form.montant_assurance.id_for_label }}">Part assurance (CFA){% if patient.assurance and patient.assurance.actif %}<span style="display:block;font-size:10.5px;font-weight:400;color:var(--text-muted);">{{ patient.assurance.nom }} — {{ patient.assurance.taux_prise_en_charge|floatformat:"-2" }} %</span>{% endif %}</label>
                 {{ form.montant_assurance }}
+                {% comment %}Tiers payant : la part de l'assureur est proposée d'après
+                son taux de prise en charge, tant qu'on ne l'a pas saisie à la main.{% endcomment %}
+                {% if not edit and patient.assurance and patient.assurance.actif %}<input type="hidden" id="taux-assurance" value="{{ patient.assurance.taux_prise_en_charge|stringformat:'s' }}">{% endif %}
             </div>
 
             <div class="field-row">
@@ -917,7 +920,13 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
             subtotal += qte * prix * (1 - rem / 100);
         });
 
-        var assurance = parseFloat(document.getElementById('{{ form.montant_assurance.id_for_label }}').value) || 0;
+        var champAss  = document.getElementById('{{ form.montant_assurance.id_for_label }}');
+        var tauxEl    = document.getElementById('taux-assurance');
+        if (tauxEl && champAss && !champAss.dataset.saisi) {
+            var taux = parseFloat(tauxEl.value) || 0;
+            if (taux > 0) champAss.value = Math.round(subtotal * taux / 100);
+        }
+        var assurance = parseFloat(champAss.value) || 0;
         var ticket    = parseFloat(document.getElementById('{{ form.ticket_moderateur.id_for_label }}').value)  || 0;
 
         document.getElementById('disp-subtotal').textContent  = fmt(subtotal);
@@ -1074,7 +1083,7 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
     /* Recalc when assurance/ticket change */
     var assEl = document.getElementById('{{ form.montant_assurance.id_for_label }}');
     var tickEl = document.getElementById('{{ form.ticket_moderateur.id_for_label }}');
-    if (assEl)  assEl.addEventListener('input', recalcTotaux);
+    if (assEl)  assEl.addEventListener('input', function () { assEl.dataset.saisi = '1'; recalcTotaux(); });
     if (tickEl) tickEl.addEventListener('input', recalcTotaux);
 
     recalcTotaux();
@@ -1087,6 +1096,9 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
     window.openPaymentModal = function () {
         var total = parseInt(document.getElementById('raw-total').value, 10) || 0;
+        // Tiers payant : le patient ne règle que sa part, l'assureur le reste.
+        var partAss = parseFloat((document.getElementById('{{ form.montant_assurance.id_for_label }}') || {}).value) || 0;
+        if (partAss > 0) total = Math.max(total - Math.round(partAss), 0);
         document.getElementById('pay-montant').value = total;
 
         var now = new Date();

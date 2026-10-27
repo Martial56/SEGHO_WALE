@@ -888,8 +888,14 @@ class TestLesLignesArriventAuDepliage(TestCase):
 
         Puis de 25 à 26 avec le motif de remise (`Facture.motif_remise`) : un
         champ lié de plus, dont le filtre personnalisé propose les valeurs.
+
+        Puis de 26 à 28 avec le tiers payant (`Facture.assurance` et
+        `Facture.bordereau_assurance`) : deux champs liés de plus, même raison.
+
+        Puis de 28 à 29 avec le menu « Trésorerie », qui liste les comptes à
+        rapprocher sur chaque page du module — sans rapport avec le balayage.
         """
-        with self.assertNumQueries(26):
+        with self.assertNumQueries(29):
             self.client.get(self.url + '&group=type&_groupe=0')
 
     def test_un_sous_groupe_rend_bien_les_siennes(self):
