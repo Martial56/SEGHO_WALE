@@ -179,8 +179,8 @@ def controles(exercice):
             and not Ecriture.all_objects.filter(origine=f'fonds_dedies:{exercice.pk}').exists()):
         avertissements.append("Fonds dédiés non examinés (Financements → Fonds dédiés) : les ressources "
                               "affectées non utilisées seraient comptées dans l'excédent.")
-    a_valider = (LigneEcriture.objects.filter(ecriture__exercice=exercice, compte__a_valider=True)
-                 .values_list('compte__numero', flat=True).distinct())
+    a_valider = set(LigneEcriture.objects.filter(ecriture__exercice=exercice, compte__a_valider=True)
+                    .values_list('compte__numero', flat=True))
     if a_valider:
         avertissements.append("Comptes utilisés dont le numéro SYCEBNL reste à confirmer par l'expert-comptable : "
                               + ', '.join(sorted(a_valider)) + '.')
