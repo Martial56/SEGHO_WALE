@@ -69,34 +69,34 @@
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <form method="get" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <form method="get" onsubmit="return false;" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <div class="st-search">
         <i class="bi bi-search"></i>
-        <input type="text" name="q" value="{{ q }}" placeholder="Nom, code, DCI ou n° de lot…">
+        <input type="text" name="q" id="search-input" value="{{ q }}" placeholder="Nom, code, DCI ou n° de lot…">
       </div>
       <!-- Filtre type -->
-      <select name="type" class="st-filter-select" onchange="this.form.submit()">
+      <select name="type" id="st-f-type" class="st-filter-select" onchange="stkAppliquerFiltres()">
         <option value="">Tous les types</option>
         <option value="medicament"  {% if type_filtre == 'medicament' %}selected{% endif %}>Médicaments</option>
         <option value="consommable" {% if type_filtre == 'consommable' %}selected{% endif %}>Consommables</option>
         <option value="equipement"  {% if type_filtre == 'equipement' %}selected{% endif %}>Équipements</option>
       </select>
       <!-- Filtre catégorie -->
-      <select name="categorie" class="st-filter-select" onchange="this.form.submit()">
+      <select name="categorie" id="st-f-categorie" class="st-filter-select" onchange="stkAppliquerFiltres()">
         <option value="">Toutes les catégories</option>
         {% for cat in categories %}
         <option value="{{ cat.pk }}" {% if categorie_filtre == cat.pk|stringformat:"s" %}selected{% endif %}>{{ cat.nom }}</option>
         {% endfor %}
       </select>
       <!-- Filtre statut -->
-      <select name="statut" class="st-filter-select" onchange="this.form.submit()">
+      <select name="statut" id="st-f-statut" class="st-filter-select" onchange="stkAppliquerFiltres()">
         <option value="">Tous les statuts</option>
         <option value="ok"      {% if statut_filtre == 'ok' %}selected{% endif %}>OK</option>
         <option value="alerte"  {% if statut_filtre == 'alerte' %}selected{% endif %}>En alerte</option>
         <option value="rupture" {% if statut_filtre == 'rupture' %}selected{% endif %}>Rupture</option>
       </select>
       {% if q or type_filtre or categorie_filtre or statut_filtre %}
-      <a href="{% url 'stock_produits' %}" class="btn-st-outline" style="padding:5px 12px;font-size:12px;">
+      <a href="{% url 'stock_produits' %}" onclick="stkEffacerFiltres(); return false;" class="btn-st-outline" style="padding:5px 12px;font-size:12px;">
         <i class="bi bi-x-lg"></i> Réinitialiser
       </a>
       {% endif %}
@@ -134,7 +134,7 @@
 </div>
 
 <!-- Tableau -->
-<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+<div id="list-result" style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
   {% if page_obj %}
   <table class="st-table">
     <thead>
@@ -282,12 +282,12 @@
   {% if page_obj.has_other_pages %}
   <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 20px;border-top:1px solid var(--st-border);">
     {% if page_obj.has_previous %}
-      <a href="?page=1{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
-         class="btn-st-outline" style="padding:4px 10px;font-size:12px;">
+      <a href="?page=1{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if categorie_filtre %}&categorie={{ categorie_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;">
         <i class="bi bi-chevron-double-left"></i>
       </a>
-      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
-         class="btn-st-outline" style="padding:4px 10px;font-size:12px;">
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if categorie_filtre %}&categorie={{ categorie_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;">
         <i class="bi bi-chevron-left"></i>
       </a>
     {% endif %}
@@ -296,18 +296,18 @@
       {% if num == page_obj.number %}
         <span class="btn-st" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</span>
       {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-        <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
-           class="btn-st-outline" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</a>
+        <a href="?page={{ num }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if categorie_filtre %}&categorie={{ categorie_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+           class="btn-st-outline o-pag-btn" style="padding:4px 11px;font-size:12px;min-width:32px;justify-content:center;">{{ num }}</a>
       {% endif %}
     {% endfor %}
 
     {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
-         class="btn-st-outline" style="padding:4px 10px;font-size:12px;">
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if categorie_filtre %}&categorie={{ categorie_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;">
         <i class="bi bi-chevron-right"></i>
       </a>
-      <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
-         class="btn-st-outline" style="padding:4px 10px;font-size:12px;">
+      <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if categorie_filtre %}&categorie={{ categorie_filtre }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}"
+         class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;">
         <i class="bi bi-chevron-double-right"></i>
       </a>
     {% endif %}
@@ -349,7 +349,26 @@ function closeImportModal(){document.getElementById('io-modal-backdrop').classLi
 function updateFileName(input){var el=document.getElementById('io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
 document.addEventListener('keydown',function(e){if(e.key==='Escape')closeImportModal();});
 {% if request.GET.action == 'import' and peut_gerer_stock and perms.stock.add_produit %}document.addEventListener('DOMContentLoaded',openImportModal);{% endif %}
+
+/* Filtres (type/catégorie/statut) + recherche en AJAX, via includes/listing/page_js.html
+   (sa recherche #search-input se déclenche déjà seule, débouncée ; seuls les
+   <select> ont besoin d'un déclencheur manuel). */
+function stkAppliquerFiltres(){
+  var params = new URLSearchParams(window.location.search);
+  params.delete('page');
+  ['type', 'categorie', 'statut'].forEach(function(nom){
+    var champ = document.getElementById('st-f-' + nom);
+    if (champ && champ.value) params.set(nom, champ.value); else params.delete(nom);
+  });
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+function stkEffacerFiltres(){
+  var recherche = document.getElementById('search-input');
+  if (recherche) recherche.value = '';
+  window.listeRafraichir(window.location.pathname, true);
+}
 </script>
+{% include 'includes/listing/page_js.html' %}
 
 <div class="io-modal-backdrop" id="io-modal-backdrop" onclick="closeImportModal()"></div>
 <div class="io-modal" id="io-modal">

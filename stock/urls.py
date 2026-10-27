@@ -34,9 +34,13 @@ urlpatterns = [
     path('commandes/<int:pk>/imprimer/',   views.commande_print,        name='stock_commande_print'),
 
     # Inventaire
-    path('inventaire/',               views.inventaire_list,       name='stock_inventaire_list'),
-    path('inventaire/nouveau/',       views.inventaire_create,     name='stock_inventaire_create'),
-    path('inventaire/<int:pk>/',      views.inventaire_detail,     name='stock_inventaire_detail'),
+    path('inventaire/',                       views.inventaire_list,              name='stock_inventaire_list'),
+    path('inventaire/nouveau/',               views.inventaire_create,            name='stock_inventaire_create'),
+    path('inventaire/feuille-comptage/',      views.inventaire_feuille_comptage,  name='stock_inventaire_feuille_comptage'),
+    path('inventaire/feuille-comptage/excel/', views.inventaire_feuille_comptage_excel, name='stock_inventaire_feuille_comptage_excel'),
+    path('inventaire/importer/',              views.inventaire_import,            name='stock_inventaire_import'),
+    path('inventaire/<int:pk>/',              views.inventaire_detail,            name='stock_inventaire_detail'),
+    path('inventaire/<int:pk>/imprimer/',     views.inventaire_print,             name='stock_inventaire_print'),
 
     # Péremptions
     path('peremptions/',              views.peremptions_list,      name='stock_peremptions'),

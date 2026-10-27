@@ -1029,16 +1029,35 @@ def inventaire_list(request):
     qs = Inventaire.objects.select_related('cree_par').annotate(
         nb_lignes=Count('lignes')
     ).order_by('-date_creation')
+
+    q = request.GET.get('q', '').strip()
+    statut_filtre = request.GET.get('statut', '').strip()
+
+    if q:
+        qs = qs.filter(
+            Q(numero__icontains=q) |
+            Q(cree_par__username__icontains=q) |
+            Q(cree_par__first_name__icontains=q) |
+            Q(cree_par__last_name__icontains=q)
+        )
+    if statut_filtre:
+        qs = qs.filter(statut=statut_filtre)
+
     paginator = Paginator(qs, 20)
     page_obj  = paginator.get_page(request.GET.get('page'))
     return render(request, 'stock/inventaire/list.html', {
-        'inventaires': page_obj,
-        'page_obj':    page_obj,
+        'inventaires':   page_obj,
+        'page_obj':      page_obj,
+        'q':             q,
+        'statut_filtre': statut_filtre,
     })
 
 
 @login_required(login_url='login')
-def inventaire_create(request):
+def inventaire_feuille_comptage(request):
+    """Feuille de comptage vierge : la liste des produits actifs avec leur
+    stock système, à imprimer et remplir à la main pendant le comptage
+    physique, avant de ressaisir les chiffres dans le formulaire en ligne."""
     if not can_manage_stock(request.user):
         raise PermissionDenied
     produits = list(
@@ -1047,6 +1066,144 @@ def inventaire_create(request):
     )
     for p in produits:
         p.lot_principal = _lot_principal(p)
+    return render(request, 'stock/inventaire/feuille_comptage.html', {
+        'produits': produits,
+        'today':    timezone.now().date(),
+    })
+
+
+_FEUILLE_COMPTAGE_HDR = [
+    'Code', 'Désignation', 'Type', 'N° de lot actuel', 'Péremption actuelle',
+    'Stock système', 'Unité', 'Stock réel compté', 'N° de lot (si changé)',
+    'Péremption (si changée)', 'Observations',
+]
+_FEUILLE_COMPTAGE_TYPE_LABEL = {'medicament': 'Médicament', 'consommable': 'Consommable', 'equipement': 'Équipement'}
+
+
+@login_required(login_url='login')
+def inventaire_feuille_comptage_excel(request):
+    """Même contenu que la feuille de comptage imprimée, en Excel : pratique
+    pour un comptage saisi directement dans le tableur plutôt qu'à la main sur
+    papier, ou pour répartir les colonnes entre plusieurs personnes."""
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    from services.views import _export_file
+    produits = list(
+        Produit.objects.filter(actif=True).select_related('unite_mesure')
+        .prefetch_related('lots').order_by('type', 'nom')
+    )
+    rows = []
+    for p in produits:
+        lot = _lot_principal(p)
+        rows.append([
+            p.code, p.nom, _FEUILLE_COMPTAGE_TYPE_LABEL.get(p.type, p.type),
+            lot.numero_lot if lot else '',
+            lot.date_peremption.strftime('%d/%m/%Y') if lot and lot.date_peremption else '',
+            float(p.stock_actuel), p.unite_mesure.nom if p.unite_mesure else '',
+            '', '', '', '',
+        ])
+    return _export_file('xlsx', 'feuille_comptage_inventaire', _FEUILLE_COMPTAGE_HDR, rows, None)
+
+
+@login_required(login_url='login')
+@require_POST
+def inventaire_import(request):
+    """Crée un inventaire à partir d'une feuille de comptage Excel réimportée
+    (mêmes colonnes que inventaire_feuille_comptage_excel). Le code produit
+    sert de clé ; les colonnes de lecture (désignation, type, stock système…)
+    ne sont pas reparsées, seules les colonnes à remplir le sont — exactement
+    comme _save_procedures_from_lignes ne relit que ce que le formulaire HTML
+    aurait posté."""
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Veuillez sélectionner un fichier.')
+        return redirect('stock_inventaire_create')
+
+    from decimal import Decimal
+    from services.views import _parse_upload
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('stock_inventaire_create')
+    if not data:
+        messages.error(request, 'Le fichier ne contient aucune ligne exploitable.')
+        return redirect('stock_inventaire_create')
+
+    produits_par_code = {
+        p.code: p for p in
+        Produit.objects.filter(actif=True).select_related('unite_mesure').prefetch_related('lots')
+    }
+
+    inv = Inventaire.objects.create(
+        notes=f"Importé depuis le fichier « {upload.name} ».",
+        cree_par=request.user,
+    )
+    nouvelles_lignes = []
+    erreurs = []
+    for i, row in enumerate(data, start=2):
+        code = str(row.get('Code') or '').strip()
+        if not code:
+            continue
+        p = produits_par_code.get(code)
+        if p is None:
+            erreurs.append(f"Ligne {i} : code « {code} » introuvable — ignorée.")
+            continue
+
+        lot = _lot_principal(p)
+        val = row.get('Stock réel compté')
+        val = '' if val is None else str(val).strip()
+        numero_lot_saisi = str(row.get('N° de lot (si changé)') or '').strip()
+        peremption_saisie = _parse_date_cell(row.get('Péremption (si changée)'))
+
+        numero_lot = numero_lot_saisi or (lot.numero_lot if lot else '')
+        peremption = peremption_saisie or (lot.date_peremption if lot else None)
+        lot_modifie = (
+            numero_lot != (lot.numero_lot if lot else '')
+            or peremption != (lot.date_peremption if lot else None)
+        )
+        if val == '' and not lot_modifie:
+            continue
+        try:
+            stock_reel = float(val.replace(',', '.')) if val else float(p.stock_actuel)
+        except ValueError:
+            erreurs.append(f"Ligne {i} : quantité « {val} » invalide pour « {code} » — ignorée.")
+            continue
+
+        ecart = Decimal(str(stock_reel)) - Decimal(str(p.stock_actuel))
+        nouvelles_lignes.append(LigneInventaire(
+            inventaire=inv, produit=p,
+            stock_theorique=p.stock_actuel, stock_reel=stock_reel, ecart=ecart,
+            lot=lot, numero_lot=numero_lot, date_peremption=peremption,
+            notes=str(row.get('Observations') or '').strip(),
+        ))
+
+    if not nouvelles_lignes:
+        inv.delete()
+        messages.warning(request, "Aucune ligne exploitable dans le fichier : aucun inventaire n'a été créé.")
+        return redirect('stock_inventaire_create')
+
+    LigneInventaire.objects.bulk_create(nouvelles_lignes)
+    messages.success(request, f"Inventaire {inv.numero} créé depuis le fichier importé ({len(nouvelles_lignes)} ligne(s)).")
+    for e in erreurs[:10]:
+        messages.warning(request, e)
+    if len(erreurs) > 10:
+        messages.warning(request, f"+ {len(erreurs) - 10} autre(s) ligne(s) ignorée(s).")
+    return redirect('stock_inventaire_detail', pk=inv.pk)
+
+
+@login_required(login_url='login')
+def inventaire_create(request):
+    if not can_manage_stock(request.user):
+        raise PermissionDenied
+    produits = list(
+        Produit.objects.filter(actif=True).select_related('unite_mesure', 'categorie')
+        .prefetch_related('lots').order_by('type', 'nom')
+    )
+    for p in produits:
+        p.lot_principal = _lot_principal(p)
+    categories = CategorieStock.objects.filter(actif=True).order_by('nom')
 
     if request.method == 'POST':
         from decimal import Decimal
@@ -1094,7 +1251,7 @@ def inventaire_create(request):
             LigneInventaire.objects.bulk_create(nouvelles_lignes)
         messages.success(request, f'Inventaire {inv.numero} créé.')
         return redirect('stock_inventaire_detail', pk=inv.pk)
-    return render(request, 'stock/inventaire/form.html', {'produits': produits})
+    return render(request, 'stock/inventaire/form.html', {'produits': produits, 'categories': categories})
 
 
 def _lot_principal(produit):
@@ -1188,6 +1345,24 @@ def inventaire_detail(request, pk):
         'inv':          inv,
         'lignes':       lignes_list,
         'stats_ecarts': stats_ecarts,
+    })
+
+
+@login_required(login_url='login')
+def inventaire_print(request, pk):
+    inv = get_object_or_404(Inventaire, pk=pk)
+    lignes_list = list(inv.lignes.select_related('produit', 'produit__unite_mesure', 'lot').all())
+    stats_ecarts = {
+        'excedents': sum(1 for l in lignes_list if float(l.ecart) > 0),
+        'manques':   sum(1 for l in lignes_list if float(l.ecart) < 0),
+        'neutres':   sum(1 for l in lignes_list if float(l.ecart) == 0),
+        'total':     len(lignes_list),
+    }
+    return render(request, 'stock/inventaire/print.html', {
+        'inv':          inv,
+        'lignes':       lignes_list,
+        'stats_ecarts': stats_ecarts,
+        'today':        timezone.now().date(),
     })
 
 
@@ -1931,7 +2106,8 @@ _PRODUIT_HDR = [
 
 def _parse_date_cell(value):
     """Accepte aussi bien une vraie date Excel (openpyxl la lit comme
-    datetime/date) qu'une chaîne 'AAAA-MM-JJ' (CSV/JSON)."""
+    datetime/date) qu'une chaîne 'AAAA-MM-JJ' (CSV/JSON) ou 'JJ/MM/AAAA'
+    (saisie à la française dans la feuille de comptage réimportée)."""
     import datetime
     if not value:
         return None
@@ -1942,10 +2118,12 @@ def _parse_date_cell(value):
     value = str(value).strip()
     if not value:
         return None
-    try:
-        return datetime.datetime.strptime(value, '%Y-%m-%d').date()
-    except ValueError:
-        return None
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y'):
+        try:
+            return datetime.datetime.strptime(value, fmt).date()
+        except ValueError:
+            pass
+    return None
 
 
 def _dec_cell(value, default):

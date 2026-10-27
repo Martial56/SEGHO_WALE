@@ -3,6 +3,7 @@
 {% block topbar_title %}Stock — Nouvel inventaire{% endblock %}
 
 {% block extra_st_css %}<style>
+{% include 'services/includes/io_styles.html' %}
 .content { padding-top: 0; }
 .inv-section { background:var(--st-100); padding:8px 20px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--accent-text); border-top:1px solid var(--st-200); border-bottom:1px solid var(--st-200); display:flex; align-items:center; gap:7px; }
 .inv-input { width:90px; border:none; border-bottom:1.5px solid rgba(0,0,0,.18); background:transparent; padding:5px 4px; font-size:13px; font-weight:700; color:var(--st-text); text-align:right; font-family:inherit; outline:none; transition:border-color .15s; }
@@ -19,6 +20,22 @@
 .lot-edit.lot-modifie { border-bottom-style:dashed; border-bottom-color:var(--st-500); font-style:italic; }
 .badge-ph-ok      { background:rgba(var(--st-600-rgb),.1); color:var(--accent-text-soft); border:1px solid rgba(var(--st-600-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
 .badge-ph-rupture { background:rgba(var(--rose-rgb),.1); color:var(--rose-text); border:1px solid rgba(var(--rose-rgb),.25); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; white-space:nowrap; }
+.st-search {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1.5px solid rgba(0,0,0,.18); padding: 5px 6px;
+  background: transparent; min-width: 220px;
+}
+.st-search input { border: none; background: transparent; font-size: 13px; color: var(--st-text); outline: none; width: 100%; }
+.st-search i { color: var(--st-muted); font-size: 14px; margin-right: 6px; }
+.st-filter-select {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 5px 22px 5px 4px;
+  font-size: 12.5px; color: var(--st-text); font-family: inherit;
+  cursor: pointer; outline: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+}
+.st-filter-select:focus { border-bottom-color: var(--st-500); outline: none; }
 </style>{% endblock %}
 
 {% block content %}
@@ -32,23 +49,67 @@
     <span class="current">Nouvel inventaire physique</span>
   </div>
   <div class="action-bar-buttons">
+    <a href="{% url 'stock_inventaire_feuille_comptage' %}" target="_blank" class="btn-form-cancel">
+      <i class="bi bi-printer"></i> Imprimer une feuille de comptage
+    </a>
+    <a href="{% url 'stock_inventaire_feuille_comptage_excel' %}" class="btn-form-cancel">
+      <i class="bi bi-file-earmark-excel"></i> Télécharger en Excel
+    </a>
+    <button type="button" onclick="invOpenImportModal()" class="btn-form-cancel">
+      <i class="bi bi-upload"></i> Importer un fichier rempli
+    </button>
     <a href="{% url 'stock_inventaire_list' %}" class="btn-form-cancel">Annuler</a>
     <button type="submit" class="btn-form-submit"><i class="bi bi-clipboard-check"></i> Créer l'inventaire</button>
   </div>
 </div>
 
 <!-- Notice -->
-<div style="background:var(--st-50);border:1px solid var(--st-200);border-radius:8px;padding:13px 16px;font-size:12.5px;color:var(--accent-text);line-height:1.7;margin-top:20px;">
+<div id="inv-notice" style="position:relative;background:var(--st-50);border:1px solid var(--st-200);border-radius:8px;padding:13px 40px 13px 16px;font-size:12.5px;color:var(--accent-text);line-height:1.7;margin-top:20px;">
+  <button type="button" onclick="inventaireMasquerNotice()" title="Masquer cette note"
+    style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:var(--st-muted);font-size:16px;line-height:1;padding:4px;">
+    <i class="bi bi-x-lg"></i>
+  </button>
   <i class="bi bi-info-circle" style="color:var(--st-500);margin-right:6px;"></i>
   Saisissez uniquement les quantités <strong>réellement comptées</strong>. Laissez un champ vide pour exclure le produit de cet inventaire. Les écarts seront calculés et le stock mis à jour lors de la validation.<br>
   Le <strong>n° de lot</strong> et la <strong>date de péremption</strong> sont pré-remplis depuis le lot en cours et peuvent être corrigés ; la correction est appliquée au lot à la validation (même sans recomptage du produit).
 </div>
+<script>
+(function () {
+  var notice = document.getElementById('inv-notice');
+  var masquee = false;
+  try { masquee = localStorage.getItem('stk-inv-notice-masquee') === '1'; } catch (e) {}
+  if (notice && masquee) notice.style.display = 'none';
+})();
+function inventaireMasquerNotice() {
+  var notice = document.getElementById('inv-notice');
+  if (notice) notice.style.display = 'none';
+  try { localStorage.setItem('stk-inv-notice-masquee', '1'); } catch (e) {}
+}
+</script>
 
 <!-- Tableau produits -->
 <div style="margin-top:16px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
-  <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;">
+  <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
     <div class="st-card-title"><i class="bi bi-boxes" style="color:var(--accent-text-soft);"></i> Saisie des stocks réels</div>
-    <span style="font-size:11.5px;color:var(--st-muted);">Laissez vide pour exclure un produit</span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="st-search">
+        <i class="bi bi-search"></i>
+        <input type="text" id="inv-search" placeholder="Code, nom ou DCI…">
+      </div>
+      <select id="inv-f-type" class="st-filter-select">
+        <option value="">Tous les types</option>
+        <option value="medicament">Médicaments</option>
+        <option value="consommable">Consommables</option>
+        <option value="equipement">Équipements</option>
+      </select>
+      <select id="inv-f-categorie" class="st-filter-select">
+        <option value="">Toutes les catégories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.pk }}">{{ cat.nom }}</option>
+        {% endfor %}
+      </select>
+      <span style="font-size:11.5px;color:var(--st-muted);">Laissez vide pour exclure un produit</span>
+    </div>
   </div>
   <table class="st-table">
     <thead>
@@ -67,7 +128,7 @@
     <tbody>
     {% regroup produits by type as produits_par_type %}
     {% for groupe in produits_par_type %}
-    <tr><td colspan="9" style="padding:0;">
+    <tr class="inv-group-row" data-groupe="{{ groupe.grouper }}"><td colspan="9" style="padding:0;">
       <div class="inv-section">
         {% if groupe.grouper == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
         {% elif groupe.grouper == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
@@ -76,7 +137,8 @@
       </div>
     </td></tr>
     {% for p in groupe.list %}
-    <tr>
+    <tr class="inv-prod-row" data-groupe="{{ groupe.grouper }}" data-cat="{{ p.categorie_id|default:'' }}"
+        data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.dci|default:''|lower }}">
       <td style="font-family: var(--font-mono);font-size:11px;color:var(--accent-text-soft);">{{ p.code }}</td>
       <td>
         <div style="font-weight:600;">{{ p.nom }}</div>
@@ -146,6 +208,42 @@
 </div>
 
 </form>
+
+<!-- Import d'une feuille de comptage remplie -->
+<div class="io-modal-backdrop" id="inv-io-modal-backdrop" onclick="invCloseImportModal()"></div>
+<div class="io-modal" id="inv-io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer une feuille de comptage</span>
+    <button type="button" class="io-modal-close" onclick="invCloseImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'stock_inventaire_import' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <p style="font-size:12px;color:var(--st-muted);margin-bottom:12px;">
+        Reprenez le fichier Excel téléchargé via « Télécharger en Excel », complétez les colonnes
+        <strong>Stock réel compté</strong> (et éventuellement n° de lot / péremption / observations), puis importez-le ici :
+        un nouvel inventaire sera créé à partir des lignes remplies.
+      </p>
+      <label class="io-file-label" for="inv-io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--accent-text-soft);display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">Excel (.xlsx), CSV ou JSON</span>
+        <input type="file" id="inv-io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="invUpdateFileName(this)">
+      </label>
+      <div class="io-filename" id="inv-io-filename" style="display:none;"></div>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="invCloseImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
+<script>
+function invOpenImportModal(){document.getElementById('inv-io-modal-backdrop').classList.add('active');document.getElementById('inv-io-modal').classList.add('active');}
+function invCloseImportModal(){document.getElementById('inv-io-modal-backdrop').classList.remove('active');document.getElementById('inv-io-modal').classList.remove('active');}
+function invUpdateFileName(input){var el=document.getElementById('inv-io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')invCloseImportModal();});
+</script>
 {% endblock %}
 
 {% block extra_js %}
@@ -184,6 +282,41 @@
       this.classList.toggle("lot-modifie", this.value.trim() !== this.dataset.initial);
     });
   });
+
+  /* Filtre client (recherche + catégorie) sur le tableau de saisie : un filtre
+     serveur rechargerait la page et perdrait les quantités déjà tapées sur les
+     lignes non reproduites, d'où un filtrage en JS qui ne fait que
+     montrer/masquer les lignes existantes. */
+  var champRecherche = document.getElementById("inv-search");
+  var champType = document.getElementById("inv-f-type");
+  var champCategorie = document.getElementById("inv-f-categorie");
+  var minuteur;
+
+  function filtrerProduits() {
+    var q = (champRecherche.value || "").trim().toLowerCase();
+    var type = champType.value;
+    var catId = champCategorie.value;
+    var comptes = {};
+    document.querySelectorAll(".inv-prod-row").forEach(function (tr) {
+      var visible = (!q || tr.dataset.search.indexOf(q) !== -1)
+                 && (!type || tr.dataset.groupe === type)
+                 && (!catId || tr.dataset.cat === catId);
+      tr.style.display = visible ? "" : "none";
+      if (visible) comptes[tr.dataset.groupe] = (comptes[tr.dataset.groupe] || 0) + 1;
+    });
+    document.querySelectorAll(".inv-group-row").forEach(function (tr) {
+      tr.style.display = comptes[tr.dataset.groupe] ? "" : "none";
+    });
+  }
+
+  if (champRecherche) {
+    champRecherche.addEventListener("input", function () {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(filtrerProduits, 150);
+    });
+  }
+  if (champType) champType.addEventListener("change", filtrerProduits);
+  if (champCategorie) champCategorie.addEventListener("change", filtrerProduits);
 }());
 </script>
 {% endblock %}

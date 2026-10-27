@@ -3,11 +3,27 @@
 {% block topbar_title %}Stock — Inventaires{% endblock %}
 
 {% block extra_st_css %}<style>
-.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:var(--st-surface);border-bottom:1px solid var(--st-border);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100; }
+.st-page-head { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 32px;margin:0 -32px;background:var(--st-surface);border-bottom:1px solid var(--st-border);box-shadow:0 2px 8px rgba(0,0,0,.04);position:sticky;top:var(--topbar-h);z-index:100;flex-wrap:wrap; }
 .badge-brouillon { background:rgba(0,0,0,.06);     color:var(--st-muted);  border:1px solid rgba(0,0,0,.12);           padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 html[data-theme="dark"] .badge-brouillon { background:rgba(255,255,255,.08); }
 .badge-valide    { background:rgba(var(--st-600-rgb),.1);  color:var(--accent-text-soft);         border:1px solid rgba(var(--st-600-rgb),.25);       padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
 .badge-annule    { background:rgba(var(--rose-rgb),.1);   color:var(--rose-text);         border:1px solid rgba(var(--rose-rgb),.25);        padding:2px 9px; border-radius:20px; font-size:10.5px; font-weight:600; }
+.st-search {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1.5px solid rgba(0,0,0,.18); padding: 5px 6px;
+  background: transparent; min-width: 220px;
+}
+.st-search input { border: none; background: transparent; font-size: 13px; color: var(--st-text); outline: none; width: 100%; }
+.st-search i { color: var(--st-muted); font-size: 14px; margin-right: 6px; }
+.st-filter-select {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 5px 22px 5px 4px;
+  font-size: 12.5px; color: var(--st-text); font-family: inherit;
+  cursor: pointer; outline: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+}
+.st-filter-select:focus { border-bottom-color: var(--st-500); outline: none; }
 </style>{% endblock %}
 
 {% block content %}
@@ -16,12 +32,29 @@ html[data-theme="dark"] .badge-brouillon { background:rgba(255,255,255,.08); }
     <div style="font-size:15px;font-weight:800;color:var(--st-900);"><i class="bi bi-clipboard2-check" style="color:var(--accent-text-soft);"></i> Inventaires physiques</div>
     <div style="font-size:11.5px;color:var(--st-muted);">Comptages physiques et ajustements de stock</div>
   </div>
-  {% if peut_gerer_stock and perms.stock.add_inventaire %}
-  <a href="{% url 'stock_inventaire_create' %}" class="btn-st"><i class="bi bi-plus-lg"></i> Nouvel inventaire</a>
-  {% endif %}
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div class="st-search">
+      <i class="bi bi-search"></i>
+      <input type="text" id="search-input" value="{{ q }}" placeholder="N° d'inventaire ou créé par…">
+    </div>
+    <select id="st-inv-f-statut" class="st-filter-select" onchange="invAppliquerFiltres()">
+      <option value="">Tous les statuts</option>
+      <option value="brouillon" {% if statut_filtre == 'brouillon' %}selected{% endif %}>En cours</option>
+      <option value="valide"    {% if statut_filtre == 'valide' %}selected{% endif %}>Validé</option>
+      <option value="annule"    {% if statut_filtre == 'annule' %}selected{% endif %}>Annulé</option>
+    </select>
+    {% if q or statut_filtre %}
+    <a href="{% url 'stock_inventaire_list' %}" onclick="invEffacerFiltres(); return false;" class="btn-st-outline" style="padding:5px 12px;font-size:12px;">
+      <i class="bi bi-x-lg"></i> Réinitialiser
+    </a>
+    {% endif %}
+    {% if peut_gerer_stock and perms.stock.add_inventaire %}
+    <a href="{% url 'stock_inventaire_create' %}" class="btn-st"><i class="bi bi-plus-lg"></i> Nouvel inventaire</a>
+    {% endif %}
+  </div>
 </div>
 
-<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+<div id="list-result" style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
   {% if inventaires %}
   <table class="st-table">
     <thead>
@@ -69,20 +102,35 @@ html[data-theme="dark"] .badge-brouillon { background:rgba(255,255,255,.08); }
     {% endif %}
   </div>
   {% endif %}
-</div>
 
-{% if page_obj.has_other_pages %}
-<div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;">
-  {% if page_obj.has_previous %}
-  <a href="?page=1&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
-  <a href="?page={{ page_obj.previous_page_number }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+  {% if page_obj.has_other_pages %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;padding:14px 0;border-top:1px solid var(--st-border);">
+    {% if page_obj.has_previous %}
+    <a href="?page=1{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}" class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-left"></i></a>
+    <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}" class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
+    {% endif %}
+    <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}" class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
+    <a href="?page={{ page_obj.paginator.num_pages }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}" class="btn-st-outline o-pag-btn" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
+    {% endif %}
+  </div>
   {% endif %}
-  <span style="font-size:12px;color:var(--st-muted);padding:0 8px;">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} &nbsp;&middot;&nbsp; {{ page_obj.paginator.count }} enregistrement{{ page_obj.paginator.count|pluralize }}</span>
-  {% if page_obj.has_next %}
-  <a href="?page={{ page_obj.next_page_number }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
-  <a href="?page={{ page_obj.paginator.num_pages }}&" class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-double-right"></i></a>
-  {% endif %}
-</div>
-{% endif %}
+</div><!-- /#list-result -->
 
+<script>
+function invAppliquerFiltres(){
+  var params = new URLSearchParams(window.location.search);
+  params.delete('page');
+  var statut = document.getElementById('st-inv-f-statut');
+  if (statut && statut.value) params.set('statut', statut.value); else params.delete('statut');
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+function invEffacerFiltres(){
+  var recherche = document.getElementById('search-input');
+  if (recherche) recherche.value = '';
+  window.listeRafraichir(window.location.pathname, true);
+}
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}
