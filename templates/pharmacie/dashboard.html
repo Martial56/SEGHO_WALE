@@ -78,6 +78,10 @@
     <div class="ph-stat-label"><i class="bi bi-exclamation-triangle-fill"></i> En alerte</div>
     <div class="ph-stat-value" style="color:var(--amber-text);">{{ stats.alertes|default:"0" }}</div>
   </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-hourglass-split"></i> Péremptions ≤ 90j</div>
+    <div class="ph-stat-value" style="color:{% if peremptions_proches %}var(--amber-text){% else %}var(--accent-text-soft){% endif %};">{{ peremptions_proches|default:"0" }}</div>
+  </div>
   {% if can_view_finances %}
   <div class="ph-stat-box">
     <div class="ph-stat-label"><i class="bi bi-cash-stack"></i> CA du mois (FCFA)</div>
@@ -90,8 +94,25 @@
     <div class="ph-stat-label"><i class="bi bi-receipt"></i> Ventes du mois</div>
     <div class="ph-stat-value" style="color:var(--accent-text);">{{ nb_ventes_mois|default:"0" }}</div>
   </div>
+  <div class="ph-stat-box">
+    <div class="ph-stat-label"><i class="bi bi-wallet2"></i> Valeur du stock</div>
+    <div class="ph-stat-value" style="color:var(--accent-text);font-size:20px;">{{ valeur_stock|default:"0"|floatformat:0 }}</div>
+    <div style="font-size:10.5px;color:var(--ph-muted);margin-top:2px;">FCFA, au prix d'achat</div>
+  </div>
   {% endif %}
 </div>
+
+{% if can_view_finances %}
+<!-- Évolution du CA -->
+<div class="ph-card" style="margin-bottom:16px;">
+  <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+    <div class="ph-card-title"><i class="bi bi-graph-up-arrow" style="color:var(--accent-text-soft);"></i> Évolution du chiffre d'affaires — 6 derniers mois</div>
+  </div>
+  <div style="padding:16px 24px;height:220px;">
+    <canvas id="chartEvolutionCA"></canvas>
+  </div>
+</div>
+{% endif %}
 
 <!-- Layout 2 colonnes -->
 <div class="ph-dash-grid">
@@ -201,23 +222,9 @@
     <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
       <div class="ph-card-title"><i class="bi bi-bar-chart-fill" style="color:var(--accent-text-soft);"></i> Top produits du mois</div>
     </div>
-    <div style="padding:16px 24px;">
+    <div style="padding:16px 24px;{% if top_produits %}height:220px;{% endif %}">
       {% if top_produits %}
-      {% for prod in top_produits %}
-      {% with max_qte=top_produits.0.qte %}
-      <div style="margin-bottom:10px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-          <span style="font-size:12px;font-weight:600;color:var(--ph-900);max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ prod.produit__nom }}</span>
-          <span style="font-size:11.5px;color:var(--ph-muted);">{{ prod.qte }} unités</span>
-        </div>
-        <div style="height:7px;background:var(--ph-100);border-radius:4px;overflow:hidden;">
-          <div style="height:100%;border-radius:4px;
-            background:{% cycle 'var(--ph-500)' 'var(--green)' 'var(--amber-text)' 'var(--violet)' 'var(--rose-text)' %};
-            width:{% if max_qte %}{% widthratio prod.qte max_qte 100 %}%{% else %}0%{% endif %};"></div>
-        </div>
-      </div>
-      {% endwith %}
-      {% endfor %}
+      <canvas id="chartTopProduits"></canvas>
       {% else %}
       <div style="text-align:center;padding:28px;color:var(--ph-muted);">
         <i class="bi bi-bar-chart" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
@@ -233,21 +240,9 @@
       <div class="ph-card-title"><i class="bi bi-pie-chart-fill" style="color:var(--accent-text-soft);"></i> Ventes par mode — mois en cours</div>
       <a href="{% url 'pharmacie_recette' pharmacie %}" class="btn-ph-outline" style="font-size:11px;padding:4px 10px;">Recette</a>
     </div>
-    <div style="padding:16px 24px;">
+    <div style="padding:16px 24px;{% if ventes_par_mode %}height:220px;{% endif %}">
       {% if ventes_par_mode %}
-      {% for vm in ventes_par_mode %}
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--ph-border);">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0;
-            background:{% cycle 'var(--ph-500)' 'var(--green)' 'var(--amber-text)' 'var(--violet)' %};"></div>
-          <span style="font-size:12.5px;font-weight:600;color:var(--ph-900);text-transform:capitalize;">
-            {{ vm.mode_paiement|default:"Non spécifié" }}
-          </span>
-          <span style="font-size:11px;color:var(--ph-muted);">({{ vm.nb }} vente{{ vm.nb|pluralize }})</span>
-        </div>
-        <span style="font-size:13px;font-weight:700;color:var(--accent-text);">{{ vm.total|floatformat:0 }} FCFA</span>
-      </div>
-      {% endfor %}
+      <canvas id="chartVentesMode"></canvas>
       {% else %}
       <div style="text-align:center;padding:28px;color:var(--ph-muted);">
         <i class="bi bi-pie-chart" style="font-size:22px;display:block;margin-bottom:6px;color:var(--ph-300);"></i>
@@ -305,4 +300,75 @@
     </table>
   </div>
 </div>
+
+{% if can_view_finances %}
+{{ chart_evolution_ca|json_script:"data-evolution-ca" }}
+{{ chart_top_produits|json_script:"data-top-produits" }}
+{{ chart_ventes_mode|json_script:"data-ventes-mode" }}
+<script src="{% static 'vendor/chart.umd.min.js' %}"></script>
+<script>
+(function () {
+  var PALETTE = ['#4a7236', '#2d99db', '#e89a1a', '#e84545', '#9e9e9e',
+                 '#e91e8c', '#6c757d', '#16a96b', '#673ab7', '#ff5722'];
+  function couleurs(n) {
+    var out = [];
+    for (var i = 0; i < n; i++) out.push(PALETTE[i % PALETTE.length]);
+    return out;
+  }
+
+  var evolutionCA = JSON.parse(document.getElementById('data-evolution-ca').textContent);
+  var canvasEvo = document.getElementById('chartEvolutionCA');
+  if (canvasEvo && evolutionCA.labels.length) {
+    new Chart(canvasEvo, {
+      type: 'line',
+      data: {
+        labels: evolutionCA.labels,
+        datasets: [
+          { label: 'Comptoir', data: evolutionCA.comptoir, borderColor: '#2d99db', backgroundColor: 'rgba(45,153,219,.12)', tension: .3, fill: true },
+          { label: 'Ordonnances', data: evolutionCA.ordonnances, borderColor: '#4a7236', backgroundColor: 'rgba(74,114,54,.12)', tension: .3, fill: true },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } },
+      },
+    });
+  }
+
+  var topProduits = JSON.parse(document.getElementById('data-top-produits').textContent);
+  var canvasTop = document.getElementById('chartTopProduits');
+  if (canvasTop && topProduits.labels.length) {
+    new Chart(canvasTop, {
+      type: 'bar',
+      data: {
+        labels: topProduits.labels,
+        datasets: [{ label: 'Unités vendues', data: topProduits.data, backgroundColor: couleurs(topProduits.labels.length) }],
+      },
+      options: {
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 11 } } } },
+      },
+    });
+  }
+
+  var ventesMode = JSON.parse(document.getElementById('data-ventes-mode').textContent);
+  var canvasMode = document.getElementById('chartVentesMode');
+  if (canvasMode && ventesMode.labels.length) {
+    new Chart(canvasMode, {
+      type: 'doughnut',
+      data: {
+        labels: ventesMode.labels,
+        datasets: [{ data: ventesMode.data, backgroundColor: couleurs(ventesMode.labels.length) }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      },
+    });
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

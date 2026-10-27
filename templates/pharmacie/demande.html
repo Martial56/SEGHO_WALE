@@ -15,6 +15,22 @@
   border-bottom: 1px solid var(--ph-border);
 }
 .ph-error { background: rgba(var(--rose-rgb),.08); color: var(--rose-text); border: 1px solid rgba(var(--rose-rgb),.2); border-radius: 6px; padding: 8px 14px; font-size: 12px; margin-bottom: 12px; }
+.ph-search {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1.5px solid rgba(0,0,0,.18); padding: 5px 6px;
+  background: transparent; min-width: 200px;
+}
+.ph-search input { border: none; background: transparent; font-size: 13px; color: var(--ph-text); outline: none; width: 100%; }
+.ph-search i { color: var(--ph-muted); font-size: 14px; margin-right: 6px; }
+.ph-filter-select {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 5px 22px 5px 4px;
+  font-size: 12.5px; color: var(--ph-text); font-family: inherit;
+  cursor: pointer; outline: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+}
+.ph-filter-select:focus { border-bottom-color: var(--ph-500); outline: none; }
 </style>{% endblock %}
 
 {% block content %}
@@ -54,9 +70,27 @@
 
 <!-- Tableau produits -->
 <div class="ph-card" style="margin-bottom:14px;">
-  <div class="ph-card-header" style="padding:12px 20px 12px 32px;">
+  <div class="ph-card-header" style="padding:12px 20px 12px 32px;flex-wrap:wrap;gap:10px;">
     <div class="ph-card-title"><i class="bi bi-box-seam" style="color:var(--accent-text-soft);"></i> Produits à demander</div>
-    <span style="font-size:11.5px;color:var(--ph-muted);">Saisissez uniquement les quantités souhaitées</span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="ph-search">
+        <i class="bi bi-search"></i>
+        <input type="text" id="dem-search" placeholder="Code, nom ou DCI…">
+      </div>
+      <select id="dem-f-type" class="ph-filter-select">
+        <option value="">Tous les types</option>
+        <option value="medicament">Médicaments</option>
+        <option value="consommable">Consommables</option>
+        <option value="equipement">Équipements</option>
+      </select>
+      <select id="dem-f-categorie" class="ph-filter-select">
+        <option value="">Toutes les catégories</option>
+        {% for cat in categories %}
+        <option value="{{ cat.pk }}">{{ cat.nom }}</option>
+        {% endfor %}
+      </select>
+      <span style="font-size:11.5px;color:var(--ph-muted);">Saisissez uniquement les quantités souhaitées</span>
+    </div>
   </div>
   <div style="overflow-x:auto;">
     <table class="ph-table" style="font-size:12.5px;">
@@ -70,7 +104,7 @@
       <tbody>
         {% for p in produits %}
         {% ifchanged p.produit.type %}
-        <tr class="ph-type-sep">
+        <tr class="ph-type-sep ph-group-row" data-groupe="{{ p.produit.type }}">
           <td colspan="3">
             {% if p.produit.type == 'medicament' %}<i class="bi bi-capsule-pill"></i> Médicaments
             {% elif p.produit.type == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
@@ -78,7 +112,8 @@
           </td>
         </tr>
         {% endifchanged %}
-        <tr>
+        <tr class="ph-prod-row" data-groupe="{{ p.produit.type }}" data-cat="{{ p.produit.categorie_id|default:'' }}"
+            data-search="{{ p.produit.code|lower }} {{ p.produit.nom|lower }} {{ p.produit.dci|default:''|lower }}">
           <td style="">
             <div style="font-weight:600;">{{ p.produit.nom }}</div>
             <div style="font-size:10.5px;font-family: var(--font-mono);color:var(--accent-text-soft);">{{ p.produit.code }}</div>
@@ -132,4 +167,42 @@
   </button>
 </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+  var champRecherche = document.getElementById("dem-search");
+  var champType = document.getElementById("dem-f-type");
+  var champCategorie = document.getElementById("dem-f-categorie");
+  var minuteur;
+
+  function filtrerProduits() {
+    var q = (champRecherche.value || "").trim().toLowerCase();
+    var type = champType.value;
+    var catId = champCategorie.value;
+    var comptes = {};
+    document.querySelectorAll(".ph-prod-row").forEach(function (tr) {
+      var visible = (!q || tr.dataset.search.indexOf(q) !== -1)
+                 && (!type || tr.dataset.groupe === type)
+                 && (!catId || tr.dataset.cat === catId);
+      tr.style.display = visible ? "" : "none";
+      if (visible) comptes[tr.dataset.groupe] = (comptes[tr.dataset.groupe] || 0) + 1;
+    });
+    document.querySelectorAll(".ph-group-row").forEach(function (tr) {
+      tr.style.display = comptes[tr.dataset.groupe] ? "" : "none";
+    });
+  }
+
+  if (champRecherche) {
+    champRecherche.addEventListener("input", function () {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(filtrerProduits, 150);
+    });
+  }
+  if (champType) champType.addEventListener("change", filtrerProduits);
+  if (champCategorie) champCategorie.addEventListener("change", filtrerProduits);
+}());
+</script>
 {% endblock %}

@@ -1,0 +1,188 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inventaire {{ inv.numero }} — {{ label }}</title>
+<style>
+:root {
+  --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace;
+  --ph-600: #4f9b4b; --ph-700: #2e592b;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family: var(--font-print); font-size:13px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8edf0; padding:20px; }
+  .page { background:#fff; max-width:900px; margin:0 auto; padding:32px 40px 40px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:900px; margin:0 auto 12px; text-align:right; display:flex; gap:8px; justify-content:flex-end; }
+  .print-btn { background:var(--ph-700); color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#071e28; }
+  .print-btn-back { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+}
+
+@media print {
+  body { background:#fff; padding:0; }
+  .page { padding:10mm 14mm; width:100%; max-width:none; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 landscape; margin:0; }
+  tr { page-break-inside: avoid; }
+}
+
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:3px solid var(--ph-700); margin-bottom:20px; }
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-left img { width:52px; height:52px; object-fit:contain; }
+.clinic-name { font-size:16px; font-weight:800; color:var(--ph-700); }
+.clinic-sub  { font-size:11px; color:#555; margin-top:2px; }
+.header-right { text-align:right; }
+.doc-title { font-size:18px; font-weight:800; color:var(--ph-700); letter-spacing:-.3px; }
+.doc-num   { font-size:13px; font-weight:700; color:#555; margin-top:3px; font-family: var(--font-mono); }
+.doc-date  { font-size:11px; color:#888; margin-top:2px; }
+
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+.info-box { border:1px solid #e0e0e0; border-radius:6px; padding:12px 16px; }
+.info-box-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#888; margin-bottom:8px; }
+.info-row { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px solid #f0f0f0; }
+.info-row:last-child { border-bottom:none; }
+.info-lbl { color:#888; }
+.info-val { font-weight:600; color:#111; }
+
+.section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--ph-700); margin-bottom:8px; border-left:3px solid var(--ph-700); padding-left:8px; }
+table { width:100%; border-collapse:collapse; font-size:11.5px; }
+thead tr { background:var(--ph-700); color:#fff; }
+thead th { padding:7px 8px; font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.3px; text-align:left; }
+thead th.num { text-align:right; }
+tbody tr { border-bottom:1px solid #eee; }
+tbody tr.ecart-pos { background:#eef7ec; }
+tbody tr.ecart-neg { background:#fdeeee; }
+tbody td { padding:6px 8px; vertical-align:middle; }
+.td-code { font-family: var(--font-mono); font-size:10.5px; color:#888; }
+.td-name { font-weight:600; }
+.td-num  { text-align:right; font-family: var(--font-mono); }
+.td-ecart-pos { color:#1a7a35; font-weight:700; }
+.td-ecart-neg { color:#c62828; font-weight:700; }
+.td-ecart-zero { color:#999; }
+
+.notes-box { background:#f0f5fa; border:1px solid #a8c8d8; border-radius:6px; padding:10px 14px; font-size:12px; color:#333; margin-top:16px; }
+
+.signature-area { display:flex; justify-content:space-between; margin-top:28px; }
+.signature-box { text-align:center; min-width:160px; }
+.signature-line { border-top:1px solid var(--ph-700); margin-top:40px; padding-top:5px; font-size:11px; color:#333; font-weight:600; }
+
+.footer { margin-top:20px; padding-top:10px; border-top:1px solid #ddd; display:flex; justify-content:space-between; font-size:10px; color:#aaa; }
+
+.badge-statut { display:inline-block; padding:3px 10px; border-radius:12px; font-size:10.5px; font-weight:700; }
+.badge-brouillon { background:#fff3e0; color:#e65100; }
+.badge-valide    { background:#e8f2f8; color:var(--ph-700); }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <a href="{% url 'pharmacie_inventaire_detail' pharmacie inv.pk %}" class="print-btn-back">&#8592; Retour</a>
+  <button class="print-btn" onclick="window.print()">&#128424; Imprimer / Exporter PDF</button>
+</div>
+
+<div class="page">
+
+  <div class="header">
+    <div class="header-left">
+      <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
+      <div>
+        <div class="clinic-name">Centre Médico-Social WALÉ</div>
+        <div class="clinic-sub">{{ label }}</div>
+        <div class="clinic-sub" style="margin-top:3px;">Gestion de la pharmacie</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">FICHE D'INVENTAIRE</div>
+      <div class="doc-num">{{ inv.numero }}</div>
+      <div class="doc-date">Édité le {{ today|date:"d/m/Y" }}</div>
+      <div style="margin-top:6px;">
+        {% if inv.statut == 'brouillon' %}<span class="badge-statut badge-brouillon">En cours</span>
+        {% else %}<span class="badge-statut badge-valide">Validé</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="info-grid">
+    <div class="info-box">
+      <div class="info-box-title">Informations</div>
+      <div class="info-row"><span class="info-lbl">N° Inventaire</span><span class="info-val" style="font-family: var(--font-mono);">{{ inv.numero }}</span></div>
+      <div class="info-row"><span class="info-lbl">Date d'inventaire</span><span class="info-val">{{ inv.date_inventaire|date:"d/m/Y" }}</span></div>
+      <div class="info-row"><span class="info-lbl">Établi par</span><span class="info-val">{{ inv.cree_par.get_full_name|default:inv.cree_par.username|default:"—" }}</span></div>
+      {% if inv.date_validation %}
+      <div class="info-row"><span class="info-lbl">Validé le</span><span class="info-val">{{ inv.date_validation|date:"d/m/Y H:i" }}</span></div>
+      {% endif %}
+    </div>
+    <div class="info-box">
+      <div class="info-box-title">Résumé des écarts</div>
+      <div class="info-row"><span class="info-lbl">Produits comptés</span><span class="info-val">{{ stats.total }}</span></div>
+      <div class="info-row"><span class="info-lbl">Excédents</span><span class="info-val" style="color:#1a7a35;">{{ stats.excedents }}</span></div>
+      <div class="info-row"><span class="info-lbl">Manquants</span><span class="info-val" style="color:#c62828;">{{ stats.manquants }}</span></div>
+      <div class="info-row"><span class="info-lbl">Sans écart</span><span class="info-val">{{ stats.neutres }}</span></div>
+    </div>
+  </div>
+
+  <div class="section-title">Lignes d'inventaire</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:24px;">#</th>
+        <th>Code</th>
+        <th>Désignation du produit</th>
+        <th class="num">Stock système</th>
+        <th class="num">Stock réel compté</th>
+        <th class="num">Écart</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ligne in lignes %}
+    <tr class="{% if ligne.ecart > 0 %}ecart-pos{% elif ligne.ecart < 0 %}ecart-neg{% endif %}">
+      <td style="color:#aaa;font-size:10px;text-align:center;">{{ forloop.counter }}</td>
+      <td class="td-code">{{ ligne.produit.code }}</td>
+      <td class="td-name">{{ ligne.produit.nom }}</td>
+      <td class="td-num">{{ ligne.stock_theorique|floatformat:0 }} {{ ligne.produit.unite_mesure.nom }}</td>
+      <td class="td-num">{{ ligne.stock_reel|floatformat:0 }} {{ ligne.produit.unite_mesure.nom }}</td>
+      <td class="td-num">
+        {% if ligne.ecart > 0 %}<span class="td-ecart-pos">+{{ ligne.ecart|floatformat:0 }}</span>
+        {% elif ligne.ecart < 0 %}<span class="td-ecart-neg">{{ ligne.ecart|floatformat:0 }}</span>
+        {% else %}<span class="td-ecart-zero">0</span>{% endif %}
+      </td>
+      <td style="color:#888;">{{ ligne.notes|default:"—" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" style="text-align:center;padding:20px;color:#aaa;font-style:italic;">Aucune ligne dans cet inventaire</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if inv.notes %}
+  <div class="notes-box">
+    <strong style="font-size:10.5px;color:#888;text-transform:uppercase;letter-spacing:.4px;">Notes :</strong>
+    <div style="margin-top:4px;">{{ inv.notes }}</div>
+  </div>
+  {% endif %}
+
+  <div class="signature-area">
+    <div class="signature-box">
+      <div class="signature-line">Le Pharmacien / Responsable</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line">Le Directeur</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Centre Médico-Social WALÉ — {{ label }}</div>
+    <div>{{ inv.numero }} — Document généré le {{ today|date:"d/m/Y" }}</div>
+    <div>Confidentiel — Usage interne</div>
+  </div>
+
+</div>
+</body>
+</html>

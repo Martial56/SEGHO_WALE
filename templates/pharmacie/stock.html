@@ -93,46 +93,35 @@
 <!-- Filtres -->
 <div class="ph-filter-bar" style="margin-top:0;">
   <span style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-right:4px;">Statut :</span>
-  <a href="?pharmacie={{ pharmacie }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if not statut %}active{% endif %}">Tous</a>
-  <a href="?pharmacie={{ pharmacie }}&statut=rupture&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if statut == 'rupture' %}active{% endif %}">
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if not statut %}active{% endif %}" data-param="statut" data-value="">Tous</a>
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if statut == 'rupture' %}active{% endif %}" data-param="statut" data-value="rupture">
     <i class="bi bi-x-circle-fill" style="color:var(--rose-text);"></i> Ruptures
   </a>
-  <a href="?pharmacie={{ pharmacie }}&statut=alerte&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if statut == 'alerte' %}active{% endif %}">
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if statut == 'alerte' %}active{% endif %}" data-param="statut" data-value="alerte">
     <i class="bi bi-exclamation-triangle-fill" style="color:var(--amber-text);"></i> Alertes
   </a>
-  <a href="?pharmacie={{ pharmacie }}&statut=ok&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if statut == 'ok' %}active{% endif %}">
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if statut == 'ok' %}active{% endif %}" data-param="statut" data-value="ok">
     <i class="bi bi-check-circle-fill" style="color:var(--accent-text-soft);"></i> OK
   </a>
   <span style="width:1px;height:20px;background:var(--ph-border);margin:0 4px;"></span>
   <span style="font-size:10.5px;font-weight:700;color:var(--ph-muted);text-transform:uppercase;letter-spacing:.4px;margin-right:4px;">Type :</span>
-  <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if not type_filtre %}active{% endif %}">Tous</a>
-  <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type=medicament&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if type_filtre == 'medicament' %}active{% endif %}">
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if not type_filtre %}active{% endif %}" data-param="type" data-value="">Tous</a>
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if type_filtre == 'medicament' %}active{% endif %}" data-param="type" data-value="medicament">
     <i class="bi bi-capsule-pill"></i> Médicaments
   </a>
-  <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type=consommable&q={{ q|default:'' }}"
-     class="ph-filter-btn {% if type_filtre == 'consommable' %}active{% endif %}">
+  <a href="#" class="ph-filter-btn ph-filter-ajax {% if type_filtre == 'consommable' %}active{% endif %}" data-param="type" data-value="consommable">
     <i class="bi bi-bandaid"></i> Consommables
   </a>
   <span style="flex:1;"></span>
-  <form method="get" style="display:flex;gap:6px;align-items:center;">
-    <input type="hidden" name="pharmacie" value="{{ pharmacie }}">
-    <input type="hidden" name="statut" value="{{ statut|default:'' }}">
-    <input type="hidden" name="type" value="{{ type_filtre|default:'' }}">
-    <input type="text" name="q" value="{{ q|default:'' }}" placeholder="Rechercher…"
-      style="border:none;border-bottom:1.5px solid var(--ph-300);background:transparent;padding:4px 8px;font-size:12.5px;color:var(--ph-text);width:180px;font-family:inherit;"
-      oninput="this.form.submit()">
+  <form method="get" onsubmit="return false;" style="display:flex;gap:6px;align-items:center;">
+    <input type="text" id="search-input" value="{{ q|default:'' }}" placeholder="Rechercher…"
+      style="border:none;border-bottom:1.5px solid var(--ph-300);background:transparent;padding:4px 8px;font-size:12.5px;color:var(--ph-text);width:180px;font-family:inherit;">
     <i class="bi bi-search" style="color:var(--ph-400);font-size:13px;"></i>
   </form>
 </div>
 
 <!-- Tableau bord à bord -->
-<div style="margin-top:12px;">
+<div id="list-result" style="margin-top:12px;">
   <div style="overflow-x:auto;">
     <div style="padding:12px 20px 12px 32px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--ph-muted);background:var(--ph-50);border-bottom:1px solid var(--ph-border);">Produits en stock</div>
     <table class="ph-table-bord">
@@ -242,24 +231,38 @@
   {% if page_obj.has_other_pages %}
   <div class="ph-pagination">
     {% if page_obj.has_previous %}
-      <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page=1" class="ph-page-btn">«</a>
-      <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.previous_page_number }}" class="ph-page-btn">‹</a>
+      <a href="?statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page=1" class="ph-page-btn o-pag-btn">«</a>
+      <a href="?statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.previous_page_number }}" class="ph-page-btn o-pag-btn">‹</a>
     {% endif %}
     {% for num in page_obj.paginator.page_range %}
       {% if num == page_obj.number %}
         <span class="ph-page-btn current">{{ num }}</span>
       {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-        <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ num }}" class="ph-page-btn">{{ num }}</a>
+        <a href="?statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ num }}" class="ph-page-btn o-pag-btn">{{ num }}</a>
       {% endif %}
     {% endfor %}
     {% if page_obj.has_next %}
-      <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.next_page_number }}" class="ph-page-btn">›</a>
-      <a href="?pharmacie={{ pharmacie }}&statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.paginator.num_pages }}" class="ph-page-btn">»</a>
+      <a href="?statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.next_page_number }}" class="ph-page-btn o-pag-btn">›</a>
+      <a href="?statut={{ statut|default:'' }}&type={{ type_filtre|default:'' }}&q={{ q|default:'' }}&page={{ page_obj.paginator.num_pages }}" class="ph-page-btn o-pag-btn">»</a>
     {% endif %}
   </div>
   <div style="text-align:center;font-size:11px;color:var(--ph-muted);margin-bottom:16px;">
     Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} — {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
   </div>
   {% endif %}
-</div>
+</div><!-- /#list-result -->
+
+<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('.ph-filter-ajax');
+  if (!a) return;
+  e.preventDefault();
+  var params = new URLSearchParams(window.location.search);
+  params.delete('page');
+  if (a.dataset.value) params.set(a.dataset.param, a.dataset.value);
+  else params.delete(a.dataset.param);
+  window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+});
+</script>
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}

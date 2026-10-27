@@ -1,0 +1,167 @@
+{% load static %}<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Feuille de comptage — {{ label }}</title>
+<style>
+:root {
+  --font-print: 'Segoe UI', Arial, sans-serif; --font-mono: 'Courier New', monospace;
+  --ph-600: #4f9b4b; --ph-700: #2e592b;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family: var(--font-print); font-size:13px; color:#111; background:#fff; }
+
+@media screen {
+  body { background:#e8edf0; padding:20px; }
+  .page { background:#fff; max-width:1000px; margin:0 auto; padding:32px 40px 40px; box-shadow:0 4px 24px rgba(0,0,0,.15); border-radius:4px; }
+  .print-btn-bar { max-width:1000px; margin:0 auto 12px; text-align:right; display:flex; gap:8px; justify-content:flex-end; }
+  .print-btn { background:var(--ph-700); color:#fff; border:none; border-radius:6px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; }
+  .print-btn:hover { background:#071e28; }
+  .print-btn-back { background:#fff; color:#555; border:1px solid #ddd; border-radius:6px; padding:8px 16px; font-size:13px; font-weight:500; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+}
+
+@media print {
+  body { background:#fff; padding:0; }
+  .page { padding:10mm 12mm; width:100%; max-width:none; box-shadow:none; }
+  .no-print { display:none !important; }
+  @page { size:A4 landscape; margin:0; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+}
+
+.header { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:14px; border-bottom:3px solid var(--ph-700); margin-bottom:16px; }
+.header-left { display:flex; align-items:center; gap:14px; }
+.header-left img { width:52px; height:52px; object-fit:contain; }
+.clinic-name { font-size:16px; font-weight:800; color:var(--ph-700); }
+.clinic-sub  { font-size:11px; color:#555; margin-top:2px; }
+.header-right { text-align:right; }
+.doc-title { font-size:18px; font-weight:800; color:var(--ph-700); letter-spacing:-.3px; }
+.doc-date  { font-size:11px; color:#888; margin-top:4px; }
+
+.meta-row { display:flex; gap:24px; margin-bottom:16px; font-size:12px; flex-wrap:wrap; }
+.meta-field { display:flex; align-items:flex-end; gap:6px; }
+.meta-field .lbl { color:#888; white-space:nowrap; }
+.meta-field .fill { border-bottom:1px solid #999; min-width:140px; height:16px; }
+
+table { width:100%; border-collapse:collapse; font-size:11px; }
+thead tr { background:var(--ph-700); color:#fff; }
+thead th { padding:7px 6px; font-weight:700; font-size:9.5px; text-transform:uppercase; letter-spacing:.2px; text-align:left; }
+thead th.num { text-align:right; }
+tbody tr { border-bottom:1px solid #ddd; }
+tbody tr:nth-child(even) { background:#f7f9fa; }
+tbody td { padding:6px; vertical-align:middle; }
+.td-code { font-family: var(--font-mono); font-size:10px; color:#888; }
+.td-name { font-weight:600; }
+.td-num  { text-align:right; font-family: var(--font-mono); color:#555; }
+.td-fill { border-bottom:1px solid #999; height:14px; }
+
+.section-sep td { background:#eef2e9; font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--ph-700); padding:6px 8px; }
+
+.signature-area { display:flex; justify-content:space-between; margin-top:24px; }
+.signature-box { text-align:center; min-width:160px; }
+.signature-line { border-top:1px solid var(--ph-700); margin-top:34px; padding-top:5px; font-size:11px; color:#333; font-weight:600; }
+
+.footer { margin-top:16px; padding-top:8px; border-top:1px solid #ddd; display:flex; justify-content:space-between; font-size:10px; color:#aaa; }
+</style>
+</head>
+<body>
+
+<div class="no-print print-btn-bar">
+  <a href="{% url 'pharmacie_inventaire_nouveau' pharmacie %}" class="print-btn-back">&#8592; Retour</a>
+  <a href="{% url 'pharmacie_inventaire_feuille_comptage_excel' pharmacie %}" class="print-btn-back">&#128190; Télécharger en Excel</a>
+  <button class="print-btn" onclick="window.print()">&#128424; Imprimer / Exporter PDF</button>
+</div>
+
+<div class="page">
+
+  <div class="header">
+    <div class="header-left">
+      <img src="{% static 'img/logo.png' %}" alt="Logo WALÉ">
+      <div>
+        <div class="clinic-name">Centre Médico-Social WALÉ</div>
+        <div class="clinic-sub">{{ label }}</div>
+        <div class="clinic-sub" style="margin-top:3px;">Gestion de la pharmacie</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="doc-title">FEUILLE DE COMPTAGE</div>
+      <div class="doc-date">Éditée le {{ today|date:"d/m/Y" }}</div>
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <div class="meta-field"><span class="lbl">Date du comptage :</span><span class="fill" style="min-width:110px;"></span></div>
+    <div class="meta-field"><span class="lbl">Compté par :</span><span class="fill"></span></div>
+    <div class="meta-field"><span class="lbl">Vérifié par :</span><span class="fill"></span></div>
+    <div class="meta-field"><span class="lbl">Page</span><span class="fill" style="min-width:40px;"></span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:20px;">#</th>
+        <th>Code</th>
+        <th>Désignation du produit</th>
+        <th>N° de lot actuel</th>
+        <th>Péremption actuelle</th>
+        <th class="num">Stock système</th>
+        <th style="width:110px;">Stock réel compté</th>
+        <th>Observations</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% regroup stock_items by produit.type as items_par_type %}
+    {% for groupe in items_par_type %}
+    <tr class="section-sep"><td colspan="8">
+      {% if groupe.grouper == 'medicament' %}Médicaments
+      {% elif groupe.grouper == 'consommable' %}Consommables
+      {% else %}Équipements{% endif %}
+    </td></tr>
+    {% for sp in groupe.list %}
+    <tr>
+      <td style="color:#aaa;font-size:9.5px;text-align:center;">{{ forloop.counter }}</td>
+      <td class="td-code">{{ sp.produit.code }}</td>
+      <td class="td-name">{{ sp.produit.nom }}</td>
+      <td class="td-code">
+        {% for lot in sp.lots_disponibles %}{{ lot.numero_lot }}{% if not forloop.last %} / {% endif %}{% empty %}—{% endfor %}
+      </td>
+      <td>
+        {% for lot in sp.lots_disponibles %}{{ lot.date_peremption|date:"d/m/Y"|default:"—" }}{% if not forloop.last %} / {% endif %}{% empty %}—{% endfor %}
+      </td>
+      <td class="td-num">{{ sp.quantite|floatformat:0 }} {{ sp.produit.unite_mesure.nom }}</td>
+      <td class="td-fill"></td>
+      <td class="td-fill"></td>
+    </tr>
+    {% endfor %}
+    {% empty %}
+    <tr><td colspan="8" style="text-align:center;padding:20px;color:#aaa;font-style:italic;">Aucun produit en stock</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="signature-area">
+    <div class="signature-box">
+      <div class="signature-line">Compté par</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line">Vérifié par</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line">Le Pharmacien / Responsable</div>
+      <div style="font-size:10px;color:#888;margin-top:3px;">Nom & Signature</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Centre Médico-Social WALÉ — {{ label }}</div>
+    <div>Feuille de comptage — {{ stock_items|length }} produit{{ stock_items|length|pluralize }} — générée le {{ today|date:"d/m/Y" }}</div>
+    <div>Confidentiel — Usage interne</div>
+  </div>
+
+</div>
+</body>
+</html>

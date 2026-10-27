@@ -3,6 +3,7 @@
 {% block title %}Nouvel inventaire physique — {{ label }}{% endblock %}
 
 {% block extra_ph_css %}<style>
+{% include 'services/includes/io_styles.html' %}
 .ph-qte-field {
   border: none; border-bottom: 1.5px solid rgba(0,0,0,.15); background: transparent;
   padding: 5px 4px; font-size: 13px; text-align: center; width: 90px;
@@ -48,6 +49,15 @@
       <span class="current">Nouvel inventaire physique — {{ label }}</span>
     </div>
     <div class="action-bar-buttons">
+      <a href="{% url 'pharmacie_inventaire_feuille_comptage' pharmacie %}" class="btn-form-cancel">
+        <i class="bi bi-printer"></i> Imprimer une feuille de comptage
+      </a>
+      <a href="{% url 'pharmacie_inventaire_feuille_comptage_excel' pharmacie %}" class="btn-form-cancel">
+        <i class="bi bi-file-earmark-excel"></i> Télécharger en Excel
+      </a>
+      <button type="button" onclick="phInvOpenImportModal()" class="btn-form-cancel">
+        <i class="bi bi-upload"></i> Importer un fichier rempli
+      </button>
       <button type="submit" class="btn-form-submit">
         <i class="bi bi-save"></i> Enregistrer
       </button>
@@ -206,6 +216,43 @@
 
   </div>
 </form>
+
+<!-- Import d'une feuille de comptage remplie -->
+<div class="io-modal-backdrop" id="ph-inv-io-modal-backdrop" onclick="phInvCloseImportModal()"></div>
+<div class="io-modal" id="ph-inv-io-modal">
+  <div class="io-modal-header">
+    <span><i class="bi bi-upload"></i> Importer une feuille de comptage</span>
+    <button type="button" class="io-modal-close" onclick="phInvCloseImportModal()">×</button>
+  </div>
+  <form method="post" action="{% url 'pharmacie_inventaire_import' pharmacie %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="io-modal-body">
+      <p style="font-size:12px;color:var(--ph-muted);margin-bottom:12px;">
+        Reprenez le fichier Excel téléchargé via « Télécharger en Excel », complétez la colonne
+        <strong>Stock réel compté</strong> (et éventuellement des observations), puis importez-le ici :
+        un nouvel inventaire sera créé pour {{ label }}. Le n° de lot et la péremption affichés sont
+        juste des rappels — pour les corriger, passez par le module Stock.
+      </p>
+      <label class="io-file-label" for="ph-inv-io-file-input">
+        <i class="bi bi-cloud-upload" style="font-size:28px;color:var(--accent-text-soft);display:block;margin-bottom:6px;"></i>
+        <strong>Choisir un fichier</strong>
+        <span style="font-size:11px;color:var(--text-muted);display:block;margin-top:3px;">Excel (.xlsx), CSV ou JSON</span>
+        <input type="file" id="ph-inv-io-file-input" name="fichier" accept=".json,.csv,.xlsx,.xls" required onchange="phInvUpdateFileName(this)">
+      </label>
+      <div class="io-filename" id="ph-inv-io-filename" style="display:none;"></div>
+    </div>
+    <div class="io-modal-footer">
+      <button type="button" class="io-btn-cancel" onclick="phInvCloseImportModal()">Annuler</button>
+      <button type="submit" class="io-btn-submit"><i class="bi bi-upload"></i> Importer</button>
+    </div>
+  </form>
+</div>
+<script>
+function phInvOpenImportModal(){document.getElementById('ph-inv-io-modal-backdrop').classList.add('active');document.getElementById('ph-inv-io-modal').classList.add('active');}
+function phInvCloseImportModal(){document.getElementById('ph-inv-io-modal-backdrop').classList.remove('active');document.getElementById('ph-inv-io-modal').classList.remove('active');}
+function phInvUpdateFileName(input){var el=document.getElementById('ph-inv-io-filename');if(input.files&&input.files[0]){el.textContent=input.files[0].name;el.style.display='block';}}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')phInvCloseImportModal();});
+</script>
 {% endblock %}
 
 {% block extra_js %}

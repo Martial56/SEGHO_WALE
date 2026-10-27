@@ -210,6 +210,8 @@ def pharmacie_accueil(request):
 
 @login_required(login_url='login')
 def pharmacie_dashboard(request, pharmacie):
+    import calendar
+    from decimal import Decimal
     get_pharmacie_or_404(request, pharmacie)
     label = PHARMACIES_DICT[pharmacie]
     today = timezone.now().date()
@@ -225,9 +227,19 @@ def pharmacie_dashboard(request, pharmacie):
     )
     stats = stock_stats
 
+    valeur_stock = stock_items.aggregate(
+        v=Sum(F('quantite') * F('produit__prix_achat'))
+    )['v'] or 0
+
+    seuil_peremption = today + datetime.timedelta(days=90)
+    peremptions_proches = LotPharmacie.objects.filter(
+        pharmacie=pharmacie, quantite_actuelle__gt=0,
+        date_peremption__isnull=False, date_peremption__lte=seuil_peremption,
+    ).count()
+
     month_start = today.replace(day=1)
     ca_data = VentePharmacie.objects.filter(
-        pharmacie=pharmacie, date_vente__gte=month_start,
+        pharmacie=pharmacie, date_vente__date__gte=month_start,
     ).aggregate(ca=Sum('montant_net'), nb=Count('id'))
     ca_comptoir_mois = ca_data['ca'] or 0
     nb_ventes_mois = ca_data['nb'] or 0
@@ -235,11 +247,11 @@ def pharmacie_dashboard(request, pharmacie):
     ca_mois = ca_comptoir_mois + ca_ordonnances_mois
 
     ventes_par_mode = list(VentePharmacie.objects.filter(
-        pharmacie=pharmacie, date_vente__gte=month_start,
+        pharmacie=pharmacie, date_vente__date__gte=month_start,
     ).values('mode_paiement').annotate(total=Sum('montant_net'), nb=Count('id')).order_by('-total'))
 
     top_produits = list(LigneVente.objects.filter(
-        vente__pharmacie=pharmacie, vente__date_vente__gte=month_start,
+        vente__pharmacie=pharmacie, vente__date_vente__date__gte=month_start,
     ).values('produit__nom', 'produit__code').annotate(
         qte=Sum('quantite'), ca=Sum('montant')
     ).order_by('-qte')[:5])
@@ -260,6 +272,38 @@ def pharmacie_dashboard(request, pharmacie):
         pharmacie=pharmacie, statut='en_attente'
     ).count()
 
+    # Évolution du CA sur les 6 derniers mois (comptoir + ordonnances), pour
+    # situer le mois en cours plutôt que de le montrer seul et hors contexte.
+    MOIS_ABBR = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+    mois_labels, serie_comptoir, serie_ordonnances = [], [], []
+    for i in range(5, -1, -1):
+        y, m = today.year, today.month - i
+        while m <= 0:
+            m += 12
+            y -= 1
+        debut_mois = datetime.date(y, m, 1)
+        fin_mois = datetime.date(y, m, calendar.monthrange(y, m)[1])
+        if fin_mois > today:
+            fin_mois = today
+        comptoir = VentePharmacie.objects.filter(
+            pharmacie=pharmacie, date_vente__date__gte=debut_mois, date_vente__date__lte=fin_mois,
+        ).aggregate(ca=Sum('montant_net'))['ca'] or Decimal('0')
+        ordonnances = _recette_ordonnances(pharmacie, debut_mois, fin_mois)
+        mois_labels.append(f"{MOIS_ABBR[m]} {y}")
+        serie_comptoir.append(float(comptoir))
+        serie_ordonnances.append(float(ordonnances))
+
+    chart_evolution_ca = {'labels': mois_labels, 'comptoir': serie_comptoir, 'ordonnances': serie_ordonnances}
+    chart_top_produits = {
+        'labels': [p['produit__nom'] for p in top_produits],
+        'data':   [float(p['qte'] or 0) for p in top_produits],
+    }
+    chart_ventes_mode = {
+        'labels': [(vm['mode_paiement'] or 'Non spécifié').capitalize() for vm in ventes_par_mode],
+        'data':   [float(vm['total'] or 0) for vm in ventes_par_mode],
+    }
+
     return render(request, 'pharmacie/dashboard.html', {
         'pharmacie':           pharmacie,
         'label':               label,
@@ -275,6 +319,11 @@ def pharmacie_dashboard(request, pharmacie):
         'derniers_mvts':       derniers_mvts,
         'stock_critique':      stock_critique,
         'demandes_en_attente': demandes_en_attente,
+        'valeur_stock':        valeur_stock,
+        'peremptions_proches': peremptions_proches,
+        'chart_evolution_ca':  chart_evolution_ca,
+        'chart_top_produits':  chart_top_produits,
+        'chart_ventes_mode':   chart_ventes_mode,
         'today':               today,
     })
 
@@ -830,7 +879,9 @@ def pharmacie_demande(request, pharmacie):
     get_pharmacie_or_404(request, pharmacie)
     label    = PHARMACIES_DICT[pharmacie]
     from .models import StockPharmacie
-    produits = Produit.objects.filter(actif=True).order_by('type', 'nom')
+    from stock.models import CategorieStock
+    produits = Produit.objects.filter(actif=True).select_related('categorie').order_by('type', 'nom')
+    categories = CategorieStock.objects.filter(actif=True).order_by('nom')
     # Récupérer le stock de cette pharmacie pour chaque produit
     stock_pharmacie = {sp.produit_id: sp for sp in StockPharmacie.objects.filter(pharmacie=pharmacie)}
     produits_data = []
@@ -868,7 +919,7 @@ def pharmacie_demande(request, pharmacie):
 
     return render(request, 'pharmacie/demande.html', {
         'pharmacie': pharmacie, 'label': label,
-        'produits': produits_data, 'errors': errors,
+        'produits': produits_data, 'categories': categories, 'errors': errors,
     })
 
 
@@ -1740,6 +1791,166 @@ def pharmacie_inventaire_supprimer(request, pharmacie, pk):
     inv.delete()
     messages.success(request, f"Inventaire {numero} supprimé.")
     return redirect('pharmacie_inventaire_list', pharmacie=pharmacie)
+
+
+@login_required(login_url='login')
+def pharmacie_inventaire_print(request, pharmacie, pk):
+    """Compte-rendu imprimable d'un inventaire (en cours ou validé), avec les
+    écarts constatés — même gabarit que stock/inventaire/print.html."""
+    get_pharmacie_or_404(request, pharmacie)
+    label = PHARMACIES_DICT[pharmacie]
+    inv = get_object_or_404(InventairePharmacie, pk=pk, pharmacie=pharmacie)
+    lignes = list(inv.lignes.select_related('produit', 'produit__unite_mesure').order_by('produit__type', 'produit__nom'))
+    stats = {
+        'total':      len(lignes),
+        'excedents':  sum(1 for l in lignes if l.ecart > 0),
+        'manquants':  sum(1 for l in lignes if l.ecart < 0),
+        'neutres':    sum(1 for l in lignes if l.ecart == 0),
+    }
+    return render(request, 'pharmacie/inventaire_print.html', {
+        'pharmacie': pharmacie, 'label': label,
+        'inv': inv, 'lignes': lignes, 'stats': stats,
+        'today': timezone.now().date(),
+    })
+
+
+def _attacher_lots_pharmacie(pharmacie, stock_items):
+    """Pose `lots_disponibles` sur chaque item, comme pharmacie_inventaire_nouveau.
+    Partagé avec la feuille de comptage (écran et Excel) : l'un et l'autre
+    montrent le même lot/péremption de référence."""
+    lots_par_produit = {}
+    for lot in LotPharmacie.objects.filter(
+        pharmacie=pharmacie, produit_id__in=[sp.produit_id for sp in stock_items], quantite_actuelle__gt=0
+    ).order_by('-date_reception'):
+        lots_par_produit.setdefault(lot.produit_id, []).append(lot)
+    for sp in stock_items:
+        sp.lots_disponibles = lots_par_produit.get(sp.produit_id, [])
+    return stock_items
+
+
+@login_required(login_url='login')
+def pharmacie_inventaire_feuille_comptage(request, pharmacie):
+    """Feuille de comptage vierge : les produits en stock de cette pharmacie,
+    avec leur stock système, à imprimer et remplir à la main (ou en Excel)
+    avant de ressaisir les chiffres via 'Nouvel inventaire' ou l'import."""
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
+    get_pharmacie_or_404(request, pharmacie)
+    label = PHARMACIES_DICT[pharmacie]
+    stock_items = list(
+        StockPharmacie.objects.filter(pharmacie=pharmacie)
+        .select_related('produit', 'produit__unite_mesure').order_by('produit__type', 'produit__nom')
+    )
+    _attacher_lots_pharmacie(pharmacie, stock_items)
+    return render(request, 'pharmacie/inventaire_feuille_comptage.html', {
+        'pharmacie': pharmacie, 'label': label,
+        'stock_items': stock_items, 'today': timezone.now().date(),
+    })
+
+
+_PH_FEUILLE_COMPTAGE_HDR = [
+    'Code', 'Désignation', 'Type', 'N° de lot actuel', 'Péremption actuelle',
+    'Stock système', 'Unité', 'Stock réel compté', 'Observations',
+]
+_PH_FEUILLE_COMPTAGE_TYPE_LABEL = {'medicament': 'Médicament', 'consommable': 'Consommable', 'equipement': 'Équipement'}
+
+
+@login_required(login_url='login')
+def pharmacie_inventaire_feuille_comptage_excel(request, pharmacie):
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
+    get_pharmacie_or_404(request, pharmacie)
+    from services.views import _export_file
+    stock_items = list(
+        StockPharmacie.objects.filter(pharmacie=pharmacie)
+        .select_related('produit', 'produit__unite_mesure').order_by('produit__type', 'produit__nom')
+    )
+    _attacher_lots_pharmacie(pharmacie, stock_items)
+    rows = [
+        [sp.produit.code, sp.produit.nom, _PH_FEUILLE_COMPTAGE_TYPE_LABEL.get(sp.produit.type, sp.produit.type),
+         ' / '.join(l.numero_lot for l in sp.lots_disponibles) or '',
+         ' / '.join(l.date_peremption.strftime('%d/%m/%Y') for l in sp.lots_disponibles if l.date_peremption) or '',
+         float(sp.quantite), sp.produit.unite_mesure.nom if sp.produit.unite_mesure else '', '', '']
+        for sp in stock_items
+    ]
+    return _export_file('xlsx', f'feuille_comptage_pharmacie_{pharmacie}', _PH_FEUILLE_COMPTAGE_HDR, rows, None)
+
+
+@login_required(login_url='login')
+@require_POST
+def pharmacie_inventaire_import(request, pharmacie):
+    """Crée un inventaire de pharmacie à partir d'une feuille de comptage
+    réimportée (mêmes colonnes que pharmacie_inventaire_feuille_comptage_excel).
+    Comme pharmacie_inventaire_nouveau, chaque produit en stock reçoit une
+    ligne — une quantité manquante ou invalide retombe sur le stock système,
+    plutôt que d'exclure le produit (ce module n'a pas la notion de produit
+    volontairement omis de l'inventaire). « N° de lot actuel » et « Péremption
+    actuelle » ne sont que des rappels sur la feuille : LigneInventairePharmacie
+    ne porte pas ces champs (contrairement au stock central), ils ne sont donc
+    jamais relus ici — une correction de lot se fait depuis le module Stock."""
+    if not can_manage_pharmacie(request.user):
+        raise PermissionDenied
+    get_pharmacie_or_404(request, pharmacie)
+    upload = request.FILES.get('fichier')
+    if not upload:
+        messages.error(request, 'Veuillez sélectionner un fichier.')
+        return redirect('pharmacie_inventaire_nouveau', pharmacie=pharmacie)
+
+    from decimal import Decimal
+    from services.views import _parse_upload
+    data, err = _parse_upload(upload)
+    if err:
+        messages.error(request, err)
+        return redirect('pharmacie_inventaire_nouveau', pharmacie=pharmacie)
+    if not data:
+        messages.error(request, 'Le fichier ne contient aucune ligne exploitable.')
+        return redirect('pharmacie_inventaire_nouveau', pharmacie=pharmacie)
+
+    stock_par_code = {
+        sp.produit.code: sp for sp in
+        StockPharmacie.objects.filter(pharmacie=pharmacie).select_related('produit')
+    }
+
+    inv = InventairePharmacie.objects.create(
+        pharmacie=pharmacie, date_inventaire=timezone.now().date(),
+        notes=f"Importé depuis le fichier « {upload.name} ».",
+        cree_par=request.user,
+    )
+    nouvelles_lignes = []
+    erreurs = []
+    for i, row in enumerate(data, start=2):
+        code = str(row.get('Code') or '').strip()
+        if not code:
+            continue
+        sp = stock_par_code.get(code)
+        if sp is None:
+            erreurs.append(f"Ligne {i} : code « {code} » introuvable dans le stock de {PHARMACIES_DICT[pharmacie]} — ignorée.")
+            continue
+        val = row.get('Stock réel compté')
+        val = '' if val is None else str(val).strip()
+        try:
+            stock_reel = Decimal(str(val).replace(',', '.')) if val else sp.quantite
+        except Exception:
+            erreurs.append(f"Ligne {i} : quantité « {val} » invalide pour « {code} » — stock système conservé.")
+            stock_reel = sp.quantite
+        nouvelles_lignes.append(LigneInventairePharmacie(
+            inventaire=inv, produit=sp.produit,
+            stock_theorique=sp.quantite, stock_reel=stock_reel,
+            notes=str(row.get('Observations') or '').strip(),
+        ))
+
+    if not nouvelles_lignes:
+        inv.delete()
+        messages.warning(request, "Aucune ligne exploitable dans le fichier : aucun inventaire n'a été créé.")
+        return redirect('pharmacie_inventaire_nouveau', pharmacie=pharmacie)
+
+    LigneInventairePharmacie.objects.bulk_create(nouvelles_lignes)
+    messages.success(request, f"Inventaire {inv.numero} créé depuis le fichier importé ({len(nouvelles_lignes)} ligne(s)).")
+    for e in erreurs[:10]:
+        messages.warning(request, e)
+    if len(erreurs) > 10:
+        messages.warning(request, f"+ {len(erreurs) - 10} autre(s) ligne(s) ignorée(s).")
+    return redirect('pharmacie_inventaire_detail', pharmacie=pharmacie, pk=inv.pk)
 
 
 @login_required(login_url='login')
