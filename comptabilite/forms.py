@@ -70,6 +70,28 @@ class BailleurForm(_Champs, forms.ModelForm):
         widgets = {'adresse': forms.Textarea(attrs={'rows': 2})}
 
 
+class AssuranceForm(_Champs, forms.ModelForm):
+    """Assureur ou mutuelle, et la part qu'il prend en charge par défaut."""
+    class Meta:
+        from patients.models import Assurance
+        model = Assurance
+        fields = ['nom', 'code', 'telephone', 'taux_prise_en_charge', 'actif']
+        labels = {'nom': "Nom de l'assureur", 'telephone': 'Téléphone',
+                  'taux_prise_en_charge': 'Taux de prise en charge (%)'}
+        help_texts = {'code': "Abréviation unique (ex. MUGEFCI).",
+                      'taux_prise_en_charge': "Part de la facture payée par l'assureur, reprise par défaut "
+                                              "sur la facture d'un patient assuré."}
+
+    def clean_code(self):
+        return self.cleaned_data['code'].strip().upper()
+
+    def clean_taux_prise_en_charge(self):
+        taux = self.cleaned_data['taux_prise_en_charge']
+        if taux is not None and not 0 <= taux <= 100:
+            raise forms.ValidationError("Le taux doit être compris entre 0 et 100 %.")
+        return taux
+
+
 class ConventionForm(_Champs, forms.ModelForm):
     class Meta:
         model = Convention

@@ -162,3 +162,26 @@ def reglement_nouveau(request):
                sum((r for _, r in regles.creances(assurance)), Decimal('0')) if assurance else None),
         'modes': ReglementAssurance.MODE, 'saisie': saisie, 'aujourdhui': timezone.localdate(),
     })
+
+
+# ─── Assureurs et taux ─────────────────────────────────────────────────────────
+
+@login_required(login_url='login')
+def assureurs(request, pk=None):
+    """Liste des assureurs et mutuelles, et le formulaire d'ajout ou de modification."""
+    from patients.models import Assurance
+    from .forms import AssuranceForm
+    _exiger(request.user, 'patients.view_assurance')
+    objet = get_object_or_404(Assurance, pk=pk) if pk else None
+    form = AssuranceForm(request.POST or None, instance=objet)
+    if request.method == 'POST':
+        _exiger(request.user, 'patients.change_assurance' if objet else 'patients.add_assurance')
+        if form.is_valid():
+            a = form.save()
+            messages.success(request, f"Assureur « {a} » enregistré.")
+            return redirect('comptabilite:assureurs')
+    return render(request, 'comptabilite/assureurs.html', {
+        'form': form, 'objet': objet, 'assureurs': Assurance.objects.order_by('-actif', 'nom'),
+        'peut_ajouter': request.user.has_perm('patients.add_assurance'),
+        'peut_modifier': request.user.has_perm('patients.change_assurance'),
+    })

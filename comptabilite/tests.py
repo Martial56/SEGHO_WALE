@@ -1466,3 +1466,33 @@ class TestCloture(TestCase):
         url = reverse('comptabilite:exercice', args=[self.e2025.pk])
         self.assertEqual(client.post(url, {'action': 'cloturer', 'malgre': '1'}).status_code, 403)
         self.assertEqual(Exercice.objects.get(pk=self.e2025.pk).statut, 'ouvert')
+
+
+class TestEcranAssureurs(TestCase):
+    """« Assureurs et taux » s'ouvre dans le module, sans passer par l'admin."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_ass', password='x')
+
+    def test_ajout_modification_et_menu(self):
+        client = _client(self.admin)
+        url = reverse('comptabilite:assureurs')
+        self.assertEqual(client.get(url).status_code, 200)
+        client.post(url, {'nom': 'MUGEF-CI', 'code': 'mugef', 'telephone': '', 'taux_prise_en_charge': '80',
+                          'actif': 'on'})
+        a = Assurance.objects.get(code='MUGEF')
+        client.post(reverse('comptabilite:assureur_modifier', args=[a.pk]),
+                    {'nom': 'MUGEF-CI', 'code': 'MUGEF', 'taux_prise_en_charge': '70', 'actif': 'on'})
+        self.assertEqual(Assurance.objects.get(pk=a.pk).taux_prise_en_charge, Decimal('70'))
+        html = client.get(url).content.decode()
+        self.assertNotIn('/admin/patients/assurance/', html)
+
+    def test_taux_borne(self):
+        reponse = _client(self.admin).post(reverse('comptabilite:assureurs'),
+                                           {'nom': 'X', 'code': 'X', 'taux_prise_en_charge': '120'})
+        self.assertContains(reponse, 'entre 0 et 100')
+        self.assertFalse(Assurance.objects.filter(code='X').exists())
+
+    def test_reserve(self):
+        user = User.objects.create_user('sans_droit', password='x')
+        self.assertEqual(_client(user).get(reverse('comptabilite:assureurs')).status_code, 403)
