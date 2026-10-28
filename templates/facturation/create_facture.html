@@ -770,6 +770,30 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
                 </select>
             </div>
 
+            {% comment %}Mobile Money : l'opérateur et le n° de transaction sont
+            exigés (voir _handle_paiement) ; le script plus bas ne les montre
+            que sur ce mode.{% endcomment %}
+            <div id="pay-mm-wrap" style="display:none;">
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Opérateur <span style="color:#dc2626;">*</span></label>
+                {% if operateurs_mobile %}
+                <select id="pay-operateur" class="field-ul" data-ts-body data-ts-nosearch>
+                    {% for o in operateurs_mobile %}<option value="{{ o.pk }}">{{ o.libelle }}</option>{% endfor %}
+                </select>
+                {% else %}
+                <div style="font-size:12px; color:var(--rose-text);">Aucun opérateur configuré (Comptabilité → Trésorerie → Comptes de trésorerie).</div>
+                {% endif %}
+            </div>
+
+            <div id="pay-transaction-wrap" style="display:none;">
+                <label style="font-size:11px; font-weight:700; text-transform:uppercase;
+                               letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">N° de transaction <span style="color:#dc2626;">*</span></label>
+                <input type="text" id="pay-transaction" placeholder="Code reçu par SMS"
+                       style="width:100%; background:transparent; border:none;
+                              border-bottom:1.5px solid var(--border-strong); padding:5px 2px;
+                              font-size:13px; font-family:inherit; outline:none; color:var(--text);">
+            </div>
+
             <div>
                 <label style="font-size:11px; font-weight:700; text-transform:uppercase;
                                letter-spacing:.06em; color:var(--text-muted); display:block; margin-bottom:6px;">Montant</label>
@@ -1135,6 +1159,17 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
         addHidden('pay_recu',    document.getElementById('pay-recu').value);
         addHidden('pay_mode',    document.getElementById('pay-mode').value);
         addHidden('pay_memo',    document.getElementById('pay-memo').value);
+        if (document.getElementById('pay-mode').value === 'mobile_money') {
+            var operateur = document.getElementById('pay-operateur');
+            var transaction = document.getElementById('pay-transaction').value.trim();
+            if (!operateur || !transaction) {
+                alert(operateur ? 'Saisissez le n° de la transaction Mobile Money.'
+                                : "Aucun opérateur Mobile Money n'est configuré.");
+                return;
+            }
+            addHidden('pay_operateur',   operateur.value);
+            addHidden('pay_transaction', transaction);
+        }
 
         form.submit();
     };
@@ -1202,7 +1237,15 @@ html[data-theme="dark"] .svc-input::placeholder { color: var(--text-muted); opac
 
   function estEspeces() { return mode.value === 'especes'; }
 
+  /* Mobile Money : opérateur et n° de transaction, sur ce mode seul. */
+  function majMobileMoney() {
+    var mobile = mode.value === 'mobile_money';
+    document.getElementById('pay-mm-wrap').style.display          = mobile ? '' : 'none';
+    document.getElementById('pay-transaction-wrap').style.display = mobile ? '' : 'none';
+  }
+
   function majMonnaie() {
+    majMobileMoney();
     if (!recu || !monnaie) return;
     var especes = estEspeces();
     document.getElementById('pay-recu-wrap').style.display    = especes ? '' : 'none';

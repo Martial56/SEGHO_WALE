@@ -56,7 +56,7 @@ def recettes(debut, fin, params):
     from .models import Avoir, SortieCaisse
 
     paiements = list(Paiement.objects.filter(date_paiement__date__range=[debut, fin])
-                     .select_related('caisse', 'facture'))
+                     .select_related('caisse', 'facture', 'operateur'))
     libelles_modes = dict(Paiement.MODE)
     libelles_types = dict(Facture.TYPE)
 
@@ -80,13 +80,17 @@ def recettes(debut, fin, params):
     t1 = _tableau('Encaissements par jour et par caisse',
                   [('Jour', 'texte')] + [(c, 'montant') for c in caisses] + [('Total', 'montant')], lignes)
 
-    # Par mode
-    par_mode = OrderedDict((code, [0, ZERO]) for code, _ in Paiement.MODE)
+    # Par mode, le Mobile Money détaillé par opérateur
+    from .caisse import mode_detaille
+    ordre = [code for code, _ in Paiement.MODE]
+    par_mode = {}
     for p in paiements:
-        par_mode.setdefault(p.mode_paiement, [0, ZERO])
-        par_mode[p.mode_paiement][0] += 1
-        par_mode[p.mode_paiement][1] += p.montant
-    lignes = [_ligne(libelles_modes.get(code, code), n, m) for code, (n, m) in par_mode.items() if n]
+        cle, libelle = mode_detaille(p, libelles_modes)
+        ligne = par_mode.setdefault(cle, [p.mode_paiement, libelle, 0, ZERO])
+        ligne[2] += 1
+        ligne[3] += p.montant
+    lignes = [_ligne(libelle, n, m) for code, libelle, n, m in
+              sorted(par_mode.values(), key=lambda l: (ordre.index(l[0]) if l[0] in ordre else 99, l[1]))]
     if lignes:
         lignes.append(_ligne('Total', len(paiements), sum((p.montant for p in paiements), ZERO), type_='total'))
     t2 = _tableau('Encaissements par mode de paiement',

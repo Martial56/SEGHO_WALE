@@ -318,6 +318,16 @@ class Paiement(ModeleCentre):
     montant_recu = models.DecimalField(
         max_digits=15, decimal_places=2, null=True, blank=True,
         verbose_name="Montant reçu")
+    # Opérateur d'un paiement Mobile Money (Wave, Orange Money, MoMo…) : un
+    # compte de trésorerie par opérateur, pour savoir à la clôture ce qui est
+    # arrivé sur chaque compte marchand et le rapprocher de son relevé. Vide
+    # sur les autres modes, et sur les paiements antérieurs à ce choix.
+    operateur = models.ForeignKey(
+        'comptabilite.CompteTresorerie', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='paiements', verbose_name="Opérateur Mobile Money",
+        limit_choices_to={'type': 'mobile_money'})
+    # N° de transaction de l'opérateur pour un paiement Mobile Money ; le
+    # mémo de la caissière pour les autres modes.
     reference = models.CharField(max_length=100, blank=True)
     date_paiement = models.DateTimeField(auto_now_add=True)
     recu_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

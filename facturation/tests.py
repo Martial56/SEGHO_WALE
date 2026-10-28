@@ -7,6 +7,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 
+from comptabilite.models import CompteTresorerie
 from patients.models import Patient
 
 from .models import Acte, Caisse, Facture, LigneFacture, Paiement
@@ -1175,7 +1176,9 @@ class TestMonnaieARendre(TestCase):
         client.login(username='u_mon_caisse', password='x')
         client.post(reverse('facturation:payer', args=[facture.pk]),
                     {'pay_journal': str(self.caisse.pk), 'pay_montant': '2000',
-                     'pay_mode': 'mobile_money', 'pay_recu': '5000'})
+                     'pay_mode': 'mobile_money', 'pay_recu': '5000',
+                     'pay_operateur': CompteTresorerie.objects.get(libelle='Wave').pk,
+                     'pay_transaction': 'TX-RECU-1'})
         self.assertIsNone(Paiement.objects.get(facture=facture).montant_recu)
 
     def test_une_saisie_illisible_n_empeche_pas_l_encaissement(self):

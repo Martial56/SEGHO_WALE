@@ -255,7 +255,11 @@ def ecriture_paiement(paiement):
     if paiement.reglement_assurance_id:
         return None          # compté avec le règlement de l'assureur (ecriture_reglement)
     facture = paiement.facture
-    tresorerie, journal_ = _tresorerie(paiement.mode_paiement, paiement.caisse)
+    if paiement.operateur_id:
+        # Mobile Money : sur le compte de l'opérateur (Wave, Orange Money…).
+        tresorerie, journal_ = paiement.operateur.compte, journal('MM')
+    else:
+        tresorerie, journal_ = _tresorerie(paiement.mode_paiement, paiement.caisse)
     tiers = _nom_patient(facture)
     return creer_ecriture(journal_, _jour(paiement.date_paiement),
                           f'Encaissement {paiement.numero} — facture {facture.numero}',
@@ -433,7 +437,7 @@ def generer(debut, fin):
             continue
         taches.append((f'Facture {f.numero}', ecriture_facture, f))
     for p in (Paiement.all_objects.filter(date_paiement__date__range=[debut, fin])
-              .select_related('facture__patient', 'caisse')):
+              .select_related('facture__patient', 'caisse', 'operateur__compte')):
         taches.append((f'Paiement {p.numero}', ecriture_paiement, p))
     for a in (Avoir.all_objects.filter(date_creation__date__range=[debut, fin])
               .select_related('facture__patient', 'session__journee__caisse')):

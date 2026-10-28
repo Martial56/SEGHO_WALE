@@ -145,6 +145,17 @@ def ouvrir_session(user, caisse, fonds_initial):
 
 # ─── Résumer ───────────────────────────────────────────────────────────────────
 
+def mode_detaille(paiement, libelles_modes):
+    """(clé, libellé) du mode d'un paiement, le Mobile Money détaillé par
+    opérateur : « Mobile Money — Wave », « Mobile Money — Orange Money »…"""
+    libelle = libelles_modes.get(paiement.mode_paiement, paiement.mode_paiement)
+    if paiement.mode_paiement != 'mobile_money':
+        return paiement.mode_paiement, libelle
+    if paiement.operateur_id:
+        return f'mobile_money:{paiement.operateur_id}', f'{libelle} — {paiement.operateur.libelle}'
+    return 'mobile_money:', f'{libelle} (opérateur non précisé)'
+
+
 def resume_session(session):
     """Ce que la caissière a encaissé, et les espèces qu'elle doit avoir.
 
@@ -159,16 +170,15 @@ def resume_session(session):
     from .models import Avoir, SortieCaisse
 
     paiements = list(Paiement.all_objects.filter(session=session)
-                     .select_related('facture__patient').order_by('date_paiement'))
+                     .select_related('facture__patient', 'operateur').order_by('date_paiement'))
     libelles_modes = dict(Paiement.MODE)
     libelles_types = dict(Facture.TYPE)
 
     par_mode, par_nature = {}, {}
     especes = ZERO
     for p in paiements:
-        ligne = par_mode.setdefault(p.mode_paiement, {
-            'code': p.mode_paiement, 'libelle': libelles_modes.get(p.mode_paiement, p.mode_paiement),
-            'montant': ZERO, 'nb': 0})
+        cle, libelle = mode_detaille(p, libelles_modes)
+        ligne = par_mode.setdefault(cle, {'code': p.mode_paiement, 'libelle': libelle, 'montant': ZERO, 'nb': 0})
         ligne['montant'] += p.montant
         ligne['nb'] += 1
         nature = libelles_types.get(p.facture.type_facture, p.facture.type_facture)
@@ -185,7 +195,8 @@ def resume_session(session):
     sorties_en_attente = [s for s in sorties if s.statut == 'en_attente']
 
     ordre = [code for code, _ in Paiement.MODE]
-    modes = sorted(par_mode.values(), key=lambda m: ordre.index(m['code']) if m['code'] in ordre else 99)
+    modes = sorted(par_mode.values(), key=lambda m: (ordre.index(m['code']) if m['code'] in ordre else 99,
+                                                      m['libelle']))
     autres = sum((m['montant'] for m in modes if m['code'] != 'especes'), ZERO)
     return {
         'paiements': paiements,
@@ -343,6 +354,19 @@ def resume_journee(journee):
         totaux['compte'] += session.montant_compte or ZERO
         totaux['ecart'] += session.ecart or ZERO
     totaux['total_encaisse'] = totaux['especes'] + totaux['autres']
+    # Toute la caisse, par mode : ce que le superviseur compare au compte
+    # marchand de chaque opérateur Mobile Money.
+    par_mode = {}
+    for l in lignes:
+        for m in l['resume']['par_mode']:
+            cumul = par_mode.setdefault(m['libelle'], {'code': m['code'], 'libelle': m['libelle'],
+                                                       'nb': 0, 'montant': ZERO})
+            cumul['nb'] += m['nb']
+            cumul['montant'] += m['montant']
+    from facturation.models import Paiement
+    ordre = [code for code, _ in Paiement.MODE]
+    totaux['par_mode'] = sorted(par_mode.values(), key=lambda m: (
+        ordre.index(m['code']) if m['code'] in ordre else 99, m['libelle']))
     return {'lignes': lignes, 'totaux': totaux,
             'toutes_closes': all(not l['session'].est_ouverte for l in lignes)}
 

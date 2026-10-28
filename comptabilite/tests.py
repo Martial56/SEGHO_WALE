@@ -51,9 +51,13 @@ def _annulable(user):
     return _perm(user, 'facturation', 'can_annuler_facture')
 
 
-def _payer(user, facture, montant, mode='especes'):
-    return _client(user).post(reverse('facturation:payer', args=[facture.pk]),
-                              {'pay_montant': str(montant), 'pay_mode': mode})
+def _payer(user, facture, montant, mode='especes', operateur='Wave', transaction=None):
+    donnees = {'pay_montant': str(montant), 'pay_mode': mode}
+    if mode == 'mobile_money':
+        from .models import CompteTresorerie
+        donnees['pay_operateur'] = CompteTresorerie.objects.get(libelle=operateur).pk
+        donnees['pay_transaction'] = transaction or f'TX-{facture.pk}-{montant}'
+    return _client(user).post(reverse('facturation:payer', args=[facture.pk]), donnees)
 
 
 class TestOuverture(TestCase):
@@ -587,7 +591,8 @@ class TestEcrituresAutomatiques(TestCase):
         _payer(self.awa, facture, 5000, mode='mobile_money')
         ecriture = moteur.ecriture_paiement(Paiement.objects.get(facture=facture))
         self.assertEqual(ecriture.journal.code, 'MM')
-        self.assertEqual(_lignes(ecriture)['552'], (Decimal('5000'), 0))
+        # Sur le sous-compte de l'opérateur choisi à l'encaissement.
+        self.assertEqual(_lignes(ecriture)['5521'], (Decimal('5000'), 0))
 
     def test_avoir_et_remboursement(self):
         facture = _facture(Decimal('5000'))
@@ -1099,7 +1104,8 @@ class TestTresorerie(TestCase):
 
     def test_comptes_de_tresorerie_de_depart(self):
         self.assertEqual(self.banque.compte.numero, '521')
-        self.assertEqual(CompteTresorerie.objects.get(libelle='Mobile Money').compte.numero, '552')
+        operateurs = {c.libelle: c.compte.numero for c in CompteTresorerie.objects.filter(type='mobile_money', actif=True)}
+        self.assertEqual(operateurs, {'Wave': '5521', 'Orange Money': '5522', 'MoMo': '5523'})
 
     def test_remise_en_banque(self):
         remise = treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin, 'BV-1')
@@ -1258,10 +1264,10 @@ class TestAchats(TestCase):
 
     def test_reglement_depuis_un_compte_choisi(self):
         f = self._facture()
-        mm = CompteTresorerie.objects.get(libelle='Mobile Money')
+        mm = CompteTresorerie.objects.get(libelle='Orange Money')
         r = achats.regler(f, Decimal('1000'), self.jour, 'mobile_money', self.admin, compte_tresorerie=mm)
         e = Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')
-        self.assertEqual((e.journal.code, _lignes(e)['552']), ('MM', (Decimal('0'), Decimal('1000'))))
+        self.assertEqual((e.journal.code, _lignes(e)['5522']), ('MM', (Decimal('0'), Decimal('1000'))))
 
     def test_compte_hors_charges_refuse(self):
         f = FactureFournisseur(fournisseur='X', date=self.jour)
@@ -1496,3 +1502,75 @@ class TestEcranAssureurs(TestCase):
     def test_reserve(self):
         user = User.objects.create_user('sans_droit', password='x')
         self.assertEqual(_client(user).get(reverse('comptabilite:assureurs')).status_code, 403)
+
+
+class TestOperateursMobileMoney(TestCase):
+    """Un paiement Mobile Money dit par quel opérateur il est arrivé."""
+
+    def setUp(self):
+        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.awa = _caissiere('awa_mm')
+        self.session = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+
+    def test_operateur_et_transaction_exiges(self):
+        facture = _facture(Decimal('3000'))
+        client = _client(self.awa)
+        url = reverse('facturation:payer', args=[facture.pk])
+        client.post(url, {'pay_montant': '3000', 'pay_mode': 'mobile_money', 'pay_transaction': 'TX1'})
+        client.post(url, {'pay_montant': '3000', 'pay_mode': 'mobile_money',
+                          'pay_operateur': CompteTresorerie.objects.get(libelle='Wave').pk, 'pay_transaction': ' '})
+        self.assertFalse(Paiement.objects.filter(facture=facture).exists())
+        _payer(self.awa, facture, 3000, mode='mobile_money', operateur='Orange Money', transaction='OM-778')
+        p = Paiement.objects.get(facture=facture)
+        self.assertEqual((p.operateur.libelle, p.reference), ('Orange Money', 'OM-778'))
+
+    def test_meme_transaction_refusee(self):
+        _payer(self.awa, _facture(Decimal('1000')), 1000, mode='mobile_money', transaction='WV-1')
+        doublon = _facture(Decimal('1000'))
+        _payer(self.awa, doublon, 1000, mode='mobile_money', transaction='wv-1')
+        self.assertFalse(Paiement.objects.filter(facture=doublon).exists())
+        # Le même numéro chez un autre opérateur est une autre transaction.
+        _payer(self.awa, doublon, 1000, mode='mobile_money', operateur='MoMo', transaction='WV-1')
+        self.assertTrue(Paiement.objects.filter(facture=doublon).exists())
+
+    def test_operateur_inactif_refuse(self):
+        CompteTresorerie.objects.filter(libelle='Wave').update(actif=False)
+        facture = _facture(Decimal('1000'))
+        _payer(self.awa, facture, 1000, mode='mobile_money')
+        self.assertFalse(Paiement.objects.filter(facture=facture).exists())
+
+    def test_bilan_de_session_et_journee_par_operateur(self):
+        _payer(self.awa, _facture(Decimal('2000')), 2000, mode='mobile_money', operateur='Wave')
+        _payer(self.awa, _facture(Decimal('3000')), 3000, mode='mobile_money', operateur='Wave')
+        _payer(self.awa, _facture(Decimal('1500')), 1500, mode='mobile_money', operateur='Orange Money')
+        _payer(self.awa, _facture(Decimal('4000')), 4000)
+        modes = {m['libelle']: (m['nb'], m['montant']) for m in regles.resume_session(self.session)['par_mode']}
+        self.assertEqual(modes, {'Espèces': (1, Decimal('4000')),
+                                 'Mobile Money — Wave': (2, Decimal('5000')),
+                                 'Mobile Money — Orange Money': (1, Decimal('1500'))})
+        journee = regles.resume_journee(self.session.journee)
+        self.assertEqual([m['libelle'] for m in journee['totaux']['par_mode']],
+                         ['Espèces', 'Mobile Money — Orange Money', 'Mobile Money — Wave'])
+        admin = User.objects.create_superuser('admin_mm', password='x')
+        html = _client(admin).get(reverse('comptabilite:journee', args=[self.session.journee.pk])).content.decode()
+        self.assertIn('Mobile Money — Wave', html)
+
+    def test_ancien_paiement_sans_operateur(self):
+        p = Paiement.objects.create(facture=_facture(Decimal('1000')), montant=Decimal('1000'),
+                                    mode_paiement='mobile_money', session=self.session, caisse=self.caisse)
+        self.assertEqual(_lignes(moteur.ecriture_paiement(p))['552'], (Decimal('1000'), 0))
+        libelles = [m['libelle'] for m in regles.resume_session(self.session)['par_mode']]
+        self.assertEqual(libelles, ['Mobile Money (opérateur non précisé)'])
+
+    def test_etat_des_recettes(self):
+        _payer(self.awa, _facture(Decimal('2500')), 2500, mode='mobile_money', operateur='MoMo')
+        jour = timezone.localdate()
+        etat = ETATS['recettes']['fonction'](jour, jour, {})
+        par_mode = {l['cellules'][0]: l['cellules'][2] for l in etat['tableaux'][1]['lignes'] if l['type'] == 'ligne'}
+        self.assertEqual(par_mode, {'Mobile Money — MoMo': Decimal('2500')})
+
+    def test_ecrans_d_encaissement(self):
+        facture = _facture(Decimal('1000'))
+        html = _client(self.awa).get(reverse('facturation:detail', args=[facture.pk])).content.decode()
+        self.assertIn('name="pay_operateur"', html)
+        self.assertIn('Orange Money', html)

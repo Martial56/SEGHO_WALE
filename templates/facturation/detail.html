@@ -761,6 +761,29 @@ html[data-theme="dark"] .fac-ro-field.grey-field { background: rgba(255,255,255,
               {% endfor %}
             </select>
           </div>
+          {% comment %}Mobile Money : l'opérateur et le n° de transaction sont
+          exigés (voir _handle_paiement). Le script en bas de page ne les
+          montre que sur ce mode.{% endcomment %}
+          <div id="pay-mm-wrap" style="display:none;">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              Opérateur <span style="color:#dc2626;">*</span>
+            </label>
+            {% if operateurs_mobile %}
+            <select name="pay_operateur" id="pay-operateur" class="field-ul" data-ts-body data-ts-nosearch>
+              {% for o in operateurs_mobile %}<option value="{{ o.pk }}">{{ o.libelle }}</option>{% endfor %}
+            </select>
+            {% else %}
+            <div style="font-size:12px;color:var(--rose-text);">Aucun opérateur configuré (Comptabilité → Trésorerie → Comptes de trésorerie).</div>
+            {% endif %}
+          </div>
+          <div id="pay-transaction-wrap" style="display:none;">
+            <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
+              N° de transaction <span style="color:#dc2626;">*</span>
+            </label>
+            <input type="text" name="pay_transaction" id="pay-transaction"
+              style="width:100%;padding:8px 10px;border:1.5px solid var(--border);border-radius:5px;font-size:13px;font-family: var(--font-mono);background:var(--bg);color:var(--text);"
+              placeholder="Code reçu par SMS">
+          </div>
           <!-- Montant -->
           <div>
             <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:5px;">
@@ -926,7 +949,16 @@ document.querySelectorAll('.fac-tab-btn').forEach(function(btn){
     majMonnaie();
   }
 
+  /* Mobile Money : opérateur et n° de transaction, exigés sur ce mode seul. */
+  function majMobileMoney() {
+    var mobile = mode.value === 'mobile_money';
+    document.getElementById('pay-mm-wrap').style.display          = mobile ? '' : 'none';
+    document.getElementById('pay-transaction-wrap').style.display = mobile ? '' : 'none';
+    document.getElementById('pay-transaction').required = mobile;
+  }
+
   function majMonnaie() {
+    majMobileMoney();
     if (!recu || !monnaie) return;
     var especes = mode.value === 'especes';
     document.getElementById('pay-recu-wrap').style.display    = especes ? '' : 'none';

@@ -373,6 +373,7 @@ def facture_create(request):
         'services':             services,
         'caisses':              caisses,
         'modes_paiement':       Paiement.MODE,
+        'operateurs_mobile':    operateurs_mobile_money(),
         'rdv':                  rdv_obj,
         'demande':              demande_obj,
         'ordonnance':           ordonnance_obj,
@@ -415,6 +416,7 @@ def facture_detail(request, pk):
         # base. Elle lit désormais les mêmes caisses que l'écran de création.
         'caisses':   _caisses_de_la_session(request.user),
         'modes_paiement': Paiement.MODE,
+        'operateurs_mobile': operateurs_mobile_money(),
         'back_url':  back_url,
         'avoirs':    facture.avoirs.select_related('cree_par', 'session__journee__caisse'),
     })
@@ -680,6 +682,7 @@ def facture_edit(request, pk):
         'services':      services,
         'caisses':       caisses,
         'modes_paiement': Paiement.MODE,
+        'operateurs_mobile': operateurs_mobile_money(),
         'initial_lignes': initial_lignes,
         'is_admin':      is_admin,
         'edit':          True,
@@ -1080,6 +1083,31 @@ def _examens_non_payes(demande):
     return {l.pk for l in demande.lignes.all() if l.pk not in payees}
 
 
+def operateurs_mobile_money():
+    """Comptes Mobile Money proposés à l'encaissement (Trésorerie → Comptes de trésorerie)."""
+    from comptabilite.models import CompteTresorerie
+    return list(CompteTresorerie.objects.filter(type='mobile_money', actif=True).order_by('libelle'))
+
+
+def _operateur_mobile_money(POST):
+    """(opérateur, n° de transaction, erreur) lus du formulaire d'encaissement."""
+    from comptabilite.models import CompteTresorerie
+    operateur = CompteTresorerie.objects.filter(
+        pk=POST.get('pay_operateur') or None, type='mobile_money', actif=True).first()
+    if operateur is None:
+        return None, '', "choisissez l'opérateur Mobile Money (Wave, Orange Money, MoMo…)."
+    transaction_mm = (POST.get('pay_transaction') or '').strip()
+    if not transaction_mm:
+        return None, '', f"saisissez le n° de la transaction {operateur.libelle}."
+    # Le même n° de transaction ne paie pas deux fois : une capture d'écran
+    # présentée deux fois, ou un double clic, serait comptée en double.
+    deja = Paiement.all_objects.filter(operateur=operateur, reference__iexact=transaction_mm).first()
+    if deja:
+        return None, '', (f"la transaction {operateur.libelle} {transaction_mm} a déjà été enregistrée "
+                          f"(paiement {deja.numero}).")
+    return operateur, transaction_mm, ''
+
+
 def _handle_paiement(facture, POST, user, total, request=None):
     if not can_manage_paiement(user):
         return facture
@@ -1124,6 +1152,18 @@ def _handle_paiement(facture, POST, user, total, request=None):
     # déjà toujours sur le mémo.
     reference = memo
 
+    # Mobile Money : l'opérateur (Wave, Orange Money, MoMo…) et le n° de la
+    # transaction sont exigés — sans eux, la clôture ne dit pas sur quel compte
+    # marchand l'argent est arrivé, et le relevé ne se rapproche pas.
+    operateur = None
+    if mode == 'mobile_money':
+        operateur, transaction_mm, erreur = _operateur_mobile_money(POST)
+        if erreur:
+            if request is not None:
+                messages.error(request, "Paiement non enregistré — " + erreur)
+            return facture
+        reference = transaction_mm
+
     Paiement.objects.create(
         facture=facture,
         montant=pay_montant,
@@ -1131,6 +1171,7 @@ def _handle_paiement(facture, POST, user, total, request=None):
         caisse=session.caisse,
         session=session,
         montant_recu=_montant_recu(POST, mode),
+        operateur=operateur,
         reference=reference,
         notes=memo,
         recu_par=user,

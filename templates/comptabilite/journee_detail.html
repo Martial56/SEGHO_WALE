@@ -36,6 +36,18 @@
     <div class="cpt-kpi accent"><div class="l">Écart total</div><div class="v {% if t.ecart < 0 %}ecart-neg{% elif t.ecart > 0 %}ecart-pos{% else %}ecart-nul{% endif %}">{{ t.ecart|floatformat:0|intcomma }} F</div></div>
   </div>
 
+  {% if t.par_mode %}
+  <div class="cpt-card">
+    <h2>Par mode de paiement</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Mode</th><th class="num">Nb</th><th class="num">Montant</th></tr></thead>
+      <tbody>{% for m in t.par_mode %}<tr><td>{{ m.libelle }}</td><td class="num">{{ m.nb }}</td><td class="num">{{ m.montant|floatformat:0|intcomma }} F</td></tr>{% endfor %}</tbody>
+      <tfoot><tr><td>Total</td><td class="num">{{ t.nb_paiements }}</td><td class="num">{{ t.total_encaisse|floatformat:0|intcomma }} F</td></tr></tfoot>
+    </table>
+    <div class="cpt-note" style="margin-top:6px;">Le Mobile Money est détaillé par opérateur : comparez chaque montant à ce qu'affiche son compte marchand.</div>
+  </div>
+  {% endif %}
+
   <div class="cpt-card">
     <h2>Par caissière</h2>
     {% if resume.lignes %}
