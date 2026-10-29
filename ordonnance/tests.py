@@ -352,6 +352,89 @@ class TestListeDesOrdonnances(TestCase):
         self.assertIn('Sirop répertorié', page)
         self.assertIn('Pommade achetée dehors', page)
 
+    def test_le_script_de_liste_n_est_pose_qu_une_fois(self):
+        """`{% block extra_js %}` vivait à l'intérieur de `{% block content %}`.
+
+        Un bloc déclaré là se rend deux fois — à sa place imbriquée et à
+        l'emplacement prévu par le gabarit parent — ce qui posait deux écouteurs
+        de recherche et deux temporisations concurrentes.
+        """
+        page = self.client.get(reverse('ordonnance_list')).content.decode()
+        self.assertEqual(page.count('window.lancerRecherche = lancerRecherche'), 1)
+
+    def test_les_zones_echangees_en_ajax_existent(self):
+        """page_js.html remplace trois régions par leur identifiant : sans elles
+        la recherche et les filtres ne rafraîchissent rien."""
+        page = self.client.get(reverse('ordonnance_list')).content.decode()
+        for marqueur in ('id="subheader-controls"', 'id="list-stats"', 'id="list-result"'):
+            self.assertEqual(page.count(marqueur), 1, marqueur)
+
+
+class TestFiltresCumulablesDesOrdonnances(TestCase):
+    """Deux valeurs d'une même famille s'additionnent, deux familles se croisent.
+
+    L'ancien menu était fait de liens qui recomposaient l'URL à la main, avec un
+    seul `statut=` : choisir « Délivrée » effaçait « Émise ». La brique
+    core.listing combine les valeurs d'une famille en OU et les familles en ET.
+    """
+
+    def setUp(self):
+        from patients.models import Patient
+
+        self.centre = Centre.objects.get_or_create(
+            code='WALE', defaults={'nom': 'CMS WALE Yamoussoukro'})[0]
+        self.user = User.objects.create_superuser('su_filtres', password='x')
+        profil = self.user.profile
+        profil.centres.add(self.centre)
+        profil.centre_actif = self.centre
+        profil.save(update_fields=['centre_actif'])
+        self.client = Client()
+        self.client.force_login(self.user)
+
+        patient = Patient.objects.create(
+            nom='TestFiltre', prenoms='Patient', date_naissance='1980-03-03',
+            sexe='M', telephone='0700000004', centre=self.centre)
+        # `date_emission` est en auto_now_add : les trois tombent aujourd'hui,
+        # donc dans la période par défaut de la liste.
+        self.emise = Ordonnance.objects.create(
+            patient=patient, statut='emise', type_ordonnance='interne')
+        self.delivree = Ordonnance.objects.create(
+            patient=patient, statut='delivree', type_ordonnance='interne')
+        self.expiree = Ordonnance.objects.create(
+            patient=patient, statut='expiree', type_ordonnance='externe')
+
+    def _total(self, params=''):
+        """Le compteur « Total » de la carte, qui porte sur toute la sélection."""
+        page = self.client.get(reverse('ordonnance_list') + params).content.decode()
+        # Depuis le balisage de la carte, et non du premier « c-total »
+        # rencontré : la feuille de style en tête de page en porte un aussi.
+        debut = page.index('class="fac-stat-card c-total"')
+        extrait = page[debut:debut + 400]
+        valeur = extrait.split('fac-stat-value">')[1].split('<')[0]
+        return int(valeur)
+
+    def test_une_seule_valeur(self):
+        self.assertEqual(self._total('?filter=statut_emise'), 1)
+
+    def test_deux_valeurs_de_la_meme_famille_s_additionnent(self):
+        self.assertEqual(
+            self._total('?filter=statut_emise&filter=statut_delivree'), 2)
+
+    def test_deux_familles_se_croisent(self):
+        """Émise OU Délivrée, et de type interne : les trois le sont, mais
+        l'expirée est externe — elle tombe par l'une comme par l'autre."""
+        self.assertEqual(
+            self._total('?filter=statut_emise&filter=statut_delivree'
+                        '&filter=type_interne'), 2)
+        self.assertEqual(
+            self._total('?filter=statut_expiree&filter=type_interne'), 0)
+
+    def test_la_recherche_trouve_un_patient_sans_consultation(self):
+        """Une ordonnance libre porte son patient sur `patient`, pas sur
+        `consultation.patient`. L'ancienne recherche n'interrogeait que le
+        second chemin : ces ordonnances étaient introuvables par nom."""
+        self.assertEqual(self._total('?q=TestFiltre&filter=annee'), 3)
+
 
 class TestToutesLesPagesDuModule(TestCase):
     """Chaque écran du module s'ouvre — le filet qui manquait.
