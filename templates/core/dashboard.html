@@ -209,14 +209,24 @@ html[data-theme="dark"] .module-sub { color: var(--text-muted); }
     </a>
     {% endif %}
 
+    {% if 'caisse' in accessible_codes %}
+    <a href="{% if pastilles.caisse %}{{ pastilles.caisse.url }}{% else %}{% url 'facturation:list' %}{% endif %}" class="module-card">
+      {% if pastilles.caisse %}<span class="module-pastille" data-pastille="caisse" title="{{ pastilles.caisse.total }} {{ pastilles.caisse.libelle }}">{{ pastilles.caisse.total }}</span>{% endif %}
+      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/sans-contact.png' %}" alt="Caisse" style="width:80%;height:80%;object-fit:contain;">
+      </div>
+      <div class="module-name">Caisse</div>
+      <div class="module-sub" data-stat-factures>{% if stats.factures_impayees > 0 %}<span data-stat="factures_impayees">{{ stats.factures_impayees }}</span> impayée(s){% else %}À jour{% endif %}</div>
+    </a>
+    {% endif %}
+
     {% if 'facturation' in accessible_codes %}
-    <a href="{% if pastilles.facturation %}{{ pastilles.facturation.url }}{% else %}{% url 'facturation:list' %}{% endif %}" class="module-card">
-      {% if pastilles.facturation %}<span class="module-pastille" data-pastille="facturation" title="{{ pastilles.facturation.total }} {{ pastilles.facturation.libelle }}">{{ pastilles.facturation.total }}</span>{% endif %}
+    <a href="{% url 'comptabilite:accueil' %}" class="module-card">
       <div class="module-icon-box ic-teal" style="padding:0;overflow:hidden;">
         <img src="{% static 'img/compp.png' %}" alt="Comptabilité" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
       </div>
       <div class="module-name">Comptabilité</div>
-      <div class="module-sub" data-stat-factures>{% if stats.factures_impayees > 0 %}<span data-stat="factures_impayees">{{ stats.factures_impayees }}</span> impayée(s){% else %}À jour{% endif %}</div>
+      <div class="module-sub">Ventes, écritures, états</div>
     </a>
     {% endif %}
 

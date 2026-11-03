@@ -1,0 +1,64 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Documents des ventes{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.dv-filtres { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.dv-filtres .cpt-field { margin: 0; }
+.dv-filtres .cpt-input { font-size: 13px; padding: 6px 8px; }
+.dv-type { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 800; background: rgba(47,127,214,.13); color: #2069b8; }
+.dv-num { font-family: var(--font-mono, monospace); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Documents des ventes</h1>
+      <div class="cpt-sub">Une facture par session de caissière validée par le superviseur : le client est la caisse, le représentant la caissière.</div>
+    </div>
+  </div>
+
+  <form method="get" class="cpt-card dv-filtres">
+    <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Caisse</label>
+      <select name="caisse" class="cpt-input"><option value="">Toutes</option>
+        {% for c in caisses %}<option value="{{ c.pk }}" {% if c == caisse %}selected{% endif %}>{{ c.nom }}</option>{% endfor %}
+      </select></div>
+    <div class="cpt-field"><label>Statut</label>
+      <select name="statut" class="cpt-input"><option value="">Tous</option>
+        {% for cle, libelle in statuts.items %}<option value="{{ cle }}" {% if cle == statut %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+      </select></div>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  <div class="cpt-card" style="padding:0;overflow-x:auto;">
+    <table class="cpt-table">
+      <thead><tr><th>Type</th><th>Statut</th><th>N° pièce</th><th>Date</th><th>N° client</th><th>Intitulé client</th><th>Représentant</th><th class="num">Factures</th><th class="num">Total TTC</th></tr></thead>
+      <tbody>
+        {% for d in documents %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:document_vente' d.session.pk %}?retour={{ request.get_full_path|urlencode }}'">
+          <td><span class="dv-type" title="Facture">{{ d.type }}</span></td>
+          <td>{% if d.statut == 'comptabilise' %}<span class="cpt-badge validee">{{ d.statut_libelle }}</span>{% else %}<span class="cpt-badge cloturee">{{ d.statut_libelle }}</span>{% endif %}</td>
+          <td class="dv-num">{{ d.piece }}</td>
+          <td>{{ d.date|date:'d/m/Y' }}</td>
+          <td class="dv-num">{{ d.numero_client|default:'—' }}</td>
+          <td>{{ d.intitule_client }}</td>
+          <td>{{ d.representant|upper }}</td>
+          <td class="num">{{ d.nb_factures }}</td>
+          <td class="num">{{ d.total|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="cpt-vide">Aucune session validée sur la période.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="cpt-note">{{ documents|length }} document{{ documents|length|pluralize }}. Montants en FCFA.</div>
+</div>
+{% endblock %}

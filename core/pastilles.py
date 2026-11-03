@@ -31,7 +31,7 @@ def pastilles(user):
     resultat = {}
     for code, calcul in (('consultations', _soins),
                          ('hospitalisation', _hospitalisation),
-                         ('facturation', _facturation)):
+                         ('caisse', _facturation)):
         entree = calcul(user)
         if entree and entree['total']:
             resultat[code] = entree

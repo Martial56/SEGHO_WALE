@@ -296,17 +296,38 @@ class Avoir(ModeleCentre):
 
 # ─── Lot 3 : plan comptable SYCEBNL, journaux, écritures ───────────────────────
 
+class CompteQuerySet(models.QuerySet):
+    def imputables(self):
+        """Comptes qu'on peut choisir sur une écriture : actifs et de détail."""
+        return self.filter(actif=True, totalisation=False)
+
+
 class Compte(models.Model):
     """Compte du plan comptable (SYCEBNL, structure OHADA).
 
-    Le plan est semé par migration et se complète à l'écran. `a_valider`
-    signale les comptes dont l'intitulé ou le numéro propre au SYCEBNL doit
-    être confirmé par l'expert-comptable avant la première clôture.
+    Le plan est semé par migration, se complète à l'écran ou s'importe depuis
+    le fichier Excel de l'expert-comptable (export « Liste des comptes » de
+    Sage 100). `a_valider` signale les comptes dont l'intitulé ou le numéro
+    propre au SYCEBNL doit être confirmé par l'expert-comptable avant la
+    première clôture.
     """
+    # Natures de compte de Sage 100, reprises telles quelles à l'import.
+    NATURE = [('', 'Aucune'), ('capitaux', 'Capitaux'), ('immobilisation', 'Immobilisation'),
+              ('amortissement', 'Amortis./Provision'), ('stock', 'Stock'), ('fournisseur', 'Fournisseur'),
+              ('client', 'Client'), ('salarie', 'Salarié'), ('banque', 'Banque'), ('caisse', 'Caisse'),
+              ('titre', 'Titre'), ('resultat_bilan', 'Résultat-Bilan'), ('charge', 'Charge'),
+              ('produit', 'Produit')]
+
     numero = models.CharField(max_length=12, unique=True, verbose_name="Numéro")
     intitule = models.CharField(max_length=200, verbose_name="Intitulé")
     actif = models.BooleanField(default=True)
     a_valider = models.BooleanField(default=False, verbose_name="À confirmer par l'expert-comptable")
+    # Compte « Total » de Sage : il regroupe ses sous-comptes dans les états
+    # mais ne reçoit jamais d'écriture.
+    totalisation = models.BooleanField(default=False, verbose_name="Compte de totalisation")
+    nature = models.CharField(max_length=20, choices=NATURE, blank=True, default='')
+
+    objects = CompteQuerySet.as_manager()
 
     @property
     def classe(self):
@@ -325,15 +346,19 @@ class Compte(models.Model):
 
 
 class Journal(models.Model):
-    TYPE = [('ventes', 'Ventes'), ('caisse', 'Caisse'), ('tresorerie', 'Trésorerie'),
-            ('achats', 'Achats'), ('od', 'Opérations diverses'), ('an', 'À-nouveaux')]
+    """Journal comptable, repris des codes journaux de l'expert-comptable
+    (Sage 100). Un journal de trésorerie porte son compte (banque, caisse) :
+    une écriture qui mouvemente ce compte va dans ce journal."""
+    # Types de Sage ; « od » est le journal Général, « an » le journal de
+    # Situation (reports à nouveau).
+    TYPE = [('ventes', 'Ventes'), ('achats', 'Achats'), ('tresorerie', 'Trésorerie'),
+            ('od', 'Général'), ('an', 'Situation')]
 
     code = models.CharField(max_length=12, unique=True)
     libelle = models.CharField(max_length=120, verbose_name="Libellé")
     type = models.CharField(max_length=12, choices=TYPE)
-    # Journal d'une caisse : un par caisse, son compte 571 en contrepartie.
-    caisse = models.OneToOneField('facturation.Caisse', on_delete=models.PROTECT, null=True, blank=True,
-                                  related_name='journal_comptable')
+    compte_tresorerie = models.ForeignKey('Compte', on_delete=models.PROTECT, null=True, blank=True,
+                                          related_name='journaux', verbose_name="N° compte trésorerie")
     actif = models.BooleanField(default=True)
 
     def __str__(self):
@@ -343,6 +368,45 @@ class Journal(models.Model):
         verbose_name = "Journal comptable"
         verbose_name_plural = "Journaux comptables"
         ordering = ['code']
+
+
+def collectif_deduit(numero, comptes):
+    """Compte collectif d'un tiers, faute de mieux : le compte de détail le
+    plus précis dont le numéro, zéros de fin ôtés, commence le numéro du
+    tiers (40110001 → 40110000, 48124078 → 48124000). `comptes` : itérable
+    de (numéro, pk) des comptes imputables. None si rien ne convient."""
+    meilleur = None
+    for num, pk in comptes:
+        racine = num.rstrip('0')
+        if num != numero and racine and numero.startswith(racine) \
+                and (meilleur is None or len(racine) > meilleur[0]):
+            meilleur = (len(racine), pk)
+    return meilleur[1] if meilleur else None
+
+
+class Tiers(models.Model):
+    """Compte tiers du plan tiers de l'expert-comptable (Sage 100) :
+    fournisseur, client (caisse, assurance, convention), salarié ou autre
+    (bailleur, projet). Il se rattache à un compte collectif du plan
+    comptable (401, 411, 421…), qui porte ses écritures en comptabilité
+    générale."""
+    TYPE = [('client', 'Client'), ('fournisseur', 'Fournisseur'), ('salarie', 'Salarié'), ('autre', 'Autre')]
+
+    numero = models.CharField(max_length=17, unique=True, verbose_name="N° compte tiers")
+    intitule = models.CharField(max_length=200, verbose_name="Intitulé du tiers")
+    type = models.CharField(max_length=12, choices=TYPE)
+    compte_collectif = models.ForeignKey(Compte, on_delete=models.PROTECT, null=True, blank=True,
+                                         related_name='tiers', verbose_name="Compte collectif")
+    ville = models.CharField(max_length=100, blank=True, verbose_name="Code postal / ville")
+    actif = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.numero} — {self.intitule}"
+
+    class Meta:
+        verbose_name = "Compte tiers"
+        verbose_name_plural = "Plan tiers"
+        ordering = ['numero']
 
 
 class Correspondance(models.Model):

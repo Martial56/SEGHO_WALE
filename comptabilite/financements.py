@@ -112,7 +112,7 @@ def ecritures_fonds_dedies(exercice, par):
     engagement = moteur.compte('engagement_fonds_dedies')
     fonds = moteur.compte('fonds_dedies')
     report = moteur.compte('report_fonds_dedies')
-    od = moteur.journal('OD')
+    od = moteur.journal(moteur.OPERATIONS_DIVERSES)
 
     constitution = reprise = None
     origine = f'fonds_dedies:{exercice.pk}'

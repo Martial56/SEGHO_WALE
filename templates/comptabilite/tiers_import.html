@@ -1,0 +1,82 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Import du plan tiers{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.pt-num { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }
+.pi-avant { color: var(--text-muted); text-decoration: line-through; }
+.pi-defile { max-height: 420px; overflow: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Aperçu de l'import du plan tiers</h1>
+      <div class="cpt-sub">Fichier « {{ fichier }} » : {{ nb_fichier }} tiers lu{{ nb_fichier|pluralize }}. Rien n'est encore enregistré.</div>
+    </div>
+    <form method="post" class="cpt-actions">
+      {% csrf_token %}
+      <button name="action" value="annuler" class="cpt-btn">Abandonner</button>
+      <button name="action" value="confirmer" class="cpt-btn primaire">Confirmer l'import</button>
+    </form>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi accent"><div class="l">Tiers créés</div><div class="v">{{ rapport.nouveaux|length }}</div></div>
+    <div class="cpt-kpi"><div class="l">Tiers mis à jour</div><div class="v">{{ rapport.modifies|length }}</div></div>
+    <div class="cpt-kpi"><div class="l">Inchangés</div><div class="v">{{ rapport.identiques }}</div></div>
+    <div class="cpt-kpi"><div class="l">Absents du fichier</div><div class="v">{{ rapport.absents|length }}</div><div class="s">conservés</div></div>
+  </div>
+
+  {% if anomalies %}
+  <div class="cpt-alerte"><b>{{ anomalies|length }} ligne{{ anomalies|pluralize }} écartée{{ anomalies|pluralize }} :</b>
+    <ul style="margin:6px 0 0;padding-left:18px;">{% for a in anomalies %}<li>{{ a }}</li>{% endfor %}</ul></div>
+  {% endif %}
+
+  {% if rapport.collectifs_inconnus %}
+  <div class="cpt-alerte"><b>{{ rapport.collectifs_inconnus|length }} compte{{ rapport.collectifs_inconnus|length|pluralize }} collectif{{ rapport.collectifs_inconnus|length|pluralize }} inconnu{{ rapport.collectifs_inconnus|length|pluralize }}</b> (absent du plan comptable ou de totalisation) : le compte collectif de ces tiers n'est pas repris.
+    {% for t in rapport.collectifs_inconnus|slice:":10" %}<span class="pt-num">{{ t.numero }}</span> → {{ t.collectif }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+  {% endif %}
+
+  {% if rapport.modifies %}
+  <div class="cpt-card">
+    <h2>Tiers mis à jour — {{ rapport.modifies|length }}</h2>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Changements</th></tr></thead>
+      <tbody>{% for m in rapport.modifies %}
+        <tr><td class="pt-num">{{ m.tiers.numero }}</td>
+          <td>{% for libelle, avant, apres in m.lisible %}<div><b>{{ libelle }}</b> : <span class="pi-avant">{{ avant }}</span> → {{ apres }}</div>{% endfor %}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+
+  {% if rapport.nouveaux %}
+  <div class="cpt-card">
+    <h2>Tiers créés — {{ rapport.nouveaux|length }}</h2>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Type</th><th>Numéro</th><th>Intitulé</th><th>Ville</th></tr></thead>
+      <tbody>{% for t in rapport.nouveaux %}
+        <tr><td class="cpt-note">{% for cle, libelle in types.items %}{% if cle == t.type %}{{ libelle }}{% endif %}{% endfor %}</td>
+          <td class="pt-num">{{ t.numero }}</td><td>{{ t.intitule }}</td><td class="cpt-note">{{ t.ville }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+
+  {% if rapport.absents %}
+  <div class="cpt-card">
+    <h2>Tiers actuels absents du fichier — {{ rapport.absents|length }}</h2>
+    <p class="cpt-note">Ils ne sont ni supprimés ni désactivés.</p>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Intitulé</th></tr></thead>
+      <tbody>{% for t in rapport.absents %}<tr><td class="pt-num">{{ t.numero }}</td><td>{{ t.intitule }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

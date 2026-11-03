@@ -56,7 +56,7 @@ class CompteTresorerieForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['compte'].queryset = Compte.objects.filter(actif=True, numero__startswith='5')
+        self.fields['compte'].queryset = Compte.objects.imputables().filter(numero__startswith='5')
         self.fields['compte'].help_text = "Compte de classe 5 (créez un sous-compte 5211, 5212… par banque si besoin)."
         for nom, champ in self.fields.items():
             if not isinstance(champ.widget, forms.CheckboxInput):
@@ -180,7 +180,7 @@ def rapprochement(request, pk):
         'ct': ct, 'fin': fin, 'etat': etat,
         'rapprochees': ct.releve.filter(ligne_ecriture__isnull=False, date__lte=fin)
                        .select_related('ligne_ecriture__ecriture').order_by('-date')[:100],
-        'comptes': Compte.objects.filter(actif=True).exclude(pk=ct.compte_id), 'frais': frais,
+        'comptes': Compte.objects.imputables().exclude(pk=ct.compte_id), 'frais': frais,
         'peut_modifier': request.user.has_perm('comptabilite.change_lignereleve'),
     })
 

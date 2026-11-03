@@ -1,0 +1,36 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Codes journaux{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>.jx-num { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Codes journaux</h1>
+      <div class="cpt-sub">Journaux de l'expert-comptable (Sage 100). Une écriture qui mouvemente un compte de trésorerie va dans le journal de ce compte ; un compte sans journal (Mobile Money, assurance, bon) va en OD.</div>
+    </div>
+  </div>
+  <div class="cpt-card" style="padding:0;overflow-x:auto;">
+    <table class="cpt-table">
+      <thead><tr><th>Code</th><th>Intitulé</th><th>Type</th><th>N° compte trésorerie</th><th class="num">Écritures</th><th>État</th></tr></thead>
+      <tbody>
+        {% for j in journaux %}
+        <tr>
+          <td class="jx-num">{{ j.code }}</td>
+          <td>{{ j.libelle }}</td>
+          <td>{{ j.get_type_display }}</td>
+          <td>{% if j.compte_tresorerie %}<span class="jx-num">{{ j.compte_tresorerie.numero }}</span> <span class="cpt-note">{{ j.compte_tresorerie.intitule }}</span>{% else %}<span class="cpt-note">—</span>{% endif %}</td>
+          <td class="num">{{ j.nb }}</td>
+          <td>{% if j.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="cpt-vide">Aucun journal.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

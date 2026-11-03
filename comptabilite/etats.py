@@ -414,8 +414,9 @@ def balance(debut, fin, params):
 
 
 def balance_tiers(debut, fin, params):
-    """Balance des patients et des assurances (comptes 411), par tiers."""
-    lignes_qs = _cumul(fin, params).filter(compte__numero__startswith='411')
+    """Balance des patients et des assurances (comptes 41 : 4111/4112 du plan
+    semé, 4125xxxx du plan de l'expert), par tiers."""
+    lignes_qs = _cumul(fin, params).filter(compte__numero__startswith='41')
     donnees = OrderedDict()
     for row in (lignes_qs.values('compte__numero', 'compte__intitule', 'tiers')
                 .annotate(d=Sum('debit'), c=Sum('credit')).order_by('compte__numero', 'tiers')):
@@ -467,7 +468,7 @@ def resultat(debut, fin, params):
     return {'titre': 'Compte de résultat simplifié', 'tableaux': [_tableau(
         'Ressources et charges', [('Compte', 'texte'), ('Intitulé', 'texte'), ('Montant', 'montant')], lignes)],
         'notes': [_note_brouillons(params),
-                  "Les remises et gratuités (709) viennent en diminution des ressources.",
+                  "Les remises et gratuités sont une charge (6582 Dons).",
                   "Présentation de gestion, pas les états financiers SYCEBNL de fin d'exercice."]}
 
 
@@ -858,9 +859,11 @@ def bilan(debut, fin, params):
             else:
                 tresorerie_passif -= s
         elif classe == '1':
-            if numero.startswith('19'):
+            # Plan de l'expert : 16 fonds affectés, 17 fonds reportés ;
+            # 18 dettes rattachées, 19 provisions pour risques et charges.
+            if numero[:2] in ('16', '17'):
                 fonds_dedies -= s
-            elif numero[:2] in ('16', '17', '18'):
+            elif numero[:2] in ('18', '19'):
                 dettes_fin -= s
             else:
                 fonds[numero[:2] if numero[:2] in fonds else '10'] -= s
@@ -904,10 +907,10 @@ def bilan(debut, fin, params):
             sous += fonds[prefixe]
     passif.append(_ligne('Total fonds propres', sous, type_='sous_total'))
     total_passif = sous
-    passif.append(_ligne('Fonds dédiés', type_='groupe'))
-    passif.append(_ligne('Fonds dédiés sur ressources affectées', fonds_dedies or None))
-    passif.append(_ligne('Dettes financières', type_='groupe'))
-    passif.append(_ligne('Emprunts et dettes financières', dettes_fin or None))
+    passif.append(_ligne('Fonds affectés et reportés', type_='groupe'))
+    passif.append(_ligne('Fonds affectés (16) et fonds reportés (17)', fonds_dedies or None))
+    passif.append(_ligne('Dettes financières et provisions', type_='groupe'))
+    passif.append(_ligne('Dettes financières (18) et provisions pour risques (19)', dettes_fin or None))
     total_passif += fonds_dedies + dettes_fin
     passif.append(_ligne('Passif circulant', type_='groupe'))
     sous = ZERO
@@ -936,7 +939,6 @@ def bilan(debut, fin, params):
 # (libellé, préfixes des comptes) ; les produits se lisent au crédit, les charges au débit.
 _EXPLOITATION_PRODUITS = [
     ('Prestations de soins et ventes de médicaments', ('700', '701', '702', '703', '704', '705', '706', '707', '708')),
-    ('Remises et gratuités accordées', ('709',)),
     ("Subventions d'exploitation", ('71',)),
     ('Dons, cotisations et autres produits', ('72', '73', '74', '75', '76')),
     ('Reports de ressources affectées et transferts de charges', ('78',)),
@@ -947,7 +949,7 @@ _EXPLOITATION_CHARGES = [
     ('Transports', ('61',)),
     ('Services extérieurs', ('62', '63')),
     ('Impôts et taxes', ('64',)),
-    ('Autres charges (dont pertes sur créances, manquants)', ('65',)),
+    ('Autres charges (dont pertes sur créances, manquants, gratuités)', ('65',)),
     ('Charges de personnel', ('66',)),
     ('Dotations aux amortissements et provisions, engagements sur ressources affectées', ('68', '69')),
 ]
@@ -993,7 +995,7 @@ def compte_resultat_sycebnl(debut, fin, params):
     return {'titre': 'Compte de résultat (SYCEBNL)', 'tableaux': [_tableau(
         'Par rubrique', [('Rubrique', 'texte'), ('Montant', 'montant')], lignes)],
         'notes': [_note_brouillons(params),
-                  "Les remises et gratuités (709) viennent en diminution des ressources.",
+                  "Les remises et gratuités sont une charge (6582 Dons, rubrique Autres charges).",
                   "Détail compte par compte : état « Compte de résultat » de la comptabilité générale.",
                   "Présentation SYCEBNL à faire confirmer par l'expert-comptable."]}
 

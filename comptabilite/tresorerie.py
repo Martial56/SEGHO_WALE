@@ -105,7 +105,7 @@ def ecritures_remise(remise):
             piece=remise.reference or remise.numero, origine=origine, centre=remise.centre))
     origine = f'remise_entree:{remise.pk}'
     if not Ecriture.all_objects.filter(origine=origine).exists():
-        journal = moteur.journal('MM' if ct.type == 'mobile_money' else 'BQ')
+        journal = moteur.journal_de_tresorerie(ct.compte)
         faites.append(moteur.creer_ecriture(
             journal, remise.date, f'Dépôt des espèces {remise.numero} — {caisse}',
             [(ct.compte, None, remise.montant, ZERO, str(caisse)),
@@ -257,7 +257,7 @@ def comptabiliser_ligne_releve(ligne, contrepartie, par):
     else:
         lignes = [(ct.compte, None, montant, ZERO, ct.libelle), (contrepartie, None, ZERO, montant, ct.libelle)]
     with transaction.atomic():
-        ecriture = moteur.creer_ecriture(moteur.journal('MM' if ct.type == 'mobile_money' else 'BQ'), ligne.date,
+        ecriture = moteur.creer_ecriture(moteur.journal_de_tresorerie(ct.compte), ligne.date,
                                          ligne.libelle, lignes, piece=ligne.reference, origine=f'releve:{ligne.pk}',
                                          par=par)
         rapprocher(ligne, ecriture.lignes.get(compte=ct.compte))

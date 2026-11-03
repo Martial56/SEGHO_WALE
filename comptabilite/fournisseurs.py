@@ -81,7 +81,7 @@ def lignes_commande_achat(commande):
 
 def comptes_d_achat():
     """Comptes acceptés sur une ligne de facture : immobilisations et charges."""
-    return Compte.objects.filter(actif=True, numero__regex=r'^[26]')
+    return Compte.objects.imputables().filter(numero__regex=r'^[26]')
 
 
 def enregistrer_facture(facture, lignes, par):

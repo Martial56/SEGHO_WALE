@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import views, vues_compta, vues_etats, vues_financements as vf, vues_assurances as va, vues_tresorerie as vt
-from . import vues_achats as vac, vues_cloture as vcl
+from . import vues_achats as vac, vues_cloture as vcl, vues_ventes
 
 app_name = 'comptabilite'
 
@@ -16,6 +16,9 @@ urlpatterns = [
     path('sorties/<int:pk>/decider/', views.sortie_decider, name='sortie_decider'),
     path('sorties/<int:pk>/annuler/', views.sortie_annuler, name='sortie_annuler'),
     path('gratuites/', views.gratuites, name='gratuites'),
+    path('', vues_ventes.accueil, name='accueil'),
+    path('ventes/', vues_ventes.documents_ventes, name='documents_ventes'),
+    path('ventes/<int:pk>/', vues_ventes.document_vente, name='document_vente'),
     path('configuration/motifs/<str:nature>/', views.motifs, name='motifs'),
     path('configuration/motifs/<str:nature>/<int:pk>/', views.motifs, name='motif_modifier'),
     path('ecritures/', vues_compta.ecritures, name='ecritures'),
@@ -24,7 +27,14 @@ urlpatterns = [
     path('ecritures/operation-diverse/', vues_compta.od_saisie, name='od_saisie'),
     path('configuration/plan-comptable/', vues_compta.plan_comptable, name='plan_comptable'),
     path('configuration/plan-comptable/<int:pk>/', vues_compta.plan_comptable, name='compte_modifier'),
+    path('configuration/plan-comptable/export/', vues_compta.plan_comptable_export, name='plan_comptable_export'),
+    path('configuration/plan-comptable/import/', vues_compta.plan_comptable_import, name='plan_comptable_import'),
     path('configuration/correspondances/', vues_compta.correspondances, name='correspondances'),
+    path('configuration/journaux/', vues_compta.journaux, name='journaux'),
+    path('configuration/plan-tiers/', vues_compta.plan_tiers, name='plan_tiers'),
+    path('configuration/plan-tiers/<int:pk>/', vues_compta.plan_tiers, name='tiers_modifier'),
+    path('configuration/plan-tiers/export/', vues_compta.plan_tiers_export, name='plan_tiers_export'),
+    path('configuration/plan-tiers/import/', vues_compta.plan_tiers_import, name='plan_tiers_import'),
     path('financements/bailleurs/', vf.bailleurs, name='bailleurs'),
     path('financements/bailleurs/<int:pk>/', vf.bailleurs, name='bailleur_modifier'),
     path('financements/conventions/', vf.conventions, name='conventions'),

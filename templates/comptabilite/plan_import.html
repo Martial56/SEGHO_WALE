@@ -1,0 +1,93 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Import du plan comptable{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.pc-num { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }
+.pi-avant { color: var(--text-muted); text-decoration: line-through; }
+.pi-defile { max-height: 420px; overflow: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Aperçu de l'import du plan comptable</h1>
+      <div class="cpt-sub">Fichier « {{ fichier }} » : {{ nb_fichier }} compte{{ nb_fichier|pluralize }} lu{{ nb_fichier|pluralize }}, dont {{ nb_totaux }} de totalisation. Rien n'est encore enregistré.</div>
+    </div>
+    <form method="post" class="cpt-actions">
+      {% csrf_token %}
+      <button name="action" value="annuler" class="cpt-btn">Abandonner</button>
+      <button name="action" value="confirmer" class="cpt-btn primaire">Confirmer l'import</button>
+    </form>
+  </div>
+
+  <div class="cpt-kpis">
+    <div class="cpt-kpi accent"><div class="l">Comptes créés</div><div class="v">{{ rapport.nouveaux|length }}</div></div>
+    <div class="cpt-kpi"><div class="l">Comptes mis à jour</div><div class="v">{{ rapport.modifies|length }}</div></div>
+    <div class="cpt-kpi"><div class="l">Inchangés</div><div class="v">{{ rapport.identiques }}</div></div>
+    <div class="cpt-kpi"><div class="l">Conflits</div><div class="v">{{ rapport.conflits|length }}</div><div class="s">laissés tels quels</div></div>
+    <div class="cpt-kpi"><div class="l">Absents du fichier</div><div class="v">{{ rapport.absents|length }}</div><div class="s">conservés</div></div>
+  </div>
+
+  {% if anomalies %}
+  <div class="cpt-alerte"><b>{{ anomalies|length }} ligne{{ anomalies|pluralize }} écartée{{ anomalies|pluralize }} :</b>
+    <ul style="margin:6px 0 0;padding-left:18px;">{% for a in anomalies %}<li>{{ a }}</li>{% endfor %}</ul></div>
+  {% endif %}
+
+  {% if rapport.conflits %}
+  <div class="cpt-card">
+    <h2>Conflits — {{ rapport.conflits|length }}</h2>
+    <p class="cpt-note">Dans le fichier, ces numéros sont des comptes de totalisation. Ici, ils portent déjà des écritures ou sont désignés dans les correspondances, un motif, un compte de trésorerie ou un budget : ils restent inchangés. Désignez d'abord le bon sous-compte dans les <a href="{% url 'comptabilite:correspondances' %}">correspondances</a>, puis réimportez.</p>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Intitulé actuel</th><th>Intitulé dans le fichier</th></tr></thead>
+      <tbody>{% for c in rapport.conflits %}
+        <tr><td class="pc-num">{{ c.compte.numero }}</td><td>{{ c.compte.intitule }}</td><td>{{ c.fichier.intitule }}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+
+  {% if rapport.modifies %}
+  <div class="cpt-card">
+    <h2>Comptes mis à jour — {{ rapport.modifies|length }}</h2>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Changements</th></tr></thead>
+      <tbody>{% for m in rapport.modifies %}
+        <tr><td class="pc-num">{{ m.compte.numero }}</td>
+          <td>{% for libelle, avant, apres in m.lisible %}<div><b>{{ libelle }}</b> : <span class="pi-avant">{{ avant|default:"—" }}</span> → {{ apres|default:"—" }}</div>{% endfor %}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+
+  {% if rapport.nouveaux %}
+  <div class="cpt-card">
+    <h2>Comptes créés — {{ rapport.nouveaux|length }}</h2>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Intitulé</th><th>Type</th><th>Nature</th></tr></thead>
+      <tbody>{% for c in rapport.nouveaux %}
+        <tr><td class="pc-num">{{ c.numero }}</td><td>{{ c.intitule }}</td><td>{% if c.totalisation %}Total{% else %}Détail{% endif %}</td>
+          <td class="cpt-note">{% for cle, libelle in natures.items %}{% if cle == c.nature %}{{ libelle }}{% endif %}{% endfor %}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+
+  {% if rapport.absents %}
+  <div class="cpt-card">
+    <h2>Comptes actuels absents du fichier — {{ rapport.absents|length }}</h2>
+    <p class="cpt-note">Ils ne sont ni supprimés ni désactivés.{% if absents_utilises %} {{ absents_utilises }} sont mouvementés ou désignés ailleurs : à rapprocher du plan de l'expert-comptable dans les correspondances.{% endif %}</p>
+    <div class="pi-defile"><table class="cpt-table">
+      <thead><tr><th>Numéro</th><th>Intitulé</th><th>Utilisé</th></tr></thead>
+      <tbody>{% for a in rapport.absents %}
+        <tr><td class="pc-num">{{ a.compte.numero }}</td><td>{{ a.compte.intitule }}</td><td>{% if a.utilise %}<span class="cpt-badge cloturee">Oui</span>{% else %}<span class="cpt-note">Non</span>{% endif %}</td></tr>
+      {% endfor %}</tbody>
+    </table></div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

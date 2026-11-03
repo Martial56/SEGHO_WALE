@@ -1,0 +1,90 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Plan tiers{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.pt-num { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }
+.pt-types { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.pt-types a { padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; font-size: 13px; color: var(--text); text-decoration: none; }
+.pt-types a.active { background: var(--teal-600, #0d9488); border-color: transparent; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Plan tiers</h1>
+      <div class="cpt-sub">Fournisseurs, clients, salariés et partenaires de l'expert-comptable (Sage 100). Chaque tiers se rattache à un compte collectif du <a href="{% url 'comptabilite:plan_comptable' %}">plan comptable</a>.</div>
+    </div>
+    <div class="cpt-actions">
+      <form method="get" class="cpt-actions">
+        {% if type %}<input type="hidden" name="type" value="{{ type }}">{% endif %}
+        <input type="search" name="q" value="{{ q }}" class="cpt-input" placeholder="Numéro ou intitulé" style="font-size:13px;padding:6px 8px;">
+        <button class="cpt-btn">Chercher</button>
+      </form>
+      <a href="{% url 'comptabilite:plan_tiers_export' %}" class="cpt-btn" title="Télécharger le plan tiers au format Excel, réimportable">⭳ Exporter (Excel)</a>
+      {% if peut_modifier and perms.comptabilite.add_tiers %}
+      <form method="post" action="{% url 'comptabilite:plan_tiers_import' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="fichier" accept=".xlsx" id="pt-fichier" hidden onchange="this.form.submit()">
+        <button type="button" class="cpt-btn primaire" onclick="document.getElementById('pt-fichier').click()"
+                title="Fichier Excel : export « Liste des tiers » de Sage 100 ou export de cette page">⭱ Importer (Excel)</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if import_en_attente %}
+  <div class="cpt-alerte">Un import est en attente de confirmation. <a href="{% url 'comptabilite:plan_tiers_import' %}">Voir l'aperçu</a></div>
+  {% endif %}
+  {% if nb_sans_collectif %}
+  <div class="cpt-alerte"><b>{{ nb_sans_collectif }} tiers sans compte collectif</b> : le numéro ne permet pas de le déduire, désignez-le ci-contre.</div>
+  {% endif %}
+
+  <div class="pt-types">
+    <a href="?{% if q %}q={{ q|urlencode }}{% endif %}" class="{% if not type %}active{% endif %}">Tous ({{ nb_total }})</a>
+    {% for cle, libelle, n in types %}
+    <a href="?type={{ cle }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="{% if type == cle %}active{% endif %}">{{ libelle }} ({{ n }})</a>
+    {% endfor %}
+  </div>
+
+  <div class="cpt-grid2" style="grid-template-columns:2fr 1fr;align-items:start;">
+    <div class="cpt-card" style="overflow-x:auto;">
+      <table class="cpt-table">
+        <thead><tr><th>Type</th><th>N° compte tiers</th><th>Intitulé du tiers</th><th>Compte collectif</th><th>Ville</th><th>État</th></tr></thead>
+        <tbody>
+          {% for t in tiers %}
+          <tr class="{% if peut_modifier %}lien{% endif %}" {% if peut_modifier %}onclick="location.href='{% url 'comptabilite:tiers_modifier' t.pk %}'"{% endif %}>
+            <td class="cpt-note">{{ t.get_type_display }}</td>
+            <td class="pt-num">{{ t.numero }}</td>
+            <td>{{ t.intitule }}</td>
+            <td>{% if t.compte_collectif %}<span class="pt-num" title="{{ t.compte_collectif.intitule }}">{{ t.compte_collectif.numero }}</span>{% else %}<span class="ecart-neg">à désigner</span>{% endif %}</td>
+            <td class="cpt-note">{{ t.ville }}</td>
+            <td>{% if t.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
+          </tr>
+          {% empty %}<tr><td colspan="6" class="cpt-vide">Aucun tiers.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if peut_modifier %}
+    <form method="post" class="cpt-card">
+      {% csrf_token %}
+      <h2>{% if objet %}Modifier le tiers {{ objet.numero }}{% else %}Nouveau tiers{% endif %}</h2>
+      {% for champ in form %}{% if champ.name != 'actif' %}
+      <div class="cpt-field"><label for="{{ champ.id_for_label }}">{{ champ.label }}</label>{{ champ }}
+        {% if champ.errors %}<div class="ecart-neg" style="font-size:12px;">{{ champ.errors.0 }}</div>{% endif %}</div>
+      {% endif %}{% endfor %}
+      <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.actif }} Tiers actif</label></div>
+      <div class="cpt-actions">
+        <button class="cpt-btn primaire">{% if objet %}Enregistrer{% else %}Ajouter{% endif %}</button>
+        {% if objet %}<a href="{% url 'comptabilite:plan_tiers' %}" class="cpt-btn">Nouveau tiers</a>{% endif %}
+      </div>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -223,7 +223,10 @@ class TestDonneesSeedMigrations(TestCase):
     def test_module_facturation_url_name_mis_a_jour_par_migration_0005(self):
         module = Module.objects.get(code='facturation')
         self.assertEqual(module.name, 'Comptabilité')
-        self.assertEqual(module.url_name, 'facturation:list')
+        # 0022 : la carte Comptabilité ouvre son accueil, la facturation
+        # étant passée au module Caisse.
+        self.assertEqual(module.url_name, 'comptabilite:accueil')
+        self.assertEqual(Module.objects.get(code='caisse').url_name, 'facturation:list')
 
     def test_module_gynecologie_url_name_mis_a_jour_par_migration_0004(self):
         module = Module.objects.get(code='gynecologie')

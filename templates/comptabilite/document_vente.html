@@ -1,0 +1,66 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Facture {{ doc.piece }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.dv-entete { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 18px; }
+.dv-entete .l { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.dv-entete .v { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.dv-num { font-family: var(--font-mono, monospace); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Facture : {{ doc.statut_libelle }} N° {{ doc.piece }} {{ doc.numero_client }} {{ doc.intitule_client }}</h1>
+      <div class="cpt-sub">Ventes de la session de {{ doc.representant }}, regroupées par article et par prix.</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% if retour %}{{ retour }}{% else %}{% url 'comptabilite:documents_ventes' %}{% endif %}" class="cpt-btn"><i class="bi bi-arrow-left"></i> Documents des ventes</a>
+      <button type="button" class="cpt-btn" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+    </div>
+  </div>
+
+  <div class="cpt-card dv-entete">
+    <div><div class="l">Date</div><div class="v">{{ doc.date|date:'d/m/Y' }}</div></div>
+    <div><div class="l">Statut</div><div class="v">{{ doc.statut_libelle }}</div></div>
+    <div><div class="l">N° pièce</div><div class="v dv-num">{{ doc.piece }}</div></div>
+    <div><div class="l">Client</div><div class="v"><span class="dv-num">{{ doc.numero_client|default:'—' }}</span> {{ doc.intitule_client }}</div></div>
+    <div><div class="l">Représentant</div><div class="v">{{ doc.representant|upper }}</div></div>
+    <div><div class="l">Total TTC</div><div class="v">{{ doc.total|floatformat:0|intcomma }} F</div></div>
+  </div>
+
+  <div class="cpt-card" style="padding:0;overflow-x:auto;">
+    <table class="cpt-table">
+      <thead><tr><th>Référence article</th><th>Désignation</th><th class="num">P.U. TTC</th><th class="num">Quantité</th><th class="num">Remise</th><th class="num">Montant TTC</th></tr></thead>
+      <tbody>
+        {% for l in doc.lignes %}
+        <tr>
+          <td class="dv-num">{{ l.reference|default:'—' }}</td>
+          <td>{{ l.designation|upper }}</td>
+          <td class="num">{{ l.prix_unitaire|floatformat:2|intcomma }}</td>
+          <td class="num">{{ l.quantite|floatformat:2 }}</td>
+          <td class="num">{% if l.remise %}{{ l.remise|floatformat:0 }} %{% endif %}</td>
+          <td class="num">{{ l.montant|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="cpt-vide">Aucune vente dans cette session.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if doc.lignes %}<tfoot><tr><td colspan="5">Total</td><td class="num">{{ doc.total|floatformat:0|intcomma }}</td></tr></tfoot>{% endif %}
+    </table>
+  </div>
+
+  {% if doc.factures %}
+  <div class="cpt-card">
+    <h2>Factures reprises — {{ doc.factures|length }}</h2>
+    <div class="cpt-note">{% for f in doc.factures %}<a href="{% url 'facturation:detail' f.pk %}">{{ f.numero }}</a> ({{ f.patient }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

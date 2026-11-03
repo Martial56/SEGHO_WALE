@@ -894,8 +894,11 @@ class TestLesLignesArriventAuDepliage(TestCase):
 
         Puis de 28 à 29 avec le menu « Trésorerie », qui liste les comptes à
         rapprocher sur chaque page du module — sans rapport avec le balayage.
+
+        Puis de 29 à 28 quand la liste des factures est passée au module
+        Caisse, dont la barre n'a pas de menu « Trésorerie ».
         """
-        with self.assertNumQueries(29):
+        with self.assertNumQueries(28):
             self.client.get(self.url + '&group=type&_groupe=0')
 
     def test_un_sous_groupe_rend_bien_les_siennes(self):

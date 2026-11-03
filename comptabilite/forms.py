@@ -39,7 +39,7 @@ class MotifSortieForm(_Champs, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from .models import Compte
-        self.fields['compte'].queryset = Compte.objects.filter(actif=True)
+        self.fields['compte'].queryset = Compte.objects.imputables()
         self.fields['compte'].empty_label = '— Compte par défaut —'
 
 
@@ -103,7 +103,7 @@ class ConventionForm(_Champs, forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['bailleur'].queryset = Bailleur.objects.filter(actif=True) | Bailleur.objects.filter(
             pk=self.instance.bailleur_id or 0)
-        self.fields['compte_ressource'].queryset = Compte.objects.filter(actif=True, numero__regex=r'^[17]')
+        self.fields['compte_ressource'].queryset = Compte.objects.imputables().filter(numero__regex=r'^[17]')
         if not self.instance.pk:
             from .models import Correspondance
             defaut = Correspondance.objects.filter(cle='subvention_defaut').first()
@@ -124,7 +124,7 @@ class LigneBudgetaireForm(_Champs, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['compte'].queryset = Compte.objects.filter(actif=True, numero__regex=r'^[26]')
+        self.fields['compte'].queryset = Compte.objects.imputables().filter(numero__regex=r'^[26]')
 
 
 LigneBudgetaireFormSet = forms.inlineformset_factory(
@@ -153,7 +153,7 @@ class DonForm(_Champs, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['convention'].queryset = Convention.objects.filter(statut='active')
-        self.fields['compte_actif'].queryset = Compte.objects.filter(actif=True, numero__regex=r'^[23]')
+        self.fields['compte_actif'].queryset = Compte.objects.imputables().filter(numero__regex=r'^[23]')
 
     def clean(self):
         donnees = super().clean()

@@ -137,7 +137,7 @@ def comptabiliser_inventaire(exercice, centre, valeurs, par):
         if not lignes:
             return None
         return moteur.creer_ecriture(
-            moteur.journal('OD'), exercice.date_fin, f"Inventaire de fin d'exercice {exercice}", lignes,
+            moteur.journal(moteur.OPERATIONS_DIVERSES), exercice.date_fin, f"Inventaire de fin d'exercice {exercice}", lignes,
             piece=f'INV-{exercice}', origine=_origine_inventaire(exercice, centre), centre=centre, par=par)
 
 
@@ -256,7 +256,7 @@ def _creer_an(exercice, suivant, centre_id, lignes, par):
     from centres.models import Centre
     centre = Centre.objects.get(pk=centre_id) if centre_id else None
     return moteur.creer_ecriture(
-        moteur.journal('AN'), suivant.date_debut, f"À-nouveaux issus de l'exercice {exercice}", lignes,
+        moteur.journal(moteur.A_NOUVEAUX), suivant.date_debut, f"À-nouveaux issus de l'exercice {exercice}", lignes,
         piece=f'AN-{exercice}', origine=_origine_an(exercice, centre_id), centre=centre, par=par)
 
 

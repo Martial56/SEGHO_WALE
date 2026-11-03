@@ -1632,15 +1632,15 @@ class TestOngletActifDuModule(TestCase):
         """(Factures actif ?, Configuration actif ?) lus dans le balisage."""
         html = self.client.get(url).content.decode()
         nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
-        # Lus par libellé : le module Comptabilité ajoute « Ma caisse » et
-        # « Journées de caisse » autour des deux onglets de la facturation.
+        # Lus par libellé. « Factures » est dans la barre du module Caisse,
+        # « Configuration » (dont les caisses) dans celle du module
+        # Comptabilité : une page n'en montre qu'une des deux.
         etats = {libelle.strip(): 'active' in classe for classe, libelle in re.findall(
             r'class="(o-nav-link ?[a-z]*)"[^>]*>\s*([^<]+?)\s*<', nav)}
-        self.assertIn('Factures', etats, nav)
-        self.assertIn('Configuration', etats, nav)
+        self.assertTrue('Factures' in etats or 'Configuration' in etats, nav)
         actifs = [nom for nom, actif in etats.items() if actif]
         self.assertLessEqual(len(actifs), 1, nav)
-        return etats['Factures'], etats['Configuration']
+        return etats.get('Factures', False), etats.get('Configuration', False)
 
     def test_l_onglet_factures_est_allume_sur_la_liste(self):
         self.assertEqual(self._onglets(reverse('facturation:list')), (True, False))

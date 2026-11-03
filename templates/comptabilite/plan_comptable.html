@@ -7,6 +7,7 @@
 <style>
 .pc-classe td { background: rgba(var(--teal-500-rgb), .06); font-weight: 800; }
 .pc-num { font-family: var(--font-mono, monospace); font-weight: 700; }
+.pc-total td { font-weight: 700; color: var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -17,11 +18,26 @@
       <h1 class="cpt-title">Plan comptable SYCEBNL</h1>
       <div class="cpt-sub">Structure OHADA des entités à but non lucratif. Les écritures automatiques n'utilisent que les comptes désignés dans les <a href="{% url 'comptabilite:correspondances' %}">correspondances</a>.</div>
     </div>
-    <form method="get" class="cpt-actions">
-      <input type="search" name="q" value="{{ q }}" class="cpt-input" placeholder="Numéro ou intitulé" style="font-size:13px;padding:6px 8px;">
-      <button class="cpt-btn">Chercher</button>
-    </form>
+    <div class="cpt-actions">
+      <form method="get" class="cpt-actions">
+        <input type="search" name="q" value="{{ q }}" class="cpt-input" placeholder="Numéro ou intitulé" style="font-size:13px;padding:6px 8px;">
+        <button class="cpt-btn">Chercher</button>
+      </form>
+      <a href="{% url 'comptabilite:plan_comptable_export' %}" class="cpt-btn" title="Télécharger le plan au format Excel, réimportable">⭳ Exporter (Excel)</a>
+      {% if peut_modifier %}
+      <form method="post" action="{% url 'comptabilite:plan_comptable_import' %}" enctype="multipart/form-data" id="pc-import">
+        {% csrf_token %}
+        <input type="file" name="fichier" accept=".xlsx" id="pc-fichier" hidden onchange="this.form.submit()">
+        <button type="button" class="cpt-btn primaire" onclick="document.getElementById('pc-fichier').click()"
+                title="Fichier Excel : export « Liste des comptes » de Sage 100 ou export de cette page">⭱ Importer (Excel)</button>
+      </form>
+      {% endif %}
+    </div>
   </div>
+
+  {% if import_en_attente %}
+  <div class="cpt-alerte">Un import est en attente de confirmation. <a href="{% url 'comptabilite:plan_comptable_import' %}">Voir l'aperçu</a></div>
+  {% endif %}
 
   {% if nb_a_valider %}
   <div class="cpt-alerte"><b>{{ nb_a_valider }} compte{{ nb_a_valider|pluralize }} à confirmer par l'expert-comptable</b> (marqués ⚠) : ce sont les comptes propres au non-lucratif — fonds associatifs, dons, subventions, partenaires — dont la numérotation SYCEBNL exacte doit être vérifiée avant la première clôture.</div>
@@ -30,16 +46,17 @@
   <div class="cpt-grid2" style="grid-template-columns:2fr 1fr;align-items:start;">
     <div class="cpt-card">
       <table class="cpt-table">
-        <thead><tr><th>Numéro</th><th>Intitulé</th><th>État</th></tr></thead>
+        <thead><tr><th>Numéro</th><th>Intitulé</th><th>Nature</th><th>État</th></tr></thead>
         <tbody>
           {% for c in comptes %}
-          {% ifchanged c.classe %}<tr class="pc-classe"><td colspan="3">Classe {{ c.classe }}</td></tr>{% endifchanged %}
-          <tr {% if peut_modifier %}class="lien" onclick="location.href='{% url 'comptabilite:compte_modifier' c.pk %}'"{% endif %}>
+          {% ifchanged c.classe %}<tr class="pc-classe"><td colspan="4">Classe {{ c.classe }}</td></tr>{% endifchanged %}
+          <tr class="{% if peut_modifier %}lien{% endif %}{% if c.totalisation %} pc-total{% endif %}" {% if peut_modifier %}onclick="location.href='{% url 'comptabilite:compte_modifier' c.pk %}'"{% endif %}>
             <td class="pc-num">{{ c.numero }}</td>
-            <td>{{ c.intitule }}{% if c.a_valider %} <span title="À confirmer par l'expert-comptable">⚠</span>{% endif %}</td>
+            <td>{{ c.intitule }}{% if c.totalisation %} <span class="cpt-note" title="Compte de totalisation : ne reçoit pas d'écriture">Σ total</span>{% endif %}{% if c.a_valider %} <span title="À confirmer par l'expert-comptable">⚠</span>{% endif %}</td>
+            <td class="cpt-note">{{ c.get_nature_display }}</td>
             <td>{% if c.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
           </tr>
-          {% empty %}<tr><td colspan="3" class="cpt-vide">Aucun compte.</td></tr>{% endfor %}
+          {% empty %}<tr><td colspan="4" class="cpt-vide">Aucun compte.</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
@@ -52,6 +69,9 @@
         {% if form.numero.errors %}<div class="ecart-neg" style="font-size:12px;">{{ form.numero.errors.0 }}</div>{% endif %}</div>
       <div class="cpt-field"><label for="{{ form.intitule.id_for_label }}">Intitulé</label>{{ form.intitule }}
         {% if form.intitule.errors %}<div class="ecart-neg" style="font-size:12px;">{{ form.intitule.errors.0 }}</div>{% endif %}</div>
+      <div class="cpt-field"><label for="{{ form.nature.id_for_label }}">Nature</label>{{ form.nature }}</div>
+      <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.totalisation }} Compte de totalisation (ne reçoit pas d'écriture)</label>
+        {% if form.totalisation.errors %}<div class="ecart-neg" style="font-size:12px;">{{ form.totalisation.errors.0 }}</div>{% endif %}</div>
       <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.actif }} Compte actif</label></div>
       <div class="cpt-field"><label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--text);">{{ form.a_valider }} À confirmer par l'expert-comptable</label></div>
       <div class="cpt-actions">

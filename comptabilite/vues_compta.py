@@ -155,7 +155,7 @@ def od_saisie(request):
             for l in lignes_saisies:
                 if not l['compte'] and not l['debit'] and not l['credit']:
                     continue
-                c = Compte.objects.filter(numero=l['compte'].split(' ')[0].strip(), actif=True).first()
+                c = Compte.objects.imputables().filter(numero=l['compte'].split(' ')[0].strip()).first()
                 if c is None:
                     raise moteur.ErreurCompta(f"Compte inconnu : « {l['compte']} ».")
                 d, cr = _montant(l['debit']), _montant(l['credit'])
@@ -177,7 +177,7 @@ def od_saisie(request):
     return render(request, 'comptabilite/od_saisie.html', {
         'journaux': Journal.objects.filter(actif=True).order_by('code'),
         'journal_defaut': Journal.objects.filter(code='OD').first(),
-        'comptes': Compte.objects.filter(actif=True),
+        'comptes': Compte.objects.imputables(),
         'lignes': lignes_saisies, 'aujourdhui': aujourdhui, 'post': request.POST,
         'conventions': Convention.objects.filter(statut='active'),
     })
@@ -193,19 +193,27 @@ def plan_comptable(request, pk=None):
     class CompteForm(forms.ModelForm):
         class Meta:
             model = Compte
-            fields = ['numero', 'intitule', 'actif', 'a_valider']
+            fields = ['numero', 'intitule', 'nature', 'totalisation', 'actif', 'a_valider']
 
         def clean_numero(self):
             numero = self.cleaned_data['numero'].strip()
-            if not numero.isdigit() or numero[0] not in '12345678':
-                raise forms.ValidationError("Un numéro de compte est fait de chiffres et commence par une classe de 1 à 8.")
+            if not numero.isdigit() or numero[0] == '0':
+                raise forms.ValidationError("Un numéro de compte est fait de chiffres et commence par une classe de 1 à 9.")
             if self.instance.pk and self.instance.numero != numero and self.instance.lignes.exists():
                 raise forms.ValidationError("Ce compte porte déjà des écritures : son numéro ne change plus.")
             return numero
 
+        def clean_totalisation(self):
+            from .plan_import import comptes_utilises
+            total = self.cleaned_data['totalisation']
+            if total and self.instance.pk and not self.instance.totalisation                     and self.instance.pk in comptes_utilises():
+                raise forms.ValidationError("Ce compte est déjà mouvementé ou désigné ailleurs : "
+                                            "il ne peut pas devenir un compte de totalisation.")
+            return total
+
     objet = get_object_or_404(Compte, pk=pk) if pk else None
     form = CompteForm(request.POST or None, instance=objet)
-    for champ in ('numero', 'intitule'):
+    for champ in ('numero', 'intitule', 'nature'):
         form.fields[champ].widget.attrs['class'] = 'cpt-input'
     if request.method == 'POST':
         if not peut_modifier:
@@ -221,6 +229,68 @@ def plan_comptable(request, pk=None):
     return render(request, 'comptabilite/plan_comptable.html', {
         'comptes': comptes, 'form': form, 'objet': objet, 'q': q, 'peut_modifier': peut_modifier,
         'nb_a_valider': Compte.objects.filter(a_valider=True).count(),
+        'import_en_attente': CLE_IMPORT_PLAN in request.session,
+    })
+
+
+CLE_IMPORT_PLAN = 'comptabilite_import_plan'
+
+
+@login_required(login_url='login')
+def plan_comptable_export(request):
+    from django.http import HttpResponse
+    from .plan_import import classeur
+
+    _exiger(request.user, 'comptabilite.view_compte')
+    reponse = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    reponse['Content-Disposition'] = f'attachment; filename="plan_comptable_{timezone.localdate():%Y%m%d}.xlsx"'
+    classeur().save(reponse)
+    return reponse
+
+
+@login_required(login_url='login')
+def plan_comptable_import(request):
+    """Import en deux temps : le fichier est lu et l'aperçu montré ; rien
+    n'est écrit avant « Confirmer l'import »."""
+    from . import plan_import
+
+    _exiger(request.user, 'comptabilite.change_compte')
+    _exiger(request.user, 'comptabilite.add_compte')
+    en_attente = request.session.get(CLE_IMPORT_PLAN)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'annuler':
+            request.session.pop(CLE_IMPORT_PLAN, None)
+            messages.info(request, "Import abandonné : le plan comptable n'a pas changé.")
+            return redirect('comptabilite:plan_comptable')
+        if action == 'confirmer' and en_attente:
+            rapport = plan_import.appliquer(en_attente['comptes'])
+            request.session.pop(CLE_IMPORT_PLAN, None)
+            messages.success(request, f"Plan comptable importé : {len(rapport['nouveaux'])} compte(s) créé(s), "
+                                      f"{len(rapport['modifies'])} mis à jour, {rapport['identiques']} inchangé(s).")
+            if rapport['conflits']:
+                messages.warning(request, f"{len(rapport['conflits'])} compte(s) en conflit laissé(s) tel(s) quel(s).")
+            return redirect('comptabilite:plan_comptable')
+        fichier = request.FILES.get('fichier')
+        if not fichier:
+            messages.error(request, "Choisissez le fichier Excel du plan comptable.")
+            return redirect('comptabilite:plan_comptable')
+        try:
+            comptes, anomalies = plan_import.lire(fichier)
+        except plan_import.ErreurImport as e:
+            messages.error(request, str(e))
+            return redirect('comptabilite:plan_comptable')
+        request.session[CLE_IMPORT_PLAN] = {'fichier': fichier.name, 'comptes': comptes, 'anomalies': anomalies}
+        return redirect('comptabilite:plan_comptable_import')
+    if not en_attente:
+        return redirect('comptabilite:plan_comptable')
+    rapport = plan_import.analyser(en_attente['comptes'])
+    return render(request, 'comptabilite/plan_import.html', {
+        'fichier': en_attente['fichier'], 'anomalies': en_attente['anomalies'], 'rapport': rapport,
+        'nb_fichier': len(en_attente['comptes']),
+        'nb_totaux': sum(1 for c in en_attente['comptes'] if c['totalisation']),
+        'natures': plan_import.NATURES,
+        'absents_utilises': sum(1 for a in rapport['absents'] if a['utilise']),
     })
 
 
@@ -228,11 +298,17 @@ def plan_comptable(request, pk=None):
 def correspondances(request):
     _exiger(request.user, 'comptabilite.view_correspondance')
     peut_modifier = request.user.has_perm('comptabilite.change_correspondance')
+    from facturation.models import Caisse
+
     lignes = list(Correspondance.objects.select_related('compte').order_by('cle'))
+    # Une caisse sans compte n'est pas comptabilisée : l'expert-comptable crée
+    # son sous-compte 571 dans le plan, puis on le désigne ici.
+    designees = {corr.cle for corr in lignes}
+    caisses_sans_compte = [c for c in Caisse.objects.order_by('nom') if f'caisse:{c.code}' not in designees]
     if request.method == 'POST':
         if not peut_modifier:
             raise PermissionDenied
-        comptes = {c.pk: c for c in Compte.objects.filter(actif=True)}
+        comptes = {c.pk: c for c in Compte.objects.imputables()}
         changes = 0
         for corr in lignes:
             choix = request.POST.get(f'corr_{corr.pk}')
@@ -240,8 +316,135 @@ def correspondances(request):
                 corr.compte = comptes[int(choix)]
                 corr.save(update_fields=['compte'])
                 changes += 1
+        for caisse in caisses_sans_compte:
+            choix = request.POST.get(f'caisse_{caisse.pk}')
+            if choix and choix.isdigit() and int(choix) in comptes:
+                Correspondance.objects.create(cle=f'caisse:{caisse.code}', libelle=f'Caisse {caisse.nom}',
+                                              compte=comptes[int(choix)])
+                changes += 1
         messages.success(request, f"{changes} correspondance(s) modifiée(s).")
         return redirect('comptabilite:correspondances')
     return render(request, 'comptabilite/correspondances.html', {
-        'lignes': lignes, 'comptes': Compte.objects.filter(actif=True), 'peut_modifier': peut_modifier,
+        'lignes': lignes, 'comptes': Compte.objects.imputables(), 'peut_modifier': peut_modifier,
+        'caisses_sans_compte': caisses_sans_compte,
+        'comptes_caisse': Compte.objects.imputables().filter(numero__startswith='57'),
+    })
+
+
+@login_required(login_url='login')
+def journaux(request):
+    """Codes journaux de l'expert-comptable, avec le compte de trésorerie de
+    chacun : c'est lui qui décide du journal d'une écriture de trésorerie."""
+    from django.db.models import Count
+    _exiger(request.user, 'comptabilite.view_journal')
+    return render(request, 'comptabilite/journaux.html', {
+        'journaux': Journal.objects.select_related('compte_tresorerie')
+                                   .annotate(nb=Count('ecritures')).order_by('code'),
+    })
+
+
+@login_required(login_url='login')
+def plan_tiers(request, pk=None):
+    """Plan tiers de l'expert-comptable : fournisseurs, clients, salariés,
+    bailleurs et projets, chacun rattaché à son compte collectif."""
+    from django import forms
+    from django.db.models import Count
+    from .models import Tiers
+
+    _exiger(request.user, 'comptabilite.view_tiers')
+    peut_modifier = request.user.has_perm('comptabilite.change_tiers')
+
+    class TiersForm(forms.ModelForm):
+        class Meta:
+            model = Tiers
+            fields = ['numero', 'intitule', 'type', 'compte_collectif', 'ville', 'actif']
+
+        def clean_numero(self):
+            numero = self.cleaned_data['numero'].strip().upper()
+            if not numero.replace(' ', '').isalnum():
+                raise forms.ValidationError("Un numéro de tiers est fait de lettres et de chiffres.")
+            return numero
+
+    objet = get_object_or_404(Tiers, pk=pk) if pk else None
+    form = TiersForm(request.POST or None, instance=objet)
+    form.fields['compte_collectif'].queryset = Compte.objects.imputables().filter(numero__startswith='4')
+    for champ in ('numero', 'intitule', 'type', 'compte_collectif', 'ville'):
+        form.fields[champ].widget.attrs['class'] = 'cpt-input'
+    if request.method == 'POST':
+        if not peut_modifier:
+            raise PermissionDenied
+        if form.is_valid():
+            t = form.save()
+            messages.success(request, f"Tiers {t} enregistré.")
+            return redirect('comptabilite:plan_tiers')
+    q = request.GET.get('q', '').strip()
+    type_ = request.GET.get('type', '')
+    tiers = Tiers.objects.select_related('compte_collectif')
+    if type_ in dict(Tiers.TYPE):
+        tiers = tiers.filter(type=type_)
+    if q:
+        tiers = tiers.filter(Q(numero__istartswith=q) | Q(intitule__icontains=q))
+    comptes_type = dict(Tiers.objects.values_list('type').annotate(n=Count('pk')))
+    return render(request, 'comptabilite/plan_tiers.html', {
+        'tiers': tiers, 'form': form, 'objet': objet, 'q': q, 'type': type_, 'peut_modifier': peut_modifier,
+        'types': [(cle, libelle, comptes_type.get(cle, 0)) for cle, libelle in Tiers.TYPE],
+        'nb_total': sum(comptes_type.values()),
+        'nb_sans_collectif': Tiers.objects.filter(compte_collectif__isnull=True).count(),
+        'import_en_attente': CLE_IMPORT_TIERS in request.session,
+    })
+
+
+CLE_IMPORT_TIERS = 'comptabilite_import_tiers'
+
+
+@login_required(login_url='login')
+def plan_tiers_export(request):
+    from django.http import HttpResponse
+    from .tiers_import import classeur
+
+    _exiger(request.user, 'comptabilite.view_tiers')
+    reponse = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    reponse['Content-Disposition'] = f'attachment; filename="plan_tiers_{timezone.localdate():%Y%m%d}.xlsx"'
+    classeur().save(reponse)
+    return reponse
+
+
+@login_required(login_url='login')
+def plan_tiers_import(request):
+    """Import en deux temps, comme le plan comptable : aperçu, puis
+    « Confirmer l'import »."""
+    from . import tiers_import
+
+    _exiger(request.user, 'comptabilite.change_tiers')
+    _exiger(request.user, 'comptabilite.add_tiers')
+    en_attente = request.session.get(CLE_IMPORT_TIERS)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'annuler':
+            request.session.pop(CLE_IMPORT_TIERS, None)
+            messages.info(request, "Import abandonné : le plan tiers n'a pas changé.")
+            return redirect('comptabilite:plan_tiers')
+        if action == 'confirmer' and en_attente:
+            rapport = tiers_import.appliquer(en_attente['tiers'])
+            request.session.pop(CLE_IMPORT_TIERS, None)
+            messages.success(request, f"Plan tiers importé : {len(rapport['nouveaux'])} tiers créé(s), "
+                                      f"{len(rapport['modifies'])} mis à jour, {rapport['identiques']} inchangé(s).")
+            return redirect('comptabilite:plan_tiers')
+        fichier = request.FILES.get('fichier')
+        if not fichier:
+            messages.error(request, "Choisissez le fichier Excel du plan tiers.")
+            return redirect('comptabilite:plan_tiers')
+        try:
+            tiers, anomalies = tiers_import.lire(fichier)
+        except tiers_import.ErreurImport as e:
+            messages.error(request, str(e))
+            return redirect('comptabilite:plan_tiers')
+        request.session[CLE_IMPORT_TIERS] = {'fichier': fichier.name, 'tiers': tiers, 'anomalies': anomalies}
+        return redirect('comptabilite:plan_tiers_import')
+    if not en_attente:
+        return redirect('comptabilite:plan_tiers')
+    return render(request, 'comptabilite/tiers_import.html', {
+        'fichier': en_attente['fichier'], 'anomalies': en_attente['anomalies'],
+        'rapport': tiers_import.analyser(en_attente['tiers']), 'nb_fichier': len(en_attente['tiers']),
+        'types': tiers_import.TYPES,
     })

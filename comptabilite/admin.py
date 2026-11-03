@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Avoir, Bailleur, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
-                     LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse)
+                     LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse, Tiers)
 
 
 class SessionInline(admin.TabularInline):
@@ -113,7 +113,15 @@ class CompteAdmin(admin.ModelAdmin):
 
 @admin.register(Journal)
 class JournalAdmin(admin.ModelAdmin):
-    list_display = ['code', 'libelle', 'type', 'caisse', 'actif']
+    list_display = ['code', 'libelle', 'type', 'compte_tresorerie', 'actif']
+
+
+@admin.register(Tiers)
+class TiersAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'intitule', 'type', 'compte_collectif', 'actif']
+    list_filter = ['type', 'actif']
+    search_fields = ['numero', 'intitule']
+    autocomplete_fields = ['compte_collectif']
 
 
 @admin.register(Correspondance)

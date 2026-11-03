@@ -17,6 +17,21 @@
 
   <form method="post" class="cpt-card">
     {% csrf_token %}
+    {% if caisses_sans_compte %}
+    <div class="cpt-alerte"><b>{{ caisses_sans_compte|length }} caisse{{ caisses_sans_compte|pluralize }} sans compte :</b> ses encaissements ne sont pas comptabilisés tant que son sous-compte n'est pas désigné. Si le compte n'existe pas encore, l'expert-comptable le crée dans le <a href="{% url 'comptabilite:plan_comptable' %}">plan comptable</a>.
+      {% if peut_modifier %}
+      <table class="cpt-table" style="margin-top:8px;">
+        {% for caisse in caisses_sans_compte %}
+        <tr><td>Caisse {{ caisse.nom }}</td><td class="cpt-note">caisse:{{ caisse.code }}</td>
+          <td style="width:45%;"><select name="caisse_{{ caisse.pk }}" class="cpt-input" style="width:100%;font-size:13px;padding:6px 8px;">
+            <option value="">— Choisir le compte —</option>
+            {% for c in comptes_caisse %}<option value="{{ c.pk }}">{{ c.numero }} — {{ c.intitule }}</option>{% endfor %}
+          </select></td></tr>
+        {% endfor %}
+      </table>
+      {% endif %}
+    </div>
+    {% endif %}
     <table class="cpt-table">
       <thead><tr><th>Événement</th><th>Clé</th><th style="width:45%;">Compte</th></tr></thead>
       <tbody>

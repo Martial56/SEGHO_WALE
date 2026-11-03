@@ -203,7 +203,7 @@ def budget(request):
         messages.success(request, f"Budget {exercice} enregistré.")
         return redirect(f"{request.path}?exercice={exercice.pk}")
     prevus = {lb.compte_id: lb.montant for lb in LigneBudget.objects.filter(exercice=exercice)}
-    comptes = [(c, prevus.get(c.pk)) for c in Compte.objects.filter(actif=True, numero__regex=r'^[67]')]
+    comptes = [(c, prevus.get(c.pk)) for c in Compte.objects.imputables().filter(numero__regex=r'^[67]')]
     return render(request, 'comptabilite/budget.html', {
         'exercice': exercice, 'exercices': Exercice.objects.all(), 'comptes': comptes,
         'total_charges': sum((m for c, m in comptes if m and c.classe == '6'), Decimal('0')),

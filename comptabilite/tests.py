@@ -13,6 +13,17 @@ from . import caisse as regles
 from .models import JourneeCaisse, SessionCaissiere
 
 
+def _caisse(**champs):
+    """Caisse avec son sous-compte 571 désigné, comme le fait l'expert-comptable
+    dans les correspondances (le logiciel n'en crée pas)."""
+    from .models import Compte, Correspondance
+    caisse = Caisse.objects.create(**champs)
+    pris = Correspondance.objects.filter(cle__startswith='caisse:').values_list('compte_id', flat=True)
+    compte = Compte.objects.imputables().filter(numero__startswith='571').exclude(pk__in=pris).first()
+    Correspondance.objects.create(cle=f'caisse:{caisse.code}', libelle=f'Caisse {caisse.nom}', compte=compte)
+    return caisse
+
+
 def _perm(user, app, codename):
     user.user_permissions.add(Permission.objects.get(content_type__app_label=app, codename=codename))
     # Le cache des permissions est posé au premier `has_perm` : on repart d'un
@@ -63,7 +74,7 @@ def _payer(user, facture, montant, mode='especes', operateur='Wave', transaction
 class TestOuverture(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         self.mariam = _caissiere('mariam')
 
@@ -82,7 +93,7 @@ class TestOuverture(TestCase):
         self.assertEqual(SessionCaissiere.objects.filter(statut='ouverte').count(), 2)
 
     def test_une_seule_session_ouverte_par_caissiere(self):
-        autre = Caisse.objects.create(nom='Caisse Pharmacie', code='PHA')
+        autre = _caisse(nom='Caisse Pharmacie', code='PHA')
         regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         with self.assertRaises(regles.ErreurCaisse):
             regles.ouvrir_session(self.awa, autre, Decimal('0'))
@@ -124,7 +135,7 @@ class TestOuverture(TestCase):
 class TestEncaissement(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         self.mariam = _caissiere('mariam')
 
@@ -192,7 +203,7 @@ class TestEncaissement(TestCase):
         self.assertTrue(reponse.url.startswith(reverse('comptabilite:ouvrir')))
 
     def test_la_fiche_ne_propose_que_la_caisse_de_la_session(self):
-        Caisse.objects.create(nom='Caisse Pharmacie', code='PHA')
+        _caisse(nom='Caisse Pharmacie', code='PHA')
         regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         contenu = _client(self.awa).get(
             reverse('facturation:detail', args=[_facture().pk])).content.decode()
@@ -203,7 +214,7 @@ class TestEncaissement(TestCase):
 class TestCloture(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         self.mariam = _caissiere('mariam')
         self.chef = _superviseur()
@@ -275,7 +286,7 @@ class TestCloture(TestCase):
 class TestJournee(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         self.mariam = _caissiere('mariam')
         self.koffi = _caissiere('koffi')
@@ -328,7 +339,7 @@ from .models import Avoir, MotifGratuite, MotifSortie, SortieCaisse  # noqa: E40
 class TestSorties(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC', seuil_sortie=5000)
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC', seuil_sortie=5000)
         self.awa = _caissiere('awa')
         self.chef = _superviseur()
         self.motif = MotifSortie.objects.get(libelle='Transport / course')
@@ -389,7 +400,7 @@ class TestSorties(TestCase):
 class TestAvoirs(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _annulable(_caissiere('awa'))
 
     def _annuler(self, facture, **extra):
@@ -450,7 +461,7 @@ class TestAvoirs(TestCase):
 class TestGratuites(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         self.patient = _patient()
@@ -533,11 +544,38 @@ def _lignes(ecriture):
 
 class TestPlanComptable(TestCase):
 
-    def test_plan_seme(self):
-        for numero in ('4111', '4112', '571', '552', '7061', '701', '709', '658', '758'):
-            self.assertTrue(Compte.objects.filter(numero=numero).exists(), numero)
-        self.assertTrue(Compte.objects.filter(numero='101', a_valider=True).exists())
-        self.assertEqual(moteur.compte('nature:pharmacie').numero, '701')
+    def test_plan_de_l_expert_seul(self):
+        import json
+        from pathlib import Path
+        chemin = Path(__file__).resolve().parent / 'data' / 'plan_expert.json'
+        plan = {n: (i, t) for n, i, t, _ in json.loads(chemin.read_text(encoding='utf-8'))}
+        self.assertEqual(len(plan), 1463)
+        self.assertEqual({c.numero: (c.intitule, c.totalisation) for c in Compte.objects.all()}, plan)
+        self.assertFalse(Compte.objects.filter(a_valider=True).exists())
+
+    def test_correspondances_sur_le_plan_de_l_expert(self):
+        attendus = {'nature:pharmacie': '70510001', 'nature:consultation': '70520100', 'patient': '41250000',
+                    'tiers_payant': '41250001', 'caisse': '57100004', 'fournisseur': '40110000',
+                    'remise': '65820000', 'fonds_dedies': '16510000', 'mode:cheque': '52110002'}
+        for cle, numero in attendus.items():
+            self.assertEqual(moteur.compte(cle).numero, numero, cle)
+        for numero in ('4111', '571', '709', '195'):    # comptes semés au départ, supprimés
+            self.assertFalse(Compte.objects.filter(numero=numero).exists(), numero)
+        self.assertTrue(Compte.objects.get(numero='701').totalisation)
+
+    def test_caisse_sans_compte_designe(self):
+        caisse = Caisse.objects.create(nom='Caisse Urgences', code='URG')
+        with self.assertRaises(moteur.ErreurCompta):
+            moteur.compte_de_caisse(caisse)
+        self.assertFalse(Compte.objects.filter(numero__startswith='571', totalisation=False)
+                         .exclude(numero__in=['57100001', '57100002', '57100003', '57100004', '57100005']).exists())
+        # Désignation à l'écran des correspondances.
+        admin = User.objects.create_superuser('admin_urg', password='x')
+        client = _client(admin)
+        self.assertContains(client.get(reverse('comptabilite:correspondances')), 'caisse:URG')
+        compte = Compte.objects.get(numero='57100003')
+        client.post(reverse('comptabilite:correspondances'), {f'caisse_{caisse.pk}': compte.pk})
+        self.assertEqual(moteur.compte_de_caisse(caisse), compte)
 
     def test_ecrans_reserves(self):
         caissiere = _caissiere('awa')
@@ -557,7 +595,7 @@ class TestPlanComptable(TestCase):
 class TestEcrituresAutomatiques(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _annulable(_caissiere('awa'))
         self.session = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         self.jour = timezone.localdate()
@@ -572,27 +610,27 @@ class TestEcrituresAutomatiques(TestCase):
         facture = self._facture_avec_remise()
         ecriture = moteur.ecriture_facture(facture)
         self.assertEqual(ecriture.journal.code, 'VTE')
-        self.assertEqual(_lignes(ecriture), {'4111': (Decimal('8000'), 0), '709': (Decimal('2000'), 0),
-                                             '7061': (0, Decimal('10000'))})
+        self.assertEqual(_lignes(ecriture), {'41250000': (Decimal('8000'), 0), '65820000': (Decimal('2000'), 0),
+                                             '70520100': (0, Decimal('10000'))})
 
     def test_paiement_especes_dans_le_journal_de_la_caisse(self):
         facture = _facture(Decimal('5000'))
         _payer(self.awa, facture, 5000)
         ecriture = moteur.ecriture_paiement(Paiement.objects.get(facture=facture))
-        self.assertEqual(ecriture.journal.code, 'CA-ACC')
+        self.assertEqual(ecriture.journal.code, 'CAI AC')
         lignes = _lignes(ecriture)
-        self.assertEqual(lignes['4111'], (0, Decimal('5000')))
+        self.assertEqual(lignes['41250000'], (0, Decimal('5000')))
         compte_caisse = [n for n in lignes if n.startswith('571')][0]
-        self.assertNotEqual(compte_caisse, '571')          # sous-compte propre à la caisse
+        self.assertNotEqual(compte_caisse, '57100004')     # sous-compte propre à la caisse
         self.assertEqual(lignes[compte_caisse], (Decimal('5000'), 0))
 
     def test_paiement_mobile_money(self):
         facture = _facture(Decimal('5000'))
         _payer(self.awa, facture, 5000, mode='mobile_money')
         ecriture = moteur.ecriture_paiement(Paiement.objects.get(facture=facture))
-        self.assertEqual(ecriture.journal.code, 'MM')
+        self.assertEqual(ecriture.journal.code, 'OD')
         # Sur le sous-compte de l'opérateur choisi à l'encaissement.
-        self.assertEqual(_lignes(ecriture)['5521'], (Decimal('5000'), 0))
+        self.assertEqual(_lignes(ecriture)['55800002'], (Decimal('5000'), 0))
 
     def test_avoir_et_remboursement(self):
         facture = _facture(Decimal('5000'))
@@ -602,19 +640,19 @@ class TestEcrituresAutomatiques(TestCase):
         resultat = moteur.generer(self.jour, self.jour)
         self.assertEqual(resultat['erreurs'], [])
         avoir = Ecriture.objects.get(origine__startswith='avoir:')
-        self.assertEqual(_lignes(avoir)['4111'], (0, Decimal('5000')))
+        self.assertEqual(_lignes(avoir)['41250000'], (0, Decimal('5000')))
         remboursement = Ecriture.objects.get(origine__startswith='remboursement:')
-        self.assertEqual(remboursement.journal.code, 'CA-ACC')
-        self.assertEqual(_lignes(remboursement)['4111'], (Decimal('5000'), 0))
+        self.assertEqual(remboursement.journal.code, 'CAI AC')
+        self.assertEqual(_lignes(remboursement)['41250000'], (Decimal('5000'), 0))
 
     def test_sortie_et_ecart(self):
         _payer(self.awa, _facture(Decimal('20000')), 20000)
         motif = MotifSortie.objects.get(libelle='Transport / course')
         sortie = regles.creer_sortie(self.session, self.awa, motif, 'Course', Decimal('2000'))
-        self.assertEqual(_lignes(moteur.ecriture_sortie(sortie))['618'], (Decimal('2000'), 0))
+        self.assertEqual(_lignes(moteur.ecriture_sortie(sortie))['61830002'], (Decimal('2000'), 0))
         regles.cloturer_session(self.session, self.awa, {}, Decimal('17500'), justification='Erreur de monnaie')
         ecart = moteur.ecriture_ecart(self.session)
-        self.assertEqual(_lignes(ecart)['658'], (Decimal('500'), 0))
+        self.assertEqual(_lignes(ecart)['65150010'], (Decimal('500'), 0))
 
     def test_generation_sans_doublon_et_equilibree(self):
         _payer(self.awa, self._facture_avec_remise(), 8000)
@@ -642,7 +680,7 @@ class TestPassageDesEcritures(TestCase):
 
     def setUp(self):
         self.comptable = User.objects.create_superuser('comptable', password='x')
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         for montant in (1000, 2000, 3000):
             moteur.ecriture_facture(_facture(Decimal(montant)))
 
@@ -680,11 +718,11 @@ class TestPassageDesEcritures(TestCase):
         client = _client(self.comptable)
         od = Journal.objects.get(code='OD')
         base = {'journal': od.pk, 'date': timezone.localdate().isoformat(), 'libelle': 'Salaires',
-                'compte_0': '661 Rémunérations', 'debit_0': '150000', 'credit_0': '',
-                'compte_1': '521', 'debit_1': '', 'credit_1': '150000'}
+                'compte_0': '66110000 APPOINTEMENT SALAIRE', 'debit_0': '150000', 'credit_0': '',
+                'compte_1': '52110002', 'debit_1': '', 'credit_1': '150000'}
         client.post(reverse('comptabilite:od_saisie'), base)
         ecriture = Ecriture.objects.get(libelle='Salaires')
-        self.assertEqual(_lignes(ecriture), {'661': (Decimal('150000'), 0), '521': (0, Decimal('150000'))})
+        self.assertEqual(_lignes(ecriture), {'66110000': (Decimal('150000'), 0), '52110002': (0, Decimal('150000'))})
         desequilibre = dict(base, libelle='Faux', credit_1='100000')
         client.post(reverse('comptabilite:od_saisie'), desequilibre)
         self.assertFalse(Ecriture.objects.filter(libelle='Faux').exists())
@@ -699,7 +737,7 @@ from .etats import ETATS  # noqa: E402
 class TestEtats(TestCase):
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa')
         self.chef = User.objects.create_superuser('chef4', password='x')
         session = regles.ouvrir_session(self.awa, self.caisse, Decimal('1000'))
@@ -741,10 +779,10 @@ class TestEtats(TestCase):
         self.assertEqual(total[6], total[7])      # soldes de fin débit = crédit
 
     def test_grand_livre_d_un_compte(self):
-        etat = self._etat('grand_livre', compte='4111')
+        etat = self._etat('grand_livre', compte='41250000')
         groupes = [l['cellules'][0] for l in etat['tableaux'][0]['lignes'] if l['type'] == 'groupe']
         self.assertEqual(len(groupes), 1)
-        self.assertTrue(groupes[0].startswith('4111'))
+        self.assertTrue(groupes[0].startswith('41250000'))
 
     def test_resultat(self):
         etat = self._etat('resultat')
@@ -811,16 +849,16 @@ class TestFinancements(TestCase):
         self.convention = Convention.objects.create(
             bailleur=self.bailleur, intitule='Prise en charge du paludisme', date_debut=self.jour.replace(month=1, day=1),
             date_fin=self.jour.replace(month=12, day=31), montant_accorde=Decimal('1000000'),
-            compte_ressource=Compte.objects.get(numero='718'))
+            compte_ressource=Compte.objects.get(numero='71300200'))
         LigneBudgetaire.objects.create(convention=self.convention, libelle='Transport des agents',
-                                       compte=Compte.objects.get(numero='618'), montant_prevu=Decimal('100000'))
+                                       compte=Compte.objects.get(numero='61830002'), montant_prevu=Decimal('100000'))
 
     def _verser(self, montant):
         v = Versement.objects.create(convention=self.convention, date=self.jour, montant=Decimal(montant), mode='virement')
         return moteur.ecriture_versement(v)
 
     def _depenser_en_caisse(self, montant):
-        caisse = Caisse.objects.create(nom='Caisse Projet', code='PRJ', seuil_sortie=Decimal('1000000'))
+        caisse = _caisse(nom='Caisse Projet', code='PRJ', seuil_sortie=Decimal('1000000'))
         awa = _caissiere('awa_prj')
         session = regles.ouvrir_session(awa, caisse, Decimal(montant))
         sortie = regles.creer_sortie(session, awa, MotifSortie.objects.get(libelle='Transport / course'),
@@ -832,11 +870,11 @@ class TestFinancements(TestCase):
 
     def test_versement_credite_le_compte_de_la_convention(self):
         ecriture = self._verser(400000)
-        self.assertEqual(ecriture.journal.code, 'BQ')
+        self.assertEqual(ecriture.journal.code, 'BQ SIB')
         lignes = {l.compte.numero: l for l in ecriture.lignes.all()}
-        self.assertEqual(lignes['521'].debit, Decimal('400000'))
-        self.assertEqual(lignes['718'].credit, Decimal('400000'))
-        self.assertEqual(lignes['718'].convention, self.convention)
+        self.assertEqual(lignes['52110002'].debit, Decimal('400000'))
+        self.assertEqual(lignes['71300200'].credit, Decimal('400000'))
+        self.assertEqual(lignes['71300200'].convention, self.convention)
 
     def test_suivi_et_budget_prevu_realise(self):
         self._verser(400000)
@@ -855,12 +893,12 @@ class TestFinancements(TestCase):
         don = Don.objects.create(donateur_nom='Pharmacie du Lac', date=self.jour, nature='nature',
                                  montant=Decimal('50000'), description='Paracétamol, 200 boîtes')
         lignes = {l.compte.numero: l for l in moteur.ecriture_don(don).lignes.all()}
-        self.assertEqual(lignes['311'].debit, Decimal('50000'))
-        self.assertEqual(lignes['7581'].credit, Decimal('50000'))
+        self.assertEqual(lignes['32100000'].debit, Decimal('50000'))
+        self.assertEqual(lignes['70410000'].credit, Decimal('50000'))
         affecte = Don.objects.create(donateur=self.bailleur, date=self.jour, nature='especes',
                                      montant=Decimal('20000'), convention=self.convention)
         lignes = {l.compte.numero: l for l in moteur.ecriture_don(affecte).lignes.all()}
-        self.assertEqual(lignes['718'].convention, self.convention)
+        self.assertEqual(lignes['71300200'].convention, self.convention)
         self.assertEqual(financements.suivi(self.convention)['dons'], Decimal('20000'))
 
     def test_fonds_dedies(self):
@@ -871,8 +909,8 @@ class TestFinancements(TestCase):
         self.assertEqual(calcul[0]['fonds_dedies'], Decimal('370000'))
         constitution, reprise = financements.ecritures_fonds_dedies(exercice, self.admin)
         lignes = {l.compte.numero: l for l in constitution.lignes.all()}
-        self.assertEqual(lignes['689'].debit, Decimal('370000'))
-        self.assertEqual(lignes['195'].credit, Decimal('370000'))
+        self.assertEqual(lignes['69110000'].debit, Decimal('370000'))
+        self.assertEqual(lignes['16510000'].credit, Decimal('370000'))
         self.assertEqual(reprise.date, exercice.date_fin + timedelta(days=1))
         # La constitution ne compte pas comme une dépense du projet.
         self.assertEqual(financements.suivi(self.convention)['depense'], Decimal('30000'))
@@ -881,7 +919,7 @@ class TestFinancements(TestCase):
     def test_budget_realise(self):
         self._depenser_en_caisse(30000)
         exercice = Exercice.objects.get(libelle=str(self.jour.year))
-        LigneBudget.objects.create(exercice=exercice, compte=Compte.objects.get(numero='618'), montant=Decimal('120000'))
+        LigneBudget.objects.create(exercice=exercice, compte=Compte.objects.get(numero='61830002'), montant=Decimal('120000'))
         ligne = financements.budget_realise(exercice, self.jour)[0]
         self.assertEqual((ligne['prevu'], ligne['realise']), (Decimal('120000'), Decimal('30000')))
 
@@ -905,9 +943,9 @@ class TestFinancements(TestCase):
         self.client_admin.post(reverse('comptabilite:convention_nouvelle'), {
             'bailleur': self.bailleur.pk, 'intitule': 'Santé maternelle', 'date_debut': '2026-01-01',
             'date_fin': '2027-12-31', 'montant_accorde': '500000', 'statut': 'active',
-            'compte_ressource': Compte.objects.get(numero='718').pk,
+            'compte_ressource': Compte.objects.get(numero='71300200').pk,
             'budget-TOTAL_FORMS': '1', 'budget-INITIAL_FORMS': '0',
-            'budget-0-libelle': 'Médicaments', 'budget-0-compte': Compte.objects.get(numero='601').pk,
+            'budget-0-libelle': 'Médicaments', 'budget-0-compte': Compte.objects.get(numero='60210001').pk,
             'budget-0-montant_prevu': '200000'})
         convention = Convention.objects.get(intitule='Santé maternelle')
         self.assertEqual(convention.lignes_budget.get().montant_prevu, Decimal('200000'))
@@ -922,8 +960,8 @@ class TestFinancements(TestCase):
         od = Journal.objects.get(code='OD')
         self.client_admin.post(reverse('comptabilite:od_saisie'), {
             'journal': od.pk, 'date': self.jour.isoformat(), 'libelle': 'Prime des relais',
-            'compte_0': '661', 'debit_0': '45000', 'convention_0': str(self.convention.pk),
-            'compte_1': '521', 'credit_1': '45000'})
+            'compte_0': '66110000', 'debit_0': '45000', 'convention_0': str(self.convention.pk),
+            'compte_1': '52110002', 'credit_1': '45000'})
         self.assertEqual(financements.suivi(self.convention)['depense'], Decimal('45000'))
 
     def test_le_menu_financements(self):
@@ -954,7 +992,7 @@ class TestAssurances(TestCase):
         self.patient = _patient()
         self.patient.assurance = self.mugef
         self.patient.save()
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa6')
         regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         self.comptable = User.objects.create_superuser('comptable6', password='x')
@@ -1023,18 +1061,18 @@ class TestAssurances(TestCase):
         self.assertEqual(resultat['erreurs'], [])
         vente = Ecriture.objects.get(origine=f'facture:{f.pk}')
         lignes = {l.compte.numero: l for l in vente.lignes.all()}
-        self.assertEqual(lignes['4111'].debit, Decimal('2000'))
-        self.assertEqual(lignes['4112'].debit, Decimal('8000'))
-        self.assertEqual(lignes['4112'].tiers, 'MUGEF-CI')
+        self.assertEqual(lignes['41250000'].debit, Decimal('2000'))
+        self.assertEqual(lignes['41250001'].debit, Decimal('8000'))
+        self.assertEqual(lignes['41250001'].tiers, 'MUGEF-CI')
         reglement = Ecriture.objects.get(origine__startswith='reglement:')
         lignes = {l.compte.numero: l for l in reglement.lignes.all()}
-        self.assertEqual((lignes['521'].debit, lignes['4112'].credit), (Decimal('8000'), Decimal('8000')))
+        self.assertEqual((lignes['52110002'].debit, lignes['41250001'].credit), (Decimal('8000'), Decimal('8000')))
         # Le paiement « Assurance » issu du règlement n'est pas compté deux fois.
         paiement_assurance = Paiement.objects.get(reglement_assurance__isnull=False)
         self.assertFalse(Ecriture.objects.filter(origine=f'paiement:{paiement_assurance.pk}').exists())
         # Plus rien dû : les comptes 4111 et 4112 de la facture sont soldés.
         from django.db.models import Sum
-        for numero in ('4111', '4112'):
+        for numero in ('41250000', '41250001'):
             t = LigneEcriture.objects.filter(compte__numero=numero).aggregate(d=Sum('debit'), c=Sum('credit'))
             self.assertEqual(t['d'], t['c'], numero)
 
@@ -1095,7 +1133,7 @@ class TestTresorerie(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser('admin7', password='x')
         self.client_admin = _client(self.admin)
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa7')
         regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
         _payer(self.awa, _facture(Decimal('40000')), 40000)
@@ -1103,9 +1141,9 @@ class TestTresorerie(TestCase):
         self.banque = CompteTresorerie.objects.get(libelle='Banque')
 
     def test_comptes_de_tresorerie_de_depart(self):
-        self.assertEqual(self.banque.compte.numero, '521')
+        self.assertEqual(self.banque.compte.numero, '52110002')
         operateurs = {c.libelle: c.compte.numero for c in CompteTresorerie.objects.filter(type='mobile_money', actif=True)}
-        self.assertEqual(operateurs, {'Wave': '5521', 'Orange Money': '5522', 'MoMo': '5523'})
+        self.assertEqual(operateurs, {'Wave': '55800002', 'Orange Money': '55800001', 'MoMo': '55800000'})
 
     def test_remise_en_banque(self):
         remise = treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin, 'BV-1')
@@ -1205,14 +1243,14 @@ class TestRefusAssurance(TestCase):
         rejet = tiers.rejeter(self.facture, Decimal('3000'), 'patient', 'Acte non couvert', self.jour, self.admin)
         ecriture = moteur.ecriture_rejet(rejet)
         lignes = {l.compte.numero: l for l in ecriture.lignes.all()}
-        self.assertEqual((lignes['4111'].debit, lignes['4112'].credit), (Decimal('3000'), Decimal('3000')))
+        self.assertEqual((lignes['41250000'].debit, lignes['41250001'].credit), (Decimal('3000'), Decimal('3000')))
         # La vente reconnaît la part d'origine (8 000), le refus en reporte 3 000 sur le patient.
         vente = {l.compte.numero: l for l in Ecriture.objects.get(origine=f'facture:{self.facture.pk}').lignes.all()}
-        self.assertEqual(vente['4112'].debit, Decimal('8000'))
+        self.assertEqual(vente['41250001'].debit, Decimal('8000'))
         perte = tiers.rejeter(Facture.objects.get(pk=self.facture.pk), Decimal('5000'), 'perte', 'Forclusion',
                               self.jour, self.admin)
         lignes = {l.compte.numero: l for l in moteur.ecriture_rejet(perte).lignes.all()}
-        self.assertEqual(lignes['651'].debit, Decimal('5000'))
+        self.assertEqual(lignes['65110000'].debit, Decimal('5000'))
 
     def test_ecran_de_refus(self):
         client = _client(self.admin)
@@ -1244,20 +1282,20 @@ class TestAchats(TestCase):
 
     def _facture(self):
         f = FactureFournisseur(fournisseur='LABOREX', reference='F-123', date=self.jour)
-        return achats.enregistrer_facture(f, [(_compte('601'), 'Médicaments', Decimal('100000')),
-                                              (_compte('604'), 'Gants', Decimal('20000'))], self.admin)
+        return achats.enregistrer_facture(f, [(_compte('60210001'), 'Médicaments', Decimal('100000')),
+                                              (_compte('60410000'), 'Gants', Decimal('20000'))], self.admin)
 
     def test_facture_et_reglement(self):
         f = self._facture()
         self.assertTrue(f.numero.startswith('FFO'))
         achat = Ecriture.objects.get(origine=f'facture_fournisseur:{f.pk}')
         self.assertEqual(achat.journal.code, 'ACH')
-        self.assertEqual(_lignes(achat), {'601': (Decimal('100000'), Decimal('0')),
-                                          '604': (Decimal('20000'), Decimal('0')),
-                                          '401': (Decimal('0'), Decimal('120000'))})
+        self.assertEqual(_lignes(achat), {'60210001': (Decimal('100000'), Decimal('0')),
+                                          '60410000': (Decimal('20000'), Decimal('0')),
+                                          '40110000': (Decimal('0'), Decimal('120000'))})
         r = achats.regler(f, Decimal('50000'), self.jour, 'virement', self.admin, reference='VIR-1')
         self.assertEqual(_lignes(Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')),
-                         {'401': (Decimal('50000'), Decimal('0')), '521': (Decimal('0'), Decimal('50000'))})
+                         {'40110000': (Decimal('50000'), Decimal('0')), '52110002': (Decimal('0'), Decimal('50000'))})
         self.assertEqual(FactureFournisseur.objects.get(pk=f.pk).reste, Decimal('70000'))
         with self.assertRaises(achats.ErreurAchat):
             achats.regler(f, Decimal('80000'), self.jour, 'virement', self.admin)
@@ -1267,12 +1305,12 @@ class TestAchats(TestCase):
         mm = CompteTresorerie.objects.get(libelle='Orange Money')
         r = achats.regler(f, Decimal('1000'), self.jour, 'mobile_money', self.admin, compte_tresorerie=mm)
         e = Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')
-        self.assertEqual((e.journal.code, _lignes(e)['5522']), ('MM', (Decimal('0'), Decimal('1000'))))
+        self.assertEqual((e.journal.code, _lignes(e)['55800001']), ('OD', (Decimal('0'), Decimal('1000'))))
 
     def test_compte_hors_charges_refuse(self):
         f = FactureFournisseur(fournisseur='X', date=self.jour)
         with self.assertRaises(achats.ErreurAchat):
-            achats.enregistrer_facture(f, [(_compte('4111'), '', Decimal('100'))], self.admin)
+            achats.enregistrer_facture(f, [(_compte('41250000'), '', Decimal('100'))], self.admin)
         with self.assertRaises(achats.ErreurAchat):
             achats.enregistrer_facture(f, [], self.admin)
 
@@ -1285,7 +1323,7 @@ class TestAchats(TestCase):
         LigneCommande.objects.create(commande=cmd, produit=g, quantite_commandee=4, quantite_recue=4,
                                      prix_unitaire=Decimal('250'))
         lignes = {c.numero: m for c, _, m in achats.lignes_commande_stock(cmd)}
-        self.assertEqual(lignes, {'601': Decimal('5000'), '604': Decimal('1000')})
+        self.assertEqual(lignes, {'60210001': Decimal('5000'), '60410000': Decimal('1000')})
         reponse = _client(self.admin).get(reverse('comptabilite:facture_fournisseur_nouvelle') + f'?commande_stock={cmd.pk}')
         self.assertContains(reponse, cmd.numero)
 
@@ -1293,7 +1331,7 @@ class TestAchats(TestCase):
         client = _client(self.admin)
         reponse = client.post(reverse('comptabilite:facture_fournisseur_nouvelle'), {
             'fournisseur': 'UBIPHARM', 'reference': 'U-9', 'date': self.jour.isoformat(), 'objet': 'Réassort',
-            'nb_lignes': '2', 'compte_0': _compte('601').pk, 'libelle_0': 'Antibiotiques', 'montant_0': '45 000',
+            'nb_lignes': '2', 'compte_0': _compte('60210001').pk, 'libelle_0': 'Antibiotiques', 'montant_0': '45 000',
             'compte_1': '', 'libelle_1': '', 'montant_1': ''})
         f = FactureFournisseur.objects.get(reference='U-9')
         self.assertRedirects(reponse, reverse('comptabilite:facture_fournisseur', args=[f.pk]))
@@ -1335,9 +1373,9 @@ class TestDonEnStock(TestCase):
         self.assertEqual(mvt.lot.numero_lot, 'L-1')
         self.assertEqual(Don.objects.get(pk=self.don.pk).montant, Decimal('3500'))
         ecriture = Ecriture.objects.get(origine=f'don:{self.don.pk}')
-        self.assertEqual(_lignes(ecriture), {'311': (Decimal('3000'), Decimal('0')),
-                                             '331': (Decimal('500'), Decimal('0')),
-                                             '7581': (Decimal('0'), Decimal('3500'))})
+        self.assertEqual(_lignes(ecriture), {'32100000': (Decimal('3000'), Decimal('0')),
+                                             '33100001': (Decimal('500'), Decimal('0')),
+                                             '70410000': (Decimal('0'), Decimal('3500'))})
         with self.assertRaises(achats.ErreurAchat):
             achats.entrer_don_en_stock(self.don, [(self.para, Decimal('1'), Decimal('1'), '', None)], self.admin)
 
@@ -1358,7 +1396,7 @@ class TestDonEnStock(TestCase):
         self.assertRedirects(reponse, reverse('comptabilite:dons'))
 
 
-class TestCloture(TestCase):
+class TestClotureExercice(TestCase):
 
     def setUp(self):
         self.admin = User.objects.create_superuser('admin8c', password='x')
@@ -1366,11 +1404,11 @@ class TestCloture(TestCase):
         od = moteur.journal('OD')
         ecritures = [
             moteur.creer_ecriture(od, _date(2025, 3, 1), 'Subvention reçue',
-                                  [(_compte('521'), None, Decimal('100000'), Decimal('0'), ''),
-                                   (_compte('718'), None, Decimal('0'), Decimal('100000'), '')]),
+                                  [(_compte('52110002'), None, Decimal('100000'), Decimal('0'), ''),
+                                   (_compte('71300200'), None, Decimal('0'), Decimal('100000'), '')]),
             moteur.creer_ecriture(moteur.journal('ACH'), _date(2025, 4, 1), 'Achat médicaments',
-                                  [(_compte('601'), None, Decimal('30000'), Decimal('0'), ''),
-                                   (_compte('401'), None, Decimal('0'), Decimal('30000'), 'LABOREX')]),
+                                  [(_compte('60210001'), None, Decimal('30000'), Decimal('0'), ''),
+                                   (_compte('40110000'), None, Decimal('0'), Decimal('30000'), 'LABOREX')]),
         ]
         moteur.valider(ecritures, self.admin)
 
@@ -1380,11 +1418,11 @@ class TestCloture(TestCase):
     def test_inventaire(self):
         e = cloture.comptabiliser_inventaire(self.e2025, None, {'medicament': Decimal('20000'),
                                                                 'consommable': Decimal('0')}, self.admin)
-        self.assertEqual(_lignes(e), {'311': (Decimal('20000'), Decimal('0')), '6031': (Decimal('0'), Decimal('20000'))})
+        self.assertEqual(_lignes(e), {'32100000': (Decimal('20000'), Decimal('0')), '60320000': (Decimal('0'), Decimal('20000'))})
         self.assertEqual(e.date, _date(2025, 12, 31))
         # Refaite tant qu'elle est en brouillon : la nouvelle remplace l'ancienne.
         e = cloture.comptabiliser_inventaire(self.e2025, None, {'medicament': Decimal('15000')}, self.admin)
-        self.assertEqual(_lignes(e)['311'], (Decimal('15000'), Decimal('0')))
+        self.assertEqual(_lignes(e)['32100000'], (Decimal('15000'), Decimal('0')))
         self.assertEqual(Ecriture.objects.filter(origine__startswith='inventaire:').count(), 1)
 
     def test_controles(self):
@@ -1392,8 +1430,8 @@ class TestCloture(TestCase):
         self.assertEqual(verif['bloquants'], [])
         self.assertTrue(any('inventaire' in a for a in verif['avertissements']))
         moteur.creer_ecriture(moteur.journal('OD'), _date(2025, 5, 1), 'Brouillon',
-                              [(_compte('521'), None, Decimal('1'), Decimal('0'), ''),
-                               (_compte('758'), None, Decimal('0'), Decimal('1'), '')])
+                              [(_compte('52110002'), None, Decimal('1'), Decimal('0'), ''),
+                               (_compte('75880000'), None, Decimal('0'), Decimal('1'), '')])
         self.assertTrue(any('brouillon' in b for b in cloture.controles(self.e2025)['bloquants']))
         with self.assertRaises(moteur.ErreurCompta):
             self._cloturer()
@@ -1408,23 +1446,23 @@ class TestCloture(TestCase):
         e = Exercice.objects.get(pk=self.e2025.pk)
         self.assertEqual((e.statut, e.resultat), ('cloture', Decimal('70000')))
         an = Ecriture.objects.get(origine__startswith=f'an:{e.pk}:')
-        self.assertEqual((an.journal.code, an.date, an.statut), ('AN', _date(2026, 1, 1), 'validee'))
-        self.assertEqual(_lignes(an), {'521': (Decimal('100000'), Decimal('0')),
-                                       '401': (Decimal('0'), Decimal('30000')),
-                                       '131': (Decimal('0'), Decimal('70000'))})
-        self.assertEqual(an.lignes.get(compte__numero='401').tiers, 'LABOREX')
+        self.assertEqual((an.journal.code, an.date, an.statut), ('RAN', _date(2026, 1, 1), 'validee'))
+        self.assertEqual(_lignes(an), {'52110002': (Decimal('100000'), Decimal('0')),
+                                       '40110000': (Decimal('0'), Decimal('30000')),
+                                       '12810000': (Decimal('0'), Decimal('70000'))})
+        self.assertEqual(an.lignes.get(compte__numero='40110000').tiers, 'LABOREX')
         # L'exercice clos est figé.
         with self.assertRaises(moteur.ErreurCompta):
             moteur.creer_ecriture(moteur.journal('OD'), _date(2025, 6, 1), 'Trop tard',
-                                  [(_compte('521'), None, Decimal('1'), Decimal('0'), ''),
-                                   (_compte('758'), None, Decimal('0'), Decimal('1'), '')])
+                                  [(_compte('52110002'), None, Decimal('1'), Decimal('0'), ''),
+                                   (_compte('75880000'), None, Decimal('0'), Decimal('1'), '')])
 
     def test_soldes_apres_cloture_sans_double_compte(self):
         self._cloturer()
         fin = _date(2026, 12, 31)
-        self.assertEqual(treso.solde_comptable(_compte('521'), fin), Decimal('100000'))
+        self.assertEqual(treso.solde_comptable(_compte('52110002'), fin), Decimal('100000'))
         balance = ETATS['balance']['fonction'](_date(2026, 1, 1), fin, {})
-        ligne_521 = next(l for l in balance['tableaux'][0]['lignes'] if l['cellules'][0] == '521')
+        ligne_521 = next(l for l in balance['tableaux'][0]['lignes'] if l['cellules'][0] == '52110002')
         # À-nouveau en solde de début, pas en mouvement de la période.
         self.assertEqual(ligne_521['cellules'][2:7], [Decimal('100000'), None, None, None, Decimal('100000')])
         bilan = ETATS['bilan']['fonction'](_date(2026, 1, 1), fin, {})
@@ -1508,7 +1546,7 @@ class TestOperateursMobileMoney(TestCase):
     """Un paiement Mobile Money dit par quel opérateur il est arrivé."""
 
     def setUp(self):
-        self.caisse = Caisse.objects.create(nom='Caisse Accueil', code='ACC')
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
         self.awa = _caissiere('awa_mm')
         self.session = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
 
@@ -1558,7 +1596,7 @@ class TestOperateursMobileMoney(TestCase):
     def test_ancien_paiement_sans_operateur(self):
         p = Paiement.objects.create(facture=_facture(Decimal('1000')), montant=Decimal('1000'),
                                     mode_paiement='mobile_money', session=self.session, caisse=self.caisse)
-        self.assertEqual(_lignes(moteur.ecriture_paiement(p))['552'], (Decimal('1000'), 0))
+        self.assertEqual(_lignes(moteur.ecriture_paiement(p))['55200000'], (Decimal('1000'), 0))
         libelles = [m['libelle'] for m in regles.resume_session(self.session)['par_mode']]
         self.assertEqual(libelles, ['Mobile Money (opérateur non précisé)'])
 
@@ -1574,3 +1612,370 @@ class TestOperateursMobileMoney(TestCase):
         html = _client(self.awa).get(reverse('facturation:detail', args=[facture.pk])).content.decode()
         self.assertIn('name="pay_operateur"', html)
         self.assertIn('Orange Money', html)
+
+
+# ─── Import / export du plan comptable ─────────────────────────────────────────
+
+import io  # noqa: E402
+
+from django.core.files.uploadedfile import SimpleUploadedFile  # noqa: E402
+
+from . import plan_import  # noqa: E402
+
+
+def _classeur_sage(lignes):
+    """Classeur imitant l'export « Liste des comptes » de Sage 100 : bandeau,
+    en-têtes décalés par les cellules fusionnées, en-tête répété en page 2."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append([])
+    ws.append([None] * 9 + ['Liste des comptes'])
+    ws.append(['CENTRE MEDICO-SOCIAL WALE'])
+    entete = ['Type', 'N°compte', None, None, None, None, None, 'Intitulé du compte', None, None, None, None,
+              'Raccourci', None, None, None, 'Nature de compte']
+    ws.append(entete)
+    for i, (type_, numero, intitule, nature) in enumerate(lignes):
+        if i == 2:
+            ws.append(entete)  # saut de page
+        ws.append([type_, numero, None, None, intitule, None, None, None, None, None, None, '', None, None, nature])
+    tampon = io.BytesIO()
+    wb.save(tampon)
+    return SimpleUploadedFile('plan.xlsx', tampon.getvalue())
+
+
+LIGNES_SAGE = [
+    ('Total', '70590000', 'AUTRES VENTES', 'Aucune'),
+    ('Détail', '70590001', 'VENTE DE KITS', 'Produit'),
+    ('Détail', '57100001', 'CAISSE ACCUEIL', 'Aucune'),
+    ('Détail', '57100001', 'DOUBLON', 'Aucune'),
+    ('Total', '57100004', 'CAISSE PRINCIPALE', 'Aucune'),
+    ('Détail', '70520000', 'SERVICES VENDUS ET PRESTATIONS', 'Produit'),
+    ('Détail', '62510000', 'ASSURANCES MULTIRISQUES', 'Charge'),
+]
+
+
+class TestImportPlanComptable(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_plan', password='x')
+
+    def test_lecture_format_sage(self):
+        comptes, anomalies = plan_import.lire(_classeur_sage(LIGNES_SAGE))
+        par_numero = {c['numero']: c for c in comptes}
+        self.assertEqual(len(comptes), 6)
+        self.assertEqual(len(anomalies), 1)  # le doublon
+        self.assertEqual(par_numero['70590001'],
+                         {'numero': '70590001', 'intitule': 'VENTE DE KITS',
+                          'totalisation': False, 'nature': 'produit'})
+        self.assertTrue(par_numero['70590000']['totalisation'])
+        self.assertEqual(par_numero['62510000']['nature'], 'charge')
+
+    def test_fichier_sans_entete(self):
+        from openpyxl import Workbook
+        wb = Workbook()
+        wb.active.append(['bonjour'])
+        tampon = io.BytesIO()
+        wb.save(tampon)
+        with self.assertRaises(plan_import.ErreurImport):
+            plan_import.lire(SimpleUploadedFile('x.xlsx', tampon.getvalue()))
+
+    def test_apercu_puis_confirmation(self):
+        client = _client(self.admin)
+        r = client.post(reverse('comptabilite:plan_comptable_import'), {'fichier': _classeur_sage(LIGNES_SAGE)})
+        self.assertRedirects(r, reverse('comptabilite:plan_comptable_import'))
+        self.assertFalse(Compte.objects.filter(numero='70590001').exists())  # rien avant confirmation
+        apercu = client.get(reverse('comptabilite:plan_comptable_import')).content.decode()
+        self.assertIn('Confirmer l', apercu)
+        self.assertIn('VENTE DE KITS', apercu)
+        client.post(reverse('comptabilite:plan_comptable_import'), {'action': 'confirmer'})
+        c = Compte.objects.get(numero='70590001')
+        self.assertEqual((c.intitule, c.nature, c.totalisation, c.a_valider),
+                         ('VENTE DE KITS', 'produit', False, False))
+        self.assertTrue(Compte.objects.get(numero='70590000').totalisation)
+        self.assertEqual(Compte.objects.get(numero='70520000').intitule, 'SERVICES VENDUS ET PRESTATIONS')
+        # 57100004, désigné par la correspondance « caisse », ne devient pas
+        # compte de totalisation (conflit).
+        self.assertFalse(Compte.objects.get(numero='57100004').totalisation)
+        self.assertNotIn(plan_import_cle(), client.session)
+
+    def test_abandon(self):
+        client = _client(self.admin)
+        client.post(reverse('comptabilite:plan_comptable_import'), {'fichier': _classeur_sage(LIGNES_SAGE)})
+        client.post(reverse('comptabilite:plan_comptable_import'), {'action': 'annuler'})
+        self.assertFalse(Compte.objects.filter(numero='70590001').exists())
+
+    def test_import_reserve(self):
+        lecteur = _perm(User.objects.create_user('lecteur', password='x'), 'comptabilite', 'view_compte')
+        r = _client(lecteur).post(reverse('comptabilite:plan_comptable_import'),
+                                  {'fichier': _classeur_sage(LIGNES_SAGE)})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(_client(lecteur).get(reverse('comptabilite:plan_comptable_export')).status_code, 200)
+
+    def test_export_reimportable(self):
+        r = _client(self.admin).get(reverse('comptabilite:plan_comptable_export'))
+        self.assertEqual(r.status_code, 200)
+        comptes, anomalies = plan_import.lire(io.BytesIO(r.content))
+        self.assertEqual(anomalies, [])
+        self.assertEqual(len(comptes), Compte.objects.count())
+        rapport = plan_import.analyser(comptes)
+        self.assertEqual((len(rapport['nouveaux']), len(rapport['modifies']), len(rapport['conflits'])), (0, 0, 0))
+
+    def test_compte_de_totalisation_non_imputable(self):
+        total = Compte.objects.get(numero='70500000')
+        self.assertNotIn(total, Compte.objects.imputables())
+        with self.assertRaises(moteur.ErreurCompta):
+            moteur.creer_ecriture(Journal.objects.first(), timezone.localdate(), 'Test',
+                                  [(total, '', Decimal('100'), None, ''),
+                                   (_compte('57100004'), '', None, Decimal('100'), '')])
+
+
+def plan_import_cle():
+    from .vues_compta import CLE_IMPORT_PLAN
+    return CLE_IMPORT_PLAN
+
+
+# ─── Modules Caisse et Comptabilité, documents des ventes ─────────────────────
+
+from facturation.models import LigneFacture  # noqa: E402
+
+
+class TestModulesCaisseEtComptabilite(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_mod', password='x')
+
+    def test_barre_du_module_caisse(self):
+        html = _client(self.admin).get(reverse('facturation:list')).content.decode()
+        self.assertIn('Ma caisse', html)
+        self.assertIn('Journées de caisse', html)
+        self.assertNotIn('Documents des ventes', html)
+        self.assertNotIn('>\n    Écritures', html)
+
+    def test_barre_du_module_comptabilite(self):
+        html = _client(self.admin).get(reverse('comptabilite:ecritures')).content.decode()
+        self.assertIn('Documents des ventes', html)
+        self.assertIn('Gratuités', html)
+        self.assertNotIn('Ma caisse', html)
+        self.assertNotIn('Journées de caisse', html)
+
+    def test_configuration_des_caisses_reste_en_comptabilite(self):
+        html = _client(self.admin).get(reverse('facturation:caisses_list')).content.decode()
+        self.assertIn('Documents des ventes', html)
+
+    def test_modules_et_menus(self):
+        from modules_permissions.models import Module, NavItem
+        self.assertEqual(Module.objects.get(code='caisse').name, 'Caisse')
+        self.assertEqual(Module.objects.get(code='facturation').url_name, 'comptabilite:accueil')
+        for code in ('comptabilite.caisse', 'facturation.list', 'comptabilite.journees'):
+            self.assertEqual(NavItem.objects.get(code=code).module.code, 'caisse')
+        self.assertEqual(NavItem.objects.get(code='comptabilite.documents_ventes').module.code, 'facturation')
+
+    def test_accueil_de_la_comptabilite(self):
+        self.assertRedirects(_client(self.admin).get(reverse('comptabilite:accueil')),
+                             reverse('comptabilite:documents_ventes'))
+
+
+class TestDocumentsDesVentes(TestCase):
+
+    def setUp(self):
+        self.caisse = _caisse(nom='Caisse Pharmacie', code='PH')
+        self.awa = _caissiere('awa')
+        self.chef = _superviseur()
+        self.admin = User.objects.create_superuser('admin_dv', password='x')
+        self.session = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        self.f1 = self._facture([('SERINGUE 5CC', 3, 100), ('GANTS', 2, 200)])
+        self.f2 = self._facture([('SERINGUE 5CC', 1, 100)])
+        _payer(self.awa, self.f1, 700)
+        _payer(self.awa, self.f2, 100)
+
+    def _facture(self, lignes):
+        f = _facture(Decimal(sum(q * p for _, q, p in lignes)))
+        for libelle, q, p in lignes:
+            LigneFacture.objects.create(facture=f, libelle=libelle, quantite=q, prix_unitaire=p)
+        return f
+
+    def _valider(self, compte=Decimal('800')):
+        regles.cloturer_session(self.session, self.awa, {}, compte)
+        regles.valider_session(self.session, self.chef)
+
+    def _documents(self):
+        jour = timezone.localdate()
+        from . import ventes
+        return ventes.documents(jour, jour)
+
+    def test_seules_les_sessions_validees(self):
+        self.assertEqual(self._documents(), [])
+        regles.cloturer_session(self.session, self.awa, {}, Decimal('800'))
+        self.assertEqual(self._documents(), [])
+        regles.valider_session(self.session, self.chef)
+        docs = self._documents()
+        self.assertEqual(len(docs), 1)
+        d = docs[0]
+        self.assertEqual((d['piece'], d['type'], d['statut'], d['total'], d['nb_factures']),
+                         (self.session.numero, 'FA', 'a_comptabiliser', Decimal('800'), 2))
+        self.assertEqual(d['intitule_client'], 'CLIENT CAISSE PHARMACIE')
+        self.assertEqual(d['numero_client'], moteur.compte_de_caisse(self.caisse).numero)
+
+    def test_lignes_regroupees_par_article_et_prix(self):
+        self._valider()
+        from . import ventes
+        doc = ventes.document(self.session)
+        lignes = {l['designation']: (l['quantite'], l['montant']) for l in doc['lignes']}
+        self.assertEqual(lignes, {'SERINGUE 5CC': (Decimal('4'), Decimal('400')), 'GANTS': (Decimal('2'), Decimal('400'))})
+        self.assertEqual(doc['total'], Decimal('800'))
+
+    def test_facture_payee_en_deux_fois_vendue_une_fois(self):
+        f3 = self._facture([('CONSULTATION ADULTE', 1, 1000)])
+        _payer(self.awa, f3, 400)
+        self._valider(Decimal('1200'))
+        autre = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        _payer(self.awa, f3, 600)
+        regles.cloturer_session(autre, self.awa, {}, Decimal('600'))
+        regles.valider_session(autre, self.chef)
+        totaux = {d['piece']: d['total'] for d in self._documents()}
+        self.assertEqual(totaux, {self.session.numero: Decimal('1800'), autre.numero: Decimal('0')})
+
+    def test_comptabilise_quand_les_ecritures_sont_validees(self):
+        self._valider()
+        jour = timezone.localdate()
+        moteur.generer(jour, jour)
+        moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
+        self.assertEqual(self._documents()[0]['statut'], 'comptabilise')
+
+    def test_ecrans(self):
+        self._valider()
+        client = _client(self.admin)
+        liste = client.get(reverse('comptabilite:documents_ventes')).content.decode()
+        self.assertIn(self.session.numero, liste)
+        self.assertIn('CLIENT CAISSE PHARMACIE', liste)
+        detail = client.get(reverse('comptabilite:document_vente', args=[self.session.pk])).content.decode()
+        self.assertIn('SERINGUE 5CC', detail)
+        self.assertIn(self.f1.numero, detail)
+        self.assertEqual(_client(self.awa).get(reverse('comptabilite:documents_ventes')).status_code, 403)
+
+    def test_session_non_validee_introuvable(self):
+        r = _client(self.admin).get(reverse('comptabilite:document_vente', args=[self.session.pk]))
+        self.assertEqual(r.status_code, 404)
+
+
+class TestJournauxDeLExpert(TestCase):
+
+    def test_journaux_du_fichier_de_l_expert(self):
+        codes = set(Journal.objects.values_list('code', flat=True))
+        self.assertEqual(codes, {'ACH', 'BQ CC', 'BQ EGP', 'BQ SIB', 'BQDASY', 'BQICLI', 'BQIRC', 'BQMANO',
+                                 'BQTENE', 'CAI AC', 'CAI PH', 'CAI PP', 'CAI TB', 'CAISPC', 'OD', 'RAN', 'RAN.',
+                                 'SIBDEP', 'VTE'})
+        self.assertEqual(Journal.objects.get(code='CAI PH').compte_tresorerie.numero, '57100002')
+        self.assertEqual(Journal.objects.get(code='RAN').type, 'an')
+
+    def test_journal_choisi_par_le_compte_de_tresorerie(self):
+        self.assertEqual(moteur.journal_de_tresorerie(_compte('52110002')).code, 'BQ SIB')
+        self.assertEqual(moteur.journal_de_tresorerie(_compte('57100004')).code, 'CAI PP')
+        self.assertEqual(moteur.journal_de_tresorerie(_compte('55800002')).code, 'OD')   # Wave : pas de journal
+
+    def test_ecran(self):
+        admin = User.objects.create_superuser('admin_jx', password='x')
+        html = _client(admin).get(reverse('comptabilite:journaux')).content.decode()
+        self.assertIn('BQ SIB', html)
+        self.assertIn('57100001', html)
+
+
+# ─── Plan tiers de l'expert-comptable ─────────────────────────────────────────
+
+from . import tiers_import  # noqa: E402
+from .models import Tiers  # noqa: E402
+
+
+def _classeur_tiers_sage(lignes):
+    """Classeur présenté comme l'export Sage « Liste des tiers » : bandeau,
+    en-têtes, valeurs décalées par les cellules fusionnées."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append([None] * 9 + ['Liste des tiers'])
+    ws.append(['CENTRE MEDICO-SOCIAL WALE'])
+    ws.append(['Type', None, 'Compte tiers', None, None, None, None, 'Intitulé du tiers', None, None, None, None,
+               None, None, 'Code postal/Ville'])
+    for type_, numero, intitule, ville in lignes:
+        ws.append([type_, numero, None, None, None, intitule, None, None, None, None, None, '', ville])
+    tampon = io.BytesIO()
+    wb.save(tampon)
+    return SimpleUploadedFile('PLAN TIERS.xlsx', tampon.getvalue())
+
+
+class TestPlanTiers(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_tiers', password='x')
+
+    def test_plan_tiers_de_l_expert(self):
+        self.assertEqual(Tiers.objects.count(), 453)
+        self.assertEqual(Tiers.objects.filter(type='salarie').count(), 257)
+        self.assertEqual(Tiers.objects.filter(type='fournisseur').count(), 128)
+        t = Tiers.objects.get(numero='40110002')
+        self.assertEqual((t.intitule, t.type, t.compte_collectif.numero), ('CIE', 'fournisseur', '40110000'))
+        # Le numéro du tiers peut aussi être celui d'un compte : le collectif est son parent.
+        self.assertEqual(Tiers.objects.get(numero='41250001').compte_collectif.numero, '41250000')
+        self.assertEqual(Tiers.objects.get(numero='48124078').compte_collectif.numero, '48124000')
+        self.assertEqual(Tiers.objects.get(numero='42200033').ville, 'TOUMBOKRO')
+        self.assertIsNone(Tiers.objects.get(numero='411TBKRO').compte_collectif)
+
+    def test_lecture_format_sage(self):
+        tiers, anomalies = tiers_import.lire(_classeur_tiers_sage([
+            ('Fournisseur', '40110999', 'NOUVEAU FOURNISSEUR', ''),
+            ('Salarié', '42200999', 'KOUAME JEAN', 'YAMOUSSOUKRO'),
+            ('Salarié', '42200999', 'DOUBLON', ''),
+            ('Client', '411tbkro', 'CAISSE TOUMBOKRO', ''),
+        ]))
+        self.assertEqual(len(anomalies), 1)
+        self.assertEqual(tiers[1], {'numero': '42200999', 'intitule': 'KOUAME JEAN', 'type': 'salarie',
+                                    'ville': 'YAMOUSSOUKRO'})
+        self.assertEqual(tiers[2]['numero'], '411TBKRO')
+
+    def test_apercu_puis_confirmation(self):
+        client = _client(self.admin)
+        url = reverse('comptabilite:plan_tiers_import')
+        client.post(url, {'fichier': _classeur_tiers_sage([
+            ('Fournisseur', '40110999', 'NOUVEAU FOURNISSEUR', ''),
+            ('Fournisseur', '40110002', 'CIE (COMPAGNIE IVOIRIENNE D\'ELECTRICITE)', ''),
+            ('Fournisseur', '40110003', 'SODECI', ''),
+        ])})
+        self.assertFalse(Tiers.objects.filter(numero='40110999').exists())  # rien avant confirmation
+        apercu = client.get(url).content.decode()
+        self.assertIn('NOUVEAU FOURNISSEUR', apercu)
+        client.post(url, {'action': 'confirmer'})
+        self.assertEqual(Tiers.objects.get(numero='40110999').compte_collectif.numero, '40110000')
+        self.assertTrue(Tiers.objects.get(numero='40110002').intitule.startswith('CIE (COMPAGNIE'))
+        self.assertEqual(Tiers.objects.count(), 454)  # rien de supprimé
+
+    def test_export_reimportable(self):
+        t = Tiers.objects.get(numero='411TBKRO')
+        t.compte_collectif = Compte.objects.get(numero='41111000')
+        t.save()
+        reponse = _client(self.admin).get(reverse('comptabilite:plan_tiers_export'))
+        tiers, anomalies = tiers_import.lire(SimpleUploadedFile('plan_tiers.xlsx', reponse.content))
+        self.assertEqual((len(tiers), anomalies), (453, []))
+        rapport = tiers_import.analyser(tiers)
+        self.assertEqual((rapport['identiques'], rapport['nouveaux'], rapport['modifies']), (453, [], []))
+        # Le compte collectif du fichier est repris.
+        tiers[0]['collectif'] = '40112000'
+        tiers_import.appliquer(tiers[:1])
+        self.assertEqual(Tiers.objects.get(numero=tiers[0]['numero']).compte_collectif.numero, '40112000')
+
+    def test_ecran(self):
+        client = _client(self.admin)
+        html = client.get(reverse('comptabilite:plan_tiers'), {'type': 'autre'}).content.decode()
+        self.assertIn('MANOS UNIDAS', html)
+        self.assertNotIn('SODECI', html)
+        self.assertIn('Salarié (257)', html)
+        t = Tiers.objects.get(numero='411TBKRO')
+        client.post(reverse('comptabilite:tiers_modifier', args=[t.pk]), {
+            'numero': t.numero, 'intitule': t.intitule, 'type': 'client',
+            'compte_collectif': Compte.objects.get(numero='41111000').pk, 'ville': '', 'actif': 'on'})
+        t.refresh_from_db()
+        self.assertEqual(t.compte_collectif.numero, '41111000')
+
+    def test_sans_permission(self):
+        user = User.objects.create_user('sans_droit_tiers', password='x')
+        self.assertEqual(_client(user).get(reverse('comptabilite:plan_tiers')).status_code, 403)

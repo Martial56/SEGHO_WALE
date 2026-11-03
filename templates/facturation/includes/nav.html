@@ -1,18 +1,22 @@
 {% load static comptabilite_menu %}
 <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+{% module_de_la_page as module %}
 {% with uname=request.resolver_match.url_name ns=request.resolver_match.namespace %}
 <nav class="o-nav">
   <a href="{% url 'dashboard' %}" class="o-nav-grid" title="Accueil">
     <i class="bi bi-grid-3x3-gap-fill"></i>
   </a>
+  {% comment %}Deux modules partagent cette barre : « Caisse » (session de la
+  caissière, factures, journées) et « Comptabilité » (tout le reste). La page
+  ouverte dit lequel s'affiche — voir comptabilite_menu.module_de_la_page.{% endcomment %}
+  {% if module == 'caisse' %}
   <span class="o-nav-brand">
-    <i class="bi bi-calculator"></i>
-    Comptabilité
+    <i class="bi bi-cash-coin"></i>
+    Caisse
   </span>
 
-  {% comment %}Ma caisse : la session de la caissière (module Comptabilité).
-  Les entrées suivent les droits — encaisser, superviser — et la case de
-  masquage par groupe, comme les autres menus.{% endcomment %}
+  {% comment %}Les entrées suivent les droits — encaisser, superviser — et la
+  case de masquage par groupe, comme les autres menus.{% endcomment %}
   {% if perms.facturation.can_encaisser and 'comptabilite.caisse' not in hidden_navitem_codes %}
   <a href="{% url 'comptabilite:ma_caisse' %}"
     class="o-nav-link {% if ns == 'comptabilite' and uname != 'journees' and uname != 'journee' %}active{% endif %}">
@@ -21,13 +25,12 @@
   {% endif %}
   {% if 'facturation.list' not in hidden_navitem_codes %}
   {% comment %}
-  Marqué actif sur tout ce qui n'est pas un écran de caisse, plutôt que sur une
-  liste de noms de routes. L'ancien test nommait `list`, `create` et `edit` : la
-  fiche d'une facture, son encaissement et son impression laissaient donc
-  l'onglet éteint. Écrit ainsi, toute route ajoutée au module l'allume d'office.
+  Marqué actif sur toute route de facturation, plutôt que sur une liste de
+  noms : la fiche d'une facture, son encaissement et son impression allument
+  l'onglet d'office.
   {% endcomment %}
   <a href="{% url 'facturation:list' %}"
-    class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' != 'caisse' %}active{% endif %}">
+    class="o-nav-link {% if ns == 'facturation' %}active{% endif %}">
     Factures
   </a>
   {% endif %}
@@ -39,6 +42,19 @@
     Journées de caisse
   </a>
   {% endif %}
+  {% endif %}
+
+  {% else %}
+  <span class="o-nav-brand">
+    <i class="bi bi-calculator"></i>
+    Comptabilité
+  </span>
+
+  {% if perms.comptabilite.view_ecriture and 'comptabilite.documents_ventes' not in hidden_navitem_codes %}
+  <a href="{% url 'comptabilite:documents_ventes' %}"
+    class="o-nav-link {% if uname == 'documents_ventes' or uname == 'document_vente' %}active{% endif %}">
+    Documents des ventes
+  </a>
   {% endif %}
 
   {% if perms.facturation.view_facture or perms.comptabilite.superviser_caisse %}
@@ -225,11 +241,11 @@
   {% comment %}Menu Configuration, sur le modèle de l'hospitalisation : chaque
   entrée suit la permission de consultation du modèle qu'elle ouvre, et le menu
   disparaît entièrement quand aucune n'est accordée.{% endcomment %}
-  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
+  {% if perms.facturation.view_caisse or perms.comptabilite.change_motifsortie or perms.comptabilite.change_motifgratuite or perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice or perms.comptabilite.view_journal or perms.comptabilite.view_tiers %}
   {% if 'facturation.config' not in hidden_navitem_codes %}
   <div class="o-nav-dropdown" data-nav-dropdown>
     <button type="button"
-            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' or uname == 'exercices' or uname == 'exercice' %}active{% endif %}"
+            class="o-nav-link {% if ns == 'facturation' and uname|slice:':6' == 'caisse' or uname == 'motifs' or uname == 'motif_modifier' or uname == 'plan_comptable' or uname == 'compte_modifier' or uname == 'correspondances' or uname == 'journaux' or uname|slice:':10' == 'plan_tiers' or uname == 'tiers_modifier' or uname == 'exercices' or uname == 'exercice' %}active{% endif %}"
             style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
       Configuration
       <i class="bi bi-chevron-down" style="font-size:10px;"></i>
@@ -254,7 +270,7 @@
         <i class="bi bi-heart" style="font-size:12px;"></i> Motifs de gratuité
       </a>
       {% endif %}
-      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice %}
+      {% if perms.comptabilite.view_compte or perms.comptabilite.view_correspondance or perms.comptabilite.view_exercice or perms.comptabilite.view_journal or perms.comptabilite.view_tiers %}
       <div class="o-nav-dd-section">Comptabilité générale</div>
       {% if perms.comptabilite.view_exercice %}
       <a href="{% url 'comptabilite:exercices' %}"
@@ -268,6 +284,18 @@
         <i class="bi bi-list-ol" style="font-size:12px;"></i> Plan comptable
       </a>
       {% endif %}
+      {% if perms.comptabilite.view_journal %}
+      <a href="{% url 'comptabilite:journaux' %}"
+         class="{% if uname == 'journaux' %}active{% endif %}">
+        <i class="bi bi-journal-bookmark" style="font-size:12px;"></i> Codes journaux
+      </a>
+      {% endif %}
+      {% if perms.comptabilite.view_tiers %}
+      <a href="{% url 'comptabilite:plan_tiers' %}"
+         class="{% if uname|slice:':10' == 'plan_tiers' or uname == 'tiers_modifier' %}active{% endif %}">
+        <i class="bi bi-people" style="font-size:12px;"></i> Plan tiers
+      </a>
+      {% endif %}
       {% if perms.comptabilite.view_correspondance %}
       <a href="{% url 'comptabilite:correspondances' %}"
          class="{% if uname == 'correspondances' %}active{% endif %}">
@@ -277,6 +305,7 @@
       {% endif %}
     </div>
   </div>
+  {% endif %}
   {% endif %}
   {% endif %}
 </nav>

@@ -90,7 +90,7 @@ def message_sans_session(user):
     if session:
         return (f"Votre session du {session.journee.date_journee:%d/%m/%Y} sur "
                 f"{session.caisse} n'est pas clôturée. Clôturez-la avant d'encaisser.")
-    return "Ouvrez votre caisse avant d'encaisser (menu Comptabilité → Ma caisse)."
+    return "Ouvrez votre caisse avant d'encaisser (module Caisse → Ma caisse)."
 
 
 # ─── Ouvrir ────────────────────────────────────────────────────────────────────

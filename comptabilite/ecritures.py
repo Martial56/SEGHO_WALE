@@ -28,15 +28,15 @@ from django.db import transaction
 from django.db.models import Max, Sum
 from django.utils import timezone
 
-from .models import Compte, Correspondance, Ecriture, Exercice, Journal, LigneEcriture
+from .models import Correspondance, Ecriture, Exercice, Journal, LigneEcriture
 
 ZERO = Decimal('0')
 
-# Journal de trésorerie selon le mode de paiement. Les espèces vont au journal
-# de la caisse ; les modes qui ne sont pas de l'argent reçu (prise en charge
-# d'une assurance, bon) passent en opérations diverses.
-JOURNAL_DU_MODE = {'mobile_money': 'MM', 'cheque': 'BQ', 'virement': 'BQ',
-                   'assurance': 'OD', 'bon': 'OD'}
+# Journaux de l'expert-comptable (codes Sage). L'argent qui entre ou sort
+# d'un compte de trésorerie va dans le journal qui porte ce compte (« CAI AC »
+# pour 57100001, « BQ SIB » pour 52110002…) ; un compte sans journal (Mobile
+# Money, prise en charge d'une assurance, bon) va aux opérations diverses.
+VENTES, ACHATS, OPERATIONS_DIVERSES, A_NOUVEAUX = 'VTE', 'ACH', 'OD', 'RAN'
 
 
 class ErreurCompta(Exception):
@@ -54,20 +54,16 @@ def compte(cle):
 
 
 def compte_de_caisse(caisse):
-    """Sous-compte 571 de la caisse, créé à sa première écriture."""
+    """Compte de la caisse, désigné dans les correspondances (clé
+    « caisse:<code> »). Le plan comptable est celui de l'expert-comptable :
+    aucun sous-compte n'est créé ici, il le crée lui-même."""
     if caisse is None:
         return compte('caisse')
-    cle = f'caisse:{caisse.code}'
-    corr = Correspondance.objects.select_related('compte').filter(cle=cle).first()
-    if corr:
-        return corr.compte
-    racine = compte('caisse').numero
-    rang = 1
-    while Compte.objects.filter(numero=f'{racine}{rang}').exists():
-        rang += 1
-    nouveau = Compte.objects.create(numero=f'{racine}{rang}', intitule=f'Caisse {caisse.nom}')
-    Correspondance.objects.create(cle=cle, libelle=f'Caisse {caisse.nom}', compte=nouveau)
-    return nouveau
+    corr = Correspondance.objects.select_related('compte').filter(cle=f'caisse:{caisse.code}').first()
+    if corr is None:
+        raise ErreurCompta(f"La caisse « {caisse.nom} » n'a pas de compte : désignez son sous-compte 571 "
+                           "dans Comptabilité → Configuration → Correspondances.")
+    return corr.compte
 
 
 def journal(code):
@@ -77,14 +73,14 @@ def journal(code):
     return j
 
 
+def journal_de_tresorerie(compte_):
+    """Le journal de l'expert qui porte ce compte de trésorerie, sinon OD."""
+    j = Journal.objects.filter(compte_tresorerie=compte_, actif=True).first()
+    return j or journal(OPERATIONS_DIVERSES)
+
+
 def journal_de_caisse(caisse):
-    if caisse is None:
-        return journal('CAI')
-    existant = Journal.objects.filter(caisse=caisse).first()
-    if existant:
-        return existant
-    code = f'CA-{caisse.code}'[:12]
-    return Journal.objects.create(code=code, libelle=f'Caisse {caisse.nom}', type='caisse', caisse=caisse)
+    return journal_de_tresorerie(compte_de_caisse(caisse))
 
 
 def exercice_pour(jour):
@@ -126,6 +122,10 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
         raise ErreurCompta("Une écriture compte au moins deux lignes.")
     if debit != credit:
         raise ErreurCompta(f"Écriture déséquilibrée : débit {debit} ≠ crédit {credit}.")
+    for l in lignes:
+        if l[0].totalisation:
+            raise ErreurCompta(f"Le compte {l[0].numero} est un compte de totalisation : "
+                               "il ne reçoit pas d'écriture, choisissez un sous-compte.")
     with transaction.atomic():
         ecriture = Ecriture.objects.create(
             journal=journal_, exercice=exercice_pour(jour), date=jour, libelle=libelle[:255],
@@ -206,7 +206,7 @@ def ecriture_facture(facture):
     lignes = lignes_de_vente(facture)
     if not any(d or c for _, _, d, c, _ in lignes):
         return None                      # facture à 0 F : rien à comptabiliser
-    return creer_ecriture(journal('VTE'), _jour(facture.date_emission),
+    return creer_ecriture(journal(VENTES), _jour(facture.date_emission),
                           f'Facture {facture.numero} — {_nom_patient(facture)}',
                           lignes, piece=facture.numero, origine=origine, centre=facture.centre)
 
@@ -220,16 +220,15 @@ def ecriture_avoir(avoir):
     inverse = [(c, lib, cr, d, t) for c, lib, d, cr, t in lignes_de_vente(facture)]
     if not any(d or c for _, _, d, c, _ in inverse):
         return None
-    return creer_ecriture(journal('VTE'), _jour(avoir.date_creation),
+    return creer_ecriture(journal(VENTES), _jour(avoir.date_creation),
                           f'Avoir {avoir.numero} sur facture {facture.numero}', inverse,
                           piece=avoir.numero, origine=origine, centre=avoir.centre)
 
 
 def _tresorerie(mode, caisse):
     """(compte, journal) de l'argent reçu ou rendu selon le mode."""
-    if mode == 'especes':
-        return compte_de_caisse(caisse), journal_de_caisse(caisse)
-    return compte(f'mode:{mode}'), journal(JOURNAL_DU_MODE.get(mode, 'OD'))
+    tresorerie = compte_de_caisse(caisse) if mode == 'especes' else compte(f'mode:{mode}')
+    return tresorerie, journal_de_tresorerie(tresorerie)
 
 
 def ecriture_remboursement(avoir):
@@ -257,7 +256,8 @@ def ecriture_paiement(paiement):
     facture = paiement.facture
     if paiement.operateur_id:
         # Mobile Money : sur le compte de l'opérateur (Wave, Orange Money…).
-        tresorerie, journal_ = paiement.operateur.compte, journal('MM')
+        tresorerie = paiement.operateur.compte
+        journal_ = journal_de_tresorerie(tresorerie)
     else:
         tresorerie, journal_ = _tresorerie(paiement.mode_paiement, paiement.caisse)
     tiers = _nom_patient(facture)
@@ -304,9 +304,8 @@ def ecriture_ecart(session):
 
 def _tresorerie_recue(mode):
     """(compte, journal) de l'argent reçu hors caisse de guichet."""
-    if mode == 'especes':
-        return compte('caisse'), journal('CAI')
-    return compte(f'mode:{mode}'), journal(JOURNAL_DU_MODE.get(mode, 'BQ'))
+    tresorerie = compte('caisse') if mode == 'especes' else compte(f'mode:{mode}')
+    return tresorerie, journal_de_tresorerie(tresorerie)
 
 
 def ecriture_versement(versement):
@@ -337,10 +336,10 @@ def ecriture_don(don):
             c = compte(f'stock:{l.produit.type}')
             par_compte[c] = par_compte.get(c, ZERO) + l.montant
         debits = [(c, None, m, ZERO, tiers) for c, m in par_compte.items()]
-        journal_ = journal('OD')
+        journal_ = journal(OPERATIONS_DIVERSES)
     elif don.nature == 'nature':
         debits = [(don.compte_actif or compte('don_nature_actif'), None, don.montant, ZERO, tiers)]
-        journal_ = journal('OD')
+        journal_ = journal(OPERATIONS_DIVERSES)
     else:
         debit, journal_ = _tresorerie_recue(don.nature)
         debits = [(debit, None, don.montant, ZERO, tiers)]
@@ -373,7 +372,7 @@ def ecriture_rejet(rejet):
     ecriture_facture(facture)            # la vente d'abord, si elle manque
     debit = compte('patient') if rejet.decision == 'patient' else compte('perte_creance')
     tiers = rejet.assurance.nom
-    return creer_ecriture(journal('OD'), rejet.date,
+    return creer_ecriture(journal(OPERATIONS_DIVERSES), rejet.date,
                           f'Refus {rejet.numero} de {tiers} — facture {facture.numero} ({rejet.get_decision_display().lower()})',
                           [(debit, None, rejet.montant, ZERO, _nom_patient(facture)),
                            (compte('tiers_payant'), None, ZERO, rejet.montant, tiers)],
@@ -391,7 +390,7 @@ def ecriture_facture_fournisseur(facture):
     convention = facture.convention
     lignes = [(l.compte, l.libelle, l.montant, ZERO, tiers, convention) for l in facture.lignes.all()]
     lignes.append((compte('fournisseur'), None, ZERO, facture.montant_total, tiers))
-    return creer_ecriture(journal('ACH'), facture.date,
+    return creer_ecriture(journal(ACHATS), facture.date,
                           f'Facture {facture.reference or facture.numero} — {tiers}', lignes,
                           piece=facture.reference or facture.numero, origine=origine, centre=facture.centre)
 
@@ -402,7 +401,7 @@ def ecriture_reglement_fournisseur(reglement):
         return None
     ct = reglement.compte_tresorerie
     if ct:
-        tresorerie, journal_ = ct.compte, journal('MM' if ct.type == 'mobile_money' else 'BQ')
+        tresorerie, journal_ = ct.compte, journal_de_tresorerie(ct.compte)
     else:
         tresorerie, journal_ = _tresorerie_recue(reglement.mode)
     tiers = reglement.facture.fournisseur
