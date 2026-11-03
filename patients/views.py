@@ -1341,17 +1341,14 @@ def rdv_edit(request, pk):
     droits_rdv = rdv_droits.droits(request.user, rdv)
     ctx_origine = origines_patient.contexte(request)
 
-    try:
-        from facturation.models import Facture
-        facture_payee = Facture.objects.filter(
-            Q(rendez_vous=rdv) | Q(patient=rdv.patient, statut='payee')
-        ).exclude(statut='annulee').exists()
-    except Exception:
-        facture_payee = False
+    # Un rendez-vous ne se confirme qu'une fois sa facture réglée (la part
+    # patient seule pour un assuré) : voir patients.utils.facturation_du_rdv.
+    from patients.utils import facturation_du_rdv
+    facture_rdv, facture_payee = facturation_du_rdv(rdv)
 
     # Une fois confirmé et facturé, le département et le type de consultation
     # ne doivent plus pouvoir être modifiés (la facture est déjà émise dessus).
-    locked_billing = facture_payee and rdv.statut != 'planifie'
+    locked_billing = facture_rdv is not None and rdv.statut != 'planifie'
 
     # Consultation + constante liées à ce RDV
     consultation = None
@@ -1391,6 +1388,14 @@ def rdv_edit(request, pk):
             return JsonResponse({'ok': True, 'heure': tz.localtime().strftime('%H:%M')})
 
         if action == 'save_eval':
+            # Poids, taille et température sont exigés : une évaluation vide
+            # s'enregistrait et laissait passer le patient en attente sans constantes.
+            from patients.utils import constantes_manquantes
+            manquantes = constantes_manquantes(request.POST)
+            if manquantes:
+                messages.error(request, "Évaluation non enregistrée : saisissez " + ', '.join(manquantes) + '.')
+                from django.urls import reverse
+                return redirect(reverse('patients:rdv_edit', kwargs={'pk': rdv.pk}) + '?edit=1')
             # Sauvegarder le médecin sélectionné dans le modal
             medecin_pk = request.POST.get('eval_medecin', '').strip()
             if medecin_pk:
@@ -1453,7 +1458,7 @@ def rdv_edit(request, pk):
                 messages.success(request, 'Rendez-vous confirmé.')
                 return redirect('patients:rdv_global')
             else:
-                messages.error(request, 'Une facture est requise pour confirmer ce rendez-vous.')
+                messages.error(request, "La facture de ce rendez-vous doit être réglée (la part patient, pour un assuré) avant de le confirmer.")
                 return redirect('patients:rdv_global')
 
         if action == 'en_attente':
@@ -1633,6 +1638,7 @@ def rdv_edit(request, pk):
         'titre':         f'Rendez-vous — {rdv.patient.nom} {rdv.patient.prenoms}',
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'facture_rdv':   facture_rdv,
         'peut_modifier': peut_modifier,
         'droits_rdv':    droits_rdv,
         **ctx_origine,

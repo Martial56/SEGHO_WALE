@@ -590,9 +590,24 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
         <div class="cp-actions">
             {% if not rdv %}
                 {# Nouveau RDV — pas encore de boutons d'action #}
-            {% elif rdv.statut == 'planifie' and droits_rdv.confirmer %}
+            {% elif rdv.statut == 'planifie' %}
+                {% comment %}Reprendre la facturation laissée en cours (voir la
+                fiche de rendez-vous des patients, même règle).{% endcomment %}
+                {% if facture_rdv %}
+                {% if not facture_payee %}
+                <a href="{% url 'facturation:detail' facture_rdv.pk %}" class="btn-action btn-ghost">
+                    <i class="bi bi-cash-coin"></i> Encaisser la facture
+                </a>
+                {% endif %}
+                {% elif peut_modifier and perms.facturation.add_facture %}
+                <button type="submit" name="_action" value="créer une facture" class="btn-action btn-ghost">
+                    <i class="bi bi-receipt"></i> Créer la facture
+                </button>
+                {% endif %}
+                {% if droits_rdv.confirmer %}
                 <button type="submit" name="_action" value="confirmer" class="btn-action btn-teal"
-                    {% if not facture_payee %}disabled title="Sauvegardez et créez d'abord une facture pour confirmer ce rendez-vous"{% endif %}>Confirmer</button>
+                    {% if not facture_payee %}disabled title="{% if facture_rdv %}Encaissez d'abord la facture (la part patient, pour un assuré) pour confirmer ce rendez-vous{% else %}Créez et encaissez d'abord la facture de ce rendez-vous pour pouvoir le confirmer{% endif %}"{% endif %}>Confirmer</button>
+                {% endif %}
             {% elif rdv.statut == 'confirme' and droits_rdv.en_attente %}
                 {% if consultation and rdv.medecin %}
                     <button type="submit" name="_action" value="en_attente" class="btn-action btn-waiting">En Attente</button>
@@ -2032,9 +2047,9 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
 
         <!-- Colonne gauche -->
         <div class="em-col">
-          <div class="em-row"><label class="em-lbl">Poids</label><div class="em-wrap"><input type="number" step="0.01" min="0" name="eval_poids" id="em-poids" class="em-inp" value="{{ constante.poids|valeur_champ|default:'' }}" placeholder=""><span class="em-unit">kg</span></div></div>
+          <div class="em-row"><label class="em-lbl">Poids <span style="color:#dc2626;">*</span></label><div class="em-wrap"><input type="number" step="0.01" min="0" name="eval_poids" required id="em-poids" class="em-inp" value="{{ constante.poids|valeur_champ|default:'' }}" placeholder=""><span class="em-unit">kg</span></div></div>
           <div class="em-row"><label class="em-lbl">Taille</label><div class="em-wrap"><input type="number" step="0.01" min="0" name="eval_taille" id="em-taille" class="em-inp" value="{{ constante.taille|valeur_champ|default:'' }}" placeholder=""><span class="em-unit">m</span></div></div>
-          <div class="em-row"><label class="em-lbl">Température</label><div class="em-wrap"><input type="number" step="0.1" min="30" max="45" name="eval_temperature" class="em-inp" value="{{ constante.temperature|valeur_champ|default:'' }}" placeholder="—"><span class="em-unit">°C</span></div></div>
+          <div class="em-row"><label class="em-lbl">Température <span style="color:#dc2626;">*</span></label><div class="em-wrap"><input type="number" step="0.1" min="30" max="45" name="eval_temperature" required class="em-inp" value="{{ constante.temperature|valeur_champ|default:'' }}" placeholder="—"><span class="em-unit">°C</span></div></div>
           <div class="em-row"><label class="em-lbl">Rythme cardiaque</label><div class="em-wrap"><input type="number" min="0" name="eval_pouls" class="em-inp" value="{{ constante.pouls|default:'' }}" placeholder="—"><span class="em-unit">bpm</span></div></div>
           <div class="em-row"><label class="em-lbl">Indice de masse corporelle</label><div class="em-wrap"><span class="em-imc" id="em-imc-val">{% if constante and constante.imc %}{{ constante.imc }}{% else %}—{% endif %}</span></div></div>
           <div class="em-row"><label class="em-lbl">Indice de masse corporelle Statut</label><div class="em-wrap"><span class="em-imc-s" id="em-imc-statut">{% if constante and constante.imc %}{% if constante.imc < 18.5 %}Insuffisance pondérale{% elif constante.imc < 25 %}Normale{% elif constante.imc < 30 %}Surpoids{% else %}Obésité{% endif %}{% endif %}</span></div></div>

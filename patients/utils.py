@@ -75,3 +75,33 @@ def type_visite_curative_obligatoire(rdv):
         return False
     tc = rdv.type_consultation
     return bool(tc and tc.departement and tc.departement.code in CODES_MEDECINE_GENERALE)
+
+
+def facturation_du_rdv(rdv):
+    """(facture, réglée) d'un rendez-vous.
+
+    `facture` : sa dernière facture non annulée, ou None — c'est elle que la
+    fiche propose de reprendre (créer, encaisser). `réglée` dit si le
+    rendez-vous peut être confirmé : le patient ne doit plus rien sur une
+    facture de ce rendez-vous. Pour un patient assuré, seule sa part compte —
+    l'assureur paiera la sienne plus tard (`Facture.reglee_par_le_patient`).
+    Une facture à 0 F (gratuité totale) émise est réglée d'office.
+
+    Auparavant, la simple existence d'une facture suffisait — même impayée —,
+    et n'importe quelle facture payée du patient aussi, fût-elle d'une autre
+    visite : on confirmait des rendez-vous que personne n'avait payés.
+    """
+    from facturation.models import Facture
+    factures = list(Facture.objects.filter(rendez_vous=rdv).exclude(statut='annulee').order_by('-pk'))
+    reglee = any(f.reglee_par_le_patient or (f.statut != 'brouillon' and f.solde_restant <= 0)
+                 for f in factures)
+    return (factures[0] if factures else None), reglee
+
+
+# Constantes sans lesquelles l'évaluation clinique ne s'enregistre pas.
+CONSTANTES_OBLIGATOIRES = [('eval_poids', 'le poids'), ('eval_temperature', 'la température')]
+
+
+def constantes_manquantes(post):
+    """Libellés des constantes obligatoires laissées vides dans le formulaire d'évaluation."""
+    return [libelle for cle, libelle in CONSTANTES_OBLIGATOIRES if not (post.get(cle) or '').strip()]

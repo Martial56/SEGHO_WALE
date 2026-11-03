@@ -1400,18 +1400,14 @@ def gynecologie_rdv_detail(request, pk):
     rdv = get_object_or_404(RendezVous, pk=pk)
     medecins = Medecin.objects.all().order_by('employe__nom')
 
-    try:
-        from facturation.models import Facture
-        facture_payee = Facture.objects.filter(
-            Q(rendez_vous=rdv) | Q(patient=rdv.patient, statut='payee')
-        ).exclude(statut='annulee').exists()
-    except Exception as _e:
-        import logging; logging.getLogger(__name__).warning('facture_payee check failed: %s', _e)
-        facture_payee = False
+    # Un rendez-vous ne se confirme qu'une fois sa facture réglée (la part
+    # patient seule pour un assuré) : voir patients.utils.facturation_du_rdv.
+    from patients.utils import facturation_du_rdv
+    facture_rdv, facture_payee = facturation_du_rdv(rdv)
 
     # Une fois confirmé et facturé, le département et le type de consultation
     # ne doivent plus pouvoir être modifiés (la facture est déjà émise dessus).
-    locked_billing = facture_payee and rdv.statut != 'planifie'
+    locked_billing = facture_rdv is not None and rdv.statut != 'planifie'
 
     # Chaque étape a sa permission (cf. patients/rdv_droits.py) : `peut_modifier`
     # vaut pour le statut actuel, `droits_rdv` pour les boutons de changement d'état.
@@ -1455,6 +1451,13 @@ def gynecologie_rdv_detail(request, pk):
             return JsonResponse({'ok': True, 'heure': timezone.localtime().strftime('%H:%M')})
 
         if action == 'save_eval':
+            # Poids, taille et température sont exigés (même règle que
+            # patients.views.rdv_edit).
+            from patients.utils import constantes_manquantes
+            manquantes = constantes_manquantes(request.POST)
+            if manquantes:
+                messages.error(request, "Évaluation non enregistrée : saisissez " + ', '.join(manquantes) + '.')
+                return redirect('gynecologie_rdv_detail', pk=rdv.pk)
             # Sauvegarder le médecin sélectionné dans le modal
             medecin_pk = request.POST.get('eval_medecin', '').strip()
             if medecin_pk:
@@ -1508,7 +1511,7 @@ def gynecologie_rdv_detail(request, pk):
                 log_event(rdv, request.user, 'État : Brouillon → Confirmer', type='statut')
                 messages.success(request, 'Rendez-vous confirmé.')
             else:
-                messages.error(request, 'Une facture est requise pour confirmer ce rendez-vous.')
+                messages.error(request, "La facture de ce rendez-vous doit être réglée (la part patient, pour un assuré) avant de le confirmer.")
             return redirect('gynecologie_rdv')
 
         if action == 'en_attente':
@@ -1633,6 +1636,7 @@ def gynecologie_rdv_detail(request, pk):
         'is_new': False,
         'patient_prefill': rdv.patient,
         'facture_payee': facture_payee,
+        'facture_rdv': facture_rdv,
         'peut_modifier': peut_modifier,
         'droits_rdv': droits_rdv,
         'consultation': consultation,

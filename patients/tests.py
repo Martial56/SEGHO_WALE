@@ -460,6 +460,105 @@ class TestLaBarreDActionDuRendezVousEnConsultation(TestCase):
         self.assertIn('name="_apres"', html)
 
 
+class TestLaFacturationDuRdvSeReprend(TestCase):
+    """Quitter l'écran de facturation (ou d'encaissement) sans terminer
+    laissait le rendez-vous « planifié » sans aucun moyen de reprendre : la
+    fiche n'offrait que « Confirmer », grisé faute de facture."""
+
+    LIRE = 'patients.view_rendezvous'
+
+    def setUp(self):
+        self.patient = _patient()
+        self.rdv = RendezVous.objects.create(patient=self.patient, date_heure=timezone.now(), statut='planifie')
+        self.url = reverse('patients:rdv_edit', args=[self.rdv.pk])
+
+    def test_sans_facture_on_peut_la_creer(self):
+        _avec('u_rdv_fac', self.LIRE, 'patients.change_rendezvous', 'facturation.add_facture')
+        html = _page('u_rdv_fac', self.url)
+        self.assertIn('value="créer une facture"', html)
+
+    def test_sans_le_droit_de_facturer_le_bouton_se_tait(self):
+        _avec('u_rdv_nofac', self.LIRE, 'patients.change_rendezvous')
+        self.assertNotIn('value="créer une facture"', _page('u_rdv_nofac', self.url))
+
+    def test_une_facture_non_soldee_se_reprend_a_l_encaissement(self):
+        from decimal import Decimal
+        from facturation.models import Facture
+        facture = Facture.objects.create(patient=self.patient, rendez_vous=self.rdv, type_facture='consultation',
+                                         statut='emise', montant_total=Decimal('5000'))
+        _avec('u_rdv_enc', self.LIRE, 'patients.change_rendezvous', 'facturation.add_facture')
+        html = _page('u_rdv_enc', self.url)
+        self.assertIn('Encaisser la facture', html)
+        self.assertIn(reverse('facturation:detail', args=[facture.pk]), html)
+        self.assertNotIn('value="créer une facture"', html)
+
+    def test_facture_reglee_ni_lien_ni_numero_sur_la_fiche(self):
+        facture = self._facture('10000', statut='payee')
+        User.objects.create_superuser('u_rdv_regle', password='x')
+        html = _page('u_rdv_regle', self.url)
+        self.assertNotIn(facture.numero, html)
+        self.assertNotIn('Encaisser la facture', html)
+        self.assertNotIn('value="créer une facture"', html)
+
+    # ── Un rendez-vous ne se confirme qu'une fois sa facture réglée ──
+
+    def _facture(self, montant_paye, statut='emise', **kw):
+        from decimal import Decimal
+        from facturation.models import Facture
+        return Facture.objects.create(patient=self.patient, rendez_vous=self.rdv, type_facture='consultation',
+                                      statut=statut, montant_total=Decimal('10000'),
+                                      montant_paye=Decimal(montant_paye), **kw)
+
+    def _confirmer(self):
+        if not User.objects.filter(username='u_rdv_conf').exists():
+            User.objects.create_superuser('u_rdv_conf', password='x')
+        client = Client()
+        client.login(username='u_rdv_conf', password='x')
+        client.post(self.url, {'_action': 'confirmer'})
+        self.rdv.refresh_from_db()
+        return self.rdv.statut
+
+    def test_facture_impayee_ne_confirme_pas(self):
+        self._facture('4000')
+        self.assertEqual(self._confirmer(), 'planifie')
+        User.objects.create_superuser('u_rdv_vue', password='x')
+        html = _page('u_rdv_vue', self.url)
+        self.assertIn("Encaissez d'abord la facture", html)
+
+    def test_facture_payee_confirme(self):
+        self._facture('10000', statut='payee')
+        self.assertEqual(self._confirmer(), 'confirme')
+
+    def test_assure_seule_la_part_patient_compte(self):
+        from decimal import Decimal
+        from patients.models import Assurance
+        mugef = Assurance.objects.create(nom='MUGEF-CI', code='MUGEF', taux_prise_en_charge=Decimal('80'))
+        facture = self._facture('1000', assurance=mugef, montant_assurance=Decimal('8000'))
+        self.assertEqual(self._confirmer(), 'planifie')      # part patient : 2 000, payé 1 000
+        facture.montant_paye = Decimal('2000')
+        facture.save(update_fields=['montant_paye'])
+        self.assertEqual(self._confirmer(), 'confirme')      # l'assureur doit encore 8 000
+
+    def test_une_autre_facture_payee_du_patient_ne_suffit_plus(self):
+        from decimal import Decimal
+        from facturation.models import Facture
+        Facture.objects.create(patient=self.patient, type_facture='consultation', statut='payee',
+                               montant_total=Decimal('5000'), montant_paye=Decimal('5000'))
+        self.assertEqual(self._confirmer(), 'planifie')
+
+    def test_gratuite_totale_confirme(self):
+        from decimal import Decimal
+        from facturation.models import Facture
+        Facture.objects.create(patient=self.patient, rendez_vous=self.rdv, type_facture='consultation',
+                               statut='emise', montant_total=Decimal('0'))
+        self.assertEqual(self._confirmer(), 'confirme')
+
+    def test_meme_reprise_sur_la_fiche_de_gynecologie(self):
+        User.objects.create_superuser('u_rdv_gyn', password='x')
+        html = _page('u_rdv_gyn', reverse('gynecologie_rdv_detail', args=[self.rdv.pk]))
+        self.assertIn('value="créer une facture"', html)
+
+
 class TestLesDroitsParEtapeDuRendezVous(TestCase):
     """Chaque étape de la fiche a sa permission (cf. patients/rdv_droits.py).
 
@@ -688,8 +787,8 @@ class TestLInfirmierEvalueEncoreUnRdvEnAttente(TestCase):
     def _evaluer(self, username, url):
         client = Client()
         client.login(username=username, password='x')
-        return client.post(url, {'_action': 'save_eval', 'eval_poids': '70',
-                                 'eval_medecin': self.medecin.pk})
+        return client.post(url, {'_action': 'save_eval', 'eval_poids': '70', 'eval_taille': '1.70',
+                                 'eval_temperature': '37', 'eval_medecin': self.medecin.pk})
 
     def test_en_attente_l_infirmier_modifie_l_evaluation_et_le_medecin(self):
         rdv, url = self._rdv('en_attente')
@@ -709,7 +808,8 @@ class TestLInfirmierEvalueEncoreUnRdvEnAttente(TestCase):
         self.assertEqual(rdv.statut, 'confirme')
 
         # Évaluation sans médecin : toujours refusé.
-        client.post(url, {'_action': 'save_eval', 'eval_poids': '70'})
+        client.post(url, {'_action': 'save_eval', 'eval_poids': '70', 'eval_taille': '1.70',
+                          'eval_temperature': '37'})
         client.post(url, {'_action': 'en_attente'})
         rdv.refresh_from_db()
         self.assertEqual(rdv.statut, 'confirme')
@@ -718,6 +818,28 @@ class TestLInfirmierEvalueEncoreUnRdvEnAttente(TestCase):
         client.post(url, {'_action': 'en_attente', 'medecin': self.medecin.pk})
         rdv.refresh_from_db()
         self.assertEqual(rdv.statut, 'en_attente')
+
+    def test_poids_et_temperature_sont_obligatoires(self):
+        rdv, url = self._rdv('confirme')
+        client = Client()
+        client.login(username='u_inf_eval', password='x')
+        reponse = client.post(url, {'_action': 'save_eval', 'eval_taille': '1.70',
+                                    'eval_medecin': self.medecin.pk}, follow=True)
+        self.assertContains(reponse, 'saisissez le poids, la température')
+        rdv.refresh_from_db()
+        self.assertFalse(hasattr(rdv, 'consultation') and rdv.consultation.pk)
+        self.assertIsNone(rdv.medecin)
+        # Poids et température sont marqués obligatoires à l'écran ; la taille non.
+        html = _page('u_inf_eval', url)
+        for nom in ('eval_poids', 'eval_temperature'):
+            self.assertRegex(html, f'name="{nom}" required')
+        self.assertNotRegex(html, 'name="eval_taille" required')
+
+        # Sans la taille, l'évaluation s'enregistre.
+        client.post(url, {'_action': 'save_eval', 'eval_poids': '70', 'eval_temperature': '37',
+                          'eval_medecin': self.medecin.pk})
+        rdv.refresh_from_db()
+        self.assertEqual(float(rdv.consultation.constantes.poids), 70)
 
     def test_une_fois_la_consultation_commencee_c_est_fini(self):
         rdv, url = self._rdv('en_consultation')
