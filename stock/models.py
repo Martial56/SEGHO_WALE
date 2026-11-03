@@ -239,6 +239,7 @@ class MouvementStock(models.Model):
     TYPE_CHOICES = [
         ('entree',        'Entrée en stock'),
         ('livraison',     'Livraison pharmacie'),
+        ('distribution_service', 'Distribution à un service'),
         ('prescription',  'Dispensation ordonnance'),
         ('ajustement',    'Ajustement inventaire'),
         ('peremption',    'Péremption'),
@@ -247,6 +248,7 @@ class MouvementStock(models.Model):
     MOTIF_CHOICES = [
         ('achat',         'Achat fournisseur'),
         ('livraison',     'Livraison à une pharmacie'),
+        ('distribution_service', 'Distribution à un service'),
         ('prescription',  'Ordonnance médicale'),
         ('inventaire',    'Inventaire'),
         ('peremption',    'Péremption / Perte'),
@@ -259,6 +261,21 @@ class MouvementStock(models.Model):
     type        = models.CharField(max_length=20, choices=TYPE_CHOICES)
     motif       = models.CharField(max_length=20, choices=MOTIF_CHOICES, blank=True)
     pharmacie   = models.CharField(max_length=30, choices=PHARMACIES, blank=True)
+    # Distribution interne (ménage, buanderie...) : destinataire distinct des
+    # pharmacies, qui ont leur propre champ `pharmacie` (une chaîne à choix
+    # fixes, pas une relation — les services, eux, sont déjà un modèle).
+    service     = models.ForeignKey(
+        'medecins.Service', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='distributions_stock', verbose_name="Service destinataire",
+    )
+    # Service n'est pas cloisonné par site (un même Service, ex. « Ménage »,
+    # existe pour les deux centres) : le centre se précise donc à part, pour
+    # savoir laquelle des deux équipes (Yamoussoukro ou Toumbokro) a reçu
+    # l'envoi.
+    centre      = models.ForeignKey(
+        'centres.Centre', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='distributions_stock', verbose_name="Centre destinataire",
+    )
     quantite    = models.DecimalField(max_digits=12, decimal_places=2)
     stock_avant = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     stock_apres = models.DecimalField(max_digits=12, decimal_places=2, default=0)

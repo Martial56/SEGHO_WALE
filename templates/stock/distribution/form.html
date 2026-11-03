@@ -1,0 +1,309 @@
+{% extends 'stock/base.html' %}
+{% load static %}
+{% block topbar_title %}Stock — Distribution aux services{% endblock %}
+
+{% block extra_st_css %}<style>
+.content { padding-top: 0; }
+.dist-section { background:var(--st-100); padding:8px 16px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--accent-text); border-top:1px solid var(--st-200); border-bottom:1px solid var(--st-200); display:flex; align-items:center; gap:7px; }
+.stock-sys { font-family: var(--font-mono); font-size:12.5px; font-weight:700; color:var(--accent-text-soft); }
+.st-search {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1.5px solid rgba(0,0,0,.18); padding: 5px 6px;
+  background: transparent; min-width: 200px;
+}
+.st-search input { border: none; background: transparent; font-size: 13px; color: var(--st-text); outline: none; width: 100%; }
+.st-search i { color: var(--st-muted); font-size: 14px; margin-right: 6px; }
+.st-filter-select {
+  border: none; border-bottom: 1.5px solid rgba(0,0,0,.18);
+  border-radius: 0; background: transparent; padding: 5px 22px 5px 4px;
+  font-size: 12.5px; color: var(--st-text); font-family: inherit;
+  cursor: pointer; outline: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 4px center;
+}
+.st-filter-select:focus { border-bottom-color: var(--st-500); outline: none; }
+.action-bar-buttons { flex-wrap: wrap; }
+.dist-centre-pill {
+  display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  color:var(--st-text); border:1.5px solid var(--st-border); border-radius:20px;
+  padding:5px 12px; cursor:pointer; transition:all .15s; white-space:nowrap;
+}
+.dist-centre-pill i { color:var(--accent-text-soft); }
+.dist-centre-pill:hover { border-color:var(--st-400); }
+
+/* ── Mise en page panier : navigation à gauche, panier collant à droite ── */
+.dist-layout { display:grid; grid-template-columns: 1fr 340px; gap:16px; align-items:start; padding:16px 32px 28px; }
+@media (max-width: 1100px) { .dist-layout { grid-template-columns: 1fr; } }
+
+.dist-browse { background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; }
+.dist-prod-row { display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--st-border); }
+.dist-prod-row:hover { background:var(--st-50); }
+.dist-prod-code { font-family: var(--font-mono); font-size:10.5px; color:var(--accent-text-soft); white-space:nowrap; width:92px; flex-shrink:0; }
+.dist-prod-nom { flex:1; min-width:0; }
+.dist-prod-nom .n { font-weight:600; font-size:13px; }
+.dist-qte-step { width:56px; border:1px solid var(--st-border); border-radius:6px; padding:4px 4px; font-size:12.5px; text-align:center; font-family:inherit; background:var(--st-surface); color:var(--st-text); }
+.btn-ajouter-panier {
+  display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700;
+  padding:5px 11px; border-radius:6px; border:1px solid var(--st-600); background:var(--st-600);
+  color:#fff; cursor:pointer; white-space:nowrap; transition:background .15s;
+}
+.btn-ajouter-panier:hover { background:var(--teal-700,var(--st-700)); }
+.btn-ajouter-panier.deja-ajoute { background:var(--st-surface); color:var(--accent-text-soft); border-color:var(--st-300); }
+
+/* ── Panier ── */
+.panier-card { position:sticky; top:16px; background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
+.panier-header { padding:14px 18px; border-bottom:1px solid var(--st-border); display:flex; align-items:center; justify-content:space-between; }
+.panier-header .titre { font-size:14px; font-weight:800; color:var(--st-900); display:flex; align-items:center; gap:8px; }
+.panier-count { background:var(--st-600); color:#fff; font-size:11px; font-weight:800; border-radius:12px; min-width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px; }
+.panier-body { overflow-y:auto; flex:1; }
+.panier-vide { text-align:center; padding:36px 18px; color:var(--st-muted); font-size:12.5px; }
+.panier-ligne { display:flex; align-items:center; gap:8px; padding:10px 18px; border-bottom:1px solid var(--st-border); }
+.panier-ligne .nom { flex:1; min-width:0; font-size:12.5px; font-weight:600; color:var(--st-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.panier-ligne .nom small { display:block; font-weight:400; color:var(--st-muted); font-size:10.5px; }
+.panier-qte-edit { width:50px; border:1px solid var(--st-border); border-radius:6px; padding:3px 4px; font-size:12px; text-align:center; font-family:inherit; background:var(--st-surface); color:var(--st-text); }
+.panier-retirer { border:none; background:none; color:var(--rose-text); cursor:pointer; font-size:15px; line-height:1; padding:2px 4px; }
+.panier-footer { padding:14px 18px; border-top:1px solid var(--st-border); background:var(--st-50); }
+.panier-footer .form-field { margin-bottom:10px; }
+</style>{% endblock %}
+
+{% block content %}
+<form id="dist-form" method="post" novalidate>
+{% csrf_token %}
+
+<div class="action-bar">
+  <div class="action-bar-breadcrumb">
+    <a href="{% url 'stock_mouvements' %}"><i class="bi bi-arrow-left"></i> Mouvements</a>
+    <span class="sep">/</span>
+    <span class="current">Distribution aux services</span>
+  </div>
+  <div class="action-bar-buttons" style="align-items:center;gap:14px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="field-label" style="margin:0;">Centre <span class="required-star">*</span></span>
+      {% for c in centres %}
+      <label class="dist-centre-pill" id="centre-label-{{ c.pk }}" onclick="selectCentre('{{ c.pk }}')">
+        <input type="radio" name="centre" value="{{ c.pk }}" id="centre-{{ c.pk }}" style="display:none;">
+        <i class="bi bi-building"></i> {{ c.nom|cut:"CMS WALE " }}
+      </label>
+      {% endfor %}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label for="id_service" class="field-label" style="margin:0;">Service <span class="required-star">*</span></label>
+      <select name="service" id="id_service" class="field-ul" style="width:180px;" required>
+        <option value="">— Sélectionner —</option>
+        {% for s in services %}
+        <option value="{{ s.pk }}">{{ s.nom }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">Annuler</a>
+  </div>
+</div>
+
+{% if errors.service or errors.centre or errors.lignes %}
+<div style="margin:16px 32px 0;padding:10px 14px;background:rgba(var(--rose-rgb),.08);border:1px solid rgba(var(--rose-rgb),.25);border-radius:8px;">
+  {% if errors.centre %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.centre }}</div>{% endif %}
+  {% if errors.service %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.service }}</div>{% endif %}
+  {% if errors.lignes %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.lignes }}</div>{% endif %}
+</div>
+{% endif %}
+
+<div class="dist-layout">
+
+  <!-- ── Colonne de gauche : parcourir et ajouter au panier ── -->
+  <div>
+    <div class="dist-browse">
+      <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+        <div class="st-card-title"><i class="bi bi-boxes" style="color:var(--accent-text-soft);"></i> Produits disponibles</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="st-search">
+            <i class="bi bi-search"></i>
+            <input type="text" id="dist-search" placeholder="Code, nom ou DCI…">
+          </div>
+          <select id="dist-f-type" class="st-filter-select">
+            <option value="">Tous les types</option>
+            <option value="consommable">Consommables</option>
+            <option value="equipement">Équipements</option>
+          </select>
+          <select id="dist-f-categorie" class="st-filter-select">
+            <option value="">Toutes les catégories</option>
+            {% for cat in categories %}
+            <option value="{{ cat.pk }}">{{ cat.nom }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      {% regroup produits by type as produits_par_type %}
+      {% for groupe in produits_par_type %}
+      <div class="dist-group-row" data-groupe="{{ groupe.grouper }}">
+        <div class="dist-section">
+          {% if groupe.grouper == 'consommable' %}<i class="bi bi-bandaid"></i> Consommables médicaux
+          {% else %}<i class="bi bi-tools"></i> Équipements{% endif %}
+          <span style="font-size:10px;font-weight:400;color:var(--st-muted);">({{ groupe.list|length }} produit{{ groupe.list|length|pluralize }})</span>
+        </div>
+        {% for p in groupe.list %}
+        <div class="dist-prod-row" data-groupe="{{ p.type }}" data-cat="{{ p.categorie_id|default:'' }}"
+             data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.dci|default:''|lower }}">
+          <span class="dist-prod-code">{{ p.code }}</span>
+          <div class="dist-prod-nom">
+            <div class="n">{{ p.nom }}</div>
+            <div style="font-size:10.5px;color:var(--st-muted);">
+              Stock : <span class="stock-sys">{{ p.stock_actuel|floatformat:0 }}</span> {{ p.unite_mesure.nom }}
+            </div>
+          </div>
+          <input type="number" class="dist-qte-step" id="step-{{ p.pk }}" min="1" step="1" value="1" aria-label="Quantité à ajouter">
+          <button type="button" class="btn-ajouter-panier" id="btn-add-{{ p.pk }}"
+            onclick="panierAjouter('{{ p.pk }}', '{{ p.nom|escapejs }}', '{{ p.unite_mesure.nom|default:''|escapejs }}')">
+            <i class="bi bi-cart-plus"></i> Ajouter
+          </button>
+          <input type="hidden" name="qte_{{ p.pk }}" id="qte-hidden-{{ p.pk }}" value="">
+        </div>
+        {% endfor %}
+      </div>
+      {% empty %}
+      <div style="text-align:center;padding:48px;color:var(--st-muted);">
+        <i class="bi bi-inbox" style="font-size:28px;display:block;margin-bottom:10px;opacity:.4;"></i>
+        Aucun consommable ou équipement actif dans le stock central.
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Colonne de droite : panier + destinataire + confirmation ── -->
+  <div class="panier-card">
+    <div class="panier-header">
+      <span class="titre"><i class="bi bi-cart3" style="color:var(--accent-text-soft);"></i> Panier</span>
+      <span class="panier-count" id="panier-count">0</span>
+    </div>
+
+    <div class="panier-body" id="panier-liste">
+      <div class="panier-vide">Aucun produit ajouté pour l'instant.</div>
+    </div>
+
+    <div class="panier-footer">
+      <div class="form-field">
+        <label for="id_notes" class="field-label">Notes</label>
+        <textarea id="id_notes" name="notes" class="field-ul" rows="1" placeholder="Période concernée, remarques…"></textarea>
+      </div>
+      <button type="submit" class="btn-form-submit" id="btn-confirmer" style="width:100%;justify-content:center;" disabled
+        onclick="return confirm('Confirmer la sortie du stock ? Le stock central sera débité immédiatement.');">
+        <i class="bi bi-send"></i> Confirmer la sortie
+      </button>
+    </div>
+  </div>
+
+</div>
+
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  "use strict";
+  var champRecherche = document.getElementById("dist-search");
+  var champType = document.getElementById("dist-f-type");
+  var champCategorie = document.getElementById("dist-f-categorie");
+  var minuteur;
+
+  function filtrerProduits() {
+    var q = (champRecherche.value || "").trim().toLowerCase();
+    var type = champType.value;
+    var catId = champCategorie.value;
+    var comptes = {};
+    document.querySelectorAll(".dist-prod-row").forEach(function (row) {
+      var visible = (!q || row.dataset.search.indexOf(q) !== -1)
+                 && (!type || row.dataset.groupe === type)
+                 && (!catId || row.dataset.cat === catId);
+      row.style.display = visible ? "" : "none";
+      if (visible) comptes[row.dataset.groupe] = (comptes[row.dataset.groupe] || 0) + 1;
+    });
+    document.querySelectorAll(".dist-group-row").forEach(function (grp) {
+      grp.style.display = comptes[grp.dataset.groupe] ? "" : "none";
+    });
+  }
+
+  if (champRecherche) {
+    champRecherche.addEventListener("input", function () {
+      clearTimeout(minuteur);
+      minuteur = setTimeout(filtrerProduits, 150);
+    });
+  }
+  if (champType) champType.addEventListener("change", filtrerProduits);
+  if (champCategorie) champCategorie.addEventListener("change", filtrerProduits);
+}());
+
+function selectCentre(val) {
+  document.querySelectorAll('input[name="centre"]').forEach(function(r) { r.checked = false; });
+  document.querySelectorAll('[id^="centre-label-"]').forEach(function(el) {
+    el.style.borderColor = 'var(--st-border)';
+    el.style.background = '';
+  });
+  var input = document.getElementById('centre-' + val);
+  var label = document.getElementById('centre-label-' + val);
+  if (input) input.checked = true;
+  if (label) { label.style.borderColor = 'var(--st-600)'; label.style.background = 'rgba(var(--st-700-rgb),.06)'; }
+}
+
+/* ── Panier : ajoute/retire des produits, pose la quantité dans le champ
+   caché qte_<pk> que la vue lit déjà tel quel — aucun changement côté
+   serveur, seule la présentation change. ── */
+var panier = {};
+
+function panierAjouter(pk, nom, unite) {
+  var pas = document.getElementById('step-' + pk);
+  var qte = parseInt(pas.value, 10);
+  if (!qte || qte < 1) qte = 1;
+  panier[pk] = { nom: nom, unite: unite, qte: qte };
+  document.getElementById('qte-hidden-' + pk).value = qte;
+  var btn = document.getElementById('btn-add-' + pk);
+  if (btn) { btn.classList.add('deja-ajoute'); btn.innerHTML = '<i class="bi bi-check-lg"></i> Dans le panier'; }
+  rafraichirPanier();
+}
+
+function panierModifierQte(pk, valeur) {
+  var qte = parseInt(valeur, 10);
+  if (!panier[pk]) return;
+  if (!qte || qte < 1) {
+    panierRetirer(pk);
+    return;
+  }
+  panier[pk].qte = qte;
+  document.getElementById('qte-hidden-' + pk).value = qte;
+}
+
+function panierRetirer(pk) {
+  delete panier[pk];
+  var hidden = document.getElementById('qte-hidden-' + pk);
+  if (hidden) hidden.value = '';
+  var btn = document.getElementById('btn-add-' + pk);
+  if (btn) { btn.classList.remove('deja-ajoute'); btn.innerHTML = '<i class="bi bi-cart-plus"></i> Ajouter'; }
+  rafraichirPanier();
+}
+
+function rafraichirPanier() {
+  var liste = document.getElementById('panier-liste');
+  var pks = Object.keys(panier);
+  document.getElementById('panier-count').textContent = pks.length;
+  document.getElementById('btn-confirmer').disabled = pks.length === 0;
+
+  if (!pks.length) {
+    liste.innerHTML = '<div class="panier-vide">Aucun produit ajouté pour l\'instant.</div>';
+    return;
+  }
+  liste.innerHTML = pks.map(function (pk) {
+    var it = panier[pk];
+    return (
+      '<div class="panier-ligne">' +
+        '<div class="nom">' + it.nom + '<small>' + it.unite + '</small></div>' +
+        '<input type="number" class="panier-qte-edit" min="1" step="1" value="' + it.qte + '" ' +
+          'onchange="panierModifierQte(\'' + pk + '\', this.value)">' +
+        '<button type="button" class="panier-retirer" title="Retirer" onclick="panierRetirer(\'' + pk + '\')">' +
+          '<i class="bi bi-x-lg"></i>' +
+        '</button>' +
+      '</div>'
+    );
+  }).join('');
+}
+</script>
+{% endblock %}

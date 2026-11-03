@@ -366,7 +366,7 @@ def produit_edit(request, pk):
 
 @login_required(login_url='login')
 def mouvements_list(request):
-    qs = MouvementStock.objects.select_related('produit', 'produit__unite_mesure').order_by('-date')
+    qs = MouvementStock.objects.select_related('produit', 'produit__unite_mesure', 'service', 'centre').order_by('-date')
     type_filtre = request.GET.get('type', '')
     periode     = request.GET.get('periode', '')
     q           = request.GET.get('q', '').strip()
@@ -2411,62 +2411,124 @@ def import_produits_modele(request):
 
 
 # ---------------------------------------------------------------------------
-# Transfert interne
+# Distribution aux services internes (ménage, buanderie...)
 # ---------------------------------------------------------------------------
 
 @login_required(login_url='login')
-def transfert_create(request):
+def distribution_service_create(request):
+    """Sortie de consommables/équipements du stock central vers un service
+    interne (ménage, buanderie...), selon sa consommation mensuelle ou
+    hebdomadaire — distincte de la dotation aux pharmacies (stock/dotation/),
+    qui passe par une demande et une validation FEFO propres à
+    DemandePharmacie. Ici la sortie est directe (pas de demande préalable),
+    mais suit le même FEFO pour ne jamais distribuer un lot déjà périmé alors
+    qu'un lot valide existe encore."""
     if not can_manage_stock(request.user):
         raise PermissionDenied
-    from .models import PHARMACIES
-    produits = Produit.objects.filter(actif=True, stock_actuel__gt=0).order_by('nom')
-    errors = {}
-    if request.method == 'POST':
-        produit_pk = request.POST.get('produit', '')
-        pharmacie  = request.POST.get('pharmacie', '')
-        notes      = request.POST.get('notes', '').strip()
-        try:
-            quantite = float(request.POST.get('quantite', 0) or 0)
-        except ValueError:
-            quantite = 0
+    from medecins.models import Service
+    from centres.models import Centre
 
-        produit = Produit.objects.filter(pk=produit_pk).first()
-        if not produit:
-            errors['produit'] = 'Sélectionnez un produit.'
-        if not pharmacie:
-            errors['pharmacie'] = 'Sélectionnez la pharmacie destinataire.'
-        if quantite <= 0:
-            errors['quantite'] = 'La quantité doit être supérieure à 0.'
-        elif produit and float(produit.stock_actuel) < quantite:
-            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure.nom if produit.unite_mesure else ""}.'
+    services = Service.objects.filter(actif=True).order_by('nom')
+    centres  = Centre.objects.filter(actif=True).order_by('nom')
+    produits = list(
+        Produit.objects.filter(actif=True, type__in=['consommable', 'equipement'])
+        .select_related('unite_mesure', 'categorie').order_by('type', 'nom')
+    )
+    categories = CategorieStock.objects.filter(actif=True).order_by('nom')
+    errors = {}
+
+    if request.method == 'POST':
+        service_pk = request.POST.get('service', '')
+        centre_pk  = request.POST.get('centre', '')
+        notes      = request.POST.get('notes', '').strip()
+        service    = Service.objects.filter(pk=service_pk, actif=True).first()
+        centre     = Centre.objects.filter(pk=centre_pk, actif=True).first()
+        if not service:
+            errors['service'] = 'Sélectionnez le service destinataire.'
+        if not centre:
+            errors['centre'] = 'Sélectionnez le centre destinataire.'
+
+        lignes_demandees = []
+        for p in produits:
+            val = request.POST.get(f'qte_{p.pk}', '').strip()
+            if not val:
+                continue
+            try:
+                qte = float(val)
+            except ValueError:
+                continue
+            if qte > 0:
+                lignes_demandees.append((p, qte))
+        if not lignes_demandees:
+            errors['lignes'] = 'Ajoutez au moins un produit avec une quantité.'
 
         if not errors:
+            today = timezone.now().date()
+            reference = f"DIST{today:%Y%m%d}-{centre.code}-{service.code}"
+            manque_stock = []
             with transaction.atomic():
-                produit = Produit.objects.select_for_update().get(pk=produit.pk)
-                if float(produit.stock_actuel) < quantite:
-                    errors['quantite'] = 'Stock insuffisant (modifié entre-temps).'
-                else:
-                    stock_avant = float(produit.stock_actuel)
-                    stock_apres = stock_avant - quantite
-                    pharma_label = dict(PHARMACIES).get(pharmacie, pharmacie)
-                    MouvementStock.objects.create(
-                        produit=produit, type='livraison', motif='livraison',
-                        pharmacie=pharmacie,
-                        quantite=quantite, stock_avant=stock_avant, stock_apres=stock_apres,
-                        notes=notes, cree_par=request.user,
-                        reference=f'Livraison → {pharma_label}',
-                    )
-                    produit.stock_actuel = stock_apres
-                    produit.save(update_fields=['stock_actuel'])
-            if not errors:
-                messages.success(request, f'{quantite} {produit.unite_mesure.nom if produit.unite_mesure else ""} de « {produit.nom} » livrés à {pharma_label}.')
-                return redirect('stock_mouvements')
+                for p, qte in lignes_demandees:
+                    produit = Produit.objects.select_for_update().get(pk=p.pk)
+                    qte_restante = qte
+                    lots_dispo = LotProduit.objects.select_for_update().filter(
+                        produit=produit, quantite_actuelle__gt=0,
+                    ).filter(
+                        Q(date_peremption__isnull=True) | Q(date_peremption__gte=today)
+                    ).order_by(F('date_peremption').asc(nulls_last=True))
+                    for lot in lots_dispo:
+                        if qte_restante <= 0:
+                            break
+                        qte_lot = min(float(lot.quantite_actuelle), qte_restante)
+                        sv = float(produit.stock_actuel)
+                        sa = max(0, sv - qte_lot)
+                        MouvementStock.objects.create(
+                            produit=produit, lot=lot,
+                            type='distribution_service', motif='distribution_service',
+                            service=service, centre=centre, quantite=qte_lot,
+                            stock_avant=sv, stock_apres=sa,
+                            reference=reference, notes=notes,
+                            cree_par=request.user,
+                        )
+                        lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte_lot)
+                        lot.save(update_fields=['quantite_actuelle'])
+                        produit.stock_actuel = sa
+                        produit.save(update_fields=['stock_actuel'])
+                        qte_restante -= qte_lot
 
-    return render(request, 'stock/transfert/form.html', {
+                    if qte_restante > 0:
+                        sv = float(produit.stock_actuel)
+                        qte_reelle = min(qte_restante, sv)
+                        if qte_reelle > 0:
+                            sa = sv - qte_reelle
+                            MouvementStock.objects.create(
+                                produit=produit, type='distribution_service', motif='distribution_service',
+                                service=service, centre=centre, quantite=qte_reelle,
+                                stock_avant=sv, stock_apres=sa,
+                                reference=reference, notes=notes,
+                                cree_par=request.user,
+                            )
+                            produit.stock_actuel = sa
+                            produit.save(update_fields=['stock_actuel'])
+                        if qte_reelle < qte_restante:
+                            manque_stock.append(produit.nom)
+
+            if manque_stock:
+                messages.warning(
+                    request,
+                    f"Stock insuffisant pour : {', '.join(manque_stock)} — quantité livrée réduite en conséquence."
+                )
+            messages.success(
+                request,
+                f"Distribution {reference} enregistrée pour {service.nom} — {centre.nom} ({len(lignes_demandees)} produit{'s' if len(lignes_demandees) > 1 else ''})."
+            )
+            return redirect('stock_mouvements')
+
+    return render(request, 'stock/distribution/form.html', {
         'produits':   produits,
-        'pharmacies': PHARMACIES,
+        'services':   services,
+        'centres':    centres,
+        'categories': categories,
         'errors':     errors,
-        'post':       request.POST if request.method == 'POST' else None,
     })
 
 

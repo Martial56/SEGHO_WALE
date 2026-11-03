@@ -38,6 +38,7 @@ html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
 .type-tab.active-ajust    { background:rgba(var(--amber-rgb),.12);  border-color:var(--amber); color:var(--amber-text); }
 .type-tab.active-peremption{ background:rgba(123,87,194,.12); border-color:#7b57c2; color:#4527a0; }
 .type-tab.active-retour   { background:rgba(0,0,0,.06);       border-color:#999;    color:#555; }
+.type-tab.active-distribution { background:rgba(22,169,107,.12); border-color:#16a96b; color:#0f7a4c; }
 
 /* Ligne du journal */
 .mv-row { border-left:3px solid transparent; transition:background .12s; }
@@ -55,6 +56,7 @@ html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
 .mv-badge-ajust     { background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); }
 .mv-badge-peremption{ background:rgba(123,87,194,.1);  color:#4527a0; border:1px solid rgba(123,87,194,.2); }
 .mv-badge-retour    { background:rgba(0,0,0,.06);      color:#555;    border:1px solid rgba(0,0,0,.12); }
+.mv-badge-distribution { background:rgba(22,169,107,.1); color:#0f7a4c; border:1px solid rgba(22,169,107,.25); }
 
 /* Variation stock */
 .delta-plus  { color:var(--accent-text-soft); font-weight:800; font-size:13px; }
@@ -119,6 +121,10 @@ html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
      class="type-tab {% if type_filtre == 'livraison' %}active-livraison{% endif %}">
     <i class="bi bi-bag-check" style="font-size:10px;"></i> Dotations
   </a>
+  <a href="?type=distribution_service{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'distribution_service' %}active-distribution{% endif %}">
+    <i class="bi bi-shuffle" style="font-size:10px;"></i> Distributions
+  </a>
   <a href="?type=ajustement{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
      class="type-tab {% if type_filtre == 'ajustement' %}active-ajust{% endif %}">
     <i class="bi bi-sliders" style="font-size:10px;"></i> Ajustements
@@ -177,6 +183,10 @@ html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
         {% elif mv.type == 'livraison' %}
           <span class="mv-badge mv-badge-livraison"><i class="bi bi-bag-check" style="font-size:9px;"></i> Dotation
             {% if mv.pharmacie %}<span style="font-size:9px;opacity:.8;">· {{ mv.get_pharmacie_display }}</span>{% endif %}
+          </span>
+        {% elif mv.type == 'distribution_service' %}
+          <span class="mv-badge mv-badge-distribution"><i class="bi bi-shuffle" style="font-size:9px;"></i> Distribution
+            {% if mv.service %}<span style="font-size:9px;opacity:.8;">· {{ mv.service.nom }}{% if mv.centre %} ({{ mv.centre.nom }}){% endif %}</span>{% endif %}
           </span>
         {% elif mv.type == 'ajustement' %}
           <span class="mv-badge mv-badge-ajust"><i class="bi bi-sliders" style="font-size:9px;"></i> Ajustement</span>
