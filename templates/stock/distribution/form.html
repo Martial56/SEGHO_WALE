@@ -49,6 +49,13 @@
 }
 .btn-ajouter-panier:hover { background:var(--teal-700,var(--st-700)); }
 .btn-ajouter-panier.deja-ajoute { background:var(--st-surface); color:var(--accent-text-soft); border-color:var(--st-300); }
+.btn-ajouter-panier:disabled, .dist-qte-step:disabled { opacity:.5; cursor:not-allowed; }
+.btn-ajouter-panier.dist-btn-rupture { background:var(--st-surface); color:var(--rose-text); border-color:rgba(var(--rose-rgb),.35); }
+.dist-cat { font-size:10.5px; color:var(--st-muted); }
+.dist-etat { display:inline-flex; align-items:center; gap:3px; font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:10px; white-space:nowrap; }
+.dist-etat-ok      { background:rgba(var(--st-600-rgb),.1); color:var(--accent-text-soft); }
+.dist-etat-alerte  { background:rgba(var(--amber-rgb),.12); color:var(--amber-text); }
+.dist-etat-rupture { background:rgba(var(--rose-rgb),.12); color:var(--rose-text); }
 
 /* ── Panier ── */
 .panier-card { position:sticky; top:16px; background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
@@ -81,7 +88,8 @@
       <span class="field-label" style="margin:0;">Centre <span class="required-star">*</span></span>
       {% for c in centres %}
       <label class="dist-centre-pill" id="centre-label-{{ c.pk }}" onclick="selectCentre('{{ c.pk }}')">
-        <input type="radio" name="centre" value="{{ c.pk }}" id="centre-{{ c.pk }}" style="display:none;">
+        <input type="radio" name="centre" value="{{ c.pk }}" id="centre-{{ c.pk }}" style="display:none;"
+          {% if post_centre_pk == c.pk|stringformat:"s" %}checked{% endif %}>
         <i class="bi bi-building"></i> {{ c.nom|cut:"CMS WALE " }}
       </label>
       {% endfor %}
@@ -91,21 +99,20 @@
       <select name="service" id="id_service" class="field-ul" style="width:180px;" required>
         <option value="">— Sélectionner —</option>
         {% for s in services %}
-        <option value="{{ s.pk }}">{{ s.nom }}</option>
+        <option value="{{ s.pk }}" {% if post_service_pk == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.nom }}</option>
         {% endfor %}
       </select>
     </div>
+    <a href="{% url 'stock_distribution_service_historique' %}" class="btn-form-cancel">
+      <i class="bi bi-clock-history"></i> Historique
+    </a>
     <a href="{% url 'stock_mouvements' %}" class="btn-form-cancel">Annuler</a>
   </div>
 </div>
 
-{% if errors.service or errors.centre or errors.lignes %}
-<div style="margin:16px 32px 0;padding:10px 14px;background:rgba(var(--rose-rgb),.08);border:1px solid rgba(var(--rose-rgb),.25);border-radius:8px;">
-  {% if errors.centre %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.centre }}</div>{% endif %}
-  {% if errors.service %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.service }}</div>{% endif %}
-  {% if errors.lignes %}<div style="font-size:12px;color:var(--rose-text);"><i class="bi bi-exclamation-triangle-fill"></i> {{ errors.lignes }}</div>{% endif %}
-</div>
-{% endif %}
+{% comment %}Les erreurs de validation (service/centre/lignes manquants) passent
+désormais par messages.error() et s'affichent en toast, comme partout
+ailleurs dans l'application — plus de bandeau dédié ici.{% endcomment %}
 
 <div class="dist-layout">
 
@@ -146,15 +153,26 @@
              data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.dci|default:''|lower }}">
           <span class="dist-prod-code">{{ p.code }}</span>
           <div class="dist-prod-nom">
-            <div class="n">{{ p.nom }}</div>
-            <div style="font-size:10.5px;color:var(--st-muted);">
+            <div class="n">{{ p.nom }}{% if p.dci %} <span style="font-weight:400;color:var(--st-muted);font-size:11px;">({{ p.dci }})</span>{% endif %}</div>
+            <div class="dist-cat">
+              {% if p.categorie %}{{ p.categorie.nom }} · {% endif %}
               Stock : <span class="stock-sys">{{ p.stock_actuel|floatformat:0 }}</span> {{ p.unite_mesure.nom }}
+              {% if p.stock_actuel <= 0 %}
+                <span class="dist-etat dist-etat-rupture"><i class="bi bi-x-circle-fill"></i> Rupture</span>
+              {% elif p.stock_actuel <= p.stock_alerte %}
+                <span class="dist-etat dist-etat-alerte"><i class="bi bi-exclamation-triangle-fill"></i> Alerte</span>
+              {% else %}
+                <span class="dist-etat dist-etat-ok"><i class="bi bi-check-circle-fill"></i> OK</span>
+              {% endif %}
             </div>
           </div>
-          <input type="number" class="dist-qte-step" id="step-{{ p.pk }}" min="1" step="1" value="1" aria-label="Quantité à ajouter">
-          <button type="button" class="btn-ajouter-panier" id="btn-add-{{ p.pk }}"
-            onclick="panierAjouter('{{ p.pk }}', '{{ p.nom|escapejs }}', '{{ p.unite_mesure.nom|default:''|escapejs }}')">
-            <i class="bi bi-cart-plus"></i> Ajouter
+          <input type="number" class="dist-qte-step" id="step-{{ p.pk }}" min="1" step="1"
+            {% if p.stock_actuel > 0 %}value="1" max="{{ p.stock_actuel|floatformat:0 }}"{% else %}value="" disabled{% endif %}
+            aria-label="Quantité à ajouter">
+          <button type="button" class="btn-ajouter-panier{% if p.stock_actuel <= 0 %} dist-btn-rupture{% endif %}" id="btn-add-{{ p.pk }}"
+            {% if p.stock_actuel <= 0 %}disabled title="Produit en rupture — impossible à distribuer"{% endif %}
+            onclick="panierAjouter('{{ p.pk }}', '{{ p.nom|escapejs }}', '{{ p.unite_mesure.nom|default:''|escapejs }}', {{ p.stock_actuel|floatformat:0 }})">
+            {% if p.stock_actuel <= 0 %}<i class="bi bi-slash-circle"></i> Rupture{% else %}<i class="bi bi-cart-plus"></i> Ajouter{% endif %}
           </button>
           <input type="hidden" name="qte_{{ p.pk }}" id="qte-hidden-{{ p.pk }}" value="">
         </div>
@@ -183,9 +201,9 @@
     <div class="panier-footer">
       <div class="form-field">
         <label for="id_notes" class="field-label">Notes</label>
-        <textarea id="id_notes" name="notes" class="field-ul" rows="1" placeholder="Période concernée, remarques…"></textarea>
+        <textarea id="id_notes" name="notes" class="field-ul" rows="1" placeholder="Période concernée, remarques…">{{ post_notes|default:'' }}</textarea>
       </div>
-      <button type="submit" class="btn-form-submit" id="btn-confirmer" style="width:100%;justify-content:center;" disabled
+      <button type="submit" class="btn-form-submit" id="btn-confirmer" style="width:100%;justify-content:center;"
         onclick="return confirm('Confirmer la sortie du stock ? Le stock central sera débité immédiatement.');">
         <i class="bi bi-send"></i> Confirmer la sortie
       </button>
@@ -195,6 +213,7 @@
 </div>
 
 </form>
+{{ panier_restaure|json_script:"data-panier-restaure" }}
 {% endblock %}
 
 {% block extra_js %}
@@ -245,15 +264,23 @@ function selectCentre(val) {
   if (label) { label.style.borderColor = 'var(--st-600)'; label.style.background = 'rgba(var(--st-700-rgb),.06)'; }
 }
 
+/* Le bouton « Confirmer la sortie » reste toujours cliquable : un centre, un
+   service ou un panier manquant ne bloque plus rien côté client — le clic
+   part au serveur, qui répond par un toast précis pour chaque champ manquant
+   (voir distribution_service_create). Un bouton désactivé en silence ne
+   disait pas à l'utilisateur ce qu'il fallait corriger. */
+
 /* ── Panier : ajoute/retire des produits, pose la quantité dans le champ
    caché qte_<pk> que la vue lit déjà tel quel — aucun changement côté
    serveur, seule la présentation change. ── */
 var panier = {};
 
-function panierAjouter(pk, nom, unite) {
+function panierAjouter(pk, nom, unite, stockDispo) {
+  if (stockDispo <= 0) return;  // sécurité : un produit en rupture ne doit jamais entrer dans le panier
   var pas = document.getElementById('step-' + pk);
   var qte = parseInt(pas.value, 10);
   if (!qte || qte < 1) qte = 1;
+  if (qte > stockDispo) qte = stockDispo;
   panier[pk] = { nom: nom, unite: unite, qte: qte };
   document.getElementById('qte-hidden-' + pk).value = qte;
   var btn = document.getElementById('btn-add-' + pk);
@@ -285,7 +312,6 @@ function rafraichirPanier() {
   var liste = document.getElementById('panier-liste');
   var pks = Object.keys(panier);
   document.getElementById('panier-count').textContent = pks.length;
-  document.getElementById('btn-confirmer').disabled = pks.length === 0;
 
   if (!pks.length) {
     liste.innerHTML = '<div class="panier-vide">Aucun produit ajouté pour l\'instant.</div>';
@@ -305,5 +331,28 @@ function rafraichirPanier() {
     );
   }).join('');
 }
+
+/* ── Réaffichage après une erreur de validation (centre/service manquant) :
+   le panier et le centre choisi ne doivent pas repartir à zéro, seul le
+   champ fautif doit être corrigé. ── */
+document.addEventListener('DOMContentLoaded', function () {
+  var centreCoche = document.querySelector('input[name="centre"]:checked');
+  if (centreCoche) selectCentre(centreCoche.value);
+
+  var dataEl = document.getElementById('data-panier-restaure');
+  if (!dataEl) return;
+  var donnees = JSON.parse(dataEl.textContent);
+  var pks = Object.keys(donnees);
+  if (!pks.length) return;
+  pks.forEach(function (pk) {
+    var it = donnees[pk];
+    panier[pk] = { nom: it.nom, unite: it.unite, qte: it.qte };
+    var hidden = document.getElementById('qte-hidden-' + pk);
+    if (hidden) hidden.value = it.qte;
+    var btn = document.getElementById('btn-add-' + pk);
+    if (btn) { btn.classList.add('deja-ajoute'); btn.innerHTML = '<i class="bi bi-check-lg"></i> Dans le panier'; }
+  });
+  rafraichirPanier();
+});
 </script>
 {% endblock %}

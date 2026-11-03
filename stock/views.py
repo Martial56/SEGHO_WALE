@@ -2435,18 +2435,25 @@ def distribution_service_create(request):
         .select_related('unite_mesure', 'categorie').order_by('type', 'nom')
     )
     categories = CategorieStock.objects.filter(actif=True).order_by('nom')
-    errors = {}
+    post_service_pk, post_centre_pk, post_notes = '', '', ''
+    panier_restaure = {}
 
     if request.method == 'POST':
-        service_pk = request.POST.get('service', '')
-        centre_pk  = request.POST.get('centre', '')
+        service_pk = request.POST.get('service', '').strip()
+        centre_pk  = request.POST.get('centre', '').strip()
         notes      = request.POST.get('notes', '').strip()
-        service    = Service.objects.filter(pk=service_pk, actif=True).first()
-        centre     = Centre.objects.filter(pk=centre_pk, actif=True).first()
+        post_service_pk, post_centre_pk, post_notes = service_pk, centre_pk, notes
+        # pk='' ferait planter .filter(pk=...) (ValueError, pas DoesNotExist) :
+        # un champ non rempli n'est pas une erreur serveur, juste une validation.
+        service    = Service.objects.filter(pk=service_pk, actif=True).first() if service_pk else None
+        centre     = Centre.objects.filter(pk=centre_pk, actif=True).first() if centre_pk else None
+        valide = True
         if not service:
-            errors['service'] = 'Sélectionnez le service destinataire.'
+            messages.error(request, 'Sélectionnez le service destinataire.')
+            valide = False
         if not centre:
-            errors['centre'] = 'Sélectionnez le centre destinataire.'
+            messages.error(request, 'Sélectionnez le centre destinataire.')
+            valide = False
 
         lignes_demandees = []
         for p in produits:
@@ -2460,11 +2467,28 @@ def distribution_service_create(request):
             if qte > 0:
                 lignes_demandees.append((p, qte))
         if not lignes_demandees:
-            errors['lignes'] = 'Ajoutez au moins un produit avec une quantité.'
+            messages.error(request, 'Ajoutez au moins un produit avec une quantité.')
+            valide = False
+        # Si un autre champ est en cause (centre/service), le panier déjà
+        # rempli ne doit pas disparaître au réaffichage — reconstruit le
+        # panier JS depuis ce qui a été posté, pas depuis zéro.
+        panier_restaure = {
+            str(p.pk): {
+                'nom': p.nom,
+                'unite': p.unite_mesure.nom if p.unite_mesure else '',
+                'qte': qte,
+            }
+            for p, qte in lignes_demandees
+        }
 
-        if not errors:
-            today = timezone.now().date()
-            reference = f"DIST{today:%Y%m%d}-{centre.code}-{service.code}"
+        if valide:
+            maintenant = timezone.now()
+            today = maintenant.date()
+            # L'heure (jusqu'à la seconde) distingue deux distributions au même
+            # service du même centre le même jour — sans elle, une deuxième
+            # sortie l'après-midi fusionnerait avec celle du matin dans
+            # l'historique (même date+centre+service -> même référence).
+            reference = f"DIST{maintenant:%Y%m%d-%H%M%S}-{centre.code}-{service.code}"
             manque_stock = []
             with transaction.atomic():
                 for p, qte in lignes_demandees:
@@ -2521,14 +2545,94 @@ def distribution_service_create(request):
                 request,
                 f"Distribution {reference} enregistrée pour {service.nom} — {centre.nom} ({len(lignes_demandees)} produit{'s' if len(lignes_demandees) > 1 else ''})."
             )
-            return redirect('stock_mouvements')
+            # Retour sur un formulaire vierge plutôt que le journal : permet
+            # d'enchaîner directement une distribution pour un autre service
+            # sans revenir cliquer sur « Distribution » à chaque fois.
+            return redirect('stock_distribution_service')
 
     return render(request, 'stock/distribution/form.html', {
-        'produits':   produits,
-        'services':   services,
-        'centres':    centres,
-        'categories': categories,
-        'errors':     errors,
+        'produits':        produits,
+        'services':        services,
+        'centres':         centres,
+        'categories':      categories,
+        'post_service_pk': post_service_pk,
+        'post_centre_pk':  post_centre_pk,
+        'post_notes':      post_notes,
+        'panier_restaure': panier_restaure,
+    })
+
+
+@login_required(login_url='login')
+def distribution_service_historique(request):
+    """Historique des distributions aux services, regroupées par envoi — une
+    distribution crée une ligne MouvementStock par produit (et par lot si le
+    FEFO en a scindé), toutes partageant la même `reference` ; le journal
+    général (stock_mouvements) les montre une par une, ce qui noie l'envoi
+    dans le détail plutôt que de répondre à « qu'a reçu tel service ce
+    mois-ci ? »."""
+    from medecins.models import Service
+    from centres.models import Centre
+
+    q             = request.GET.get('q', '').strip()
+    service_pk    = request.GET.get('service', '').strip()
+    centre_pk     = request.GET.get('centre', '').strip()
+    periode       = request.GET.get('periode', '')
+    date_from     = request.GET.get('date_from', '').strip()
+    date_to       = request.GET.get('date_to', '').strip()
+
+    qs = MouvementStock.objects.filter(type='distribution_service').select_related(
+        'produit', 'produit__unite_mesure', 'service', 'centre', 'cree_par'
+    )
+    if q:
+        qs = qs.filter(Q(reference__icontains=q) | Q(produit__nom__icontains=q))
+    if service_pk:
+        qs = qs.filter(service_id=service_pk)
+    if centre_pk:
+        qs = qs.filter(centre_id=centre_pk)
+
+    today = timezone.now().date()
+    if date_from or date_to:
+        # Un intervalle explicite l'emporte sur les raccourcis période :
+        # les deux en même temps ne voudraient rien dire de cohérent.
+        periode = ''
+        if date_from:
+            qs = qs.filter(date__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__date__lte=date_to)
+    elif periode == 'today':
+        qs = qs.filter(date__date=today)
+    elif periode == 'week':
+        debut_semaine = today - timezone.timedelta(days=today.weekday())
+        qs = qs.filter(date__date__gte=debut_semaine)
+    elif periode == 'month':
+        qs = qs.filter(date__month=today.month, date__year=today.year)
+
+    groupes = {}
+    for m in qs.order_by('date'):
+        g = groupes.setdefault(m.reference, {
+            'reference': m.reference, 'service': m.service, 'centre': m.centre,
+            'date': m.date, 'cree_par': m.cree_par, 'notes': m.notes, 'lignes': [],
+        })
+        g['lignes'].append(m)
+        g['date'] = min(g['date'], m.date)
+    envois = sorted(groupes.values(), key=lambda g: g['date'], reverse=True)
+    for envoi in envois:
+        envoi['nb_produits'] = len(envoi['lignes'])
+
+    paginator = Paginator(envois, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'stock/distribution/historique.html', {
+        'page_obj':      page_obj,
+        'q':             q,
+        'service_pk':    service_pk,
+        'centre_pk':     centre_pk,
+        'periode':       periode,
+        'date_from':     date_from,
+        'date_to':       date_to,
+        'services':      Service.objects.filter(actif=True).order_by('nom'),
+        'centres':       Centre.objects.filter(actif=True).order_by('nom'),
+        'total_envois':  len(envois),
     })
 
 
