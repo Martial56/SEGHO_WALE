@@ -1396,3 +1396,64 @@ class TestDepistageVihCpnPorteLeTypeDeVisite(TestCase):
 
     def test_rien_de_choisi(self):
         self.assertEqual(self._ligne(cpn_type_visite=''), 'Non renseigné')
+
+
+# ─── Export Excel / CSV des fiches mensuelles ────────────────────────────────
+
+class TestExportDesFichesMensuelles(TestCase):
+    """Chaque fiche se télécharge en Excel et en CSV, avec les lignes de la
+    fiche imprimée et sans la barre d'outils ni les notes d'écran."""
+
+    FICHES = {
+        'rapports:maternite': 'Nombre de consultations prénatales',
+        'rapports:soins': 'Nombre de MO',
+        'rapports:gynecologie': 'Nombre de consultant',
+        'rapports:med_generale': 'Nombre de cas référés',
+    }
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.client.force_login(User.objects.create_superuser('export_fiche', password='x'))
+
+    def test_excel(self):
+        import io
+        from django.urls import reverse
+        from openpyxl import load_workbook
+        for nom_url, libelle in self.FICHES.items():
+            with self.subTest(nom_url):
+                reponse = self.client.get(reverse(nom_url), {'mois': 3, 'annee': 2026, 'format': 'xlsx'})
+                self.assertEqual(reponse.status_code, 200)
+                self.assertIn('_2026_03.xlsx', reponse['Content-Disposition'])
+                ws = load_workbook(io.BytesIO(reponse.content)).active
+                textes = [str(c.value) for ligne in ws.iter_rows() for c in ligne if c.value is not None]
+                self.assertIn(libelle, textes)
+                self.assertFalse(any('Appliquer' in t or 'Imprimer' in t for t in textes))
+
+    def test_csv(self):
+        from django.urls import reverse
+        for nom_url, libelle in self.FICHES.items():
+            with self.subTest(nom_url):
+                reponse = self.client.get(reverse(nom_url), {'mois': 3, 'annee': 2026, 'format': 'csv'})
+                self.assertEqual(reponse.status_code, 200)
+                contenu = reponse.content.decode('utf-8-sig')
+                self.assertIn(libelle, contenu)
+                self.assertNotIn('Appliquer', contenu)
+
+    def test_l_export_est_inscrit_a_l_historique(self):
+        from django.urls import reverse
+        from .models import HistoriqueRapport
+        self.client.get(reverse('rapports:gynecologie'), {'mois': 3, 'annee': 2026, 'format': 'csv'})
+        historique = HistoriqueRapport.objects.get(slug='gynecologie')
+        self.assertEqual(historique.format_fichier, 'csv')
+        self.assertEqual(str(historique.periode_fin), '2026-03-31')
+
+    def test_les_fusions_de_l_entete_sont_reprises(self):
+        from .export_fiche import _grille, lire_fiche
+        html = ('<table><tr><th rowspan="2">X</th><th colspan="2">0-28 j</th></tr>'
+                '<tr><th>F</th><th>M</th></tr><tr><td>Paludisme</td><td>3</td><td>1</td></tr></table>')
+        (table,) = [b for b in lire_fiche(html) if b[0] == 'table']
+        placees, largeur = _grille(table[1])
+        self.assertEqual(largeur, 3)
+        self.assertEqual([(r, c, i['texte']) for r, c, i in placees],
+                         [(0, 0, 'X'), (0, 1, '0-28 j'), (1, 1, 'F'), (1, 2, 'M'),
+                          (2, 0, 'Paludisme'), (2, 1, '3'), (2, 2, '1')])

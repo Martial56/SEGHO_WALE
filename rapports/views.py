@@ -1,3 +1,4 @@
+import calendar
 import re
 import unicodedata
 from datetime import datetime
@@ -7,11 +8,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
 from .configuration_soins import CompositionInvalide, appliquer, composition
 from .export import csv_response, xlsx_response
+from .export_fiche import construire_csv, construire_xlsx, lire_fiche, nb_lignes
 from .maternite import calculer_rapport_maternite
 from .soins import calculer_rapport_soins
 from .gynecologie import calculer_rapport_gynecologie
@@ -150,6 +153,39 @@ def rapports_historique(request):
     })
 
 
+def _fiche(request, gabarit, rapport, slug, titre, paysage=False):
+    """Affiche une fiche mensuelle, ou la télécharge en Excel / CSV quand le
+    bouton d'export a envoyé `?format=xlsx|csv`. Le fichier est tiré de la page
+    rendue : il reprend exactement les lignes de la fiche imprimée."""
+    format_fichier = request.GET.get('format')
+    if format_fichier not in ('xlsx', 'csv'):
+        return render(request, gabarit, rapport)
+
+    html = render_to_string(gabarit, rapport, request=request)
+    annee, mois = rapport['annee'], rapport['mois']
+    nom = f"Rapport_{slug}_{annee}_{mois:02d}"
+    if format_fichier == 'csv':
+        contenu = construire_csv(html)
+        type_mime = 'text/csv; charset=utf-8'
+    else:
+        contenu = construire_xlsx(html, titre_feuille=titre, paysage=paysage)
+        type_mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+    debut = datetime(annee, mois, 1).date()
+    fin = datetime(annee, mois, calendar.monthrange(annee, mois)[1]).date()
+    historique = HistoriqueRapport(
+        slug=slug, nom=nom, utilisateur=request.user,
+        periode_debut=debut, periode_fin=fin, format_fichier=format_fichier,
+        nb_lignes=nb_lignes(lire_fiche(html)),
+    )
+    historique.fichier.save(f"{nom}.{format_fichier}", ContentFile(contenu), save=False)
+    historique.save()
+
+    response = HttpResponse(contenu, content_type=type_mime)
+    response['Content-Disposition'] = f'attachment; filename="{nom}.{format_fichier}"'
+    return response
+
+
 @login_required(login_url='login')
 def rapports_maternite(request):
     today = datetime.now().date()
@@ -164,7 +200,8 @@ def rapports_maternite(request):
     mois = min(max(mois, 1), 12)
 
     rapport = calculer_rapport_maternite(annee, mois)
-    return render(request, 'rapports/rapport_maternite.html', rapport)
+    return _fiche(request, 'rapports/rapport_maternite.html', rapport,
+                  'maternite', 'Maternité')
 
 
 @login_required(login_url='login')
@@ -201,7 +238,8 @@ def rapports_soins(request):
 
     rapport = calculer_rapport_soins(annee, mois, configuration=configuration)
     rapport['configurations'] = list(visibles.order_by('-est_defaut', 'nom'))
-    return render(request, 'rapports/rapport_soins.html', rapport)
+    return _fiche(request, 'rapports/rapport_soins.html', rapport,
+                  'soins', 'Activité de soins')
 
 
 def _configuration_a_modifier(configuration, utilisateur):
@@ -392,7 +430,8 @@ def rapports_gynecologie(request):
     mois = min(max(mois, 1), 12)
 
     rapport = calculer_rapport_gynecologie(annee, mois)
-    return render(request, 'rapports/rapport_gynecologie.html', rapport)
+    return _fiche(request, 'rapports/rapport_gynecologie.html', rapport,
+                  'gynecologie', 'Gynécologie', paysage=True)
 
 
 @login_required(login_url='login')
@@ -409,7 +448,8 @@ def rapports_med_generale(request):
     mois = min(max(mois, 1), 12)
 
     rapport = calculer_rapport_med_generale(annee, mois)
-    return render(request, 'rapports/rapport_med_generale.html', rapport)
+    return _fiche(request, 'rapports/rapport_med_generale.html', rapport,
+                  'med_generale', 'Médecine générale', paysage=True)
 
 
 @login_required(login_url='login')

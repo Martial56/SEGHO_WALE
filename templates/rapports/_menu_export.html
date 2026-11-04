@@ -1,0 +1,46 @@
+{% comment %}
+Bouton « Exporter » de la barre d'outils des fiches mensuelles : un seul
+bouton, qui déroule Imprimer / PDF, Excel et CSV. À inclure DANS le formulaire
+de période — Excel et CSV le soumettent avec `format=xlsx|csv`, de sorte que le
+fichier suit le mois, l'année (et la composition) choisis à l'écran.
+{% endcomment %}
+<style>
+.export-menu { position: relative; }
+.btn-exporter { background: #fff; color: var(--brand); }
+.export-liste {
+  display: none; position: absolute; right: 0; top: calc(100% + 4px); min-width: 220px;
+  background: #fff; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.18); padding: 4px 0; z-index: 200;
+}
+.export-menu.ouvert .export-liste { display: block; }
+.export-liste button {
+  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  padding: 8px 14px; font-size: 12px; font-family: inherit; color: #1f2937;
+}
+.export-liste button:hover { background: #f0fdf4; color: var(--brand); }
+</style>
+<div class="export-menu" id="export-menu">
+  <button type="button" class="toolbar-btn btn-exporter" aria-haspopup="true" aria-expanded="false"
+          onclick="basculerExport(event)">Exporter ▾</button>
+  <div class="export-liste" role="menu">
+    <button type="button" role="menuitem" onclick="fermerExport(); window.print();">Imprimer / Télécharger PDF</button>
+    <button type="submit" role="menuitem" name="format" value="xlsx" onclick="fermerExport()">Excel (.xlsx)</button>
+    <button type="submit" role="menuitem" name="format" value="csv" onclick="fermerExport()">CSV (.csv)</button>
+  </div>
+</div>
+<script>
+  function fermerExport() {
+    var m = document.getElementById('export-menu');
+    m.classList.remove('ouvert');
+    m.firstElementChild.setAttribute('aria-expanded', 'false');
+  }
+  function basculerExport(e) {
+    e.stopPropagation();
+    var m = document.getElementById('export-menu');
+    var ouvert = m.classList.toggle('ouvert');
+    m.firstElementChild.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
+  }
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('export-menu').contains(e.target)) fermerExport();
+  });
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') fermerExport(); });
+</script>
