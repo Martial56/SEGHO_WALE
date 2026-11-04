@@ -240,7 +240,7 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 
   .pl-signature { margin-top: 16px; }
 
-  .content { padding: 10mm 12mm !important; }
+  .content { padding: 4mm !important; }
 
   @page { size: A4 landscape; margin: 0; }
 }
@@ -562,17 +562,24 @@ if (histModal) {
   if (!wrap) return;
 
   // Hauteur de page A4 paysage (210mm) moins le padding vertical imposé à
-  // .content en impression (10mm haut + 10mm bas, voir @media print ci-dessus).
+  // .content en impression (4mm haut + 4mm bas, voir @media print ci-dessus).
   var MM_PAR_PX = 25.4 / 96;
-  var HAUTEUR_IMPRIMABLE_PX = (210 - 20) / MM_PAR_PX;
+  var HAUTEUR_IMPRIMABLE_PX = (210 - 8) / MM_PAR_PX;
 
   function appliquerEchelle() {
     wrap.style.transform = 'none';
+    wrap.style.width = '';
     wrap.style.height = 'auto';
     var hauteurNaturelle = wrap.getBoundingClientRect().height;
     if (hauteurNaturelle <= HAUTEUR_IMPRIMABLE_PX) return;
     var echelle = HAUTEUR_IMPRIMABLE_PX / hauteurNaturelle;
-    wrap.style.transformOrigin = 'top center';
+    // Élargir avant de réduire : une réduction uniforme (scale) rétrécit la
+    // largeur autant que la hauteur, ce qui laisserait des bandes blanches de
+    // part et d'autre. En élargissant d'abord dans la même proportion que la
+    // réduction à venir, le résultat final occupe exactement toute la
+    // largeur de la page, sans déformer le contenu (même ratio partout).
+    wrap.style.width = (100 / echelle) + '%';
+    wrap.style.transformOrigin = 'top left';
     wrap.style.transform = 'scale(' + echelle + ')';
     // Sans ceci, l'espace réservé dans le flux du document reste celui
     // d'avant la réduction (transform ne change pas la taille de boîte) et
@@ -582,6 +589,7 @@ if (histModal) {
 
   function reinitialiserEchelle() {
     wrap.style.transform = 'none';
+    wrap.style.width = '';
     wrap.style.height = 'auto';
   }
 
