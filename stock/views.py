@@ -370,6 +370,8 @@ def mouvements_list(request):
     type_filtre = request.GET.get('type', '')
     periode     = request.GET.get('periode', '')
     q           = request.GET.get('q', '').strip()
+    date_from   = request.GET.get('date_from', '').strip()
+    date_to     = request.GET.get('date_to', '').strip()
 
     if type_filtre:
         qs = qs.filter(type=type_filtre)
@@ -377,7 +379,13 @@ def mouvements_list(request):
         qs = qs.filter(Q(produit__nom__icontains=q) | Q(reference__icontains=q))
 
     today = timezone.now().date()
-    if periode == 'today':
+    if date_from or date_to:
+        periode = ''
+        if date_from:
+            qs = qs.filter(date__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__date__lte=date_to)
+    elif periode == 'today':
         qs = qs.filter(date__date=today)
     elif periode == 'week':
         debut_semaine = today - timezone.timedelta(days=today.weekday())
@@ -392,6 +400,8 @@ def mouvements_list(request):
         'type_filtre': type_filtre,
         'periode':     periode,
         'q':           q,
+        'date_from':   date_from,
+        'date_to':     date_to,
     })
 
 

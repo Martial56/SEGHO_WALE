@@ -3,7 +3,13 @@
 {% block topbar_title %}Stock — Distribution aux services{% endblock %}
 
 {% block extra_st_css %}<style>
-.content { padding-top: 0; }
+/* .content a overflow-y:auto dans global.css (règle partagée par tout le
+   site), ce qui en fait le conteneur de référence pour position:sticky alors
+   qu'il ne défile jamais lui-même (c'est la fenêtre qui défile) — ça casse
+   le collant. Restaurer overflow:visible ici, scopé à cette page, rend le
+   défilement de fenêtre à nouveau la référence (même piège déjà rencontré
+   et corrigé sur le Journal de stock). */
+.content { padding-top: 0; overflow: visible; }
 .dist-section { background:var(--st-100); padding:8px 16px; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--accent-text); border-top:1px solid var(--st-200); border-bottom:1px solid var(--st-200); display:flex; align-items:center; gap:7px; }
 .stock-sys { font-family: var(--font-mono); font-size:12.5px; font-weight:700; color:var(--accent-text-soft); }
 .st-search {
@@ -36,6 +42,11 @@
 @media (max-width: 1100px) { .dist-layout { grid-template-columns: 1fr; } }
 
 .dist-browse { background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; }
+.dist-browse-head {
+  position:sticky; top:var(--topbar-h); z-index:60;
+  background:var(--st-surface); border-radius:12px 12px 0 0;
+  box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);
+}
 .dist-prod-row { display:flex; align-items:center; gap:10px; padding:9px 16px; border-bottom:1px solid var(--st-border); }
 .dist-prod-row:hover { background:var(--st-50); }
 .dist-prod-code { font-family: var(--font-mono); font-size:10.5px; color:var(--accent-text-soft); white-space:nowrap; width:92px; flex-shrink:0; }
@@ -58,7 +69,7 @@
 .dist-etat-rupture { background:rgba(var(--rose-rgb),.12); color:var(--rose-text); }
 
 /* ── Panier ── */
-.panier-card { position:sticky; top:16px; background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - 100px); }
+.panier-card { position:sticky; top:calc(var(--topbar-h) + 16px); background:var(--st-surface); border-radius:12px; box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08); overflow:hidden; display:flex; flex-direction:column; max-height:calc(100vh - var(--topbar-h) - 32px); }
 .panier-header { padding:14px 18px; border-bottom:1px solid var(--st-border); display:flex; align-items:center; justify-content:space-between; }
 .panier-header .titre { font-size:14px; font-weight:800; color:var(--st-900); display:flex; align-items:center; gap:8px; }
 .panier-count { background:var(--st-600); color:#fff; font-size:11px; font-weight:800; border-radius:12px; min-width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; padding:0 6px; }
@@ -118,7 +129,7 @@ ailleurs dans l'application — plus de bandeau dédié ici.{% endcomment %}
 
   <!-- ── Colonne de gauche : parcourir et ajouter au panier ── -->
   <div>
-    <div class="dist-browse">
+    <div class="dist-browse-head">
       <div style="padding:12px 20px;border-bottom:1px solid var(--st-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
         <div class="st-card-title"><i class="bi bi-boxes" style="color:var(--accent-text-soft);"></i> Produits disponibles</div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -139,7 +150,8 @@ ailleurs dans l'application — plus de bandeau dédié ici.{% endcomment %}
           </select>
         </div>
       </div>
-
+    </div>
+    <div class="dist-browse" style="border-radius:0 0 12px 12px;">
       {% regroup produits by type as produits_par_type %}
       {% for groupe in produits_par_type %}
       <div class="dist-group-row" data-groupe="{{ groupe.grouper }}">
