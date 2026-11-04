@@ -248,6 +248,10 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 
 {% block content %}
 
+<!-- Tout ce bloc est redimensionné (JS, à l'impression) pour toujours tenir
+sur une seule page, quel que soit le nombre de bureaux/créneaux. -->
+<div id="print-scale-wrap">
+
 <!-- En-tête visible uniquement à l'impression -->
 <div class="print-header">
   <div class="print-header-inner">
@@ -434,6 +438,8 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 </div>
 {% endif %}
 
+</div><!-- /#print-scale-wrap -->
+
 {% if modifications %}
 <div class="pl-modal-overlay hist-modal" id="histModal">
   <div class="pl-modal">
@@ -544,6 +550,43 @@ if (histModal) {
       td.classList.add(text.includes(q) ? 'search-match' : 'search-dim');
     });
   });
+})();
+
+// ── Impression : forcer le contenu entier sur une seule page ────────────────
+// Le nombre de bureaux/créneaux (et donc la hauteur du tableau) varie d'un
+// planning à l'autre ; plutôt que de parier sur des tailles de police fixes,
+// on réduit le contenu à l'échelle juste avant impression pour qu'il tienne
+// toujours dans la hauteur imprimable d'une page A4 paysage.
+(function () {
+  var wrap = document.getElementById('print-scale-wrap');
+  if (!wrap) return;
+
+  // Hauteur de page A4 paysage (210mm) moins le padding vertical imposé à
+  // .content en impression (10mm haut + 10mm bas, voir @media print ci-dessus).
+  var MM_PAR_PX = 25.4 / 96;
+  var HAUTEUR_IMPRIMABLE_PX = (210 - 20) / MM_PAR_PX;
+
+  function appliquerEchelle() {
+    wrap.style.transform = 'none';
+    wrap.style.height = 'auto';
+    var hauteurNaturelle = wrap.getBoundingClientRect().height;
+    if (hauteurNaturelle <= HAUTEUR_IMPRIMABLE_PX) return;
+    var echelle = HAUTEUR_IMPRIMABLE_PX / hauteurNaturelle;
+    wrap.style.transformOrigin = 'top center';
+    wrap.style.transform = 'scale(' + echelle + ')';
+    // Sans ceci, l'espace réservé dans le flux du document reste celui
+    // d'avant la réduction (transform ne change pas la taille de boîte) et
+    // une seconde page, vide, serait quand même imprimée.
+    wrap.style.height = (hauteurNaturelle * echelle) + 'px';
+  }
+
+  function reinitialiserEchelle() {
+    wrap.style.transform = 'none';
+    wrap.style.height = 'auto';
+  }
+
+  window.addEventListener('beforeprint', appliquerEchelle);
+  window.addEventListener('afterprint', reinitialiserEchelle);
 })();
 </script>
 {% endblock %}
