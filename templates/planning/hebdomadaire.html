@@ -128,14 +128,9 @@ html[data-theme="dark"] .td-cell.search-match { background: #2a2600 !important; 
 }
 .pl-signature .sig-name { font-size: 13px; font-weight: 700; color: var(--text); }
 
-/* Historique */
-.pl-history {
-  margin-top: 28px; border-top: 1px solid var(--border); padding: 18px 32px 40px;
-}
-.pl-history h3 {
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 12px 0;
-}
+/* Historique (modale, ouverte depuis le bouton de la barre d'actions) */
+.hist-modal .pl-modal { width: 480px; max-width: 92vw; max-height: 80vh; display: flex; flex-direction: column; }
+.hist-modal .pl-history-list { overflow-y: auto; margin: 0 -28px; padding: 0 28px; }
 .pl-history-item {
   display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -194,7 +189,7 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
   /* Masquer les éléments de l'interface */
   .pl-nav, .pl-actions, .pl-title-block, .pl-nav-week,
   nav, #top-bar, .topbar, .sidebar, .sidebar-wrapper,
-  .topbar-wrapper, #sidebar, .pl-history, .pl-modal-overlay { display: none !important; }
+  .topbar-wrapper, #sidebar, .pl-modal-overlay { display: none !important; }
 
   /* Afficher l'en-tête print */
   .print-header { display: block; margin-bottom: 14px; }
@@ -315,6 +310,11 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
   <a href="{% url 'planning_export_excel' planning.pk %}" class="btn-secondary">
     <i class="bi bi-file-earmark-excel"></i> Export Excel
   </a>
+  {% if modifications %}
+  <button type="button" class="btn-secondary" onclick="openHistModal()">
+    <i class="bi bi-clock-history"></i> Historique
+  </button>
+  {% endif %}
   <a href="{% url 'planning_list' %}" class="btn-secondary">
     <i class="bi bi-arrow-left"></i> Retour
   </a>
@@ -435,17 +435,24 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 {% endif %}
 
 {% if modifications %}
-<div class="pl-history">
-  <h3><i class="bi bi-clock-history"></i> Historique des modifications</h3>
-  {% for mod in modifications %}
-  <div class="pl-history-item">
-    <div class="pl-history-meta">
-      <strong>{{ mod.modifie_par.get_full_name|default:mod.modifie_par.username }}</strong><br>
-      {{ mod.modifie_le|date:"d/m/Y H:i" }}
+<div class="pl-modal-overlay hist-modal" id="histModal">
+  <div class="pl-modal">
+    <h3><i class="bi bi-clock-history"></i> Historique des modifications</h3>
+    <div class="pl-history-list">
+      {% for mod in modifications %}
+      <div class="pl-history-item">
+        <div class="pl-history-meta">
+          <strong>{% if mod.modifie_par %}{{ mod.modifie_par.get_full_name|default:mod.modifie_par.username }}{% else %}—{% endif %}</strong><br>
+          {{ mod.modifie_le|date:"d/m/Y H:i" }}
+        </div>
+        <div class="pl-history-resume">{{ mod.resume }}</div>
+      </div>
+      {% endfor %}
     </div>
-    <div class="pl-history-resume">{{ mod.resume }}</div>
+    <div class="pl-modal-actions" style="margin-top:14px;">
+      <button type="button" class="btn-cancel" onclick="closeHistModal()">Fermer</button>
+    </div>
   </div>
-  {% endfor %}
 </div>
 {% endif %}
 
@@ -514,6 +521,15 @@ function closeDupModal() { document.getElementById('dupModal').classList.remove(
 document.getElementById('dupModal').addEventListener('click', function(e) {
   if (e.target === this) closeDupModal();
 });
+
+var histModal = document.getElementById('histModal');
+function openHistModal()  { if (histModal) histModal.classList.add('open'); }
+function closeHistModal() { if (histModal) histModal.classList.remove('open'); }
+if (histModal) {
+  histModal.addEventListener('click', function(e) {
+    if (e.target === this) closeHistModal();
+  });
+}
 
 // ── Recherche rapide ──────────────────────────────────────────────────────────
 (function() {
