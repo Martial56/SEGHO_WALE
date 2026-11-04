@@ -19,7 +19,8 @@ urlpatterns = [
     path('mouvements/nouveau/',       views.mouvement_create,      name='stock_mouvement_create'),
 
     # Transfert
-    path('transfert/',                views.transfert_create,      name='stock_transfert'),
+    path('distribution/',             views.distribution_service_create, name='stock_distribution_service'),
+    path('distribution/historique/',  views.distribution_service_historique, name='stock_distribution_service_historique'),
 
     # Commandes
     path('commandes/',                views.commandes_list,        name='stock_commandes'),

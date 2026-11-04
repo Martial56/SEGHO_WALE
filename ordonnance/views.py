@@ -21,54 +21,69 @@ from medecins.models import Medecin
 
 @login_required(login_url='login')
 def ordonnance_list(request):
-    qs = Ordonnance.objects.select_related(
+    """Liste des ordonnances, bâtie sur core.listing comme les autres modules.
+
+    Le menu écrit à la main dans le gabarit ne portait qu'un statut, un type et
+    un intervalle de dates, chaque valeur chassant la précédente. Il est remplacé
+    par la brique commune : les filtres se cumulent, la recherche et la
+    pagination passent en AJAX (voir includes/listing/page_js.html), et la
+    sélection par défaut — la journée en cours — se déclare au lieu de vivre dans
+    un `else` au milieu du filtrage.
+    """
+    from core.listing import menu_filtres
+
+    from .ordonnance_listing import libelle_periode, listing_ordonnances
+
+    today = date.today()
+    q = request.GET.get('q', '').strip()
+    date_from = request.GET.get('date_from', '').strip()
+    date_to = request.GET.get('date_to', '').strip()
+
+    base_qs = Ordonnance.objects.select_related(
         'consultation__patient', 'consultation__medecin', 'medecin', 'patient'
-    ).annotate(nb_lignes=Count('lignes')).order_by('-date_emission')
+    ).annotate(nb_lignes=Count('lignes'))
 
-    q        = request.GET.get('q', '').strip()
-    statut   = request.GET.get('statut', '')
-    type_ord = request.GET.get('type', '')
-    date_debut = request.GET.get('date_debut', '')
-    date_fin   = request.GET.get('date_fin', '')
+    listing = listing_ordonnances()
+    filtres = listing.filtres_demandes(request)
+    selection = listing.selection(request, base_qs, contexte={
+        'aujourdhui': today, 'date_from': date_from, 'date_to': date_to,
+    })
+    qs = selection.qs
 
-    if q:
-        qs = qs.filter(
-            Q(numero__icontains=q) |
-            Q(consultation__patient__nom__icontains=q) |
-            Q(consultation__patient__prenoms__icontains=q)
-        )
-    if statut:
-        qs = qs.filter(statut=statut)
-    if type_ord:
-        qs = qs.filter(type_ordonnance=type_ord)
-
-    if date_debut or date_fin:
-        if date_debut:
-            qs = qs.filter(date_emission__date__gte=date_debut)
-        if date_fin:
-            qs = qs.filter(date_emission__date__lte=date_fin)
-    else:
-        qs = qs.filter(date_emission__date=date.today())
-
+    # Les cartes du haut portent sur la sélection, pas sur la table entière : une
+    # liste filtrée sur un statut affichait auparavant les quatre compteurs de la
+    # même sélection, ce qui en laissait trois à zéro sans que ce soit faux — mais
+    # une seule agrégation suffit là où il y avait quatre COUNT.
+    sommes = qs.order_by().aggregate(
+        total=Count('id'),
+        emises=Count('id', filter=Q(statut='emise')),
+        delivrees=Count('id', filter=Q(statut='delivree')),
+        expirees=Count('id', filter=Q(statut='expiree')),
+    )
     stats = {
-        'total':     qs.count(),
-        'emises':    qs.filter(statut='emise').count(),
-        'delivrees': qs.filter(statut='delivree').count(),
-        'expirees':  qs.filter(statut='expiree').count(),
+        'total':     sommes['total'],
+        'emises':    sommes['emises'],
+        'delivrees': sommes['delivrees'],
+        'expirees':  sommes['expirees'],
     }
 
-    paginator = Paginator(qs, 25)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    page_obj = Paginator(qs, listing.par_page).get_page(request.GET.get('page'))
 
     return render(request, 'pharmacie/ordonnance/ordonnance_list.html', {
-        'page_obj': page_obj,
-        'stats': stats,
-        'q': q,
-        'statut_filtre': statut,
-        'type_filtre': type_ord,
-        'date_debut': date_debut,
-        'date_fin': date_fin,
-        'today': date.today(),
+        'page_obj':         page_obj,
+        'stats':            stats,
+        'q':                q,
+        'tri':              selection.tri,
+        'tri_sens':         selection.sens,
+        'filters':          filtres,
+        'date_from':        date_from,
+        'date_to':          date_to,
+        'filtre_pose':      bool(filtres),
+        'selection_active': bool(q or date_from or date_to
+                                 or not listing.est_selection_par_defaut(filtres)),
+        'periode_libelle':  libelle_periode(filtres, date_from, date_to),
+        'listing_filtres':  menu_filtres(listing.familles, filtres, date_from, date_to),
+        'today':            today,
     })
 
 

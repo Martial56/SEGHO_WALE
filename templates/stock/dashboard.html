@@ -377,7 +377,13 @@ Chart.defaults.font.size   = 12;
 var isDarkMode  = document.documentElement.getAttribute('data-theme') === 'dark';
 var chartTick   = isDarkMode ? '#6b7884' : undefined;
 var chartGrid   = isDarkMode ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.05)';
-var donutBorder = isDarkMode ? '#0f0e0e' : '#fff';
+/* La bordure des segments doit se fondre dans la carte qui porte le
+   graphique (.chart-card, var(--st-surface)). On lit le jeton plutôt que
+   de recopier sa valeur : la copie avait déjà dérivé sur #0f0e0e, l'ancien
+   noir du module, d'où un liseré brun autour de chaque part. */
+var donutBorder = isDarkMode
+  ? getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()
+  : '#fff';
 Chart.defaults.color = chartTick;
 
 /* 1. Donut statut */

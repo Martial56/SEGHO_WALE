@@ -67,14 +67,36 @@
   .o-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
   .o-empty-sub { font-size: 12.5px; color: var(--text-muted); }
 
-  .fac-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
-  .fac-stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; padding: 12px 16px;
-    border-top: 3px solid transparent;
-    transition: box-shadow .15s;
+  /* Bande pleine largeur, comme le sous-en-tête au-dessus et le tableau en
+     dessous, qui sortent tous deux des 32px de .content par la même marge
+     négative. Les quatre cartes restaient seules en retrait, en îlots arrondis
+     entre deux bandes jointives. Même parti que la liste des factures : une
+     seule surface, des cartes séparées par un filet plutôt que par un vide. */
+  .fac-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    margin: 0 -32px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
   }
-  .fac-stat-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+  /* Quatre cartes se tassent sur un portable : deux rangs plutôt que des
+     chiffres tronqués. La marge suit celle de .content à ce palier. */
+  @media (max-width: 1024px) {
+    .fac-stats { grid-template-columns: repeat(2, 1fr); margin: 0 -20px; }
+  }
+  .fac-stat-card {
+    padding: 14px 20px;
+    border-top: 3px solid transparent;
+    position: relative;
+    transition: background .15s;
+  }
+  /* Le filet s'arrête avant la dernière carte de chaque rang : sur deux rangs,
+     un trait à droite de la deuxième carte pendrait dans le vide. */
+  .fac-stat-card:not(:last-child)::after {
+    content: ''; position: absolute; right: 0; top: 22%; bottom: 22%;
+    width: 1px; background: var(--border);
+  }
+  .fac-stat-card:hover { background: rgba(var(--teal-500-rgb), .04); }
+  html[data-theme="dark"] .fac-stat-card:hover { background: rgba(255,255,255,.03); }
   .fac-stat-card.c-total  { border-top-color: #94a3b8; }
   .fac-stat-card.c-emises { border-top-color: var(--sky); }
   .fac-stat-card.c-deliv  { border-top-color: var(--teal-500); }
@@ -114,63 +136,45 @@
   .o-pag-btn:hover { color: var(--accent-text-soft); }
   .o-pag-btn.disabled { opacity: 0.3; pointer-events: none; }
 
-  .o-filter-dd { position: relative; }
-  .o-filter-btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    border: 1px solid var(--border); border-radius: var(--radius-xs, 4px);
-    background: var(--surface); color: var(--text-muted);
-    font-size: 12px; padding: 4px 10px; cursor: pointer;
-    transition: border-color .15s, color .15s; white-space: nowrap;
-  }
-  .o-filter-btn:hover { border-color: var(--teal-400); color: var(--accent-text-soft); }
-  .o-filter-btn.active { border-color: var(--teal-500); color: var(--accent-text-soft); background: rgba(var(--teal-500-rgb),.12); }
-  .o-filter-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--teal-500); display: inline-block;
-  }
-  .o-filter-panel {
-    display: none; position: absolute; top: calc(100% + 6px); right: 0;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.14);
-    min-width: 190px; padding: 8px 0; z-index: 999;
-  }
-  .o-filter-panel.open { display: block; }
-  .o-filter-section-label {
-    display: block; font-size: 10.5px; font-weight: 700; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: .5px;
-    padding: 8px 16px 4px;
-  }
-  .o-filter-section-label:first-child { padding-top: 4px; }
-  .o-filter-option {
-    display: block; padding: 6px 16px; font-size: 13px; color: var(--text);
-    text-decoration: none; cursor: pointer; transition: background .1s;
-    white-space: nowrap;
-  }
-  .o-filter-option:hover { background: rgba(var(--teal-500-rgb),.12); color: var(--accent-text-soft); }
-  .o-filter-option.active { color: var(--accent-text-soft); font-weight: 600; }
-  .o-filter-sep { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
-  html[data-theme="dark"] .o-filter-panel { background: var(--surface); border-color: var(--border-strong); }
-  html[data-theme="dark"] .o-filter-option:hover { background: rgba(var(--teal-500-rgb), 0.15); }
+  /* La boîte du menu « Filtres » et ses lignes. includes/listing/styles.html
+     n'apporte que les sous-menus, l'intervalle de dates et o-dd-hint : chaque
+     liste pose elle-même le panneau qui les contient. Sans ces règles, le menu
+     n'est plus masqué au repos et ses entrées s'étalent par-dessus la bande de
+     comptage. o-ctrl-btn et o-pag-btn, eux, sont globaux.
 
-  .o-filter-period { padding: 4px 16px 8px; }
-  .o-filter-period-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-  .o-filter-period-row label { font-size: 11px; color: var(--text-muted); width: 34px; flex-shrink: 0; }
-  .o-filter-period-row input[type="date"] {
-    flex: 1; font-size: 12px; padding: 3px 6px; border: 1px solid var(--border);
-    border-radius: 4px; background: var(--surface); color: var(--text);
+     `position: fixed` est imposé par toggleDd (page_js.html), qui place le
+     panneau aux coordonnées de la fenêtre lues sur le bouton — en `absolute`
+     il se poserait relativement au sous-en-tête et serait rogné par lui.
+
+     Les fonds passent par les jetons du thème, jamais par un #fff en dur : le
+     panneau doit suivre le mode sombre comme le reste de la page. */
+  .o-dd-wrap { position: relative; }
+  .o-dd-panel {
+    display: none; position: fixed; z-index: 9999; min-width: 210px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.16); padding: 5px 0;
   }
-  .o-filter-period-actions { display: flex; gap: 6px; margin-top: 4px; }
-  .o-filter-period-apply {
-    flex: 1; background: var(--teal-500); color: #fff; border: none; border-radius: 4px;
-    font-size: 12px; padding: 5px 0; cursor: pointer; font-weight: 500;
+  html[data-theme="dark"] .o-dd-panel { border-color: var(--border-strong); }
+  .o-dd-panel.open { display: block; animation: ddFadeIn .12s ease; }
+  @keyframes ddFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+  .o-dd-section {
+    padding: 6px 14px 3px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
   }
-  .o-filter-period-apply:hover { background: var(--teal-600); }
-  .o-filter-period-reset {
-    background: none; border: 1px solid var(--border); color: var(--text-muted);
-    border-radius: 4px; font-size: 12px; padding: 5px 10px; cursor: pointer; text-decoration: none;
-    display: inline-flex; align-items: center;
+  .o-dd-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 14px; font-size: 12px; color: var(--text); position: relative;
+    text-decoration: none; cursor: pointer; transition: background .1s;
   }
-  .o-filter-period-reset:hover { border-color: var(--teal-400); color: var(--accent-text-soft); }
+  .o-dd-item:hover  { background: rgba(var(--teal-500-rgb),.12); color: var(--accent-text-soft); }
+  .o-dd-item.active { color: var(--accent-text-soft); font-weight: 600; }
+  html[data-theme="dark"] .o-dd-item:hover { background: rgba(var(--teal-500-rgb),.15); }
+  .o-dd-sep { border: none; border-top: 1px solid var(--border); margin: 4px 0; }
+  .o-dd-arr { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+  .o-ctrl-btn.active {
+    background: rgba(var(--teal-700-rgb), .08); color: var(--accent-text);
+    border-color: rgba(var(--teal-700-rgb), .18); font-weight: 600;
+  }
   .o-btn-create {
     background: var(--teal-500); color: #fff; border: none; padding: 5px 14px; border-radius: 4px;
     font-size: 12.5px; font-weight: 500; cursor: pointer; text-decoration: none;
@@ -184,97 +188,74 @@
 
 {% block content %}
 
+{% comment %}Styles de la brique de listing : menus à sous-menus et intervalle
+de dates. Sans eux le panneau de filtres s'affiche sans mise en forme.{% endcomment %}
+{% include 'includes/listing/styles.html' %}
+
 <!-- ══ SUBHEADER ══ -->
 <div class="o-subheader">
+  {% comment %}Ligne 1 : titre et recherche, jamais remplacés en AJAX pour ne
+  pas perdre le focus pendant la frappe. Le compte vit désormais sur la carte
+  « Total » juste en dessous : le répéter ici en faisait deux à tenir d'accord.
+  {% endcomment %}
   <div class="o-subheader-row">
-    <span class="o-page-title">Ordonnances <span style="font-size:13px;color:var(--text-muted);font-weight:400;">({{ page_obj.paginator.count }})</span></span>
-    <span style="font-size:12px;color:var(--text-muted);">
-      {% if date_debut or date_fin %}
-        Période&nbsp;: {{ date_debut|default:"…" }} → {{ date_fin|default:"…" }}
-      {% else %}
-        Aujourd'hui ({{ today|date:"d/m/Y" }})
-      {% endif %}
-    </span>
+    <span class="o-page-title">Ordonnances</span>
+    <span style="font-size:12px;color:var(--text-muted);">· {{ periode_libelle }}</span>
     <div class="o-subheader-row-right">
-      <form method="get" id="search-form">
-        <div class="o-search-bar">
-          <input class="o-search-input" id="search-input" type="text" name="q"
-                 value="{{ q }}" placeholder="Rechercher une ordonnance…" autocomplete="off">
-          <button type="submit" class="o-search-btn"><i class="bi bi-search"></i></button>
-        </div>
-        {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
-        {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
-        {% if date_debut %}<input type="hidden" name="date_debut" value="{{ date_debut }}">{% endif %}
-        {% if date_fin %}<input type="hidden" name="date_fin" value="{{ date_fin }}">{% endif %}
-      </form>
+      <div class="o-search-bar">
+        <input class="o-search-input" id="search-input" type="text"
+               value="{{ q }}" placeholder="Rechercher une ordonnance…" autocomplete="off">
+        <button type="button" class="o-search-btn" onclick="lancerRecherche()" title="Rechercher">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
     </div>
   </div>
-  <div class="o-subheader-row">
+
+  {% comment %}Ligne 2 : contrôles, échangés en bloc à chaque rafraîchissement.
+  `data-filters` expose les filtres réellement appliqués, défauts compris :
+  toggleParam en part, là où l'URL nue ne les reflète pas au premier affichage.
+  `data-groups` reste vide — la page ne regroupe pas — mais l'attribut doit
+  exister, page_js.html le lit.{% endcomment %}
+  <div class="o-subheader-row" id="subheader-controls"
+       data-filters="{{ filters|join:"," }}" data-groups="">
     {% if perms.consultations.add_ordonnance %}
     <a href="{% url 'ordonnance_create_libre' %}" class="o-btn-create">+ CRÉER</a>
     {% endif %}
     <div class="o-subheader-row-right">
-      <div class="o-filter-dd" id="filter-dd">
-        <button type="button" class="o-filter-btn {% if statut_filtre or type_filtre or date_debut or date_fin %}active{% endif %}"
-                onclick="document.getElementById('filter-panel').classList.toggle('open')">
-          <i class="bi bi-funnel"></i> Filtres
-          {% if statut_filtre or type_filtre or date_debut or date_fin %}<span class="o-filter-dot"></span>{% endif %}
+
+      {% comment %}Absent quand seule la période par défaut est posée : Effacer
+      ramène à cet état, il n'aurait alors rien à faire.{% endcomment %}
+      {% if selection_active %}
+      <a href="#" class="o-ctrl-btn" style="color:var(--rose-text);"
+         onclick="resetAll(); return false;"
+         title="Effacer les filtres et la recherche">
+        <i class="bi bi-x-circle"></i> Effacer
+      </a>
+      {% endif %}
+
+      <div class="o-dd-wrap">
+        <button type="button" class="o-ctrl-btn {% if filtre_pose %}active{% endif %}"
+                id="btn-filtres" onclick="toggleDd('dd-filtres', this)">
+          <i class="bi bi-funnel{% if filtre_pose %}-fill{% endif %}"></i> Filtres
         </button>
-        <div class="o-filter-panel" id="filter-panel">
-          <span class="o-filter-section-label">Statut</span>
-          <a class="o-filter-option {% if not statut_filtre %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Tous</a>
-          <a class="o-filter-option {% if statut_filtre == 'emise' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=emise{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Émise</a>
-          <a class="o-filter-option {% if statut_filtre == 'delivree' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=delivree{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Délivrée</a>
-          <a class="o-filter-option {% if statut_filtre == 'partielle' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=partielle{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Partielle</a>
-          <a class="o-filter-option {% if statut_filtre == 'expiree' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}statut=expiree{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Expirée</a>
-          <hr class="o-filter-sep">
-          <span class="o-filter-section-label">Type</span>
-          <a class="o-filter-option {% if not type_filtre %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Tous</a>
-          <a class="o-filter-option {% if type_filtre == 'interne' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=interne{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Interne</a>
-          <a class="o-filter-option {% if type_filtre == 'externe' %}active{% endif %}"
-             href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}type=externe{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}">Externe</a>
-          <hr class="o-filter-sep">
-          <span class="o-filter-section-label">Période</span>
-          <div class="o-filter-period">
-            <form method="get" id="period-form">
-              {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-              {% if statut_filtre %}<input type="hidden" name="statut" value="{{ statut_filtre }}">{% endif %}
-              {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
-              <div class="o-filter-period-row">
-                <label for="date_debut">Du</label>
-                <input type="date" id="date_debut" name="date_debut" value="{{ date_debut }}">
-              </div>
-              <div class="o-filter-period-row">
-                <label for="date_fin">Au</label>
-                <input type="date" id="date_fin" name="date_fin" value="{{ date_fin }}">
-              </div>
-              <div class="o-filter-period-actions">
-                <button type="submit" class="o-filter-period-apply">Appliquer</button>
-                {% if date_debut or date_fin %}
-                <a class="o-filter-period-reset"
-                   href="?{% if q %}q={{ q }}&{% endif %}{% if statut_filtre %}statut={{ statut_filtre }}&{% endif %}{% if type_filtre %}type={{ type_filtre }}{% endif %}">Aujourd'hui</a>
-                {% endif %}
-              </div>
-            </form>
-          </div>
+        <div class="o-dd-panel lst-menu" id="dd-filtres">
+          {% include 'includes/listing/menu_filtres.html' %}
         </div>
       </div>
+
       <div class="o-ctrl-sep"></div>
+
       <div class="o-pagination">
         <a class="o-pag-btn {% if not page_obj.has_previous %}disabled{% endif %}"
-           href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_previous %}{% querystring page=page_obj.previous_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-left"></i>
         </a>
+        {% if page_obj.paginator.count > 0 %}
         <span>{{ page_obj.start_index }}-{{ page_obj.end_index }} / {{ page_obj.paginator.count }}</span>
+        {% else %}<span>0 / 0</span>{% endif %}
         <a class="o-pag-btn {% if not page_obj.has_next %}disabled{% endif %}"
-           href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_filtre %}&statut={{ statut_filtre }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if date_debut %}&date_debut={{ date_debut }}{% endif %}{% if date_fin %}&date_fin={{ date_fin }}{% endif %}{% else %}#{% endif %}">
+           href="{% if page_obj.has_next %}{% querystring page=page_obj.next_page_number %}{% else %}#{% endif %}">
           <i class="bi bi-chevron-right"></i>
         </a>
       </div>
@@ -282,7 +263,10 @@
   </div>
 </div>
 
-<!-- ══ STATS ══ -->
+{% comment %}`list-stats` est la zone que page_js.html échange avec les
+résultats : sans elle, les quatre compteurs resteraient ceux de l'affichage
+précédent après un changement de filtre.{% endcomment %}
+<div id="list-stats">
 <div class="fac-stats">
   <div class="fac-stat-card c-total">
     <div class="fac-stat-label">Total</div>
@@ -301,8 +285,10 @@
     <div class="fac-stat-value" style="color:var(--rose);">{{ stats.expirees }}</div>
   </div>
 </div>
+</div>
 
 <!-- ══ TABLE ══ -->
+<div id="list-result">
 <div class="o-list-wrap">
   {% if page_obj %}
   <table class="o-list">
@@ -383,29 +369,19 @@
   </div>
   {% endif %}
 </div>
-
-{% block extra_js %}
-{{ block.super }}
-<script>
-(function() {
-  var input = document.getElementById('search-input');
-  var form  = document.getElementById('search-form');
-  var timer = null;
-  if (input) {
-    input.addEventListener('input', function() {
-      clearTimeout(timer);
-      timer = setTimeout(function() { form.submit(); }, 350);
-    });
-  }
-  document.addEventListener('click', function(e) {
-    var dd = document.getElementById('filter-dd');
-    var panel = document.getElementById('filter-panel');
-    if (dd && panel && !dd.contains(e.target)) {
-      panel.classList.remove('open');
-    }
-  });
-})();
-</script>
+</div>
 {% endblock %}
 
+{% comment %}
+Au niveau du gabarit, et non imbriqué dans `content` : déclaré là-dedans, le
+bloc se rendait **deux fois** — à sa place imbriquée et à l'emplacement prévu par
+le parent — posant deux écouteurs de recherche et deux temporisations.
+
+page_js.html remplace le script maison : il apporte la recherche temporisée, la
+pagination et les filtres en AJAX, Effacer, et la fermeture des menus au clic
+extérieur. Le `block.super` est indispensable, il porte le calage de --topbar-h.
+{% endcomment %}
+{% block extra_js %}
+{{ block.super }}
+{% include 'includes/listing/page_js.html' %}
 {% endblock %}

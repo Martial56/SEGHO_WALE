@@ -366,10 +366,12 @@ def produit_edit(request, pk):
 
 @login_required(login_url='login')
 def mouvements_list(request):
-    qs = MouvementStock.objects.select_related('produit', 'produit__unite_mesure').order_by('-date')
+    qs = MouvementStock.objects.select_related('produit', 'produit__unite_mesure', 'service', 'centre').order_by('-date')
     type_filtre = request.GET.get('type', '')
     periode     = request.GET.get('periode', '')
     q           = request.GET.get('q', '').strip()
+    date_from   = request.GET.get('date_from', '').strip()
+    date_to     = request.GET.get('date_to', '').strip()
 
     if type_filtre:
         qs = qs.filter(type=type_filtre)
@@ -377,7 +379,13 @@ def mouvements_list(request):
         qs = qs.filter(Q(produit__nom__icontains=q) | Q(reference__icontains=q))
 
     today = timezone.now().date()
-    if periode == 'today':
+    if date_from or date_to:
+        periode = ''
+        if date_from:
+            qs = qs.filter(date__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__date__lte=date_to)
+    elif periode == 'today':
         qs = qs.filter(date__date=today)
     elif periode == 'week':
         debut_semaine = today - timezone.timedelta(days=today.weekday())
@@ -392,6 +400,8 @@ def mouvements_list(request):
         'type_filtre': type_filtre,
         'periode':     periode,
         'q':           q,
+        'date_from':   date_from,
+        'date_to':     date_to,
     })
 
 
@@ -2411,62 +2421,228 @@ def import_produits_modele(request):
 
 
 # ---------------------------------------------------------------------------
-# Transfert interne
+# Distribution aux services internes (ménage, buanderie...)
 # ---------------------------------------------------------------------------
 
 @login_required(login_url='login')
-def transfert_create(request):
+def distribution_service_create(request):
+    """Sortie de consommables/équipements du stock central vers un service
+    interne (ménage, buanderie...), selon sa consommation mensuelle ou
+    hebdomadaire — distincte de la dotation aux pharmacies (stock/dotation/),
+    qui passe par une demande et une validation FEFO propres à
+    DemandePharmacie. Ici la sortie est directe (pas de demande préalable),
+    mais suit le même FEFO pour ne jamais distribuer un lot déjà périmé alors
+    qu'un lot valide existe encore."""
     if not can_manage_stock(request.user):
         raise PermissionDenied
-    from .models import PHARMACIES
-    produits = Produit.objects.filter(actif=True, stock_actuel__gt=0).order_by('nom')
-    errors = {}
+    from medecins.models import Service
+    from centres.models import Centre
+
+    services = Service.objects.filter(actif=True).order_by('nom')
+    centres  = Centre.objects.filter(actif=True).order_by('nom')
+    produits = list(
+        Produit.objects.filter(actif=True, type__in=['consommable', 'equipement'])
+        .select_related('unite_mesure', 'categorie').order_by('type', 'nom')
+    )
+    categories = CategorieStock.objects.filter(actif=True).order_by('nom')
+    post_service_pk, post_centre_pk, post_notes = '', '', ''
+    panier_restaure = {}
+
     if request.method == 'POST':
-        produit_pk = request.POST.get('produit', '')
-        pharmacie  = request.POST.get('pharmacie', '')
+        service_pk = request.POST.get('service', '').strip()
+        centre_pk  = request.POST.get('centre', '').strip()
         notes      = request.POST.get('notes', '').strip()
-        try:
-            quantite = float(request.POST.get('quantite', 0) or 0)
-        except ValueError:
-            quantite = 0
+        post_service_pk, post_centre_pk, post_notes = service_pk, centre_pk, notes
+        # pk='' ferait planter .filter(pk=...) (ValueError, pas DoesNotExist) :
+        # un champ non rempli n'est pas une erreur serveur, juste une validation.
+        service    = Service.objects.filter(pk=service_pk, actif=True).first() if service_pk else None
+        centre     = Centre.objects.filter(pk=centre_pk, actif=True).first() if centre_pk else None
+        valide = True
+        if not service:
+            messages.error(request, 'Sélectionnez le service destinataire.')
+            valide = False
+        if not centre:
+            messages.error(request, 'Sélectionnez le centre destinataire.')
+            valide = False
 
-        produit = Produit.objects.filter(pk=produit_pk).first()
-        if not produit:
-            errors['produit'] = 'Sélectionnez un produit.'
-        if not pharmacie:
-            errors['pharmacie'] = 'Sélectionnez la pharmacie destinataire.'
-        if quantite <= 0:
-            errors['quantite'] = 'La quantité doit être supérieure à 0.'
-        elif produit and float(produit.stock_actuel) < quantite:
-            errors['quantite'] = f'Stock insuffisant — disponible : {produit.stock_actuel} {produit.unite_mesure.nom if produit.unite_mesure else ""}.'
+        lignes_demandees = []
+        for p in produits:
+            val = request.POST.get(f'qte_{p.pk}', '').strip()
+            if not val:
+                continue
+            try:
+                qte = float(val)
+            except ValueError:
+                continue
+            if qte > 0:
+                lignes_demandees.append((p, qte))
+        if not lignes_demandees:
+            messages.error(request, 'Ajoutez au moins un produit avec une quantité.')
+            valide = False
+        # Si un autre champ est en cause (centre/service), le panier déjà
+        # rempli ne doit pas disparaître au réaffichage — reconstruit le
+        # panier JS depuis ce qui a été posté, pas depuis zéro.
+        panier_restaure = {
+            str(p.pk): {
+                'nom': p.nom,
+                'unite': p.unite_mesure.nom if p.unite_mesure else '',
+                'qte': qte,
+            }
+            for p, qte in lignes_demandees
+        }
 
-        if not errors:
+        if valide:
+            maintenant = timezone.now()
+            today = maintenant.date()
+            # L'heure (jusqu'à la seconde) distingue deux distributions au même
+            # service du même centre le même jour — sans elle, une deuxième
+            # sortie l'après-midi fusionnerait avec celle du matin dans
+            # l'historique (même date+centre+service -> même référence).
+            reference = f"DIST{maintenant:%Y%m%d-%H%M%S}-{centre.code}-{service.code}"
+            manque_stock = []
             with transaction.atomic():
-                produit = Produit.objects.select_for_update().get(pk=produit.pk)
-                if float(produit.stock_actuel) < quantite:
-                    errors['quantite'] = 'Stock insuffisant (modifié entre-temps).'
-                else:
-                    stock_avant = float(produit.stock_actuel)
-                    stock_apres = stock_avant - quantite
-                    pharma_label = dict(PHARMACIES).get(pharmacie, pharmacie)
-                    MouvementStock.objects.create(
-                        produit=produit, type='livraison', motif='livraison',
-                        pharmacie=pharmacie,
-                        quantite=quantite, stock_avant=stock_avant, stock_apres=stock_apres,
-                        notes=notes, cree_par=request.user,
-                        reference=f'Livraison → {pharma_label}',
-                    )
-                    produit.stock_actuel = stock_apres
-                    produit.save(update_fields=['stock_actuel'])
-            if not errors:
-                messages.success(request, f'{quantite} {produit.unite_mesure.nom if produit.unite_mesure else ""} de « {produit.nom} » livrés à {pharma_label}.')
-                return redirect('stock_mouvements')
+                for p, qte in lignes_demandees:
+                    produit = Produit.objects.select_for_update().get(pk=p.pk)
+                    qte_restante = qte
+                    lots_dispo = LotProduit.objects.select_for_update().filter(
+                        produit=produit, quantite_actuelle__gt=0,
+                    ).filter(
+                        Q(date_peremption__isnull=True) | Q(date_peremption__gte=today)
+                    ).order_by(F('date_peremption').asc(nulls_last=True))
+                    for lot in lots_dispo:
+                        if qte_restante <= 0:
+                            break
+                        qte_lot = min(float(lot.quantite_actuelle), qte_restante)
+                        sv = float(produit.stock_actuel)
+                        sa = max(0, sv - qte_lot)
+                        MouvementStock.objects.create(
+                            produit=produit, lot=lot,
+                            type='distribution_service', motif='distribution_service',
+                            service=service, centre=centre, quantite=qte_lot,
+                            stock_avant=sv, stock_apres=sa,
+                            reference=reference, notes=notes,
+                            cree_par=request.user,
+                        )
+                        lot.quantite_actuelle = max(0, float(lot.quantite_actuelle) - qte_lot)
+                        lot.save(update_fields=['quantite_actuelle'])
+                        produit.stock_actuel = sa
+                        produit.save(update_fields=['stock_actuel'])
+                        qte_restante -= qte_lot
 
-    return render(request, 'stock/transfert/form.html', {
-        'produits':   produits,
-        'pharmacies': PHARMACIES,
-        'errors':     errors,
-        'post':       request.POST if request.method == 'POST' else None,
+                    if qte_restante > 0:
+                        sv = float(produit.stock_actuel)
+                        qte_reelle = min(qte_restante, sv)
+                        if qte_reelle > 0:
+                            sa = sv - qte_reelle
+                            MouvementStock.objects.create(
+                                produit=produit, type='distribution_service', motif='distribution_service',
+                                service=service, centre=centre, quantite=qte_reelle,
+                                stock_avant=sv, stock_apres=sa,
+                                reference=reference, notes=notes,
+                                cree_par=request.user,
+                            )
+                            produit.stock_actuel = sa
+                            produit.save(update_fields=['stock_actuel'])
+                        if qte_reelle < qte_restante:
+                            manque_stock.append(produit.nom)
+
+            if manque_stock:
+                messages.warning(
+                    request,
+                    f"Stock insuffisant pour : {', '.join(manque_stock)} — quantité livrée réduite en conséquence."
+                )
+            messages.success(
+                request,
+                f"Distribution {reference} enregistrée pour {service.nom} — {centre.nom} ({len(lignes_demandees)} produit{'s' if len(lignes_demandees) > 1 else ''})."
+            )
+            # Retour sur un formulaire vierge plutôt que le journal : permet
+            # d'enchaîner directement une distribution pour un autre service
+            # sans revenir cliquer sur « Distribution » à chaque fois.
+            return redirect('stock_distribution_service')
+
+    return render(request, 'stock/distribution/form.html', {
+        'produits':        produits,
+        'services':        services,
+        'centres':         centres,
+        'categories':      categories,
+        'post_service_pk': post_service_pk,
+        'post_centre_pk':  post_centre_pk,
+        'post_notes':      post_notes,
+        'panier_restaure': panier_restaure,
+    })
+
+
+@login_required(login_url='login')
+def distribution_service_historique(request):
+    """Historique des distributions aux services, regroupées par envoi — une
+    distribution crée une ligne MouvementStock par produit (et par lot si le
+    FEFO en a scindé), toutes partageant la même `reference` ; le journal
+    général (stock_mouvements) les montre une par une, ce qui noie l'envoi
+    dans le détail plutôt que de répondre à « qu'a reçu tel service ce
+    mois-ci ? »."""
+    from medecins.models import Service
+    from centres.models import Centre
+
+    q             = request.GET.get('q', '').strip()
+    service_pk    = request.GET.get('service', '').strip()
+    centre_pk     = request.GET.get('centre', '').strip()
+    periode       = request.GET.get('periode', '')
+    date_from     = request.GET.get('date_from', '').strip()
+    date_to       = request.GET.get('date_to', '').strip()
+
+    qs = MouvementStock.objects.filter(type='distribution_service').select_related(
+        'produit', 'produit__unite_mesure', 'service', 'centre', 'cree_par'
+    )
+    if q:
+        qs = qs.filter(Q(reference__icontains=q) | Q(produit__nom__icontains=q))
+    if service_pk:
+        qs = qs.filter(service_id=service_pk)
+    if centre_pk:
+        qs = qs.filter(centre_id=centre_pk)
+
+    today = timezone.now().date()
+    if date_from or date_to:
+        # Un intervalle explicite l'emporte sur les raccourcis période :
+        # les deux en même temps ne voudraient rien dire de cohérent.
+        periode = ''
+        if date_from:
+            qs = qs.filter(date__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(date__date__lte=date_to)
+    elif periode == 'today':
+        qs = qs.filter(date__date=today)
+    elif periode == 'week':
+        debut_semaine = today - timezone.timedelta(days=today.weekday())
+        qs = qs.filter(date__date__gte=debut_semaine)
+    elif periode == 'month':
+        qs = qs.filter(date__month=today.month, date__year=today.year)
+
+    groupes = {}
+    for m in qs.order_by('date'):
+        g = groupes.setdefault(m.reference, {
+            'reference': m.reference, 'service': m.service, 'centre': m.centre,
+            'date': m.date, 'cree_par': m.cree_par, 'notes': m.notes, 'lignes': [],
+        })
+        g['lignes'].append(m)
+        g['date'] = min(g['date'], m.date)
+    envois = sorted(groupes.values(), key=lambda g: g['date'], reverse=True)
+    for envoi in envois:
+        envoi['nb_produits'] = len(envoi['lignes'])
+
+    paginator = Paginator(envois, 20)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'stock/distribution/historique.html', {
+        'page_obj':      page_obj,
+        'q':             q,
+        'service_pk':    service_pk,
+        'centre_pk':     centre_pk,
+        'periode':       periode,
+        'date_from':     date_from,
+        'date_to':       date_to,
+        'services':      Service.objects.filter(actif=True).order_by('nom'),
+        'centres':       Centre.objects.filter(actif=True).order_by('nom'),
+        'total_envois':  len(envois),
     })
 
 

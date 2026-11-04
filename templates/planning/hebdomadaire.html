@@ -128,14 +128,9 @@ html[data-theme="dark"] .td-cell.search-match { background: #2a2600 !important; 
 }
 .pl-signature .sig-name { font-size: 13px; font-weight: 700; color: var(--text); }
 
-/* Historique */
-.pl-history {
-  margin-top: 28px; border-top: 1px solid var(--border); padding: 18px 32px 40px;
-}
-.pl-history h3 {
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
-  text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 12px 0;
-}
+/* Historique (modale, ouverte depuis le bouton de la barre d'actions) */
+.hist-modal .pl-modal { width: 480px; max-width: 92vw; max-height: 80vh; display: flex; flex-direction: column; }
+.hist-modal .pl-history-list { overflow-y: auto; margin: 0 -28px; padding: 0 28px; }
 .pl-history-item {
   display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border);
   font-size: 12px;
@@ -194,7 +189,7 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
   /* Masquer les éléments de l'interface */
   .pl-nav, .pl-actions, .pl-title-block, .pl-nav-week,
   nav, #top-bar, .topbar, .sidebar, .sidebar-wrapper,
-  .topbar-wrapper, #sidebar, .pl-history, .pl-modal-overlay { display: none !important; }
+  .topbar-wrapper, #sidebar, .pl-modal-overlay { display: none !important; }
 
   /* Afficher l'en-tête print */
   .print-header { display: block; margin-bottom: 14px; }
@@ -245,13 +240,17 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 
   .pl-signature { margin-top: 16px; }
 
-  .content { padding: 10mm 12mm !important; }
+  .content { padding: 4mm !important; }
 
   @page { size: A4 landscape; margin: 0; }
 }
 {% endblock %}
 
 {% block content %}
+
+<!-- Tout ce bloc est redimensionné (JS, à l'impression) pour toujours tenir
+sur une seule page, quel que soit le nombre de bureaux/créneaux. -->
+<div id="print-scale-wrap">
 
 <!-- En-tête visible uniquement à l'impression -->
 <div class="print-header">
@@ -315,6 +314,11 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
   <a href="{% url 'planning_export_excel' planning.pk %}" class="btn-secondary">
     <i class="bi bi-file-earmark-excel"></i> Export Excel
   </a>
+  {% if modifications %}
+  <button type="button" class="btn-secondary" onclick="openHistModal()">
+    <i class="bi bi-clock-history"></i> Historique
+  </button>
+  {% endif %}
   <a href="{% url 'planning_list' %}" class="btn-secondary">
     <i class="bi bi-arrow-left"></i> Retour
   </a>
@@ -434,18 +438,27 @@ html[data-theme="dark"] .pl-modal input[type="date"]:focus { border-bottom-color
 </div>
 {% endif %}
 
+</div><!-- /#print-scale-wrap -->
+
 {% if modifications %}
-<div class="pl-history">
-  <h3><i class="bi bi-clock-history"></i> Historique des modifications</h3>
-  {% for mod in modifications %}
-  <div class="pl-history-item">
-    <div class="pl-history-meta">
-      <strong>{{ mod.modifie_par.get_full_name|default:mod.modifie_par.username }}</strong><br>
-      {{ mod.modifie_le|date:"d/m/Y H:i" }}
+<div class="pl-modal-overlay hist-modal" id="histModal">
+  <div class="pl-modal">
+    <h3><i class="bi bi-clock-history"></i> Historique des modifications</h3>
+    <div class="pl-history-list">
+      {% for mod in modifications %}
+      <div class="pl-history-item">
+        <div class="pl-history-meta">
+          <strong>{% if mod.modifie_par %}{{ mod.modifie_par.get_full_name|default:mod.modifie_par.username }}{% else %}—{% endif %}</strong><br>
+          {{ mod.modifie_le|date:"d/m/Y H:i" }}
+        </div>
+        <div class="pl-history-resume">{{ mod.resume }}</div>
+      </div>
+      {% endfor %}
     </div>
-    <div class="pl-history-resume">{{ mod.resume }}</div>
+    <div class="pl-modal-actions" style="margin-top:14px;">
+      <button type="button" class="btn-cancel" onclick="closeHistModal()">Fermer</button>
+    </div>
   </div>
-  {% endfor %}
 </div>
 {% endif %}
 
@@ -515,6 +528,15 @@ document.getElementById('dupModal').addEventListener('click', function(e) {
   if (e.target === this) closeDupModal();
 });
 
+var histModal = document.getElementById('histModal');
+function openHistModal()  { if (histModal) histModal.classList.add('open'); }
+function closeHistModal() { if (histModal) histModal.classList.remove('open'); }
+if (histModal) {
+  histModal.addEventListener('click', function(e) {
+    if (e.target === this) closeHistModal();
+  });
+}
+
 // ── Recherche rapide ──────────────────────────────────────────────────────────
 (function() {
   const inp = document.getElementById('plSearch');
@@ -528,6 +550,51 @@ document.getElementById('dupModal').addEventListener('click', function(e) {
       td.classList.add(text.includes(q) ? 'search-match' : 'search-dim');
     });
   });
+})();
+
+// ── Impression : forcer le contenu entier sur une seule page ────────────────
+// Le nombre de bureaux/créneaux (et donc la hauteur du tableau) varie d'un
+// planning à l'autre ; plutôt que de parier sur des tailles de police fixes,
+// on réduit le contenu à l'échelle juste avant impression pour qu'il tienne
+// toujours dans la hauteur imprimable d'une page A4 paysage.
+(function () {
+  var wrap = document.getElementById('print-scale-wrap');
+  if (!wrap) return;
+
+  // Hauteur de page A4 paysage (210mm) moins le padding vertical imposé à
+  // .content en impression (4mm haut + 4mm bas, voir @media print ci-dessus).
+  var MM_PAR_PX = 25.4 / 96;
+  var HAUTEUR_IMPRIMABLE_PX = (210 - 8) / MM_PAR_PX;
+
+  function appliquerEchelle() {
+    wrap.style.transform = 'none';
+    wrap.style.width = '';
+    wrap.style.height = 'auto';
+    var hauteurNaturelle = wrap.getBoundingClientRect().height;
+    if (hauteurNaturelle <= HAUTEUR_IMPRIMABLE_PX) return;
+    var echelle = HAUTEUR_IMPRIMABLE_PX / hauteurNaturelle;
+    // Élargir avant de réduire : une réduction uniforme (scale) rétrécit la
+    // largeur autant que la hauteur, ce qui laisserait des bandes blanches de
+    // part et d'autre. En élargissant d'abord dans la même proportion que la
+    // réduction à venir, le résultat final occupe exactement toute la
+    // largeur de la page, sans déformer le contenu (même ratio partout).
+    wrap.style.width = (100 / echelle) + '%';
+    wrap.style.transformOrigin = 'top left';
+    wrap.style.transform = 'scale(' + echelle + ')';
+    // Sans ceci, l'espace réservé dans le flux du document reste celui
+    // d'avant la réduction (transform ne change pas la taille de boîte) et
+    // une seconde page, vide, serait quand même imprimée.
+    wrap.style.height = (hauteurNaturelle * echelle) + 'px';
+  }
+
+  function reinitialiserEchelle() {
+    wrap.style.transform = 'none';
+    wrap.style.width = '';
+    wrap.style.height = 'auto';
+  }
+
+  window.addEventListener('beforeprint', appliquerEchelle);
+  window.addEventListener('afterprint', reinitialiserEchelle);
 })();
 </script>
 {% endblock %}

@@ -2,10 +2,21 @@
 {% load i18n %}
 
 {% block extra_planning_css %}
+/* .content a overflow-x:clip (planning/base.html) + overflow-y:auto (règle
+   globale forcée par le clip sur l'autre axe) : il devient alors le
+   conteneur de référence pour position:sticky alors qu'il ne défile jamais
+   réellement lui-même (c'est la fenêtre qui défile), ce qui casse le
+   collant. Restaurer overflow:visible ici, scopé à cette page, rend le
+   défilement de fenêtre à nouveau la référence (même piège déjà rencontré
+   et corrigé sur le Journal de stock et la Distribution). */
+.content { overflow: visible; }
 .pl-subheader {
-  position: sticky; top: 0; z-index: 180;
+  position: sticky; top: var(--topbar-h); z-index: 180;
   background: var(--surface); border-bottom: 1px solid var(--border);
-  padding: 10px 0 0; 
+  padding: 10px 0 0;
+}
+.pl-list-table thead th {
+  position: sticky; top: calc(var(--topbar-h) + var(--pl-subheader-h, 0px)); z-index: 170;
 }
 .pl-subheader-row {
   display: flex; align-items: center; justify-content: space-between;
@@ -38,15 +49,21 @@
   padding: 3px 12px; border-radius: 20px; border: 1px solid var(--pl-600);
   background: var(--pl-600); color: #fff; font-size: 12px; cursor: pointer;
 }
-.pl-table-wrap { overflow-x: auto; }
-.pl-list-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+/* overflow-x:auto ici (même en desktop où la table n'est pas assez large pour
+   en avoir besoin) forçait ce wrapper à devenir le conteneur de référence du
+   thead sticky au lieu de la fenêtre — même piège que .content. Le scroll
+   horizontal mobile est déjà couvert par la media query de planning/base.html. */
+/* border-collapse:collapse empêche position:sticky de fonctionner sur les
+   <th> dans Chrome — separate + border-spacing:0 donne le même rendu visuel
+   sans ce blocage. */
+.pl-list-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13.5px; }
 .pl-list-table thead th {
   background: var(--pl-700); color: #fff; padding: 9px 14px;
   font-weight: 600; font-size: 12px; text-align: left; white-space: nowrap;
 }
-.pl-list-table tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.pl-list-table tbody tr { transition: background 0.1s; }
 .pl-list-table tbody tr:hover { background: var(--pl-50); }
-.pl-list-table tbody td { padding: 10px 14px; vertical-align: middle; color: var(--text); }
+.pl-list-table tbody td { padding: 10px 14px; vertical-align: middle; color: var(--text); border-bottom: 1px solid var(--border); }
 .badge-publie {
   display: inline-flex; align-items: center; gap: 4px;
   background: var(--pl-100); color: var(--pl-800); border-radius: 20px;
@@ -187,4 +204,22 @@ html[data-theme="dark"] .badge-brouillon { background: #3d2e00; color: #ffd666; 
   {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  function syncPlSubheaderH() {
+    var sub = document.querySelector('.pl-subheader');
+    if (sub) {
+      var h = sub.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--pl-subheader-h', h + 'px');
+    }
+  }
+  syncPlSubheaderH();
+  document.addEventListener('DOMContentLoaded', syncPlSubheaderH);
+  window.addEventListener('resize', syncPlSubheaderH);
+})();
+</script>
 {% endblock %}

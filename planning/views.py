@@ -917,36 +917,58 @@ def _send_publication_email(planning, published_by):
 
 # ── Semaine en cours / Tableau de bord ───────────────────────────────────────
 
-@login_required(login_url='login')
-def planning_courant(request):
+def _dashboard_stats(request):
+    """Stats du tableau de bord Planning — partagées entre le rendu initial
+    (planning_courant) et le rafraîchissement périodique en JSON
+    (planning_courant_json), pour ne jamais les faire diverger."""
     today       = date.today()
     monday      = today - timedelta(days=today.weekday())
     next_monday = monday + timedelta(weeks=1)
     prev_monday = monday - timedelta(weeks=1)
 
-    planning_courant_ = PlanningHebdomadaire.objects.filter(semaine_debut=monday).first()
-    planning_prochain = PlanningHebdomadaire.objects.filter(semaine_debut=next_monday).first()
-    planning_precedent = PlanningHebdomadaire.objects.filter(semaine_debut=prev_monday).first()
+    plannings = PlanningHebdomadaire.objects.select_related('cree_par')
+    if not can_manage_planning(request.user):
+        # Même politique que planning_list : les brouillons restent internes
+        # à la hiérarchie tant qu'ils ne sont pas publiés.
+        plannings = plannings.filter(publie=True)
+
+    planning_courant_ = plannings.filter(semaine_debut=monday).first()
+    planning_prochain = plannings.filter(semaine_debut=next_monday).first()
+    planning_precedent = plannings.filter(semaine_debut=prev_monday).first()
 
     # 6 derniers plannings (hors semaine courante)
-    recents = (
-        PlanningHebdomadaire.objects
-        .exclude(semaine_debut=monday)
-        .order_by('-semaine_debut')[:6]
-    )
+    recents = plannings.exclude(semaine_debut=monday).order_by('-semaine_debut')[:6]
 
     # Stats rapides
     active_bureaux = list(Bureau.objects.filter(actif=True).prefetch_related('plages'))
     total_cells_week = sum(len(b.plages.all()) * 6 for b in active_bureaux)
     filled_courant = 0
     if planning_courant_:
-        filled_courant = planning_courant_.affectations.exclude(personnel='').count()
-    pct_courant = round(filled_courant * 100 / total_cells_week) if total_cells_week else 0
+        filled_courant = planning_courant_.affectations.filter(
+            plage__bureau__actif=True,
+        ).exclude(personnel='').count()
+    pct_courant = min(100, round(filled_courant * 100 / total_cells_week)) if total_cells_week else 0
 
     total_published = PlanningHebdomadaire.objects.filter(publie=True).count()
     total_plannings = PlanningHebdomadaire.objects.count()
 
-    return render(request, 'planning/dashboard.html', {
+    # Tendance de couverture des 6 derniers mois — même calcul que
+    # planning_stats (seuils et couleurs partagés avec le graphique des
+    # statistiques détaillées), mais borné à une courte fenêtre glissante
+    # pour rester léger sur le tableau de bord.
+    six_months_ago = (monday.replace(day=1) - timedelta(days=150)).replace(day=1)
+    monthly_raw = defaultdict(list)
+    for pl in plannings.filter(semaine_debut__gte=six_months_ago).prefetch_related('affectations'):
+        filled = sum(1 for a in pl.affectations.all() if a.personnel)
+        pct    = round(filled * 100 / total_cells_week) if total_cells_week else 0
+        monthly_raw[(pl.semaine_debut.year, pl.semaine_debut.month)].append(pct)
+
+    monthly_chart = [
+        {'year': y, 'month': m, 'mois_nom': MOIS_NOMS[m], 'avg_pct': round(sum(pcts) / len(pcts))}
+        for (y, m), pcts in sorted(monthly_raw.items())
+    ][-6:]
+
+    return {
         'today':               today,
         'monday':              monday,
         'next_monday':         next_monday,
@@ -960,7 +982,30 @@ def planning_courant(request):
         'pct_courant':         pct_courant,
         'total_published':     total_published,
         'total_plannings':     total_plannings,
+        'monthly_chart':       monthly_chart,
+    }
+
+
+@login_required(login_url='login')
+def planning_courant(request):
+    return render(request, 'planning/dashboard.html', {
+        **_dashboard_stats(request),
         **_base_ctx(request),
+    })
+
+
+@login_required(login_url='login')
+def planning_courant_json(request):
+    """Rafraîchissement périodique (AJAX) des KPI et du graphe du tableau de
+    bord, sans recharger la page — même convention que core.dashboard_stats_json."""
+    stats = _dashboard_stats(request)
+    return JsonResponse({
+        'total_plannings':  stats['total_plannings'],
+        'total_published':  stats['total_published'],
+        'total_cells_week': stats['total_cells_week'],
+        'filled_courant':   stats['filled_courant'],
+        'pct_courant':      stats['pct_courant'],
+        'monthly_chart':    stats['monthly_chart'],
     })
 
 

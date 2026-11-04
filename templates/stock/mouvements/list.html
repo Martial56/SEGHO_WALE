@@ -3,14 +3,36 @@
 {% block topbar_title %}Stock — Journal de stock{% endblock %}
 
 {% block extra_st_css %}<style>
+/* .content a overflow-y:auto dans global.css (règle partagée par tout le
+   site) : CSS force alors overflow-x à 'auto' aussi, et .content devient le
+   conteneur de référence pour position:sticky — alors qu'il ne défile jamais
+   réellement lui-même (sa hauteur n'est pas contrainte, c'est la fenêtre qui
+   défile). Résultat : les éléments sticky de cette page défilaient avec le
+   reste au lieu de se figer. Restaurer overflow:visible ici, scopé à cette
+   seule page, rend le défilement de fenêtre à nouveau la référence. Même
+   piège que celui déjà rencontré et documenté sur le module congés. */
+.content { overflow: visible; }
+
+/* Bande figée au scroll : en-tête + les deux rangées de filtres, en un seul
+   bloc sticky (ses enfants gardent leur mise en page normale — seul ce
+   conteneur est positionné). La hauteur réelle de ce bloc varie (les tabs
+   passent à la ligne sur un écran étroit) : elle est mesurée en JS et posée
+   dans --mv-head-h, pour que le résumé puis l'en-tête de tableau sachent
+   exactement où se figer à leur tour, sans jamais se chevaucher. */
+#mv-sticky-top {
+  position:sticky; top:var(--topbar-h); z-index:100;
+  background:var(--st-surface);
+}
 .st-page-head {
   display:flex; align-items:center; justify-content:space-between; gap:16px;
   padding:12px 32px; margin:0 -32px;
   background:#e8f2f7; border-bottom:1px solid rgba(0,0,0,.05);
   box-shadow:0 2px 8px rgba(0,0,0,.04);
-  position:sticky; top:var(--topbar-h); z-index:100;
 }
-html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
+/* var(--st-surface), pas l'ancien noir du module : #0f0e0e est chaud et
+   presque aussi clair que le fond de page, la bande s'en détachait en
+   brun. Voir la note de stock/base.html. */
+html[data-theme="dark"] .st-page-head { background:var(--st-surface); }
 
 /* Filtres rapides période */
 .periode-tabs { display:flex; gap:4px; flex-wrap:wrap; margin-top:14px; }
@@ -35,6 +57,7 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
 .type-tab.active-ajust    { background:rgba(var(--amber-rgb),.12);  border-color:var(--amber); color:var(--amber-text); }
 .type-tab.active-peremption{ background:rgba(123,87,194,.12); border-color:#7b57c2; color:#4527a0; }
 .type-tab.active-retour   { background:rgba(0,0,0,.06);       border-color:#999;    color:#555; }
+.type-tab.active-distribution { background:rgba(22,169,107,.12); border-color:#16a96b; color:#0f7a4c; }
 
 /* Ligne du journal */
 .mv-row { border-left:3px solid transparent; transition:background .12s; }
@@ -52,6 +75,7 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
 .mv-badge-ajust     { background:rgba(var(--amber-rgb),.1);  color:var(--amber-text); border:1px solid rgba(var(--amber-rgb),.25); }
 .mv-badge-peremption{ background:rgba(123,87,194,.1);  color:#4527a0; border:1px solid rgba(123,87,194,.2); }
 .mv-badge-retour    { background:rgba(0,0,0,.06);      color:#555;    border:1px solid rgba(0,0,0,.12); }
+.mv-badge-distribution { background:rgba(22,169,107,.1); color:#0f7a4c; border:1px solid rgba(22,169,107,.25); }
 
 /* Variation stock */
 .delta-plus  { color:var(--accent-text-soft); font-weight:800; font-size:13px; }
@@ -62,10 +86,21 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
 .stock-arrow { display:inline-flex; align-items:center; gap:5px; font-size:12px; }
 .stock-arrow .avant { color:var(--st-muted); }
 .stock-arrow .apres { color:var(--st-text); font-weight:700; }
+
+/* Résumé et en-tête de tableau figés juste sous le bloc filtres : chacun se
+   pose à la suite de ce qui le précède (topbar, puis filtres, puis résumé),
+   jamais l'un sur l'autre — d'où l'addition des trois hauteurs. */
+.mv-resume-bar {
+  position:sticky; top:calc(var(--topbar-h) + var(--mv-head-h, 0px)); z-index:95;
+}
+.st-table thead {
+  position:sticky; top:calc(var(--topbar-h) + var(--mv-head-h, 0px) + var(--mv-resume-h, 0px)); z-index:90;
+}
 </style>{% endblock %}
 
 {% block content %}
 
+<div id="mv-sticky-top">
 <!-- En-tête -->
 <div class="st-page-head">
   <div>
@@ -75,10 +110,26 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
     <div style="font-size:11.5px;color:var(--st-muted);">Traçabilité de toutes les entrées et sorties</div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;">
-    <form method="get" style="display:flex;align-items:center;gap:0;border-bottom:1.5px solid rgba(0,0,0,.18);padding:4px 6px;">
-      <i class="bi bi-search" style="color:var(--st-muted);font-size:13px;margin-right:5px;"></i>
-      <input type="text" name="q" value="{{ q }}" placeholder="Produit, référence…"
-        style="border:none;background:transparent;font-size:12.5px;color:var(--st-text);outline:none;width:200px;">
+    <form method="get" style="display:flex;align-items:center;gap:10px;">
+      <span style="display:flex;align-items:center;gap:0;border-bottom:1.5px solid rgba(0,0,0,.18);padding:4px 6px;">
+        <i class="bi bi-search" style="color:var(--st-muted);font-size:13px;margin-right:5px;"></i>
+        <input type="text" name="q" value="{{ q }}" placeholder="Produit, référence…"
+          style="border:none;background:transparent;font-size:12.5px;color:var(--st-text);outline:none;width:180px;">
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--st-muted);">
+        Du
+        <input type="date" name="date_from" value="{{ date_from }}"
+          style="border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:3px 6px;font-size:11.5px;color:var(--st-text);background:transparent;">
+        au
+        <input type="date" name="date_to" value="{{ date_to }}"
+          style="border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:3px 6px;font-size:11.5px;color:var(--st-text);background:transparent;">
+      </span>
+      <button type="submit" class="btn-st-outline" style="font-size:12px;border-color:rgba(0,0,0,.2);color:var(--st-muted);">
+        <i class="bi bi-funnel"></i> Filtrer
+      </button>
+      {% if date_from or date_to %}
+      <a href="?{% if type_filtre %}type={{ type_filtre }}&{% endif %}{% if q %}q={{ q }}{% endif %}" style="font-size:11.5px;color:var(--st-muted);">Effacer les dates</a>
+      {% endif %}
       {% if type_filtre %}<input type="hidden" name="type" value="{{ type_filtre }}">{% endif %}
       {% if periode %}<input type="hidden" name="periode" value="{{ periode }}">{% endif %}
     </form>
@@ -116,6 +167,10 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
      class="type-tab {% if type_filtre == 'livraison' %}active-livraison{% endif %}">
     <i class="bi bi-bag-check" style="font-size:10px;"></i> Dotations
   </a>
+  <a href="?type=distribution_service{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
+     class="type-tab {% if type_filtre == 'distribution_service' %}active-distribution{% endif %}">
+    <i class="bi bi-shuffle" style="font-size:10px;"></i> Distributions
+  </a>
   <a href="?type=ajustement{% if periode %}&periode={{ periode }}{% endif %}{% if q %}&q={{ q }}{% endif %}"
      class="type-tab {% if type_filtre == 'ajustement' %}active-ajust{% endif %}">
     <i class="bi bi-sliders" style="font-size:10px;"></i> Ajustements
@@ -129,13 +184,18 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
     <i class="bi bi-arrow-return-left" style="font-size:10px;"></i> Retours
   </a>
 </div>
+</div><!-- /#mv-sticky-top -->
 
 <!-- Tableau -->
-<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);overflow:hidden;">
+{% comment %}overflow:hidden retiré : un ancêtre avec overflow non-visible
+casse position:sticky sur ses descendants (résumé + thead), qui ne pourraient
+alors plus se figer au-delà des bords de CE conteneur, lequel défile avec le
+reste de la page — voir mv-resume-bar / .st-table thead plus bas.{% endcomment %}
+<div style="margin-top:14px;margin-left:-32px;margin-right:-32px;background:var(--st-surface);box-shadow:0 2px 12px rgba(var(--st-700-rgb),.08);">
   {% if page_obj %}
 
   <!-- Résumé rapide -->
-  <div style="padding:10px 20px;border-bottom:1px solid var(--st-border);display:flex;gap:20px;flex-wrap:wrap;background:var(--st-50);">
+  <div class="mv-resume-bar" style="padding:10px 20px;border-bottom:1px solid var(--st-border);display:flex;gap:20px;flex-wrap:wrap;background:var(--st-50);">
     <span style="font-size:12px;color:var(--st-muted);">
       <strong style="color:var(--st-text);">{{ page_obj.paginator.count }}</strong> mouvement{{ page_obj.paginator.count|pluralize }}
     </span>
@@ -174,6 +234,10 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
         {% elif mv.type == 'livraison' %}
           <span class="mv-badge mv-badge-livraison"><i class="bi bi-bag-check" style="font-size:9px;"></i> Dotation
             {% if mv.pharmacie %}<span style="font-size:9px;opacity:.8;">· {{ mv.get_pharmacie_display }}</span>{% endif %}
+          </span>
+        {% elif mv.type == 'distribution_service' %}
+          <span class="mv-badge mv-badge-distribution"><i class="bi bi-shuffle" style="font-size:9px;"></i> Distribution
+            {% if mv.service %}<span style="font-size:9px;opacity:.8;">· {{ mv.service.nom }}{% if mv.centre %} ({{ mv.centre.nom }}){% endif %}</span>{% endif %}
           </span>
         {% elif mv.type == 'ajustement' %}
           <span class="mv-badge mv-badge-ajust"><i class="bi bi-sliders" style="font-size:9px;"></i> Ajustement</span>
@@ -216,11 +280,11 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
   <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-top:1px solid var(--st-border);">
     <div style="display:flex;gap:4px;">
       {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}"
+      <a href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
          class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-left"></i></a>
       {% endif %}
       {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}"
+      <a href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_filtre %}&type={{ type_filtre }}{% endif %}{% if periode %}&periode={{ periode }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}"
          class="btn-st-outline" style="padding:4px 10px;font-size:12px;"><i class="bi bi-chevron-right"></i></a>
       {% endif %}
     </div>
@@ -240,4 +304,33 @@ html[data-theme="dark"] .st-page-head { background:#0f0e0e; }
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  /* Hauteurs des deux bandes qui précèdent l'en-tête de tableau, pour que
+     résumé puis thead se figent juste à la suite l'un de l'autre (voir
+     #mv-sticky-top / .mv-resume-bar / .st-table thead dans le <style>
+     ci-dessus) — mesurées en JS plutôt que codées en dur : le bloc filtres
+     passe à plusieurs lignes sur un écran étroit, une valeur fixe aurait
+     laissé un trou ou un chevauchement selon la largeur réelle. */
+  function syncMvStickyOffsets() {
+    var filtres = document.getElementById('mv-sticky-top');
+    var resume  = document.querySelector('.mv-resume-bar');
+    if (filtres) {
+      var hf = filtres.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--mv-head-h', hf + 'px');
+    }
+    if (resume) {
+      var hr = resume.getBoundingClientRect().height;
+      document.documentElement.style.setProperty('--mv-resume-h', hr + 'px');
+    }
+  }
+  syncMvStickyOffsets();
+  window.addEventListener('resize', syncMvStickyOffsets);
+  document.addEventListener('DOMContentLoaded', syncMvStickyOffsets);
+})();
+</script>
 {% endblock %}
