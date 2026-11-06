@@ -48,6 +48,25 @@
         {% endfor %}
       </tbody>
     </table>
+    <h2 style="margin-top:20px;">Comptes tiers des caisses et des assurances</h2>
+    <p class="cpt-note">Le client du <a href="{% url 'comptabilite:plan_tiers' %}">plan tiers</a> qui porte la créance : les patients d'une caisse sont le « CLIENT CAISSE … » de cette caisse ; un assureur, son propre compte client. Sans désignation, la ligne d'écriture garde seulement le nom.</p>
+    <table class="cpt-table">
+      <thead><tr><th>Client du centre</th><th>Clé</th><th style="width:45%;">Compte tiers</th></tr></thead>
+      <tbody>
+        {% for cle, libelle, designe in clients_du_centre %}
+        <tr>
+          <td>{{ libelle }}</td>
+          <td class="cpt-note">{{ cle }}</td>
+          <td>{% if peut_modifier %}
+            <select name="tiers_{{ forloop.counter0 }}" class="cpt-input" style="width:100%;font-size:13px;padding:6px 8px;">
+              <option value="">— Aucun —</option>
+              {% for t in tiers_clients %}<option value="{{ t.pk }}" {% if designe and t.pk == designe.tiers_id %}selected{% endif %}>{{ t.numero }} — {{ t.intitule }}</option>{% endfor %}
+            </select>
+            {% elif designe %}{{ designe.tiers }}{% else %}<span class="cpt-note">—</span>{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="3" class="cpt-vide">Aucune caisse ni assurance.</td></tr>{% endfor %}
+      </tbody>
+    </table>
     {% if peut_modifier %}<div style="margin-top:12px;"><button class="cpt-btn primaire">Enregistrer</button></div>{% endif %}
   </form>
 </div>

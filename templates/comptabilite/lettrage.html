@@ -1,0 +1,109 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Lettrage{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.lt-filtres { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.lt-filtres .cpt-field { margin: 0; }
+.lt-filtres .cpt-input { font-size: 13px; padding: 6px 8px; }
+.lt-num { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }
+.lt-lettre { font-family: var(--font-mono, monospace); font-weight: 800; color: var(--teal-600, #0d9488); }
+.lt-barre { position: sticky; bottom: 0; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+            background: var(--surface, #fff); border-top: 1px solid var(--border); padding: 10px 0; margin-top: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Lettrage des comptes de tiers</h1>
+      <div class="cpt-sub">Une même lettre rapproche les lignes qui se soldent : une facture et ses règlements. Ce qui reste sans lettre est ce qui reste dû. Seules les écritures validées se lettrent.</div>
+    </div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:ecritures' %}" class="cpt-btn">Écritures</a></div>
+  </div>
+
+  <form method="get" class="cpt-card lt-filtres">
+    <datalist id="lt-tiers">{% for t in plan_tiers %}<option value="{{ t.numero }} {{ t.intitule }}">{% endfor %}</datalist>
+    <div class="cpt-field"><label>Compte tiers</label>
+      <input name="tiers" class="cpt-input" list="lt-tiers" autocomplete="off" value="{% if tiers %}{{ tiers.numero }} {{ tiers.intitule }}{% else %}{{ numero_tiers }}{% endif %}" placeholder="ex. 41250008" style="width:280px;"></div>
+    <div class="cpt-field"><label>Compte général</label>
+      <select name="compte" class="cpt-input">
+        <option value="">{% if tiers %}Son compte collectif{% else %}— Choisir —{% endif %}</option>
+        {% for c in comptes %}<option value="{{ c.numero }}" {% if compte and c.pk == compte.pk %}selected{% endif %}>{{ c.numero }} — {{ c.intitule }}</option>{% endfor %}
+      </select></div>
+    <label class="cpt-note" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="toutes" value="1" {% if toutes %}checked{% endif %}> Afficher aussi les lignes lettrées</label>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  {% if compte %}
+  <div class="cpt-kpis">
+    <div class="cpt-kpi"><div class="l">Compte</div><div class="v" style="font-size:16px;">{{ compte.numero }}</div><div class="s">{{ compte.intitule }}</div></div>
+    <div class="cpt-kpi"><div class="l">Compte tiers</div><div class="v" style="font-size:16px;">{% if tiers %}{{ tiers.numero }}{% else %}—{% endif %}</div><div class="s">{% if tiers %}{{ tiers.intitule }}{% else %}lignes sans compte tiers{% endif %}</div></div>
+    <div class="cpt-kpi accent"><div class="l">Non lettré</div><div class="v">{{ totaux.solde|floatformat:0|intcomma }}</div><div class="s">débit {{ totaux.debit|floatformat:0|intcomma }} · crédit {{ totaux.credit|floatformat:0|intcomma }}</div></div>
+  </div>
+
+  <form method="post" class="cpt-card" id="lt-form">
+    {% csrf_token %}
+    {% if peut_lettrer %}
+    <div class="cpt-actions" style="margin-bottom:10px;">
+      <button name="action" value="auto" class="cpt-btn" title="Lettre chaque facture soldée avec ses règlements">⚡ Lettrage automatique</button>
+    </div>
+    {% endif %}
+    <div style="overflow-x:auto;">
+    <table class="cpt-table">
+      <thead><tr>{% if peut_lettrer %}<th></th>{% endif %}<th>Date</th><th>Journal / n°</th><th>Pièce</th><th>Libellé</th><th>Tiers</th><th class="num">Débit</th><th class="num">Crédit</th><th>Lettre</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr>
+          {% if peut_lettrer %}<td>{% if not l.lettre %}<input type="checkbox" name="ligne" value="{{ l.pk }}" data-d="{{ l.debit|stringformat:'s' }}" data-c="{{ l.credit|stringformat:'s' }}">{% endif %}</td>{% endif %}
+          <td style="white-space:nowrap;">{{ l.ecriture.date|date:"d/m/Y" }}</td>
+          <td class="lt-num"><a href="{% url 'comptabilite:ecriture' l.ecriture_id %}">{{ l.ecriture.journal.code }} {{ l.ecriture.reference }}</a></td>
+          <td class="cpt-note">{{ l.ecriture.piece }}</td>
+          <td>{{ l.libelle|default:l.ecriture.libelle }}</td>
+          <td class="cpt-note">{{ l.tiers }}</td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td>
+          <td class="num">{% if l.credit %}{{ l.credit|floatformat:0|intcomma }}{% endif %}</td>
+          <td>{% if l.lettre %}<span class="lt-lettre">{{ l.lettre }}</span>
+            {% if peut_lettrer %}<button name="action" value="delettrer" formnovalidate class="cpt-btn" style="padding:2px 6px;font-size:11px;" onclick="this.form.lettre.value='{{ l.lettre }}'" title="Retirer la lettre {{ l.lettre }} de toutes ses lignes">✕</button>{% endif %}{% endif %}</td>
+        </tr>
+        {% empty %}<tr><td colspan="9" class="cpt-vide">{% if toutes %}Aucune ligne validée sur ce compte.{% else %}Tout est lettré : rien ne reste dû sur ce compte.{% endif %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <input type="hidden" name="lettre" value="">
+    {% if peut_lettrer and lignes %}
+    <div class="lt-barre">
+      <span>Sélection : débit <b id="lt-d">0</b> · crédit <b id="lt-c">0</b> · écart <b id="lt-e">0</b></span>
+      <button name="action" value="lettrer" class="cpt-btn primaire" id="lt-lettrer" disabled>Lettrer la sélection</button>
+    </div>
+    {% endif %}
+  </form>
+  {% elif numero_tiers or numero %}
+  <div class="cpt-alerte">Compte introuvable : choisissez un compte de tiers (classe 4) ou un compte du plan tiers.</div>
+  {% endif %}
+</div>
+<script>
+(function () {
+  var form = document.getElementById('lt-form');
+  if (!form) return;
+  var fmt = function (n) { return Math.round(n).toLocaleString('fr-FR'); };
+  function maj() {
+    var d = 0, c = 0, n = 0;
+    form.querySelectorAll('input[name=ligne]:checked').forEach(function (x) {
+      d += parseFloat(x.dataset.d) || 0; c += parseFloat(x.dataset.c) || 0; n++;
+    });
+    var bouton = document.getElementById('lt-lettrer');
+    if (!bouton) return;
+    document.getElementById('lt-d').textContent = fmt(d);
+    document.getElementById('lt-c').textContent = fmt(c);
+    document.getElementById('lt-e').textContent = fmt(d - c);
+    bouton.disabled = !(n >= 2 && Math.abs(d - c) < 0.005);
+  }
+  form.addEventListener('change', maj);
+})();
+</script>
+{% endblock %}

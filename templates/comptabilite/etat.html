@@ -50,7 +50,7 @@
 
   <form method="get" class="cpt-card et-barre no-print">
     {% for cle, libelle in periodes %}
-    <a class="et-chip {% if periode == cle %}active{% endif %}" href="?periode={{ cle }}{% if params.caisse %}&caisse={{ params.caisse }}{% endif %}{% if params.journal %}&journal={{ params.journal }}{% endif %}{% if params.compte %}&compte={{ params.compte }}{% endif %}{% if params.convention %}&convention={{ params.convention }}{% endif %}{% if params.brouillons %}&brouillons=1{% endif %}">{{ libelle }}</a>
+    <a class="et-chip {% if periode == cle %}active{% endif %}" href="?periode={{ cle }}{% if params.caisse %}&caisse={{ params.caisse }}{% endif %}{% if params.journal %}&journal={{ params.journal }}{% endif %}{% if params.compte %}&compte={{ params.compte }}{% endif %}{% if params.tiers %}&tiers={{ params.tiers }}{% endif %}{% if params.convention %}&convention={{ params.convention }}{% endif %}{% if params.brouillons %}&brouillons=1{% endif %}">{{ libelle }}</a>
     {% endfor %}
     <div class="cpt-field"><label>Du</label><input type="date" name="debut" class="cpt-input" value="{{ debut|date:'Y-m-d' }}"></div>
     <div class="cpt-field"><label>Au</label><input type="date" name="fin" class="cpt-input" value="{{ fin|date:'Y-m-d' }}"></div>
@@ -70,8 +70,11 @@
     <div class="cpt-field"><label>Journal</label>
       <select name="journal" class="cpt-input"><option value="">Tous</option>{% for j in etat.choix_journal.journaux %}<option value="{{ j.code }}" {% if j.code == etat.choix_journal.actuel %}selected{% endif %}>{{ j.code }} — {{ j.libelle }}</option>{% endfor %}</select></div>
     {% endif %}
-    {% if code == 'grand_livre' or code == 'balance' %}
+    {% if code == 'grand_livre' or code == 'balance' or code == 'grand_livre_tiers' or code == 'balance_tiers' %}
     <div class="cpt-field"><label>Comptes commençant par</label><input type="text" name="compte" class="cpt-input" value="{{ params.compte }}" placeholder="ex. 4, 571, 706" style="width:140px;"></div>
+    {% endif %}
+    {% if code == 'grand_livre_tiers' or code == 'balance_tiers' %}
+    <div class="cpt-field"><label>Comptes tiers commençant par</label><input type="text" name="tiers" class="cpt-input" value="{{ params.tiers }}" placeholder="ex. 4011, 41250008" style="width:160px;"></div>
     {% endif %}
     {% if comptable %}
     <label class="cpt-note" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" name="brouillons" value="1" {% if params.brouillons %}checked{% endif %}> Inclure les brouillons</label>

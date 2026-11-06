@@ -139,7 +139,7 @@ Pour chaque fichier ORU dont le témoin `.ok` est présent, le module :
 
 | Donnée HPRIM | Champ | Modèle SEGHO |
 |---|---|---|
-| Numéro de demande | OBR 9.3.2 | `DemandeExamen.numero` |
+| Numéro de demande | OBR 9.3.1 et 9.3.2 (identiques, chiffres seuls) | `DemandeExamen.numero` sans le préfixe `DEM` |
 | Identifiant patient | P 8.3 | `Patient.code_patient` |
 
 Le laboratoire **doit renvoyer le numéro de demande à l'identique** dans

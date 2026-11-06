@@ -84,6 +84,7 @@ TEMPLATES = [
                 'stock.context_processors.stock_alertes',
                 'pharmacie.context_processors.pharmacie_alertes',
                 'soins.context_processors.soins_alertes',
+                'laboratoire.context_processors.resultats_a_lire',
                 'presence.context_processors.permanence_medecins_ctx',
                 'comptabilite.context_processors.session_caisse',
             ],

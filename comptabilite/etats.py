@@ -413,33 +413,105 @@ def balance(debut, fin, params):
         'filtre_compte': params.get('compte', '')}
 
 
+def _lignes_tiers(qs, params):
+    """Lignes des comptes de tiers (classe 4), filtrées par compte et par tiers."""
+    qs = qs.filter(compte__numero__startswith=params.get('compte') or '4')
+    if params.get('tiers'):
+        qs = qs.filter(compte_tiers__numero__istartswith=params['tiers'].split(' ')[0])
+    return qs
+
+
+def _nom_tiers(numero, intitule, texte):
+    return f'{numero} — {intitule}' if numero else (texte or '(sans tiers)')
+
+
 def balance_tiers(debut, fin, params):
-    """Balance des patients et des assurances (comptes 41 : 4111/4112 du plan
-    semé, 4125xxxx du plan de l'expert), par tiers."""
-    lignes_qs = _cumul(fin, params).filter(compte__numero__startswith='41')
+    """Balance des tiers : solde de chaque compte tiers, regroupé par compte
+    collectif. Les lignes sans compte tiers (anciennes écritures) sont
+    détaillées par le nom porté sur la ligne."""
+    lignes_qs = _lignes_tiers(_cumul(fin, params), params)
     donnees = OrderedDict()
-    for row in (lignes_qs.values('compte__numero', 'compte__intitule', 'tiers')
-                .annotate(d=Sum('debit'), c=Sum('credit')).order_by('compte__numero', 'tiers')):
-        donnees.setdefault((row['compte__numero'], row['compte__intitule']), []).append(row)
+    for row in (lignes_qs.values('compte__numero', 'compte__intitule', 'compte_tiers__numero',
+                                 'compte_tiers__intitule', 'tiers')
+                .annotate(d=Sum('debit'), c=Sum('credit')).order_by('compte__numero', 'compte_tiers__numero', 'tiers')):
+        cle = (row['compte_tiers__numero'], row['compte_tiers__intitule'],
+               '' if row['compte_tiers__numero'] else row['tiers'])
+        groupe = donnees.setdefault((row['compte__numero'], row['compte__intitule']), OrderedDict())
+        d, c = groupe.get(cle, (ZERO, ZERO))
+        groupe[cle] = (d + (row['d'] or ZERO), c + (row['c'] or ZERO))
     lignes, total = [], ZERO
-    for (numero, intitule), rows in donnees.items():
+    for (numero, intitule), tiers in donnees.items():
         lignes.append(_ligne(f'{numero} — {intitule}', type_='groupe'))
         sous = ZERO
-        for row in rows:
-            solde = (row['d'] or ZERO) - (row['c'] or ZERO)
+        for (num_tiers, int_tiers, texte), (d, c) in tiers.items():
+            solde = d - c
             if not solde:
                 continue
             sous += solde
-            lignes.append(_ligne(row['tiers'] or '(sans tiers)', row['d'] or None, row['c'] or None, solde))
+            lien = None
+            if num_tiers:
+                lien = reverse('comptabilite:lettrage') + f'?compte={numero}&tiers={num_tiers}'
+            lignes.append(_ligne(_nom_tiers(num_tiers, int_tiers, texte), d or None, c or None, solde, lien=lien))
         lignes.append(_ligne(f'Solde {numero}', None, None, sous, type_='sous_total'))
         total += sous
     if lignes:
         lignes.append(_ligne('Solde total', None, None, total, type_='total'))
-    return {'titre': f'Balance des patients et des assurances au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
-        'Par tiers', [('Tiers', 'texte'), ('Débit', 'montant'), ('Crédit', 'montant'), ('Solde', 'montant')],
+    return {'titre': f'Balance des tiers au {fin:%d/%m/%Y}', 'tableaux': [_tableau(
+        'Par compte tiers', [('Tiers', 'texte'), ('Débit', 'montant'), ('Crédit', 'montant'), ('Solde', 'montant')],
         lignes)],
         'notes': [_note_brouillons(params),
-                  "Solde positif : le tiers doit au centre ; négatif : le centre lui doit (trop-perçu, avance)."]}
+                  "Solde positif : le tiers doit au centre ; négatif : le centre lui doit (dette, avance reçue).",
+                  "Un clic sur un compte tiers ouvre son lettrage."]}
+
+
+def grand_livre_tiers(debut, fin, params):
+    """Pour chaque compte tiers : solde antérieur, mouvements avec leur
+    lettre, solde cumulé."""
+    anterieur = {}
+    for a in (_lignes_tiers(_ouverture(debut, fin, params), params)
+              .values('compte_id', 'compte_tiers_id', 'tiers').annotate(d=Sum('debit'), c=Sum('credit'))):
+        cle = (a['compte_id'], a['compte_tiers_id'], '' if a['compte_tiers_id'] else a['tiers'])
+        anterieur[cle] = anterieur.get(cle, ZERO) + (a['d'] or ZERO) - (a['c'] or ZERO)
+    mouvements = (_lignes_tiers(_mouvements(debut, fin, params), params)
+                  .select_related('ecriture__journal', 'compte', 'compte_tiers')
+                  .order_by('compte__numero', 'compte_tiers__numero', 'tiers', 'ecriture__date', 'pk'))
+    groupes = OrderedDict()
+    for l in mouvements:
+        cle = (l.compte_id, l.compte_tiers_id, '' if l.compte_tiers_id else l.tiers)
+        groupes.setdefault(cle, []).append(l)
+    for cle, solde in anterieur.items():
+        if solde and cle not in groupes:
+            groupes[cle] = []
+    from .models import Compte, Tiers
+    comptes = Compte.objects.in_bulk({c for c, _, _ in groupes})
+    plan = Tiers.objects.in_bulk({t for _, t, _ in groupes if t})
+    lignes, td, tc = [], ZERO, ZERO
+    for cle in sorted(groupes, key=lambda k: (comptes[k[0]].numero, plan[k[1]].numero if k[1] else '~', k[2])):
+        compte_id, tiers_id, texte = cle
+        c, t = comptes[compte_id], plan.get(tiers_id)
+        solde = anterieur.get(cle, ZERO)
+        titre = f'{c.numero} · ' + (_nom_tiers(t.numero, t.intitule, '') if t else (texte or '(sans tiers)'))
+        lignes.append(_ligne(titre, type_='groupe', lien=(reverse('comptabilite:lettrage') +
+                                                         f'?compte={c.numero}&tiers={t.numero}') if t else None))
+        lignes.append(_ligne('', '', 'Solde antérieur', '', None, None, solde))
+        sd = sc = ZERO
+        for l in groupes[cle]:
+            solde += l.debit - l.credit
+            sd += l.debit
+            sc += l.credit
+            e = l.ecriture
+            lignes.append(_ligne(e.date.strftime('%d/%m/%Y'), f'{e.journal.code} {e.reference if e.numero else ""}'.strip(),
+                                 l.libelle or e.libelle, l.lettre, l.debit or None, l.credit or None, solde,
+                                 lien=reverse('comptabilite:ecriture', args=[e.pk])))
+        lignes.append(_ligne('Total', '', '', '', sd, sc, solde, type_='sous_total'))
+        td += sd
+        tc += sc
+    if lignes:
+        lignes.append(_ligne('Total des mouvements', '', '', '', td, tc, None, type_='total'))
+    return {'titre': 'Grand livre des tiers', 'tableaux': [_tableau(
+        'Comptes tiers', [('Date', 'texte'), ('Journal / n°', 'texte'), ('Libellé', 'texte'), ('Lettre', 'texte'),
+                          ('Débit', 'montant'), ('Crédit', 'montant'), ('Solde', 'montant')], lignes)],
+        'notes': [_note_brouillons(params), "Une ligne sans lettre n'est pas encore soldée."]}
 
 
 def resultat(debut, fin, params):
@@ -1026,8 +1098,11 @@ ETATS = OrderedDict([
                      'description': "Chaque compte : solde antérieur, mouvements, solde cumulé."}),
     ('balance', {'groupe': 'comptabilite', 'icone': 'bi-columns-gap', 'titre': 'Balance générale', 'fonction': balance, 'perm': PERM_COMPTA, 'periode': 'mois',
                  'description': "Soldes de début, mouvements et soldes de fin de tous les comptes."}),
-    ('balance_tiers', {'groupe': 'comptabilite', 'icone': 'bi-people', 'titre': 'Balance patients et assurances', 'fonction': balance_tiers, 'perm': PERM_COMPTA,
-                       'periode': 'mois', 'description': "Ce que doit chaque patient et chaque assureur."}),
+    ('grand_livre_tiers', {'groupe': 'comptabilite', 'icone': 'bi-person-lines-fill', 'titre': 'Grand livre des tiers',
+                           'fonction': grand_livre_tiers, 'perm': PERM_COMPTA, 'periode': 'mois',
+                           'description': "Chaque compte tiers : mouvements, lettrage et solde."}),
+    ('balance_tiers', {'groupe': 'comptabilite', 'icone': 'bi-people', 'titre': 'Balance des tiers', 'fonction': balance_tiers, 'perm': PERM_COMPTA,
+                       'periode': 'mois', 'description': "Ce que doit chaque client, assureur, fournisseur, salarié…"}),
     ('resultat', {'groupe': 'comptabilite', 'icone': 'bi-bar-chart-line', 'titre': 'Compte de résultat', 'fonction': resultat, 'perm': PERM_COMPTA, 'periode': 'mois',
                   'description': "Ressources, charges et excédent ou déficit de la période."}),
     ('controle', {'groupe': 'comptabilite', 'icone': 'bi-shield-check', 'titre': 'Contrôle de cohérence', 'fonction': controle, 'perm': PERM_COMPTA, 'periode': 'mois',

@@ -28,7 +28,7 @@ from django.db import transaction
 from django.db.models import Max, Sum
 from django.utils import timezone
 
-from .models import Correspondance, Ecriture, Exercice, Journal, LigneEcriture
+from .models import Correspondance, CorrespondanceTiers, Ecriture, Exercice, Journal, LigneEcriture
 
 ZERO = Decimal('0')
 
@@ -64,6 +64,72 @@ def compte_de_caisse(caisse):
         raise ErreurCompta(f"La caisse « {caisse.nom} » n'a pas de compte : désignez son sous-compte 571 "
                            "dans Comptabilité → Configuration → Correspondances.")
     return corr.compte
+
+
+class NomTiers(str):
+    """Le nom lisible d'un tiers sur une ligne (« KOFFI Awa (PAT…) »), qui
+    porte en plus son compte du plan tiers (`compte`) : la créance d'un
+    patient est due au client « CLIENT CAISSE … » de sa caisse."""
+
+    def __new__(cls, nom, compte_tiers=None):
+        obj = super().__new__(cls, nom or '')
+        obj.compte = compte_tiers
+        return obj
+
+
+def tiers_designe(cle):
+    """Le compte tiers désigné pour `cle` (« caisse:CAISACC »,
+    « assurance:NSIA »), ou None : faute de désignation, la ligne garde
+    seulement le nom."""
+    corr = CorrespondanceTiers.objects.select_related('tiers').filter(cle=cle).first()
+    return corr.tiers if corr else None
+
+
+def tiers_de_caisse(caisse):
+    return tiers_designe(f'caisse:{caisse.code}') if caisse else None
+
+
+def caisse_de_facture(facture):
+    """La caisse du premier encaissement de la facture (celle qui l'a vendue,
+    comme dans les documents des ventes), sinon None."""
+    from facturation.models import Paiement
+    p = (Paiement.all_objects.filter(facture=facture, caisse__isnull=False)
+         .select_related('caisse').order_by('date_paiement', 'pk').first())
+    return p.caisse if p else None
+
+
+def _patient(facture, caisse=None):
+    """Le patient de la facture, rattaché au client de sa caisse."""
+    return NomTiers(_nom_patient(facture), tiers_de_caisse(caisse or caisse_de_facture(facture)))
+
+
+def rattacher_facture(facture, compte_tiers):
+    """Une facture comptabilisée avant tout encaissement ne connaissait pas
+    sa caisse : sa créance (et celle de ses avoirs) prend le client de la
+    caisse qui encaisse, pour se lettrer avec ses règlements. Seul le
+    rattachement au tiers change ; comptes et montants restent."""
+    if compte_tiers is None:
+        return 0
+    origines = [f'facture:{facture.pk}'] + [f'avoir:{pk}' for pk in facture.avoirs.values_list('pk', flat=True)]
+    return (LigneEcriture.objects.filter(ecriture__origine__in=origines, compte=compte('patient'),
+                                         compte_tiers__isnull=True, lettre='')
+            .update(compte_tiers=compte_tiers))
+
+
+def _assureur(assurance):
+    return NomTiers(assurance.nom, tiers_designe(f'assurance:{assurance.code}'))
+
+
+def compte_fournisseur(facture):
+    """Compte de la dette : le collectif du fournisseur dans le plan tiers,
+    sinon la correspondance « fournisseur »."""
+    if facture.compte_tiers_id and facture.compte_tiers.compte_collectif_id:
+        return facture.compte_tiers.compte_collectif
+    return compte('fournisseur')
+
+
+def _fournisseur(facture):
+    return NomTiers(facture.fournisseur, facture.compte_tiers)
 
 
 def journal(code):
@@ -126,6 +192,9 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
         if l[0].totalisation:
             raise ErreurCompta(f"Le compte {l[0].numero} est un compte de totalisation : "
                                "il ne reçoit pas d'écriture, choisissez un sous-compte.")
+        if getattr(l[4], 'compte', None) and l[0].classe != '4':
+            raise ErreurCompta(f"Le compte tiers {l[4].compte.numero} ne va que sur un compte de tiers "
+                               f"(classe 4), pas sur {l[0].numero}.")
     with transaction.atomic():
         ecriture = Ecriture.objects.create(
             journal=journal_, exercice=exercice_pour(jour), date=jour, libelle=libelle[:255],
@@ -134,6 +203,7 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
         LigneEcriture.objects.bulk_create([
             LigneEcriture(ecriture=ecriture, compte=l[0], libelle=(l[1] or libelle)[:255],
                           debit=l[2] or ZERO, credit=l[3] or ZERO, tiers=(l[4] or '')[:150],
+                          compte_tiers=getattr(l[4], 'compte', None),
                           convention=l[5] if len(l) > 5 else None)
             for l in lignes])
     return ecriture
@@ -167,7 +237,7 @@ def _nom_patient(facture):
 def lignes_de_vente(facture):
     """Lignes de l'écriture de vente : produits au prix plein, remises à part,
     créance sur le patient (et l'assurance pour sa part)."""
-    tiers = _nom_patient(facture)
+    tiers = _patient(facture)
     produits, remises = {}, ZERO
     for ligne in facture.lignes.select_related('article__categorie'):
         brut = (ligne.quantite * ligne.prix_unitaire).quantize(Decimal('0.01'))
@@ -190,12 +260,13 @@ def lignes_de_vente(facture):
     lignes = [(compte('patient'), 'Créance patient', total - part_assurance, ZERO, tiers)]
     if part_assurance:
         lignes.append((compte('tiers_payant'), f'Part assurance — {tiers}', part_assurance, ZERO,
-                       facture.assurance.nom))
+                       _assureur(facture.assurance)))
+    # Sur les comptes de charge et de produit, le nom seul.
     if remises:
         motif = facture.motif_remise.libelle if facture.motif_remise_id else 'remise'
-        lignes.append((compte('remise'), f'Remise — {motif}', remises, ZERO, tiers))
+        lignes.append((compte('remise'), f'Remise — {motif}', remises, ZERO, str(tiers)))
     for nature, montant in produits.items():
-        lignes.append((compte(f'nature:{nature}'), None, ZERO, montant, tiers))
+        lignes.append((compte(f'nature:{nature}'), None, ZERO, montant, str(tiers)))
     return lignes
 
 
@@ -237,11 +308,11 @@ def ecriture_remboursement(avoir):
         return None
     caisse = avoir.session.journee.caisse if avoir.session_id else None
     tresorerie, journal_ = _tresorerie(avoir.mode_remboursement or 'especes', caisse)
-    tiers = _nom_patient(avoir.facture)
+    tiers = _patient(avoir.facture, caisse)
     return creer_ecriture(journal_, _jour(avoir.date_creation),
                           f'Remboursement avoir {avoir.numero}',
                           [(compte('patient'), None, avoir.montant_rembourse, ZERO, tiers),
-                           (tresorerie, None, ZERO, avoir.montant_rembourse, tiers)],
+                           (tresorerie, None, ZERO, avoir.montant_rembourse, str(tiers))],
                           piece=avoir.numero, origine=origine, centre=avoir.centre)
 
 
@@ -260,10 +331,15 @@ def ecriture_paiement(paiement):
         journal_ = journal_de_tresorerie(tresorerie)
     else:
         tresorerie, journal_ = _tresorerie(paiement.mode_paiement, paiement.caisse)
-    tiers = _nom_patient(facture)
+    tiers = _patient(facture, paiement.caisse)
+    rattacher_facture(facture, tiers.compte)
+    # Prise en charge (mode assurance, bon) : la « trésorerie » est la
+    # créance sur l'assureur.
+    debiteur = (_assureur(facture.assurance) if tresorerie.classe == '4' and facture.assurance_id
+                else str(tiers))
     return creer_ecriture(journal_, _jour(paiement.date_paiement),
                           f'Encaissement {paiement.numero} — facture {facture.numero}',
-                          [(tresorerie, None, paiement.montant, ZERO, tiers),
+                          [(tresorerie, None, paiement.montant, ZERO, debiteur),
                            (compte('patient'), None, ZERO, paiement.montant, tiers)],
                           piece=paiement.numero, origine=origine, centre=paiement.centre)
 
@@ -355,9 +431,9 @@ def ecriture_reglement(reglement):
     if _deja(origine):
         return None
     tresorerie, journal_ = _tresorerie_recue(reglement.mode)
-    tiers = reglement.assurance.nom
+    tiers = _assureur(reglement.assurance)
     return creer_ecriture(journal_, reglement.date, f'Règlement {reglement.numero} — {tiers}',
-                          [(tresorerie, None, reglement.montant, ZERO, tiers),
+                          [(tresorerie, None, reglement.montant, ZERO, str(tiers)),
                            (compte('tiers_payant'), None, ZERO, reglement.montant, tiers)],
                           piece=reglement.reference or reglement.numero, origine=origine,
                           centre=reglement.centre)
@@ -371,10 +447,11 @@ def ecriture_rejet(rejet):
     facture = rejet.facture
     ecriture_facture(facture)            # la vente d'abord, si elle manque
     debit = compte('patient') if rejet.decision == 'patient' else compte('perte_creance')
-    tiers = rejet.assurance.nom
+    tiers = _assureur(rejet.assurance)
+    patient = _patient(facture) if debit.classe == '4' else _nom_patient(facture)
     return creer_ecriture(journal(OPERATIONS_DIVERSES), rejet.date,
                           f'Refus {rejet.numero} de {tiers} — facture {facture.numero} ({rejet.get_decision_display().lower()})',
-                          [(debit, None, rejet.montant, ZERO, _nom_patient(facture)),
+                          [(debit, None, rejet.montant, ZERO, patient),
                            (compte('tiers_payant'), None, ZERO, rejet.montant, tiers)],
                           piece=rejet.numero, origine=origine, centre=rejet.centre)
 
@@ -386,10 +463,10 @@ def ecriture_facture_fournisseur(facture):
     origine = f'facture_fournisseur:{facture.pk}'
     if _deja(origine) or not facture.montant_total:
         return None
-    tiers = facture.fournisseur
+    tiers = _fournisseur(facture)
     convention = facture.convention
-    lignes = [(l.compte, l.libelle, l.montant, ZERO, tiers, convention) for l in facture.lignes.all()]
-    lignes.append((compte('fournisseur'), None, ZERO, facture.montant_total, tiers))
+    lignes = [(l.compte, l.libelle, l.montant, ZERO, str(tiers), convention) for l in facture.lignes.all()]
+    lignes.append((compte_fournisseur(facture), None, ZERO, facture.montant_total, tiers))
     return creer_ecriture(journal(ACHATS), facture.date,
                           f'Facture {facture.reference or facture.numero} — {tiers}', lignes,
                           piece=facture.reference or facture.numero, origine=origine, centre=facture.centre)
@@ -404,11 +481,11 @@ def ecriture_reglement_fournisseur(reglement):
         tresorerie, journal_ = ct.compte, journal_de_tresorerie(ct.compte)
     else:
         tresorerie, journal_ = _tresorerie_recue(reglement.mode)
-    tiers = reglement.facture.fournisseur
+    tiers = _fournisseur(reglement.facture)
     return creer_ecriture(journal_, reglement.date,
                           f'Règlement {reglement.numero} — {tiers} (facture {reglement.facture.numero})',
-                          [(compte('fournisseur'), None, reglement.montant, ZERO, tiers),
-                           (tresorerie, None, ZERO, reglement.montant, tiers)],
+                          [(compte_fournisseur(reglement.facture), None, reglement.montant, ZERO, tiers),
+                           (tresorerie, None, ZERO, reglement.montant, str(tiers))],
                           piece=reglement.reference or reglement.numero, origine=origine,
                           centre=reglement.centre)
 
@@ -459,10 +536,11 @@ def generer(debut, fin):
         taches.append((f'Don {d.numero}', ecriture_don, d))
     from .models import FactureFournisseur, ReglementFournisseur
     for f in (FactureFournisseur.all_objects.filter(date__range=[debut, fin])
-              .select_related('convention').prefetch_related('lignes__compte')):
+              .select_related('convention', 'compte_tiers__compte_collectif')
+              .prefetch_related('lignes__compte')):
         taches.append((f'Facture fournisseur {f.numero}', ecriture_facture_fournisseur, f))
     for r in (ReglementFournisseur.all_objects.filter(date__range=[debut, fin])
-              .select_related('facture', 'compte_tresorerie__compte')):
+              .select_related('facture__compte_tiers__compte_collectif', 'compte_tresorerie__compte')):
         taches.append((f'Règlement fournisseur {r.numero}', ecriture_reglement_fournisseur, r))
     for s in (SessionCaissiere.all_objects.filter(date_cloture__date__range=[debut, fin])
               .exclude(statut='ouverte').select_related('journee__caisse', 'caissiere')):
@@ -517,7 +595,8 @@ def contre_passer(ecriture, par, jour=None):
         raise ErreurCompta("Seule une écriture validée se contre-passe ; un brouillon se supprime.")
     if hasattr(ecriture, 'contre_passee_par'):
         raise ErreurCompta("Cette écriture a déjà été contre-passée.")
-    lignes = [(l.compte, l.libelle, l.credit, l.debit, l.tiers, l.convention) for l in ecriture.lignes.all()]
+    lignes = [(l.compte, l.libelle, l.credit, l.debit, NomTiers(l.tiers, l.compte_tiers), l.convention)
+              for l in ecriture.lignes.select_related('compte', 'compte_tiers')]
     return creer_ecriture(ecriture.journal, jour or timezone.localdate(),
                           f'Contre-passation de {ecriture.reference} — {ecriture.libelle}', lignes,
                           piece=ecriture.piece, centre=ecriture.centre, par=par,

@@ -57,7 +57,7 @@ def vers_avec_retour(destination, retour):
 #: deux gabarits. La liste sert de filtre : l'onglet demandé vient du
 #: navigateur, et on ne recopie pas tel quel dans une URL ce qu'il nous donne.
 ONGLETS_RDV = ('infos', 'clinique', 'cpn', 'accouchement',
-               'postnatale', 'curative', 'autres')
+               'postnatale', 'curative', 'resultats', 'autres')
 
 
 def retour_vers_le_rdv(request, chemin):

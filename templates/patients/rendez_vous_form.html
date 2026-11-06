@@ -727,7 +727,7 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
                 encore enregistré. La vue enregistre, puis redirige vers `_apres`
                 en lui passant l'adresse de retour, onglet compris.{% endcomment %}
                 {% if perms.consultations.add_ordonnance %}<button type="submit" name="_apres" value="{% url 'ordonnance_create_libre' %}?patient_id={{ rdv.patient.pk }}{% if consultation %}&consultation_id={{ consultation.pk }}{% endif %}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-file-earmark-medical"></i> Créer une ordonnance</button>{% endif %}
-                {% if perms.laboratoire.add_demandeexamen %}<button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>{% endif %}
+                {% if perms.laboratoire.add_demandeexamen %}<button type="submit" name="_apres" value="{% url 'laboratoire_create' %}?patient={{ rdv.patient.pk }}&rdv={{ rdv.pk }}{% if rdv.medecin %}&medecin_id={{ rdv.medecin.pk }}{% endif %}" class="btn-action btn-ghost"><i class="bi bi-flask"></i> Demande de lab</button>{% endif %}
                 {% if perms.soins.add_soin %}<button type="submit" name="_apres" value="{% url 'soins:create' %}?patient_id={{ rdv.patient.pk }}" class="btn-action btn-ghost"><i class="bi bi-bandaid"></i> Soins</button>{% endif %}
                 {% if perms.hospitalisation.add_hospitalisation %}<button type="submit" name="_apres" value="{% url 'hospitalisation:create' %}?patient={{ rdv.patient.pk }}{% if rdv.medecin %}&medecin={{ rdv.medecin.pk }}{% endif %}&rdv={{ rdv.pk }}" class="btn-action btn-ghost"><i class="bi bi-clipboard2-pulse"></i> M.O</button>{% endif %}
                 <button type="submit" name="_action" value="terminer" class="btn-action btn-dark">Consultation terminée</button>
@@ -923,6 +923,8 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
         <button type="button" class="f-tab" data-tab="accouchement">Accouchement</button>
         <button type="button" class="f-tab" data-tab="postnatale">Consultation postnatale</button>-->
         <button type="button" class="f-tab" data-tab="curative">Consultation curative</button>
+        {% if rdv %}<button type="button" class="f-tab{% if resultats_non_ouverts %} f-tab-resultats-nouveaux{% endif %}" data-tab="resultats"
+          {% if resultats_non_ouverts %}title="{{ resultats_non_ouverts }} résultat{{ resultats_non_ouverts|pluralize }} pas encore ouvert{{ resultats_non_ouverts|pluralize }} par le médecin"{% endif %}>Résultats d'examens{% if demandes_examens_rdv %} ({{ demandes_examens_rdv|length }}){% endif %}{% if resultats_non_ouverts %} <span class="f-tab-pastille">{{ resultats_non_ouverts }}</span>{% endif %}</button>{% endif %}
         <button type="button" class="f-tab" data-tab="autres">Autres informations</button>
       </div>
 
@@ -1592,6 +1594,12 @@ l'adresse de retour, pour qu'on revienne là où on était et pas sur
           <textarea name="cur_remarques" class="f-tab-textarea editable" rows="3" placeholder="Remarques..."></textarea>
         </div>
       </div>
+      <!-- Résultats d'examens -->
+      {% if rdv %}
+      <div class="f-tab-panel" id="tab-resultats">
+        {% include "patients/_onglet_resultats_examens.html" %}
+      </div>
+      {% endif %}
       <!-- Autres informations -->
       <div class="f-tab-panel" id="tab-autres">
         <div class="f-tab-grid">

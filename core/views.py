@@ -792,6 +792,13 @@ def laboratoire_create(request):
     from medecins.models import Medecin
     medecins = Medecin.objects.filter(actif=True).select_related('employe', 'user').order_by('employe__nom')
 
+    # Consultation d'origine : reconduite du GET au POST par un champ caché.
+    rdv_pk = request.GET.get('rdv') or request.POST.get('rdv_id')
+    rdv_origine = None
+    if rdv_pk and patient:
+        from patients.models import RendezVous
+        rdv_origine = RendezVous.objects.filter(pk=rdv_pk, patient=patient).first()
+
     prefill_medecin = None
     medecin_pk = request.GET.get('medecin_id')
     if medecin_pk:
@@ -817,6 +824,7 @@ def laboratoire_create(request):
             commentaire=request.POST.get('commentaire', '').strip(),
             statut='demande' if action == 'envoyer' else 'brouillon',
             cree_par=request.user,
+            rendez_vous=rdv_origine,
         )
         med_id = request.POST.get('medecin_prescripteur')
         if med_id:
@@ -871,6 +879,7 @@ def laboratoire_create(request):
     from core.retour import url_interne
     return render(request, 'laboratoire/create_analyse.html', {
         'patient': patient,
+        'rdv_origine': rdv_origine,
         'services_examens': services_examens,
         'medecins': medecins,
         'prefill_medecin': prefill_medecin,
@@ -1624,6 +1633,8 @@ def gynecologie_rdv_detail(request, pk):
     ]
     from patients.models import Pathologie, RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
     from gynecologie.models import TypeVisite
+    from laboratoire.resultats import demandes_de_consultation, nb_non_ouverts
+    demandes_examens_rdv = demandes_de_consultation(rdv)
     def _get_reg(Model):
         try:
             return Model.objects.get(rdv=rdv)
@@ -1657,6 +1668,8 @@ def gynecologie_rdv_detail(request, pk):
         'registre_accouchement': _get_reg(RegistreAccouchement),
         'registre_postnatale':   _get_reg(RegistrePostnatale),
         'registre_curatif':      _get_reg(RegistreCuratif),
+        'demandes_examens_rdv':  demandes_examens_rdv,
+        'resultats_non_ouverts': nb_non_ouverts(demandes_examens_rdv),
     })
 
 

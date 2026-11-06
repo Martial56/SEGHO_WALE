@@ -1,0 +1,124 @@
+{% extends 'patients/base.html' %}
+
+{% block topbar_title %}{{ patient.nom }} {{ patient.prenoms }} — Résultat {{ analyse.numero }}{% endblock %}
+
+{% comment %}Même raison que sur la fiche : on garde le menu du module d'où l'on vient.{% endcomment %}
+{% block module_navbar %}{% if origine %}{% include origine.nav %}{% else %}{{ block.super }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+<style>
+    .re-card {
+        background: var(--surface); border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); overflow: hidden; margin-bottom: 18px;
+    }
+    .re-head {
+        padding: 18px 24px; border-bottom: 1px solid var(--border);
+        display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .re-retour { color: var(--accent-text-soft); text-decoration: none; font-size: 13px; font-weight: 600; }
+    .re-retour:hover { text-decoration: underline; }
+    .re-bulletin {
+        margin-left: auto; padding: 6px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 600;
+        background: var(--teal-600); color: #fff; text-decoration: none;
+    }
+    .re-bulletin:hover { filter: brightness(1.08); }
+    .re-code {
+        background: var(--teal-50); border: 1px solid var(--teal-200); color: var(--accent-text);
+        padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; font-family: var(--font-mono);
+    }
+    .re-nom { font-size: 17px; font-weight: 800; color: var(--teal-950); }
+    .re-infos {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px 24px; padding: 16px 24px; border-bottom: 1px solid var(--border);
+    }
+    .re-info-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); font-weight: 700; }
+    .re-info-val { font-size: 13.5px; color: var(--text); margin-top: 2px; }
+    .re-alerte {
+        margin: 16px 24px 0; padding: 10px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;
+        background: rgba(var(--rose-rgb), .10); color: var(--rose-text); border: 1px solid rgba(var(--rose-rgb), .30);
+    }
+    .re-table-wrap { padding: 16px 24px 22px; overflow-x: auto; }
+    table.re-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    table.re-table th {
+        text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+        color: var(--text-muted); background: var(--surface-muted);
+        border-bottom: 2px solid var(--border); padding: 9px 12px;
+    }
+    table.re-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); }
+    table.re-table td.re-param { font-weight: 600; }
+    table.re-table td.re-valeur { font-weight: 700; font-family: var(--font-mono); }
+    table.re-table tr.re-anormal td.re-valeur,
+    table.re-table tr.re-anormal td.re-param { color: var(--rose-text); }
+    .re-fleche { font-size: 12px; margin-left: 6px; }
+    .re-badge {
+        display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 11px; font-weight: 700;
+    }
+    .re-badge-normal { background: rgba(var(--teal-500-rgb), .12); color: var(--accent-text-soft); }
+    .re-badge-anormal { background: rgba(var(--rose-rgb), .12); color: var(--rose-text); }
+    .re-vide { padding: 28px 24px; text-align: center; color: var(--text-muted); }
+    html[data-theme="dark"] table.re-table tr.re-anormal td.re-valeur,
+    html[data-theme="dark"] table.re-table tr.re-anormal td.re-param,
+    html[data-theme="dark"] .re-alerte,
+    html[data-theme="dark"] .re-badge-anormal { color: #f09090; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="re-card">
+    <div class="re-head">
+        <a class="re-retour" href="{% url 'patients:resultat_examens_list' patient.pk %}{{ origine_qs }}">← Résultats d'examens</a>
+        <span class="re-code">{{ patient.code_patient }}</span>
+        <span class="re-nom">{{ patient.nom }} {{ patient.prenoms }}</span>
+        <a class="re-bulletin" href="{% url 'patients:resultat_examen_bulletin' patient.pk analyse.pk %}" target="_blank">🖨 Imprimer le bulletin</a>
+    </div>
+
+    <div class="re-infos">
+        <div><div class="re-info-lbl">Analyse</div><div class="re-info-val" style="font-family:var(--font-mono);">{{ analyse.numero }}</div></div>
+        <div><div class="re-info-lbl">Examen</div><div class="re-info-val">{{ analyse.libelle_examen }}</div></div>
+        <div><div class="re-info-lbl">Date du résultat</div><div class="re-info-val">{{ analyse.date_resultat|date:"d/m/Y à H:i"|default:"—" }}</div></div>
+        <div><div class="re-info-lbl">Statut</div><div class="re-info-val">{{ analyse.get_statut_display }}{% if analyse.urgent %} — <strong style="color:var(--rose-text);">Urgent</strong>{% endif %}</div></div>
+        {% if analyse.demande %}
+        <div><div class="re-info-lbl">Demande</div><div class="re-info-val" style="font-family:var(--font-mono);">{{ analyse.demande.numero }}</div></div>
+        <div><div class="re-info-lbl">Prescripteur</div><div class="re-info-val">{{ analyse.demande.medecin_prescripteur|default:"—" }}</div></div>
+        {% endif %}
+        {% if analyse.validateur %}
+        <div><div class="re-info-lbl">Validé par</div><div class="re-info-val">{{ analyse.validateur.get_full_name|default:analyse.validateur.username }}</div></div>
+        {% endif %}
+    </div>
+
+    {% if nb_anormaux %}
+    <div class="re-alerte">⚠ {{ nb_anormaux }} valeur{{ nb_anormaux|pluralize }} hors normes</div>
+    {% endif %}
+
+    {% if resultats %}
+    <div class="re-table-wrap">
+        <table class="re-table">
+            <thead>
+                <tr><th>Paramètre</th><th>Résultat</th><th>Unité</th><th>Normes</th><th>Interprétation</th></tr>
+            </thead>
+            <tbody>
+                {% for r in resultats %}
+                <tr{% if r.anormal %} class="re-anormal"{% endif %}>
+                    <td class="re-param">{{ r.parametre }}</td>
+                    <td class="re-valeur">{{ r.valeur }}{% if r.interpretation == 'eleve' %}<span class="re-fleche" title="Élevé">▲</span>{% elif r.interpretation == 'bas' %}<span class="re-fleche" title="Bas">▼</span>{% elif r.interpretation == 'critique' %}<span class="re-fleche" title="Critique">‼</span>{% endif %}</td>
+                    <td>{{ r.unite|default:"—" }}</td>
+                    <td>{{ r.normes|default:"—" }}</td>
+                    <td>{% if r.interpretation %}<span class="re-badge {% if r.anormal %}re-badge-anormal{% else %}re-badge-normal{% endif %}">{{ r.get_interpretation_display }}</span>{% else %}—{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="re-vide">Aucun paramètre n'a encore été transmis pour cette analyse.</div>
+    {% endif %}
+
+    {% if analyse.conclusion %}
+    <div style="padding:0 24px 14px;font-size:13.5px;font-weight:700;white-space:pre-line;">✎ {{ analyse.conclusion }}</div>
+    {% endif %}
+    {% if analyse.commentaire %}
+    <div style="padding:0 24px 18px;font-size:12px;color:var(--text-muted);">{{ analyse.commentaire }}</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -409,6 +409,24 @@ class Tiers(models.Model):
         ordering = ['numero']
 
 
+class CorrespondanceTiers(models.Model):
+    """Quel compte tiers pour quel client du centre : « caisse:<code> » (les
+    patients d'une caisse sont le client « CLIENT CAISSE … » de l'expert),
+    « assurance:<code> » (l'assureur). Pendant de `Correspondance` pour le
+    plan tiers."""
+    cle = models.CharField(max_length=60, unique=True)
+    libelle = models.CharField(max_length=150)
+    tiers = models.ForeignKey(Tiers, on_delete=models.PROTECT, related_name='correspondances')
+
+    def __str__(self):
+        return f"{self.libelle} → {self.tiers.numero}"
+
+    class Meta:
+        verbose_name = "Correspondance tiers"
+        verbose_name_plural = "Correspondances tiers"
+        ordering = ['cle']
+
+
 class Correspondance(models.Model):
     """Quel compte pour quel événement : nature de prestation, mode de
     paiement, caisse, remise, écart… Les écritures automatiques ne
@@ -509,6 +527,15 @@ class LigneEcriture(models.Model):
     compte = models.ForeignKey(Compte, on_delete=models.PROTECT, related_name='lignes')
     libelle = models.CharField(max_length=255, blank=True)
     tiers = models.CharField(max_length=150, blank=True, help_text="Patient, assureur, fournisseur…")
+    # Compte du plan tiers (Sage) : seulement sur un compte de classe 4. Le
+    # texte `tiers` garde le nom lisible (le patient, par exemple), le compte
+    # tiers dit à qui la créance ou la dette est due (la caisse cliente).
+    compte_tiers = models.ForeignKey('Tiers', on_delete=models.PROTECT, null=True, blank=True,
+                                     related_name='lignes', verbose_name="Compte tiers")
+    # Lettrage (Sage) : les lignes d'un même compte et d'un même tiers qui se
+    # soldent — une facture et ses règlements — portent la même lettre.
+    lettre = models.CharField(max_length=4, blank=True, default='', db_index=True)
+    lettree_le = models.DateField(null=True, blank=True, verbose_name="Lettrée le")
     debit = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     credit = models.DecimalField(max_digits=15, decimal_places=2, default=0)
     # Axe « financement » : la convention qui porte cette charge ou cette
@@ -871,6 +898,10 @@ class FactureFournisseur(ModeleCentre):
     d'immobilisation, et peut être imputée à une convention."""
     numero = models.CharField(max_length=20, unique=True, editable=False)
     fournisseur = models.CharField(max_length=150)
+    # Le fournisseur dans le plan tiers, retrouvé par son intitulé : sa dette
+    # va sur son compte collectif (401…, 481… pour une immobilisation).
+    compte_tiers = models.ForeignKey('Tiers', on_delete=models.PROTECT, null=True, blank=True,
+                                     related_name='factures_fournisseur', verbose_name="Compte tiers")
     reference = models.CharField(max_length=100, blank=True, verbose_name="N° de la facture du fournisseur")
     date = models.DateField(verbose_name="Date de la facture")
     date_echeance = models.DateField(null=True, blank=True, verbose_name="Échéance")

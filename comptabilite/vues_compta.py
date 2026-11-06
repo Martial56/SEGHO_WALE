@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import ecritures as moteur
-from .models import Compte, Convention, Correspondance, Ecriture, Journal
+from .models import Compte, Convention, Correspondance, Ecriture, Journal, Tiers
 
 ZERO = Decimal('0')
 
@@ -90,7 +90,7 @@ def ecriture_detail(request, pk):
         'journal', 'exercice', 'cree_par', 'validee_par', 'contre_passation_de'), pk=pk)
     debit, credit = ecriture.totaux()
     return render(request, 'comptabilite/ecriture_detail.html', {
-        'ecriture': ecriture, 'lignes': ecriture.lignes.select_related('compte'),
+        'ecriture': ecriture, 'lignes': ecriture.lignes.select_related('compte', 'compte_tiers'),
         'debit': debit, 'credit': credit,
         'contre_passee_par': getattr(ecriture, 'contre_passee_par', None),
         'peut_passer': request.user.has_perm('comptabilite.passer_ecritures'),
@@ -163,7 +163,7 @@ def od_saisie(request):
                     raise moteur.ErreurCompta(f"Compte {c.numero} : une ligne est au débit ou au crédit, pas les deux.")
                 convention = (Convention.objects.filter(pk=l['convention']).first()
                               if l['convention'].isdigit() else None)
-                lignes.append((c, l['libelle'], d, cr, l['tiers'], convention))
+                lignes.append((c, l['libelle'], d, cr, _tiers_saisi(l['tiers']), convention))
             ecriture = moteur.creer_ecriture(journal_, jour, libelle, lignes,
                                              piece=request.POST.get('piece', '').strip(), par=request.user)
         except moteur.ErreurCompta as e:
@@ -180,7 +180,16 @@ def od_saisie(request):
         'comptes': Compte.objects.imputables(),
         'lignes': lignes_saisies, 'aujourdhui': aujourdhui, 'post': request.POST,
         'conventions': Convention.objects.filter(statut='active'),
+        'plan_tiers': Tiers.objects.filter(actif=True),
     })
+
+
+def _tiers_saisi(texte):
+    """« 40110002 CIE » (choisi dans la liste) → le compte tiers 40110002 ;
+    un autre texte reste un simple nom."""
+    texte = (texte or '').strip()
+    tiers = Tiers.objects.filter(numero=texte.split(' ')[0].upper()).first() if texte else None
+    return moteur.NomTiers(tiers.intitule, tiers) if tiers else texte
 
 
 @login_required(login_url='login')
@@ -299,6 +308,14 @@ def correspondances(request):
     _exiger(request.user, 'comptabilite.view_correspondance')
     peut_modifier = request.user.has_perm('comptabilite.change_correspondance')
     from facturation.models import Caisse
+    from patients.models import Assurance
+    from .models import CorrespondanceTiers, Tiers
+
+    # Le client du plan tiers de chaque caisse (ses patients) et de chaque assureur.
+    designes = {c.cle: c for c in CorrespondanceTiers.objects.select_related('tiers')}
+    clients_du_centre = ([(f'caisse:{c.code}', f'Caisse {c.nom}') for c in Caisse.objects.order_by('nom')]
+                         + [(f'assurance:{a.code}', f'Assurance {a.nom}') for a in Assurance.objects.order_by('nom')])
+    tiers_clients = list(Tiers.objects.filter(type='client', actif=True))
 
     lignes = list(Correspondance.objects.select_related('compte').order_by('cle'))
     # Une caisse sans compte n'est pas comptabilisée : l'expert-comptable crée
@@ -322,11 +339,23 @@ def correspondances(request):
                 Correspondance.objects.create(cle=f'caisse:{caisse.code}', libelle=f'Caisse {caisse.nom}',
                                               compte=comptes[int(choix)])
                 changes += 1
+        clients = {str(t.pk): t for t in tiers_clients}
+        for i, (cle, libelle) in enumerate(clients_du_centre):
+            choix, actuel = request.POST.get(f'tiers_{i}', ''), designes.get(cle)
+            if choix in clients and (actuel is None or str(actuel.tiers_id) != choix):
+                CorrespondanceTiers.objects.update_or_create(cle=cle, defaults={'libelle': libelle,
+                                                                                'tiers': clients[choix]})
+                changes += 1
+            elif f'tiers_{i}' in request.POST and not choix and actuel:
+                actuel.delete()
+                changes += 1
         messages.success(request, f"{changes} correspondance(s) modifiée(s).")
         return redirect('comptabilite:correspondances')
     return render(request, 'comptabilite/correspondances.html', {
         'lignes': lignes, 'comptes': Compte.objects.imputables(), 'peut_modifier': peut_modifier,
         'caisses_sans_compte': caisses_sans_compte,
+        'clients_du_centre': [(cle, libelle, designes.get(cle)) for cle, libelle in clients_du_centre],
+        'tiers_clients': tiers_clients,
         'comptes_caisse': Compte.objects.imputables().filter(numero__startswith='57'),
     })
 
@@ -447,4 +476,60 @@ def plan_tiers_import(request):
         'fichier': en_attente['fichier'], 'anomalies': en_attente['anomalies'],
         'rapport': tiers_import.analyser(en_attente['tiers']), 'nb_fichier': len(en_attente['tiers']),
         'types': tiers_import.TYPES,
+    })
+
+
+@login_required(login_url='login')
+def lettrage(request):
+    """Lettrage d'un compte de tiers : les lignes validées d'un compte (et
+    d'un compte tiers), à cocher pour les lettrer ensemble ; lettrage
+    automatique des documents soldés ; délettrage d'une lettre."""
+    from . import lettrage as regles_lettrage
+
+    _exiger(request.user, 'comptabilite.view_ecriture')
+    peut_lettrer = request.user.has_perm('comptabilite.passer_ecritures')
+    numero = request.GET.get('compte', '').strip()
+    numero_tiers = request.GET.get('tiers', '').strip().split(' ')[0].upper()
+    toutes = request.GET.get('toutes') == '1'
+    compte = Compte.objects.filter(numero=numero, numero__startswith='4').first() if numero else None
+    tiers = Tiers.objects.filter(numero=numero_tiers).first() if numero_tiers else None
+    if tiers and compte is None and tiers.compte_collectif_id:
+        compte = tiers.compte_collectif
+
+    if request.method == 'POST':
+        if not peut_lettrer:
+            raise PermissionDenied
+        action = request.POST.get('action')
+        try:
+            if action == 'lettrer':
+                ids = [int(i) for i in request.POST.getlist('ligne') if i.isdigit()]
+                lettre = regles_lettrage.lettrer(regles_lettrage.lettrables().filter(pk__in=ids))
+                messages.success(request, f"{len(ids)} lignes lettrées « {lettre} ».")
+            elif action == 'delettrer':
+                n = regles_lettrage.delettrer(compte.pk if compte else None, tiers.pk if tiers else None,
+                                              request.POST.get('lettre', ''))
+                messages.success(request, f"Lettre « {request.POST.get('lettre')} » retirée de {n} ligne(s).")
+            elif action == 'auto':
+                n = regles_lettrage.lettrage_automatique(compte, tiers)
+                messages.success(request, f"Lettrage automatique : {n} document(s) soldé(s) lettré(s).")
+        except regles_lettrage.ErreurLettrage as e:
+            messages.error(request, str(e))
+        return redirect(request.get_full_path())
+
+    lignes, totaux = [], {}
+    if compte:
+        qs = (regles_lettrage.lettrables().filter(compte=compte, compte_tiers=tiers)
+              .select_related('ecriture__journal').order_by('ecriture__date', 'pk'))
+        if not toutes:
+            qs = qs.filter(lettre='')
+        lignes = list(qs[:1000])
+        reste = regles_lettrage.lettrables().filter(compte=compte, compte_tiers=tiers, lettre='') \
+            .aggregate(d=Sum('debit'), c=Sum('credit'))
+        totaux = {'debit': reste['d'] or ZERO, 'credit': reste['c'] or ZERO}
+        totaux['solde'] = totaux['debit'] - totaux['credit']
+    return render(request, 'comptabilite/lettrage.html', {
+        'compte': compte, 'tiers': tiers, 'toutes': toutes, 'lignes': lignes, 'totaux': totaux,
+        'peut_lettrer': peut_lettrer, 'numero': numero, 'numero_tiers': numero_tiers,
+        'comptes': Compte.objects.imputables().filter(numero__startswith='4'),
+        'plan_tiers': Tiers.objects.filter(actif=True),
     })

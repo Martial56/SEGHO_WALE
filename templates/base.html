@@ -1092,7 +1092,7 @@
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
-                {% with nb_sys=header_stats.medicaments_alerte|add:header_stats.factures_impayees|add:header_stats.analyses_pending|add:planning_notifs_total|add:cg_rh_notifs_total|add:soins_en_attente_count|add:soins_a_administrer_count|default:0 %}{% with nb_tot=alertes_count|default:0|add:nb_sys %}{% if nb_tot %}
+                {% with nb_sys=header_stats.medicaments_alerte|add:header_stats.factures_impayees|add:header_stats.analyses_pending|add:planning_notifs_total|add:cg_rh_notifs_total|add:soins_en_attente_count|add:soins_a_administrer_count|add:resultats_a_lire_count|default:0 %}{% with nb_tot=alertes_count|default:0|add:nb_sys %}{% if nb_tot %}
                 <span id="notif-badge" style="
                   position:absolute;top:4px;right:4px;
                   min-width:16px;height:16px;border-radius:8px;
@@ -1234,6 +1234,24 @@
                   {% endfor %}
                   {% endif %}
 
+                  {% if resultats_a_lire %}
+                  <div class="notif-section{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche %} avec-trait{% endif %}">
+                    Résultats d'examens à lire
+                  </div>
+                  {% for a in resultats_a_lire %}
+                  <a href="{{ a.url_notification }}" class="notif-ligne">
+                    <div class="notif-bulle" style="background:rgba(var(--rose-rgb),0.12);">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6L4 18a2 2 0 0 0 2 3h12a2 2 0 0 0 2-3L15 8V2"/><line x1="8" y1="2" x2="16" y2="2"/></svg>
+                    </div>
+                    <div class="notif-corps">
+                      <div class="notif-titre">Résultat disponible — {{ a.patient.nom }} {{ a.patient.prenoms }}</div>
+                      <div class="notif-sous">{{ a.libelle_examen }}</div>
+                      <div class="notif-date">{{ a.date_resultat|date:"d/m/Y à H:i" }}</div>
+                    </div>
+                  </a>
+                  {% endfor %}
+                  {% endif %}
+
                   {% if header_stats.medicaments_alerte or header_stats.factures_impayees or header_stats.analyses_pending %}
                   <div class="notif-section{% if alertes_contrat or alertes_document or notifs_conge or cg_demandes_attente or cg_debut_proche %} avec-trait{% endif %}">
                     Système
@@ -1341,7 +1359,7 @@
                   {% endfor %}
                   {% endif %}
 
-                  {% if not alertes_contrat and not alertes_document and not notifs_conge and not cg_demandes_attente and not cg_debut_proche and not header_stats.medicaments_alerte and not header_stats.factures_impayees and not header_stats.analyses_pending and not planning_non_publiees and not planning_non_vues and not soins_en_attente and not soins_a_administrer %}
+                  {% if not alertes_contrat and not alertes_document and not notifs_conge and not cg_demandes_attente and not cg_debut_proche and not header_stats.medicaments_alerte and not header_stats.factures_impayees and not header_stats.analyses_pending and not planning_non_publiees and not planning_non_vues and not soins_en_attente and not soins_a_administrer and not resultats_a_lire %}
                   <div class="notif-vide">
                     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block;opacity:.4">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>

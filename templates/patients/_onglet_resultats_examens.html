@@ -1,0 +1,121 @@
+{% comment %}
+Onglet « Résultats d'examens » d'une consultation : les demandes de
+laboratoire faites depuis ce rendez-vous et les résultats reçus pour chacune.
+Partagé par patients/rendez_vous_form.html et gynecologie/rdv_form.html.
+Paramètres : demandes_examens_rdv (laboratoire.resultats.demandes_de_consultation), rdv.
+{% endcomment %}
+<style>
+  .rex-demande { border: 1px solid var(--border); border-radius: 6px; margin: 12px 0 16px; overflow: hidden; }
+  .rex-demande-head {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 9px 14px; background: var(--surface-muted); border-bottom: 1px solid var(--border); font-size: 12.5px;
+  }
+  .rex-num { font-family: var(--font-mono); font-weight: 700; color: var(--accent-text-soft); }
+  .rex-examens { color: var(--text); font-weight: 600; }
+  .rex-statut { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 10px;
+    background: rgba(var(--teal-500-rgb), .12); color: var(--accent-text-soft); }
+  .rex-statut.attente { background: rgba(var(--amber-rgb), .14); color: var(--amber-text); }
+  .rex-analyse-head { display: flex; align-items: center; gap: 10px; padding: 8px 14px 0; font-size: 12px; color: var(--text-muted); }
+  .rex-analyse-head a { color: var(--accent-text-soft); font-weight: 600; text-decoration: none; }
+  .rex-analyse-head a:hover { text-decoration: underline; }
+  .rex-alerte { color: var(--rose-text); font-weight: 700; }
+  table.rex-table { width: calc(100% - 28px); margin: 6px 14px 12px; border-collapse: collapse; font-size: 13px; }
+  table.rex-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 6px 8px; }
+  table.rex-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+  table.rex-table tr:last-child td { border-bottom: none; }
+  table.rex-table td.rex-valeur { font-weight: 700; font-family: var(--font-mono); }
+  table.rex-table tr.rex-anormal td.rex-param,
+  table.rex-table tr.rex-anormal td.rex-valeur { color: var(--rose-text); }
+  /* Résultat arrivé que le médecin n'a pas encore ouvert : onglet en rouge. */
+  .f-tab.f-tab-resultats-nouveaux { color: var(--rose-text) !important; font-weight: 700; }
+  .f-tab-pastille {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 9px;
+    background: var(--rose); color: #fff; font-size: 10.5px; font-weight: 800; line-height: 18px; text-align: center;
+  }
+  .rex-nouveau {
+    font-size: 10.5px; font-weight: 800; color: #fff; background: var(--rose);
+    padding: 1px 8px; border-radius: 9px; letter-spacing: .03em;
+  }
+  html[data-theme="dark"] .f-tab.f-tab-resultats-nouveaux { color: #f09090 !important; }
+  .rex-attente { padding: 10px 14px; font-size: 12px; font-style: italic; color: var(--text-muted); }
+  html[data-theme="dark"] table.rex-table tr.rex-anormal td.rex-param,
+  html[data-theme="dark"] table.rex-table tr.rex-anormal td.rex-valeur,
+  html[data-theme="dark"] .rex-alerte { color: #f09090; }
+</style>
+
+<div class="f-tab-section-title">Examens demandés pendant cette consultation</div>
+{% for demande in demandes_examens_rdv %}
+<div class="rex-demande">
+  <div class="rex-demande-head">
+    <span class="rex-num">{{ demande.numero }}</span>
+    <span class="rex-examens">{% for l in demande.lignes.all %}{{ l.libelle }}{% if not forloop.last %}, {% endif %}{% empty %}{{ demande.get_type_test_display|default:"Examen" }}{% endfor %}</span>
+    <span style="color:var(--text-muted);">demandé le {{ demande.date_creation|date:"d/m/Y à H:i" }}</span>
+    {% if demande.urgent %}<span class="rex-alerte">URGENT</span>{% endif %}
+    <span class="rex-statut{% if not demande.analyses.all %} attente{% endif %}">
+      {% if demande.analyses.all %}Résultat reçu{% else %}{{ demande.get_statut_display }} — en attente du résultat{% endif %}
+    </span>
+  </div>
+
+  {% for analyse in demande.analyses.all %}
+  <div class="rex-analyse-head">
+    {% if not analyse.vu_le %}<span class="rex-nouveau">NOUVEAU</span>{% endif %}
+    <span>Analyse {{ analyse.numero }} — {{ analyse.date_resultat|date:"d/m/Y à H:i"|default:"—" }} — {{ analyse.get_statut_display }}</span>
+    {% if analyse.nb_anormaux %}<span class="rex-alerte">⚠ {{ analyse.nb_anormaux }} valeur{{ analyse.nb_anormaux|pluralize }} hors normes</span>{% endif %}
+    <a href="{% url 'patients:resultat_examen_detail' rdv.patient_id analyse.pk %}" target="_blank" style="margin-left:auto;">Ouvrir la fiche ↗</a>
+    <a href="{% url 'patients:resultat_examen_bulletin' rdv.patient_id analyse.pk %}" target="_blank">Imprimer le bulletin ↗</a>
+  </div>
+  {% if analyse.resultats.all %}
+  <table class="rex-table">
+    <thead><tr><th>Paramètre</th><th>Résultat</th><th>Unité</th><th>Normes</th><th>Interprétation</th></tr></thead>
+    <tbody>
+      {% for r in analyse.resultats.all %}
+      <tr{% if r.anormal %} class="rex-anormal"{% endif %}>
+        <td class="rex-param">{{ r.parametre }}</td>
+        <td class="rex-valeur">{{ r.valeur }}{% if r.interpretation == 'eleve' %} ▲{% elif r.interpretation == 'bas' %} ▼{% elif r.interpretation == 'critique' %} ‼{% endif %}</td>
+        <td>{{ r.unite|default:"—" }}</td>
+        <td>{{ r.normes|default:"—" }}</td>
+        <td>{{ r.get_interpretation_display|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="rex-attente">Aucun paramètre transmis pour cette analyse.</div>
+  {% endif %}
+  {% empty %}
+  <div class="rex-attente">Le laboratoire n'a pas encore transmis de résultat pour cette demande.</div>
+  {% endfor %}
+</div>
+{% empty %}
+<div class="f-vide">Aucun examen de laboratoire n'a été demandé depuis cette consultation.</div>
+{% endfor %}
+
+{% if resultats_non_ouverts %}
+<script>
+  // Le médecin ouvre l'onglet : ses résultats passent « ouverts ». Le serveur
+  // décide qui peut les ouvrir (le médecin destinataire, pas l'infirmière qui
+  // consulte) et renvoie ce qui reste à lire ; l'onglet ne perd son rouge que
+  // s'il ne reste plus rien.
+  (function () {
+    var onglet = document.querySelector('.f-tab[data-tab="resultats"]');
+    if (!onglet) return;
+    var envoye = false;
+    onglet.addEventListener('click', function () {
+      if (envoye) return;
+      envoye = true;
+      var jeton = document.querySelector('[name=csrfmiddlewaretoken]');
+      fetch('{% url "patients:rdv_resultats_vus" rdv.pk %}', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRFToken': jeton ? jeton.value : ''},
+      }).then(function (r) { return r.ok ? r.json() : null; }).then(function (rep) {
+        if (!rep || rep.restants) return;
+        onglet.classList.remove('f-tab-resultats-nouveaux');
+        onglet.removeAttribute('title');
+        var pastille = onglet.querySelector('.f-tab-pastille');
+        if (pastille) pastille.remove();
+      }).catch(function () {});
+    });
+  })();
+</script>
+{% endif %}

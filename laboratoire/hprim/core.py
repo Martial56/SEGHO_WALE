@@ -41,6 +41,8 @@ class Separators:
 
 
 SEGMENT_TERMINATOR = "\r\n"
+# 7.13 : version demandée par le laboratoire partenaire (SYSLAM).
+VERSION_HPRIM = "H2.2"
 ENCODING = "iso-8859-1"
 MAX_SEGMENT_LEN = 220
 
@@ -190,8 +192,8 @@ class HprimMessage:
             "",
             comp(self.recepteur.code, self.recepteur.nom, sep=s),
             "",                          # 7.11 : commentaire (facultatif)
-            "P",                         # 7.12 : mode de traitement (P = production, valeur par défaut de la norme)
-            comp("H2.4", self.type_liaison, sep=s),
+            "",                          # 7.12 : mode de traitement (vide = production)
+            comp(VERSION_HPRIM, self.type_liaison, sep=s),
             fmt_ts(self.date_message),
         ]
         return _join_trim(champs, s.field)
@@ -217,8 +219,10 @@ class HprimMessage:
 
     def _seg_OBR(self, d: DemandeData) -> str:
         s = self.sep
+        # 9.5 : codes HPRIM seuls (« NFS^VS ») ; le libellé n'est transmis
+        # qu'à défaut de code, pour que le laboratoire voie au moins l'examen.
         analyses = repeat(
-            *(comp(a.code, a.libelle, a.table, sep=s) for a in d.analyses),
+            *(a.code or comp("", a.libelle, sep=s) for a in d.analyses),
             sep=s,
         )
         champs = [
@@ -270,9 +274,7 @@ class HprimMessage:
 
     def _seg_L(self, nb_patients: int, nb_segments: int) -> str:
         s = self.sep
-        # 14.6 (numéro de lot, facultatif) : on y reporte le nom du fichier,
-        # par convention utilisée par plusieurs logiciels de laboratoire.
-        champs = ["L", "1", "", str(nb_patients), str(nb_segments), self.nom_fichier]
+        champs = ["L", "1", "", str(nb_patients), str(nb_segments)]
         return _join_trim(champs, s.field)
 
     # ---- assemblage ------------------------------------------------------- #
@@ -323,6 +325,11 @@ class OruDemande:
     id_demande: str          # 9.3.2 : correspond au numéro de la demande SEGHO
     statut: str              # 9.26
     resultats: List[OruResultat] = field(default_factory=list)
+    code_examen: str = ""    # 9.5 : code HPRIM de l'examen (ex. NFS)
+    libelle_examen: str = ""
+    # Segments C (commentaires du biologiste) qui suivent l'OBR ou ses OBX,
+    # ex. « Anémie, Hypochrome, Microcytaire ».
+    commentaires: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -534,11 +541,14 @@ def parse_message(raw: bytes) -> OruMessage:
             demande = None
         elif kind == "OBR" and patient is not None:
             id_dem = _get(c, 2)
+            examen = _get(c, 4).split(header[3])[0]   # 9.5, premier examen
             demande = OruDemande(
                 rang=_get(c, 1),
                 id_echantillon=sous(id_dem, 0),
                 id_demande=sous(id_dem, 1),
                 statut=_get(c, 25),  # 9.26
+                code_examen=sous(examen, 0),
+                libelle_examen=sous(examen, 1),
             )
             patient.demandes.append(demande)
         elif kind == "OBX" and demande is not None:
@@ -555,7 +565,12 @@ def parse_message(raw: bytes) -> OruMessage:
                 statut=_get(c, 11),
                 date_resultat=parse_ts(_get(c, 14)),
             ))
-        # C, A, L : ignorés / déjà traités
+        elif kind == "C" and demande is not None:
+            # C.4 : texte du commentaire (C.3 = source, ex. L pour laboratoire)
+            texte = (_get(c, 3) or _get(c, 2)).strip()
+            if texte:
+                demande.commentaires.append(texte)
+        # A, L : ignorés / déjà traités
     return msg
 
 
@@ -638,7 +653,7 @@ def construire_err(
         "", "",
         comp(recepteur.code, recepteur.nom, sep=sep),
         "", "",
-        comp("H2.4", type_liaison, sep=sep),
+        comp(VERSION_HPRIM, type_liaison, sep=sep),
         fmt_ts(date_message),
     ], sep.field)
 
@@ -660,7 +675,7 @@ def construire_err(
         segments.append(seg_err)
 
     segments.append(_join_trim(
-        ["L", "1", "", "0", str(len(segments) + 1), nom_fichier], sep.field))
+        ["L", "1", "", "0", str(len(segments) + 1)], sep.field))
 
     out: List[str] = []
     for seg in segments:

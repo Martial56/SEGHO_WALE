@@ -25,6 +25,7 @@ urlpatterns = [
     path('ecritures/<int:pk>/', vues_compta.ecriture_detail, name='ecriture'),
     path('ecritures/<int:pk>/action/', vues_compta.ecriture_action, name='ecriture_action'),
     path('ecritures/operation-diverse/', vues_compta.od_saisie, name='od_saisie'),
+    path('ecritures/lettrage/', vues_compta.lettrage, name='lettrage'),
     path('configuration/plan-comptable/', vues_compta.plan_comptable, name='plan_comptable'),
     path('configuration/plan-comptable/<int:pk>/', vues_compta.plan_comptable, name='compte_modifier'),
     path('configuration/plan-comptable/export/', vues_compta.plan_comptable_export, name='plan_comptable_export'),

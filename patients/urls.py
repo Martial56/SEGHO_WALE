@@ -31,6 +31,7 @@ urlpatterns = [
     path('rendez-vous/export/', views.rdv_export, name='rdv_export'),
     path('rendez-vous/nouveau/', views.rdv_create, name='rdv_create'),
     path('rendez-vous/<int:pk>/modifier/', views.rdv_edit, name='rdv_edit'),
+    path('rendez-vous/<int:pk>/resultats-vus/', views.rdv_resultats_vus, name='rdv_resultats_vus'),
     path('<int:pk>/info/', views.patient_info_json, name='patient_info'),
     path('recherche/', views.patient_search_json, name='patient_search'),
     path('nouveau/', views.patient_create, name='create'),
@@ -44,6 +45,10 @@ urlpatterns = [
     path('<int:pk>/hospitalisations/', views.patient_hospitalisation_list, name='hospitalisation_list'),
     path('<int:pk>/examens-demandes/', views.patient_demande_examens_list, name='demande_examens_list'),
     path('<int:pk>/examens-resultats/', views.patient_resultat_examens_list, name='resultat_examens_list'),
+    path('<int:pk>/examens-resultats/<int:analyse_pk>/', views.patient_resultat_examen_detail,
+         name='resultat_examen_detail'),
+    path('<int:pk>/examens-resultats/<int:analyse_pk>/bulletin/', views.patient_resultat_examen_bulletin,
+         name='resultat_examen_bulletin'),
     path('doublons/verifier/', views.doublons_verifier, name='doublons_verifier'),
     path('doublons/journaliser/', views.doublons_journaliser, name='doublons_journaliser'),
     # ── L'écran des doublons (étape 4a) ──────────────────────────────────

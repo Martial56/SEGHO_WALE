@@ -203,17 +203,19 @@ def _lignes_a_nouveaux(exercice, centre_id):
     """Soldes de bilan d'un centre : par compte, et par tiers sur les comptes de tiers (classe 4)."""
     soldes = (LigneEcriture.objects.filter(ecriture__exercice=exercice, ecriture__statut='validee',
                                            ecriture__centre_id=centre_id, compte__numero__regex=r'^[1-5]')
-              .values('compte_id', 'compte__numero', 'tiers').annotate(d=Sum('debit'), c=Sum('credit'))
-              .order_by('compte__numero', 'tiers'))
-    from .models import Compte
+              .values('compte_id', 'compte__numero', 'tiers', 'compte_tiers_id')
+              .annotate(d=Sum('debit'), c=Sum('credit')).order_by('compte__numero', 'tiers'))
+    from .models import Compte, Tiers
     cumul = {}
     for s in soldes:
-        tiers = s['tiers'] if s['compte__numero'].startswith('4') else ''
-        cle = (s['compte_id'], tiers)
+        classe4 = s['compte__numero'].startswith('4')
+        cle = (s['compte_id'], s['tiers'] if classe4 else '', s['compte_tiers_id'] if classe4 else None)
         cumul[cle] = cumul.get(cle, ZERO) + (s['d'] or ZERO) - (s['c'] or ZERO)
-    comptes = Compte.objects.in_bulk({compte_id for compte_id, _ in cumul})
+    comptes = Compte.objects.in_bulk({compte_id for compte_id, _, _ in cumul})
+    plan_tiers = Tiers.objects.in_bulk({t for _, _, t in cumul if t})
     lignes = []
-    for (compte_id, tiers), solde in cumul.items():
+    for (compte_id, nom, tiers_id), solde in cumul.items():
+        tiers = moteur.NomTiers(nom, plan_tiers.get(tiers_id))
         if solde > 0:
             lignes.append((comptes[compte_id], 'À nouveau', solde, ZERO, tiers))
         elif solde < 0:

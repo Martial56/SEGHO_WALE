@@ -1626,6 +1626,8 @@ def rdv_edit(request, pk):
         form = RendezVousForm(instance=rdv, locked_billing=locked_billing)
 
     from patients.models import RegistreCPN, RegistreAccouchement, RegistrePostnatale, RegistreCuratif
+    from laboratoire.resultats import demandes_de_consultation, nb_non_ouverts
+    demandes_examens_rdv = demandes_de_consultation(rdv)
     def _get_reg(Model):
         try:
             return Model.objects.get(rdv=rdv)
@@ -1655,6 +1657,8 @@ def rdv_edit(request, pk):
         'registre_accouchement': _get_reg(RegistreAccouchement),
         'registre_postnatale':   _get_reg(RegistrePostnatale),
         'registre_curatif':      _get_reg(RegistreCuratif),
+        'demandes_examens_rdv':  demandes_examens_rdv,
+        'resultats_non_ouverts': nb_non_ouverts(demandes_examens_rdv),
     })
 
 
@@ -1786,7 +1790,8 @@ def patient_resultat_examens_list(request, pk):
         from laboratoire.models import AnalyseLaboratoire
         items = AnalyseLaboratoire.objects.filter(
             patient=patient, statut__in=['resultat', 'valide', 'envoye']
-        ).order_by('-date_resultat')
+        ).select_related('type_examen').prefetch_related(
+            'demande__lignes', 'resultats').order_by('-date_resultat')
     except Exception:
         items = []
     return _render_related_list(request, {
@@ -1794,6 +1799,103 @@ def patient_resultat_examens_list(request, pk):
         'view_type': 'resultat_examens',
         'titre': "Résultats d'examens de laboratoire",
         'items': items,
+    })
+
+
+@login_required
+@permission_required('patients.view_patient', raise_exception=True)
+def patient_resultat_examen_detail(request, pk, analyse_pk):
+    """Fiche d'un résultat de laboratoire, ouverte depuis la liste des
+    résultats du dossier : un paramètre par ligne, les valeurs hors normes en
+    rouge. Jusqu'ici les valeurs n'étaient visibles que dans l'admin."""
+    from laboratoire.models import AnalyseLaboratoire
+    patient = get_object_or_404(Patient, pk=pk)
+    analyse = get_object_or_404(
+        AnalyseLaboratoire.objects.select_related('demande__medecin_prescripteur', 'type_examen', 'validateur'),
+        pk=analyse_pk, patient=patient,
+    )
+    resultats = list(analyse.resultats.all())
+    from laboratoire.resultats import marquer_vus
+    marquer_vus([analyse], request.user)
+    return render(request, 'patients/resultat_examen.html', {
+        'patient': patient,
+        'analyse': analyse,
+        'resultats': resultats,
+        'nb_anormaux': sum(1 for r in resultats if r.anormal),
+        **origines_patient.contexte(request),
+    })
+
+
+@login_required
+@require_POST
+def rdv_resultats_vus(request, pk):
+    """Appelé quand le médecin ouvre l'onglet « Résultats d'examens » d'une
+    consultation : les résultats qu'il avait à lire passent « ouverts », ce qui
+    éteint le rouge de l'onglet et sa notification."""
+    from laboratoire.models import AnalyseLaboratoire
+    from laboratoire.resultats import marquer_vus
+    rdv = get_object_or_404(RendezVous, pk=pk)
+    analyses = list(AnalyseLaboratoire.objects.filter(demande__rendez_vous=rdv))
+    marques = marquer_vus(analyses, request.user)
+    restants = AnalyseLaboratoire.objects.filter(demande__rendez_vous=rdv, vu_le__isnull=True).count()
+    return JsonResponse({'marques': marques, 'restants': restants})
+
+
+# Rubriques du bulletin, dans l'ordre de la fiche papier du laboratoire ; la
+# clé est le « type de test » de l'examen dans le catalogue des prestations.
+RUBRIQUES_BULLETIN = [
+    ('hematologie', 'HEMATOLOGIE GENERALE'),
+    ('biochimie', 'EXAMENS BIOCHIMIQUES DU METABOLISME'),
+    ('serologie', 'SEROLOGIE - IMMUNOLOGIE'),
+    ('parasitologie', 'PARASITOLOGIE'),
+    ('bacteriologie', 'BACTERIOLOGIE'),
+    ('pathologie', 'ANATOMIE PATHOLOGIQUE'),
+    ('imagerie', 'IMAGERIE'),
+    ('autre', 'AUTRES EXAMENS'),
+]
+
+
+@login_required
+@permission_required('patients.view_patient', raise_exception=True)
+def patient_resultat_examen_bulletin(request, pk, analyse_pk):
+    """Bulletin de résultats imprimable, calqué sur la fiche papier du
+    laboratoire : tous les examens de la même demande, rangés par rubrique,
+    avec les valeurs de référence et l'antériorité de chaque paramètre."""
+    from laboratoire.models import AnalyseLaboratoire, ResultatAnalyse
+    patient = get_object_or_404(Patient, pk=pk)
+    analyse = get_object_or_404(AnalyseLaboratoire, pk=analyse_pk, patient=patient)
+    demande = analyse.demande
+    if demande is not None:
+        analyses = list(demande.analyses.filter(patient=patient)
+                        .prefetch_related('resultats', 'demande__lignes__article_service')
+                        .order_by('date_resultat', 'pk'))
+    else:
+        analyses = [analyse]
+
+    rubriques = {cle: [] for cle, _ in RUBRIQUES_BULLETIN}
+    for a in analyses:
+        lignes = []
+        for r in a.resultats.all():
+            precedent = (ResultatAnalyse.objects
+                         .filter(analyse__patient=patient, parametre=r.parametre,
+                                 analyse__date_resultat__lt=a.date_resultat)
+                         .exclude(analyse__in=analyses)
+                         .select_related('analyse')
+                         .order_by('-analyse__date_resultat').first()) if a.date_resultat else None
+            lignes.append({'r': r, 'anteriorite': precedent})
+        rubriques.get(a.rubrique, rubriques['autre']).append({'analyse': a, 'lignes': lignes})
+
+    dates = [a.date_resultat for a in analyses if a.date_resultat]
+    from laboratoire.resultats import marquer_vus
+    marquer_vus(analyses, request.user)
+    return render(request, 'laboratoire/bulletin_resultats.html', {
+        'patient': patient,
+        'analyse': analyse,
+        'demande': demande,
+        'rubriques': [{'titre': titre, 'examens': rubriques[cle]}
+                      for cle, titre in RUBRIQUES_BULLETIN if rubriques[cle]],
+        'date_edition': max(dates) if dates else None,
+        'retour': reverse('patients:resultat_examen_detail', args=[patient.pk, analyse.pk]),
     })
 
 

@@ -1,0 +1,177 @@
+{% load static %}
+{% comment %}
+Bulletin de résultats d'examens, calqué sur la fiche papier du laboratoire du
+CMS WALÉ : en-tête du centre, cadre patient, cadre prélèvement / édition /
+prescripteur, puis une rubrique par famille d'examens (HEMATOLOGIE GENERALE,
+PARASITOLOGIE…) avec valeurs de référence et antériorités. Les valeurs hors
+normes sont grisées et en gras, comme sur le papier.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Résultats d'examens — {{ patient.nom }} {{ patient.prenoms }}</title>
+<style>
+:root { --brand: #1a5c4a; --font-print: Arial, 'Segoe UI', sans-serif; --font-titre: 'Courier New', monospace; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-print); background: #e5e7eb; color: #111; font-size: 12px; }
+
+/* ── Contrôles écran ── */
+.print-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--brand); color: #fff; padding: 10px 24px; position: sticky; top: 0; z-index: 100;
+}
+.print-toolbar span { flex: 1; font-size: 13px; font-weight: 600; }
+.toolbar-btn {
+  padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer;
+  border: none; font-family: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn-print { background: #fff; color: var(--brand); }
+.btn-back { background: rgba(255,255,255,.15); color: #fff; }
+
+/* ── Page A4 ── */
+.bl-page {
+  max-width: 800px; margin: 24px auto; background: #fff; border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.12); padding: 30px 38px 70px; position: relative;
+}
+
+/* En-tête du centre */
+.bl-entete { display: grid; grid-template-columns: 110px 1fr; gap: 14px; align-items: start; }
+.bl-logo img { width: 100px; height: 100px; object-fit: contain; }
+.bl-centre { font-size: 26px; font-weight: 800; letter-spacing: .5px; text-align: center; margin-top: 6px; }
+.bl-contacts { margin: 8px 0 0 auto; width: 260px; font-size: 10.5px; line-height: 1.7; }
+.bl-contacts div::before { content: '■'; font-size: 8px; margin-right: 7px; vertical-align: 1px; }
+
+/* Cadres patient / prélèvement */
+.bl-identite { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; }
+.bl-cadre { border: 1px solid #333; padding: 6px 10px; font-size: 11px; line-height: 1.5; }
+.bl-cadre + .bl-cadre { margin-top: 6px; min-height: 70px; font-style: italic; }
+.bl-cadre .bl-nom { font-size: 13px; font-weight: 800; font-style: normal; }
+.bl-cadre strong { font-style: normal; }
+.bl-destinataire { padding-top: 70px; font-size: 13px; line-height: 2; }
+.bl-destinataire strong { font-style: italic; }
+
+/* Rubriques */
+.bl-rubrique { margin-top: 26px; }
+.bl-bande {
+  display: grid; grid-template-columns: 1fr 160px 90px; align-items: end;
+  background: #e8e8e8; padding: 3px 6px; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.bl-bande h2 { font-family: var(--font-titre); font-size: 17px; font-weight: 400; letter-spacing: 1px; }
+.bl-bande span { font-size: 11px; }
+.bl-examen { margin-top: 10px; break-inside: avoid; }
+.bl-examen-titre { font-size: 12.5px; font-weight: 700; color: #223; text-decoration: underline; margin-bottom: 6px; }
+table.bl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.bl-table td { padding: 2px 6px; vertical-align: top; line-height: 1.35; }
+td.bl-param { width: 38%; }
+td.bl-valeur { width: 14%; text-align: right; white-space: pre-line; }
+td.bl-unite { width: 12%; }
+td.bl-ref { width: 22%; }
+td.bl-ant { width: 14%; font-size: 10.5px; color: #444; }
+td.bl-valeur.bl-anormal {
+  font-weight: 700; background: #e3e3e3; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.bl-texte { font-weight: 800; }
+.bl-conclusion { margin: 8px 0 0 6px; font-weight: 800; font-size: 12.5px; white-space: pre-line; }
+.bl-conclusion::before { content: '✎ '; font-weight: 400; }
+
+/* Signature / pied */
+.bl-signature { margin-top: 40px; text-align: right; font-size: 12px; font-weight: 700; padding-right: 30px; }
+.bl-pied {
+  position: absolute; left: 38px; right: 38px; bottom: 18px;
+  font-size: 8.5px; text-align: center; color: #333; line-height: 1.4;
+}
+.bl-vide { margin-top: 30px; font-style: italic; color: #666; }
+
+@media print {
+  body { background: #fff; }
+  .print-toolbar { display: none !important; }
+  .bl-page { margin: 0; max-width: 100%; box-shadow: none; border-radius: 0; padding: 10mm 12mm 22mm; position: static; }
+  /* Pied répété en bas de chaque page imprimée. */
+  .bl-pied { position: fixed; left: 12mm; right: 12mm; bottom: 6mm; }
+}
+@page { size: A4; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="print-toolbar">
+  <span>Résultats d'examens — {{ patient.nom }} {{ patient.prenoms }}</span>
+  <button class="toolbar-btn btn-print" onclick="window.print()">Imprimer / Télécharger PDF</button>
+  <a class="toolbar-btn btn-back" href="{{ retour }}">← Retour</a>
+</div>
+
+<div class="bl-page">
+  <div class="bl-entete">
+    <div class="bl-logo"><img src="{% static 'img/logo.png' %}" alt="CMS WALÉ"></div>
+    <div>
+      <div class="bl-centre">CENTRE MEDICO SOCIAL WALE</div>
+      <div class="bl-contacts">
+        <div>Quartier Dioulabougou B.P. 1336 Yamoussoukro</div>
+        <div>(+225) 30 64 33 50</div>
+        <div>centremedicosocialwale@gmail.com</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bl-identite">
+    <div>
+      <div class="bl-cadre">
+        <div class="bl-nom">{{ patient.nom|upper }} {{ patient.prenoms }}</div>
+        <div>{% if patient.sexe == 'F' %}Née{% else %}Né{% endif %} le {{ patient.date_naissance|date:"d.m.Y"|default:"—" }}
+          &nbsp;&nbsp;&nbsp; Sexe : {{ patient.sexe|default:"—" }}</div>
+        <div>Examen n° {% if demande %}{{ demande.numero }}{% else %}{{ analyse.numero }}{% endif %} / {{ patient.code_patient }}</div>
+      </div>
+      <div class="bl-cadre">
+        <div>Prélèvement effectué le {% if demande.date_prelevement %}{{ demande.date_prelevement|date:"j.n.Y \à G\hi" }}{% else %}—{% endif %}</div>
+        <div>Résultat complet édité le {% if date_edition %}{{ date_edition|date:"j.n.Y \à G\hi" }}{% else %}—{% endif %}</div>
+        <div>Prescrit par : <strong>{{ demande.medecin_prescripteur|default:"—" }}</strong></div>
+      </div>
+    </div>
+    <div class="bl-destinataire">
+      <div>{% if patient.age is not None and patient.age < 15 %}Enfant{% elif patient.sexe == 'F' %}Madame{% else %}Monsieur{% endif %}
+        <strong>{{ patient.nom|upper }} {{ patient.prenoms }}</strong></div>
+      {% if patient.telephone %}<div>TEL:{{ patient.telephone }}</div>{% endif %}
+    </div>
+  </div>
+
+  {% for rubrique in rubriques %}
+  <div class="bl-rubrique">
+    <div class="bl-bande">
+      <h2>{{ rubrique.titre }}</h2>
+      <span>Valeurs de référence</span>
+      <span>Antériorités</span>
+    </div>
+    {% for examen in rubrique.examens %}
+    <div class="bl-examen">
+      <div class="bl-examen-titre">{{ examen.analyse.libelle_examen }}</div>
+      <table class="bl-table">
+        {% for ligne in examen.lignes %}{% with r=ligne.r %}
+        <tr>
+          <td class="bl-param">{{ r.parametre }}</td>
+          <td class="bl-valeur{% if r.anormal %} bl-anormal{% endif %}{% if not r.unite and not r.normes %} bl-texte{% endif %}">{{ r.valeur }}</td>
+          <td class="bl-unite">{{ r.unite }}</td>
+          <td class="bl-ref">{% if r.normes %}({{ r.normes }}){% endif %}</td>
+          <td class="bl-ant">{% if ligne.anteriorite %}{{ ligne.anteriorite.valeur }} {{ ligne.anteriorite.unite }}<br>({{ ligne.anteriorite.analyse.date_resultat|date:"d/m/y" }}){% endif %}</td>
+        </tr>
+        {% endwith %}{% endfor %}
+      </table>
+      {% if examen.analyse.conclusion %}<div class="bl-conclusion">{{ examen.analyse.conclusion }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% empty %}
+  <div class="bl-vide">Aucun résultat transmis par le laboratoire pour cette demande.</div>
+  {% endfor %}
+
+  <div class="bl-signature">Biologiste</div>
+
+  <div class="bl-pied">
+    Association Ivoirienne pour la Formation Universitaire et Professionnelle (AIFUP) - Côte d'Ivoire - Yamoussoukro, quartier Dioulabougou,<br>
+    en face de la salle de l'ex-cinéma du complexe commercial Mo-Faitai - B.P. 1336 Yamoussoukro - Tél/Fax : (+225) 30 64 33 50<br>
+    E-mail : centremedicosocialwale@gmail.com - N°CC 0419252N - Cpte Bancaire : CI008 04311 0311400346-58 63 SGBCI
+  </div>
+</div>
+</body>
+</html>

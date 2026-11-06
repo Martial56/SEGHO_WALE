@@ -34,13 +34,30 @@ def _francs(m):
 
 
 def noms_fournisseurs():
-    """Fournisseurs connus des modules Achats et Stock, et des factures déjà saisies."""
+    """Fournisseurs du plan tiers, des modules Achats et Stock, et des factures déjà saisies."""
+    from .models import Tiers
     from achats.models import Fournisseur as FournisseurAchats
     from stock.models import Fournisseur as FournisseurStock
     noms = set(FournisseurAchats.objects.filter(actif=True).values_list('nom', flat=True))
     noms |= set(FournisseurStock.objects.filter(actif=True).values_list('nom', flat=True))
     noms |= set(FactureFournisseur.objects.values_list('fournisseur', flat=True).distinct())
+    noms |= set(Tiers.objects.filter(type='fournisseur', actif=True).values_list('intitule', flat=True))
     return sorted(n for n in noms if n)
+
+
+def tiers_du_fournisseur(nom, immobilisation=False):
+    """Le fournisseur du plan tiers qui porte exactement ce nom (casse
+    ignorée), ou None. L'expert donne parfois deux comptes au même
+    fournisseur (ELITE MEDICAL : 40110138 pour les achats, 48124138 pour les
+    immobilisations) : une facture d'immobilisation prend celui dont le
+    collectif est en 481, les autres celui en 401."""
+    from .models import Tiers
+    trouves = list(Tiers.objects.filter(type='fournisseur', actif=True, intitule__iexact=(nom or '').strip())
+                   .select_related('compte_collectif'))
+    if len(trouves) > 1:
+        racine = '48' if immobilisation else '40'
+        trouves = [t for t in trouves if t.compte_collectif and t.compte_collectif.numero.startswith(racine)]
+    return trouves[0] if len(trouves) == 1 else None
 
 
 def _compte_achat(type_):
@@ -104,6 +121,8 @@ def enregistrer_facture(facture, lignes, par):
         raise ErreurAchat(f"Le total ({_francs(total)} F) serait inférieur à ce qui est déjà réglé.")
     with transaction.atomic():
         facture.montant_total = total
+        facture.compte_tiers = tiers_du_fournisseur(facture.fournisseur,
+                                                    any(c.classe == '2' for c, _, _ in lignes))
         if not facture.cree_par_id:
             facture.cree_par = par
         facture.save()

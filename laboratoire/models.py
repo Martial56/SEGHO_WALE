@@ -21,6 +21,22 @@ class AnalyseLaboratoire(models.Model):
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='analyses')
     examen_demande = models.OneToOneField('consultations.ExamenDemande', on_delete=models.SET_NULL, null=True, blank=True)
     type_examen = models.ForeignKey(TypeExamen, on_delete=models.SET_NULL, null=True)
+    # Demande d'origine, quand le résultat revient du laboratoire par HPRIM :
+    # c'est elle qui sait quels examens ont été prescrits, et par qui.
+    demande = models.ForeignKey('DemandeExamen', on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='analyses')
+    # Examen auquel répond ce résultat (OBR 9.5 du message ORU) : une demande
+    # NFS + Goutte épaisse revient en deux analyses, une par examen.
+    code_examen = models.CharField(max_length=50, blank=True)
+    # Commentaire du biologiste (segments C), imprimé sous l'examen sur le bulletin.
+    conclusion = models.TextField(blank=True)
+    # Médecin à prévenir à l'arrivée du résultat (prescripteur, à défaut le
+    # médecin de la consultation) et moment où il l'a ouvert : tant que
+    # `vu_le` est vide, le résultat est signalé dans sa cloche et en rouge sur
+    # l'onglet « Résultats d'examens » de la consultation.
+    destinataire = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='resultats_a_lire')
+    vu_le = models.DateTimeField(null=True, blank=True)
     date_prelevement = models.DateTimeField(auto_now_add=True)
     date_resultat = models.DateTimeField(null=True, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='recu')
@@ -39,6 +55,43 @@ class AnalyseLaboratoire(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Analyse {self.numero} - {self.patient}"
+
+    @property
+    def ligne_demande(self):
+        """La ligne de la demande à laquelle répond ce résultat, retrouvée par
+        le code HPRIM de l'examen."""
+        if not (self.demande_id and self.code_examen):
+            return None
+        for ligne in self.demande.lignes.all():
+            if ligne.article_service and ligne.article_service.code_hprim == self.code_examen:
+                return ligne
+        return None
+
+    @property
+    def rubrique(self):
+        """Rubrique du bulletin (HÉMATOLOGIE, BIOCHIMIE…) : le « type de test »
+        de l'examen dans le catalogue des prestations."""
+        ligne = self.ligne_demande
+        if ligne and ligne.article_service and ligne.article_service.type_test_labo:
+            return ligne.article_service.type_test_labo
+        return 'autre'
+
+    @property
+    def libelle_examen(self):
+        """Ce qui a été analysé, en clair. Les demandes se font depuis le
+        catalogue des prestations, pas depuis TypeExamen : sans repli sur les
+        lignes de la demande, la fiche affichait « None »."""
+        if self.type_examen_id:
+            return str(self.type_examen)
+        ligne = self.ligne_demande
+        if ligne:
+            return ligne.libelle
+        if self.demande_id:
+            libelles = [l.libelle for l in self.demande.lignes.all() if l.libelle]
+            if libelles:
+                return ", ".join(libelles)
+        return ", ".join(r.parametre for r in self.resultats.all()) or "—"
+
     class Meta:
         verbose_name = "Analyse laboratoire"
         ordering = ['-date_prelevement']
@@ -54,6 +107,17 @@ class ResultatAnalyse(models.Model):
     interpretation = models.CharField(max_length=20, choices=[('normal','Normal'),('eleve','Élevé'),('bas','Bas'),('critique','Critique')], blank=True)
 
     def __str__(self): return f"{self.parametre}: {self.valeur} {self.unite}"
+
+    @property
+    def anormal(self):
+        return self.interpretation in ('eleve', 'bas', 'critique')
+
+    @property
+    def normes(self):
+        if self.valeur_normale_min and self.valeur_normale_max:
+            return f"{self.valeur_normale_min} – {self.valeur_normale_max}"
+        return self.valeur_normale_min or self.valeur_normale_max or ""
+
     class Meta: verbose_name = "Résultat d'analyse"
 
 
@@ -89,6 +153,10 @@ class DemandeExamen(ModeleCentre):
     date_creation = models.DateTimeField(auto_now_add=True)
     montant_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     facture = models.ForeignKey('facturation.Facture', on_delete=models.SET_NULL, null=True, blank=True, related_name='demandes_examens')
+    # Consultation (rendez-vous) d'où la demande a été faite : c'est par elle
+    # que l'onglet « Résultats d'examens » de la consultation retrouve ses résultats.
+    rendez_vous = models.ForeignKey('patients.RendezVous', on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='demandes_examens')
 
     def save(self, *args, **kwargs):
         if not self.numero:
@@ -178,13 +246,15 @@ class ConfigurationHPRIM(ModeleCentre):
     actif = models.BooleanField(default=True)
 
     # Identités HPRIM (segment H)
+    # Valeurs imposées par le laboratoire partenaire (SYSLAM) :
+    # « ACCWAL~WALE Accueil Auto » en 7.5, « WALE~CMS WALE » en 7.10.
     emetteur_code = models.CharField(
-        max_length=20, default="WALE",
-        help_text="Code émetteur (ex. n° autorisation préfectorale) — champ 7.5")
-    emetteur_nom = models.CharField(max_length=40, default="CMS WALE")
-    recepteur_code = models.CharField(max_length=20, default="LABO",
-                                      help_text="Code du laboratoire — champ 7.10")
-    recepteur_nom = models.CharField(max_length=40, default="LABORATOIRE")
+        max_length=20, default="ACCWAL",
+        help_text="Code émetteur — champ 7.5")
+    emetteur_nom = models.CharField(max_length=40, default="WALE Accueil Auto")
+    recepteur_code = models.CharField(max_length=20, default="WALE",
+                                      help_text="Code du récepteur — champ 7.10")
+    recepteur_nom = models.CharField(max_length=40, default="CMS WALE")
     type_liaison = models.CharField(
         max_length=1, default="L",
         choices=[("L", "Laboratoires"), ("C", "Clinique/hôpital"),

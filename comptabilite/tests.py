@@ -1979,3 +1979,179 @@ class TestPlanTiers(TestCase):
     def test_sans_permission(self):
         user = User.objects.create_user('sans_droit_tiers', password='x')
         self.assertEqual(_client(user).get(reverse('comptabilite:plan_tiers')).status_code, 403)
+
+
+# ─── Écritures rattachées au plan tiers ───────────────────────────────────────
+
+from .models import CorrespondanceTiers  # noqa: E402
+
+
+def _tiers(numero):
+    return Tiers.objects.get(numero=numero)
+
+
+class TestEcrituresSurLePlanTiers(TestCase):
+
+    def setUp(self):
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
+        self.awa = _caissiere('awa')
+        regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        self.admin = User.objects.create_superuser('admin_pt', password='x')
+        self.jour = timezone.localdate()
+
+    def _designer_caisse(self):
+        CorrespondanceTiers.objects.create(cle='caisse:ACC', libelle='Caisse Accueil', tiers=_tiers('41250008'))
+
+    def _tiers_des_lignes(self, ecriture):
+        return {(l.compte.numero, l.compte_tiers.numero if l.compte_tiers else None)
+                for l in ecriture.lignes.select_related('compte', 'compte_tiers')}
+
+    def test_patient_rattache_au_client_de_sa_caisse(self):
+        self._designer_caisse()
+        facture = _facture(Decimal('5000'))
+        _payer(self.awa, facture, 5000)
+        paiement = moteur.ecriture_paiement(Paiement.objects.get(facture=facture))
+        vente = moteur.ecriture_facture(facture)
+        self.assertIn(('41250000', '41250008'), self._tiers_des_lignes(paiement))
+        self.assertIn(('41250000', '41250008'), self._tiers_des_lignes(vente))
+        # Ni la caisse ni le produit ne portent de compte tiers ; le nom du patient reste.
+        self.assertIn(('70520100', None), self._tiers_des_lignes(vente))
+        self.assertTrue(all(l.tiers.startswith('Kouassi') for l in vente.lignes.all()))
+        # La contre-passation garde le compte tiers.
+        moteur.valider([vente], self.admin)
+        inverse = moteur.contre_passer(vente, self.admin)
+        self.assertIn(('41250000', '41250008'), self._tiers_des_lignes(inverse))
+
+    def test_sans_designation_le_nom_seul(self):
+        facture = _facture(Decimal('5000'))
+        _payer(self.awa, facture, 5000)
+        ecriture = moteur.ecriture_paiement(Paiement.objects.get(facture=facture))
+        self.assertIn(('41250000', None), self._tiers_des_lignes(ecriture))
+
+    def test_fournisseur_du_plan_tiers(self):
+        f = achats.enregistrer_facture(FactureFournisseur(fournisseur='cie', date=self.jour),
+                                       [(_compte('60520000'), 'Électricité', Decimal('30000'))], self.admin)
+        self.assertEqual(f.compte_tiers.numero, '40110002')
+        achat = Ecriture.objects.get(origine=f'facture_fournisseur:{f.pk}')
+        self.assertIn(('40110000', '40110002'), self._tiers_des_lignes(achat))
+        r = achats.regler(f, Decimal('30000'), self.jour, 'virement', self.admin)
+        self.assertIn(('40110000', '40110002'),
+                      self._tiers_des_lignes(Ecriture.objects.get(origine=f'reglement_fournisseur:{r.pk}')))
+        # Fournisseur d'immobilisation : la dette va sur son collectif 481.
+        f = achats.enregistrer_facture(FactureFournisseur(fournisseur='ELITE MEDICAL', date=self.jour),
+                                       [(_compte('24410000'), 'Échographe', Decimal('900000'))], self.admin)
+        achat = Ecriture.objects.get(origine=f'facture_fournisseur:{f.pk}')
+        self.assertIn(('48124000', '48124138'), self._tiers_des_lignes(achat))
+
+    def test_saisie_d_od_avec_compte_tiers(self):
+        client = _client(self.admin)
+        od = Journal.objects.get(code='OD')
+        donnees = {'date': self.jour.isoformat(), 'libelle': 'Avance', 'journal': od.pk,
+                   'compte_0': '42110000', 'tiers_0': '42110013 KAMAGATE ALASSANE', 'debit_0': '10000',
+                   'compte_1': '57100004', 'credit_1': '10000'}
+        client.post(reverse('comptabilite:od_saisie'), donnees)
+        ligne = LigneEcriture.objects.get(compte__numero='42110000')
+        self.assertEqual((ligne.compte_tiers.numero, ligne.tiers), ('42110013', 'KAMAGATE ALASSANE'))
+        # Un compte tiers sur un compte qui n'est pas de classe 4 est refusé.
+        donnees.update({'compte_0': '65880000', 'libelle': 'Erreur'})
+        r = client.post(reverse('comptabilite:od_saisie'), donnees, follow=True)
+        self.assertContains(r, 'classe 4')
+        self.assertFalse(Ecriture.objects.filter(libelle='Erreur').exists())
+
+    def test_designation_a_l_ecran_des_correspondances(self):
+        from patients.models import Assurance
+        Assurance.objects.create(nom='NSIA', code='NSIA')
+        client = _client(self.admin)
+        page = client.get(reverse('comptabilite:correspondances')).content.decode()
+        self.assertIn('assurance:NSIA', page)
+        cles = [cle for cle, _, _ in client.get(reverse('comptabilite:correspondances')).context['clients_du_centre']]
+        donnees = {f'tiers_{i}': '' for i in range(len(cles))}
+        donnees[f'tiers_{cles.index("assurance:NSIA")}'] = _tiers('41250003').pk
+        client.post(reverse('comptabilite:correspondances'), donnees)
+        self.assertEqual(moteur.tiers_designe('assurance:NSIA').numero, '41250003')
+
+
+# ─── Lettrage, grand livre et balance des tiers ───────────────────────────────
+
+from . import lettrage  # noqa: E402
+
+
+class TestLettrage(TestCase):
+
+    def setUp(self):
+        self.caisse = _caisse(nom='Caisse Accueil', code='ACC')
+        CorrespondanceTiers.objects.create(cle='caisse:ACC', libelle='Caisse Accueil', tiers=_tiers('41250008'))
+        self.awa = _caissiere('awa')
+        regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        self.admin = User.objects.create_superuser('admin_lt', password='x')
+        self.jour = timezone.localdate()
+
+    def _vente(self, montant, paye):
+        facture = _facture(Decimal(montant))
+        if paye:
+            _payer(self.awa, facture, paye)
+        moteur.generer(self.jour, self.jour)
+        moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
+        return facture
+
+    def _client_ligne(self, origine):
+        return LigneEcriture.objects.get(ecriture__origine=origine, compte__numero='41250000')
+
+    def test_lettrage_automatique_des_factures_soldees(self):
+        soldee = self._vente(5000, 5000)
+        partielle = self._vente(8000, 3000)
+        self.assertEqual(lettrage.lettrage_automatique(), 1)
+        vente = self._client_ligne(f'facture:{soldee.pk}')
+        paiement = self._client_ligne(f'paiement:{Paiement.objects.get(facture=soldee).pk}')
+        self.assertEqual((vente.lettre, paiement.lettre), ('A', 'A'))
+        self.assertEqual(self._client_ligne(f'facture:{partielle.pk}').lettre, '')
+        # Le reste est payé : le document se lettre, lettre suivante.
+        _payer(self.awa, partielle, 5000)
+        moteur.generer(self.jour, self.jour)
+        moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
+        self.assertEqual(lettrage.lettrage_automatique(), 1)
+        self.assertEqual(self._client_ligne(f'facture:{partielle.pk}').lettre, 'B')
+        # Délettrer rend les lignes au « reste dû ».
+        self.assertEqual(lettrage.delettrer(vente.compte_id, vente.compte_tiers_id, 'A'), 2)
+        self.assertEqual(LigneEcriture.objects.get(pk=vente.pk).lettre, '')
+
+    def test_lettrage_manuel_controle(self):
+        a = self._vente(5000, None)
+        b = self._vente(3000, None)
+        la, lb = self._client_ligne(f'facture:{a.pk}'), self._client_ligne(f'facture:{b.pk}')
+        with self.assertRaises(lettrage.ErreurLettrage):
+            lettrage.lettrer([la, lb])                      # deux débits : ne se soldent pas
+        _payer(self.awa, a, 5000)
+        moteur.generer(self.jour, self.jour)               # paiement en brouillon
+        lp = LigneEcriture.objects.get(ecriture__origine__startswith='paiement:', compte__numero='41250000')
+        with self.assertRaises(lettrage.ErreurLettrage):
+            lettrage.lettrer([la, lp])                      # brouillon : pas encore lettrable
+        moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
+        client = _client(self.admin)
+        url = reverse('comptabilite:lettrage') + '?tiers=41250008'
+        page = client.get(url).content.decode()
+        self.assertIn('Lettrer la sélection', page)
+        client.post(url, {'action': 'lettrer', 'ligne': [la.pk, lp.pk]})
+        self.assertEqual(LigneEcriture.objects.get(pk=la.pk).lettre, 'A')
+
+    def test_fournisseur_lettre_avec_son_reglement(self):
+        f = achats.enregistrer_facture(FactureFournisseur(fournisseur='SODECI', date=self.jour),
+                                       [(_compte('60510000'), 'Eau', Decimal('12000'))], self.admin)
+        achats.regler(f, Decimal('12000'), self.jour, 'virement', self.admin)
+        moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
+        self.assertEqual(lettrage.lettrage_automatique(), 1)
+        self.assertEqual(set(LigneEcriture.objects.filter(compte_tiers__numero='40110003')
+                             .values_list('lettre', flat=True)), {'A'})
+
+    def test_etats_des_tiers(self):
+        self._vente(5000, 5000)
+        self._vente(8000, 3000)
+        lettrage.lettrage_automatique()
+        client = _client(self.admin)
+        balance = client.get(reverse('comptabilite:etat', args=['balance_tiers']), {'periode': 'mois'})
+        self.assertContains(balance, '41250008 — CLIENT CAISSE ACC')
+        self.assertContains(balance, '5\xa0000')            # reste dû de la facture partielle
+        gl = client.get(reverse('comptabilite:etat', args=['grand_livre_tiers']),
+                        {'periode': 'mois', 'tiers': '41250008'}).content.decode()
+        self.assertIn('CLIENT CAISSE ACC', gl)
+        self.assertIn('>A<', gl.replace(' ', ''))

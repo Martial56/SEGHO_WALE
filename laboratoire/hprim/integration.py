@@ -76,6 +76,24 @@ def _analyses_de_demande(demande):
     return analyses
 
 
+def identifiant_hprim(numero: str) -> str:
+    """9.3.1 / 9.3.2 : le laboratoire n'accepte que des chiffres.
+    « DEM2026000027 » -> « 2026000027 »."""
+    return "".join(ch for ch in (numero or "") if ch.isdigit())
+
+
+def _demande_par_identifiant(identifiant: str):
+    """Retrouve la DemandeExamen d'un identifiant renvoyé par le laboratoire :
+    numérique (« 2026000027 », ce qu'on envoie) ou complet (« DEM2026000027 »)."""
+    from laboratoire.models import DemandeExamen
+    identifiant = (identifiant or "").strip()
+    if not identifiant:
+        return None
+    if identifiant.isdigit():
+        identifiant = f"DEM{identifiant}"
+    return DemandeExamen.all_objects.filter(numero=identifiant).first()
+
+
 # --------------------------------------------------------------------------- #
 # Flux sortant : DemandeExamen -> message ORM
 # --------------------------------------------------------------------------- #
@@ -97,14 +115,18 @@ def construire_orm(demande, config, numero_ordre: int):
 
     patient_data = _patient_data(demande.patient, rang=1)
 
+    identifiant = identifiant_hprim(demande.numero)
     demande_data = DemandeData(
         rang=1,
-        id_demande=demande.numero,            # 9.3.2 : n° demande SEGHO (clé de retour)
+        # 9.3.1 / 9.3.2 : échantillon et demande, numériques, identiques
+        # (le n° de demande SEGHO sans son préfixe DEM — clé de retour ORU).
+        id_echantillon=identifiant,
+        id_demande=identifiant,
         analyses=_analyses_de_demande(demande),
         code_action="N",                       # nouvelle demande
         date_prelevement=_aware_to_naive(demande.date_prelevement),
         renseignements_cliniques=(demande.commentaire or "")[:300],
-        priorite="A" if demande.urgent else "R",   # 9.6 : table ASTM 12 (A=Urgent, R=Routine)
+        priorite="A" if demande.urgent else "",    # 9.6 : A = urgent ; vide = routine
     )
 
     msg.ajouter_patient(patient_data, [demande_data])
@@ -154,7 +176,7 @@ def integrer_oru(contenu: bytes, centre=None):
     Retourne un dict de synthèse {patients, demandes, resultats, details}.
 
     Le rapprochement se fait via :
-      - 9.3.2 (id_demande) <-> DemandeExamen.numero
+      - 9.3.2 (id_demande, numérique) <-> DemandeExamen.numero sans « DEM »
       - 8.3   (id_demandeur) <-> Patient.code_patient
       - à défaut, la ressemblance (patients.doublons), au seuil de blocage
 
@@ -164,11 +186,12 @@ def integrer_oru(contenu: bytes, centre=None):
     """
     # Imports locaux pour éviter les imports circulaires au chargement du module
     from laboratoire.models import (
-        AnalyseLaboratoire, ResultatAnalyse, DemandeExamen, TypeExamen,
+        AnalyseLaboratoire, ResultatAnalyse,
     )
     from patients.models import Patient
 
     from patients.doublons import SEUIL_BLOCAGE, chercher_doublons
+    from laboratoire.resultats import destinataire_de
 
     perimetre = (Patient.all_objects.filter(centre=centre) if centre is not None
                  else Patient.objects.all())
@@ -207,7 +230,8 @@ def integrer_oru(contenu: bytes, centre=None):
         synthese["patients"] += 1
 
         for d in p.demandes:
-            demande_obj = DemandeExamen.objects.filter(numero=d.id_demande).first()
+            demande_obj = (_demande_par_identifiant(d.id_demande)
+                           or _demande_par_identifiant(d.id_echantillon))
             if patient_obj is None and demande_obj is not None:
                 patient_obj = _fiche_courante(demande_obj.patient, synthese)
 
@@ -233,6 +257,10 @@ def integrer_oru(contenu: bytes, centre=None):
             analyse = AnalyseLaboratoire(
                 patient=patient_obj,
                 type_examen=type_examen,
+                demande=demande_obj,
+                code_examen=d.code_examen[:50],
+                destinataire=destinataire_de(demande_obj),
+                conclusion="\n".join(d.commentaires),
                 statut="valide" if (d.statut or "F").upper() == "F" else "resultat",
                 date_resultat=date_resultat,
                 commentaire=f"Importé HPRIM (fichier {parsed.nom_fichier}, "
@@ -292,7 +320,7 @@ def integrer_err(contenu: bytes, echange):
 
     Retourne (parsed, synthese) où synthese = {erreurs, rejet_total, details}.
     """
-    from laboratoire.models import ErreurHPRIM, EchangeHPRIM, DemandeExamen
+    from laboratoire.models import ErreurHPRIM, EchangeHPRIM
 
     parsed = parse_err(contenu)
     synthese = {"erreurs": 0, "rejet_total": parsed.rejet_total, "details": []}
@@ -312,8 +340,8 @@ def integrer_err(contenu: bytes, echange):
         if demande is None and e.adresse_segment:
             for jeton in e.adresse_segment.replace("~", "&").split("&"):
                 jeton = jeton.strip()
-                if jeton.startswith("DEM"):
-                    demande = DemandeExamen.objects.filter(numero=jeton).first()
+                if jeton.startswith("DEM") or jeton.isdigit():
+                    demande = _demande_par_identifiant(jeton)
                     if demande:
                         break
 

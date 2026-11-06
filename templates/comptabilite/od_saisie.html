@@ -34,6 +34,7 @@
       <div class="cpt-field"><label>Libellé</label><input type="text" name="libelle" class="cpt-input" value="{{ post.libelle }}" required placeholder="Ex. Salaires d'octobre"></div>
     </div>
 
+    <datalist id="liste-tiers">{% for t in plan_tiers %}<option value="{{ t.numero }} {{ t.intitule }}">{% endfor %}</datalist>
     <datalist id="liste-comptes">{% for c in comptes %}<option value="{{ c.numero }} {{ c.intitule }}">{% endfor %}</datalist>
     <table class="cpt-table od-table">
       <thead><tr><th style="width:30%;">Compte</th><th>Libellé de ligne</th><th>Tiers</th><th>Convention</th><th class="num" style="width:12%;">Débit</th><th class="num" style="width:12%;">Crédit</th></tr></thead>
@@ -42,7 +43,7 @@
         <tr>
           <td><input list="liste-comptes" name="compte_{{ forloop.counter0 }}" value="{{ l.compte }}" placeholder="Numéro ou intitulé"></td>
           <td><input name="libelle_{{ forloop.counter0 }}" value="{{ l.libelle }}"></td>
-          <td><input name="tiers_{{ forloop.counter0 }}" value="{{ l.tiers }}"></td>
+          <td><input name="tiers_{{ forloop.counter0 }}" value="{{ l.tiers }}" list="liste-tiers" autocomplete="off" title="Compte tiers (classe 4) choisi dans la liste, ou un simple nom"></td>
           <td><select name="convention_{{ forloop.counter0 }}" class="cpt-input" style="font-size:12px;padding:5px 6px;width:100%;">
             <option value="">—</option>{% for c in conventions %}<option value="{{ c.pk }}" {% if l.convention == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select></td>
           <td><input class="num montant" data-sens="debit" name="debit_{{ forloop.counter0 }}" value="{{ l.debit }}" inputmode="decimal"></td>

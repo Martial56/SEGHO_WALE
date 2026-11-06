@@ -1,6 +1,6 @@
 from datetime import date
 
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from centres.models import Centre
@@ -283,3 +283,350 @@ class TestLaNumerotationSurvitAUneSuppression(TestCase):
             patient=self.patient, type_imagerie='radiographie',
             zone_examinee='Thorax')
         self.assertGreater(suivante.numero, dernier)
+
+
+class FormatOrmSyslamTests(SimpleTestCase):
+    """Le fichier ORM doit être exactement celui attendu par le laboratoire
+    (SYSLAM) : identités du segment H, version H2.2, identifiants numériques
+    en 9.3, codes HPRIM seuls en 9.5, segment L sans nom de fichier."""
+
+    ATTENDU = (
+        "H|~^\\&|WALE0020.HPR||ACCWAL~WALE Accueil Auto||ORM|||WALE~CMS WALE|||H2.2~L|202608070608\r\n"
+        "P|1|PAT202600013|||Adepo~Jean||19570720|M||||080605\r\n"
+        "OBR|1|2026000027~2026000027||NFS^VS|||||||N\r\n"
+        "L|1||1|4\r\n"
+    )
+
+    def test_fichier_identique_a_l_exemple_du_laboratoire(self):
+        from datetime import datetime
+        from .hprim.core import (AnalyseData, DemandeData, Entite, HprimMessage,
+                                 PatientData)
+        from .hprim.integration import identifiant_hprim
+
+        msg = HprimMessage(
+            contexte="ORM",
+            emetteur=Entite("ACCWAL", "WALE Accueil Auto"),
+            recepteur=Entite("WALE", "CMS WALE"),
+            nom_fichier="WALE0020.HPR",
+            date_message=datetime(2026, 8, 7, 6, 8),
+        )
+        identifiant = identifiant_hprim("DEM2026000027")
+        msg.ajouter_patient(
+            PatientData(rang=1, id_demandeur="PAT202600013", nom="Adepo", prenom="Jean",
+                        date_naissance=datetime(1957, 7, 20), sexe="M", telephone="080605"),
+            [DemandeData(rang=1, id_echantillon=identifiant, id_demande=identifiant,
+                         analyses=[AnalyseData("NFS", "Numération formule sanguine"),
+                                   AnalyseData("VS", "Vitesse de sédimentation")])],
+        )
+        self.assertEqual(msg.render(), self.ATTENDU)
+
+
+class OrmDepuisLaBaseTests(TestCase):
+    """Bout en bout : une demande enregistrée part avec les identités et les
+    identifiants attendus par le laboratoire, et le résultat qui revient avec
+    l'identifiant numérique retrouve bien sa demande."""
+
+    def setUp(self):
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-ORM')
+        with centre_actif(self.centre):
+            self.config = ConfigurationHPRIM.objects.create(nom='Config WALE', actif=True)
+            patient = Patient.objects.create(
+                nom='Adepo', prenoms='Jean', date_naissance=date(1957, 7, 20),
+                sexe='M', telephone='080605',
+            )
+            self.demande = DemandeExamen.objects.create(patient=patient, statut='brouillon')
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='NFS', prix=5000)
+
+    def test_segments_h_et_obr(self):
+        from .hprim.integration import construire_orm
+        _nom, contenu, _msg = construire_orm(self.demande, self.config, 20)
+        segments = contenu.split("\r\n")
+        identifiant = self.demande.numero.replace("DEM", "")
+        self.assertIn("|ACCWAL~WALE Accueil Auto||ORM|||WALE~CMS WALE|||H2.2~L|", segments[0])
+        self.assertTrue(segments[2].startswith(f"OBR|1|{identifiant}~{identifiant}||"))
+        self.assertTrue(identifiant.isdigit())
+        self.assertEqual(segments[3], "L|1||1|4")
+
+    def test_le_retour_oru_numerique_retrouve_la_demande(self):
+        from .hprim.integration import integrer_oru
+        identifiant = self.demande.numero.replace("DEM", "")
+        oru = (
+            "H|~^\\&|LAB00001.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|||H2.2~L|202608071000\r\n"
+            f"P|1|{self.demande.patient.code_patient}|||Adepo~Jean\r\n"
+            f"OBR|1|{identifiant}~{identifiant}||NFS\r\n"
+            "OBX|1|NM|HB~Hémoglobine~L||13.5|g/dl|12-16|N\r\n"
+            "L|1||1|5\r\n"
+        ).encode("iso-8859-1")
+        with centre_actif(self.centre):
+            _parsed, synthese = integrer_oru(oru, centre=self.centre)
+        self.assertEqual(synthese["resultats"], 1)
+        self.demande.refresh_from_db()
+        self.assertEqual(self.demande.statut, "termine")
+
+    def test_le_medecin_ouvre_la_fiche_du_resultat(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        from .hprim.integration import integrer_oru
+        identifiant = self.demande.numero.replace("DEM", "")
+        patient = self.demande.patient
+        oru = (
+            "H|~^\\&|LAB00002.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|||H2.2~L|202608071000\r\n"
+            f"P|1|{patient.code_patient}|||Adepo~Jean\r\n"
+            f"OBR|1|{identifiant}~{identifiant}||NFS\r\n"
+            "OBX|1|NM|HB~Hémoglobine~L||8.1|g/dl|12-16|L\r\n"
+            "OBX|2|NM|GB~Leucocytes~L||6500|/mm3|4000-10000|N\r\n"
+            "L|1||1|6\r\n"
+        ).encode("iso-8859-1")
+        with centre_actif(self.centre):
+            integrer_oru(oru, centre=self.centre)
+            self.client.force_login(User.objects.create_superuser('medecin_res', password='x'))
+            analyse = self.demande.analyses.get()
+            liste = self.client.get(reverse('patients:resultat_examens_list', args=[patient.pk]))
+            fiche = self.client.get(reverse('patients:resultat_examen_detail', args=[patient.pk, analyse.pk]))
+
+        url_fiche = reverse('patients:resultat_examen_detail', args=[patient.pk, analyse.pk])
+        self.assertContains(liste, f'data-url="{url_fiche}')
+        self.assertContains(liste, 'NFS')                 # libellé de la demande, plus « None »
+        self.assertContains(fiche, 'Hémoglobine')
+        self.assertContains(fiche, '12 – 16')
+        self.assertContains(fiche, '<tr class="re-anormal">', count=1)
+        self.assertContains(fiche, '1 valeur hors normes')
+
+
+class OngletResultatsDeLaConsultationTests(TestCase):
+    """Une demande faite depuis une consultation garde le lien avec elle, et
+    le résultat reçu s'affiche dans l'onglet « Résultats d'examens » des deux
+    fiches de consultation (médecine générale et gynécologie)."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from patients.models import RendezVous
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-ONG')
+        self.user = User.objects.create_superuser('medecin_onglet', password='x')
+        with centre_actif(self.centre):
+            self.patient = Patient.objects.create(
+                nom='Kone', prenoms='Mariam', date_naissance=date(1992, 3, 3),
+                sexe='F', telephone='0700000001')
+            self.rdv = RendezVous.objects.create(
+                patient=self.patient, date_heure=timezone.now(),
+                statut='en_consultation', motif='Consultation')
+            self.autre_rdv = RendezVous.objects.create(
+                patient=self.patient, date_heure=timezone.now(),
+                statut='en_consultation', motif='Autre consultation')
+        self.client.force_login(self.user)
+
+    def _demande_depuis_la_consultation(self):
+        from django.urls import reverse
+        with centre_actif(self.centre):
+            self.client.post(reverse('laboratoire_create'), {
+                'patient_id': self.patient.pk, 'rdv_id': self.rdv.pk,
+                'ligne_examen_0': 'Hémogramme', 'ligne_prix_0': '4000',
+            })
+        return DemandeExamen.all_objects.get(patient=self.patient)
+
+    def test_la_demande_garde_sa_consultation(self):
+        self.assertEqual(self._demande_depuis_la_consultation().rendez_vous, self.rdv)
+
+    def test_le_resultat_s_affiche_dans_l_onglet(self):
+        from django.urls import reverse
+        from .hprim.integration import integrer_oru
+        demande = self._demande_depuis_la_consultation()
+        identifiant = demande.numero.replace("DEM", "")
+        oru = (
+            "H|~^\\&|LAB00003.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|||H2.2~L|202608071000\r\n"
+            f"P|1|{self.patient.code_patient}|||Kone~Mariam\r\n"
+            f"OBR|1|{identifiant}~{identifiant}||NFS\r\n"
+            "OBX|1|NM|HB~Hémoglobine~L||7.9|g/dl|12-16|L\r\n"
+            "OBX|2|NM|PLQ~Plaquettes~L||250000|/mm3|150000-400000|N\r\n"
+            "L|1||1|6\r\n"
+        ).encode("iso-8859-1")
+        with centre_actif(self.centre):
+            integrer_oru(oru, centre=self.centre)
+            pages = [
+                self.client.get(reverse('patients:rdv_edit', args=[self.rdv.pk])),
+                self.client.get(reverse('gynecologie_rdv_detail', args=[self.rdv.pk])),
+            ]
+            autre = self.client.get(reverse('patients:rdv_edit', args=[self.autre_rdv.pk]))
+
+        for page in pages:
+            self.assertContains(page, 'data-tab="resultats"')
+            self.assertContains(page, 'id="tab-resultats"')
+            self.assertContains(page, 'Hémoglobine')
+            self.assertContains(page, '<tr class="rex-anormal">', count=1)
+            self.assertContains(page, '1 valeur hors normes')
+        # L'autre consultation du même jour ne montre pas ce résultat.
+        self.assertNotContains(autre, 'Hémoglobine')
+        self.assertContains(autre, "Aucun examen de laboratoire n'a été demandé depuis cette consultation.")
+
+
+class BulletinDeResultatsTests(TestCase):
+    """Le bulletin imprimable reprend la fiche papier du laboratoire : une
+    rubrique par type de test, l'examen en titre, les valeurs de référence,
+    l'antériorité et le commentaire du biologiste (segment C)."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from services.models import Articleservice, CategorieArticle
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-BUL')
+        categorie = CategorieArticle.objects.create(nom='Examens biologiques', code='EX')
+        nfs = Articleservice.objects.create(nom='Hémogramme', code_hprim='NFS', categorie=categorie,
+                                            type_test_labo='hematologie')
+        ge = Articleservice.objects.create(nom='Goutte épaisse', code_hprim='GE', categorie=categorie,
+                                           type_test_labo='parasitologie')
+        with centre_actif(self.centre):
+            self.patient = Patient.objects.create(
+                nom='Kouassi', prenoms='Adjoua Adeline', date_naissance=date(1988, 1, 1),
+                sexe='F', telephone='0799125679')
+            self.ancienne = DemandeExamen.objects.create(patient=self.patient)
+            LigneDemandeExamen.objects.create(demande=self.ancienne, libelle='Hémogramme', prix=0,
+                                              article_service=nfs)
+            self.demande = DemandeExamen.objects.create(patient=self.patient)
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='Hémogramme', prix=0,
+                                              article_service=nfs)
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='Goutte épaisse', prix=0,
+                                              article_service=ge)
+        self.client.force_login(User.objects.create_superuser('medecin_bul', password='x'))
+
+    def _oru(self, demande, date_msg, corps):
+        ident = demande.numero.replace("DEM", "")
+        return (
+            "H|~^\\&|LAB00009.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|||H2.2~L|" + date_msg + "\r\n"
+            f"P|1|{self.patient.code_patient}|||Kouassi~Adjoua Adeline\r\n"
+            + corps.replace("ID", f"{ident}~{ident}") + "L|1||1|9\r\n"
+        ).encode("iso-8859-1")
+
+    def test_bulletin(self):
+        from django.urls import reverse
+        from .hprim.integration import integrer_oru
+        with centre_actif(self.centre):
+            integrer_oru(self._oru(self.ancienne, "202610010800",
+                                   "OBR|1|ID||NFS\r\nOBX|1|NM|HB~Hémoglobine~L||10.1|g/dl|11.5-16.0|L\r\n"),
+                         centre=self.centre)
+            integrer_oru(self._oru(self.demande, "202611060830",
+                                   "OBR|1|ID||NFS\r\n"
+                                   "OBX|1|NM|HB~Hémoglobine~L||8.8|g/dl|11.5-16.0|L\r\n"
+                                   "OBX|2|NM|GB~Leucocytes~L||8700|/mm3|4000-10000|N\r\n"
+                                   "C|1|L|Anémie, Hypochrome, Microcytaire\r\n"
+                                   "OBR|2|ID||GE\r\n"
+                                   "OBX|1|TX|GE~Recherche de parasites sanguins~L||POSITIVE|||A\r\n"),
+                         centre=self.centre)
+            analyses = list(self.demande.analyses.order_by('code_examen'))
+            self.assertEqual([a.code_examen for a in analyses], ['GE', 'NFS'])
+            nfs = analyses[1]
+            self.assertEqual(nfs.conclusion, 'Anémie, Hypochrome, Microcytaire')
+            page = self.client.get(reverse('patients:resultat_examen_bulletin',
+                                           args=[self.patient.pk, nfs.pk]))
+
+        html = page.content.decode()
+        # Les deux examens de la demande, chacun dans sa rubrique, dans l'ordre de la fiche.
+        self.assertLess(html.index('HEMATOLOGIE GENERALE'), html.index('PARASITOLOGIE'))
+        self.assertContains(page, 'Hémogramme')
+        self.assertContains(page, 'Recherche de parasites sanguins')
+        self.assertContains(page, '(11.5 – 16.0)')
+        self.assertContains(page, 'Anémie, Hypochrome, Microcytaire')
+        self.assertContains(page, '10.1 g/dl<br>(01/10/26)')      # antériorité
+        self.assertContains(page, 'Née le 01.01.1988')
+        self.assertRegex(html, r'Madame\s+<strong>KOUASSI Adjoua Adeline</strong>')
+
+
+class NotificationResultatTests(TestCase):
+    """Un résultat arrivé est signalé au médecin prescripteur — dans sa cloche
+    et en rouge sur l'onglet de la consultation — jusqu'à ce que lui l'ouvre.
+    Un autre utilisateur qui consulte le dossier n'éteint pas l'alerte."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        from django.utils import timezone
+        from employer.models import Employe
+        from medecins.models import Medecin, Specialite
+        from patients.models import RendezVous
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-NOT')
+        self.docteur = User.objects.create_superuser('dr_notif', password='x')
+        self.infirmiere = User.objects.create_superuser('inf_notif', password='x')
+        specialite, _ = Specialite.objects.get_or_create(nom='Généraliste', code='GEN')
+        medecin = Medecin.objects.create(
+            user=self.docteur, specialite=specialite,
+            employe=Employe.objects.create(nom='Docteur', prenoms='Notif', telephone='0700000009',
+                                           date_embauche='2020-01-01'))
+        with centre_actif(self.centre):
+            self.patient = Patient.objects.create(
+                nom='Traore', prenoms='Awa', date_naissance=date(1990, 5, 5),
+                sexe='F', telephone='0700000010')
+            self.rdv = RendezVous.objects.create(
+                patient=self.patient, medecin=medecin, date_heure=timezone.now(),
+                statut='en_consultation', motif='Consultation')
+            self.demande = DemandeExamen.objects.create(
+                patient=self.patient, rendez_vous=self.rdv, medecin_prescripteur=medecin)
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='Hémogramme', prix=0)
+
+    def _recevoir_resultat(self):
+        from .hprim.integration import integrer_oru
+        ident = self.demande.numero.replace("DEM", "")
+        oru = (
+            "H|~^\&|LAB00010.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|||H2.2~L|202611060900\r\n"
+            f"P|1|{self.patient.code_patient}|||Traore~Awa\r\n"
+            f"OBR|1|{ident}~{ident}||NFS\r\n"
+            "OBX|1|NM|HB~Hémoglobine~L||12.4|g/dl|11.5-16.0|N\r\n"
+            "L|1||1|5\r\n"
+        ).encode("iso-8859-1")
+        with centre_actif(self.centre):
+            integrer_oru(oru, centre=self.centre)
+        return self.demande.analyses.get()
+
+    def _get(self, user, url):
+        self.client.force_login(user)
+        with centre_actif(self.centre):
+            return self.client.get(url)
+
+    def _post(self, user, url):
+        self.client.force_login(user)
+        with centre_actif(self.centre):
+            return self.client.post(url)
+
+    def test_parcours(self):
+        from django.urls import reverse
+        analyse = self._recevoir_resultat()
+        self.assertEqual(analyse.destinataire, self.docteur)
+        self.assertIsNone(analyse.vu_le)
+        fiche_rdv = reverse('patients:rdv_edit', args=[self.rdv.pk])
+        vus = reverse('patients:rdv_resultats_vus', args=[self.rdv.pk])
+
+        # Le médecin est prévenu, l'infirmière non ; l'onglet est rouge.
+        page = self._get(self.docteur, fiche_rdv)
+        self.assertContains(page, "Résultats d'examens à lire")
+        self.assertContains(page, 'class="f-tab f-tab-resultats-nouveaux"')
+        self.assertContains(page, 'NOUVEAU')
+        self.assertNotContains(self._get(self.infirmiere, fiche_rdv), "Résultats d'examens à lire")
+
+        # L'infirmière ouvre l'onglet : l'alerte du médecin reste.
+        self.assertEqual(self._post(self.infirmiere, vus).json(), {'marques': 0, 'restants': 1})
+        self.assertContains(self._get(self.infirmiere, fiche_rdv), 'class="f-tab f-tab-resultats-nouveaux"')
+
+        # Le médecin l'ouvre : plus de rouge, plus de notification.
+        self.assertEqual(self._post(self.docteur, vus).json(), {'marques': 1, 'restants': 0})
+        page = self._get(self.docteur, fiche_rdv)
+        self.assertNotContains(page, 'class="f-tab f-tab-resultats-nouveaux"')
+        self.assertNotContains(page, "Résultats d'examens à lire")
+
+    def test_ouvrir_la_fiche_du_resultat_eteint_l_alerte(self):
+        from django.urls import reverse
+        analyse = self._recevoir_resultat()
+        self._get(self.docteur, reverse('patients:resultat_examen_detail', args=[self.patient.pk, analyse.pk]))
+        analyse.refresh_from_db()
+        self.assertIsNotNone(analyse.vu_le)
+
+    def test_sans_destinataire_le_premier_lecteur_eteint_l_alerte(self):
+        """Prescripteur sans compte : personne ne peut être prévenu, mais
+        l'onglet ne doit pas rester rouge une fois le résultat lu."""
+        from django.urls import reverse
+        self.demande.medecin_prescripteur = None
+        self.demande.save()
+        self.rdv.medecin = None
+        self.rdv.save()
+        analyse = self._recevoir_resultat()
+        self.assertIsNone(analyse.destinataire)
+        vus = reverse('patients:rdv_resultats_vus', args=[self.rdv.pk])
+        self.assertEqual(self._post(self.infirmiere, vus).json(), {'marques': 1, 'restants': 0})
+        self.assertNotContains(self._get(self.infirmiere, reverse('patients:rdv_edit', args=[self.rdv.pk])),
+                               'class="f-tab f-tab-resultats-nouveaux"')
