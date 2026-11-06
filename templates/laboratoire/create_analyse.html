@@ -645,10 +645,28 @@
     }
 
     .col-prix {
-        /* Le prix n'est pas montré à la création : il reste géré par la
-           caissière au moment de la facturation. Le champ reste dans le DOM
-           (auto-rempli en JS depuis le catalogue) pour préremplir la facture. */
-        display: none;
+        /* Prix du catalogue, affiché pour information et non modifiable ici :
+           c'est la caisse qui arrête le montant facturé. Le champ caché
+           ligne_prix_N, rempli au choix de l'examen, préremplit la facture. */
+        width: 130px;
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    .tests-table thead th.col-prix {
+        text-align: right;
+    }
+
+    .prix-aff {
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--teal-900);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .prix-aff.vide {
+        color: var(--text-faint);
+        font-weight: 400;
     }
 
     .col-instr {
@@ -808,6 +826,8 @@
             <div class="status-bar" id="status-bar">
                 <div class="status-step active" data-step="brouillon">Brouillon</div>
                 <span class="status-sep">›</span>
+                <div class="status-step" data-step="facturee">Facturé</div>
+                <span class="status-sep">›</span>
                 <div class="status-step" data-step="demande">Demandé</div>
                 <span class="status-sep">›</span>
                 <div class="status-step" data-step="accepte">Accepté</div>
@@ -941,7 +961,7 @@
                     <tr>
                         <th class="col-test">Test <span class="req">*</span></th>
                         <th class="col-type-test">Type de test</th>
-                        <th class="col-prix">Prix de vente (CFA)</th>
+                        <th class="col-prix">Prix (CFA)</th>
                         <th class="col-instr">Instructions spéciales</th>
                         <th class="col-del"></th>
                     </tr>
@@ -964,8 +984,8 @@
                             <input type="text" id="type-test-0" placeholder="—" readonly>
                         </td>
                         <td class="col-prix">
-                            <input type="number" name="ligne_prix_0" id="prix-0" min="0" step="1" value="0"
-                                oninput="recalcTotal()">
+                            <span class="prix-aff vide" id="prix-aff-0">—</span>
+                            <input type="hidden" name="ligne_prix_0" id="prix-0" value="0">
                         </td>
                         <td class="col-instr">
                             <input type="text" name="ligne_instructions_0" placeholder="Précisions…">
@@ -1081,13 +1101,22 @@
             dropdown.style.display = 'block';
         }
 
+        function poserPrix(prix) {
+            var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
+            if (prixInput) { prixInput.value = prix || 0; recalcTotal(); }
+            var aff = document.getElementById('prix-aff-' + idx);
+            if (aff) {
+                aff.textContent = prix === null ? '—' : Number(prix).toLocaleString('fr-FR') + ' CFA';
+                aff.classList.toggle('vide', prix === null);
+            }
+        }
+
         function selectExamen(id, nom, prix, typeTest) {
             hidden.value = nom;
             input.value = nom;
             if (articleId) { articleId.value = id; }
             wrapper.classList.add('ex-preloaded');
-            var prixInput = document.querySelector('[name="ligne_prix_' + idx + '"]');
-            if (prixInput) { prixInput.value = prix; recalcTotal(); }
+            poserPrix(prix);
             var typeInput = document.getElementById('type-test-' + idx);
             if (typeInput) { typeInput.value = typeTestLabel(typeTest); }
         }
@@ -1099,6 +1128,10 @@
             wrapper.classList.remove('ex-preloaded');
             hidden.value = '';
             if (articleId) { articleId.value = ''; }
+            // L'examen est effacé : son prix ne doit pas rester affiché ni partir à la caisse.
+            poserPrix(null);
+            var typeInput = document.getElementById('type-test-' + idx);
+            if (typeInput) { typeInput.value = ''; }
             render(input.value);
         });
         input.addEventListener('keydown', function (e) {
@@ -1139,8 +1172,8 @@
             '</div>' +
             '</td>' +
             '<td class="col-type-test"><input type="text" id="type-test-' + idx + '" placeholder="—" readonly></td>' +
-            '<td class="col-prix"><input type="number" name="ligne_prix_' + idx + '" id="prix-' + idx +
-            '" min="0" step="1" value="0" oninput="recalcTotal()"></td>' +
+            '<td class="col-prix"><span class="prix-aff vide" id="prix-aff-' + idx + '">—</span>' +
+            '<input type="hidden" name="ligne_prix_' + idx + '" id="prix-' + idx + '" value="0"></td>' +
             '<td class="col-instr"><input type="text" name="ligne_instructions_' + idx + '" placeholder="Précisions…"></td>' +
             '<td class="col-del"><button type="button" class="btn-del" onclick="removeLigne(this)">×</button></td>';
         body.appendChild(tr);

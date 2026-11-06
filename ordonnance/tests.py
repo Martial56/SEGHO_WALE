@@ -882,3 +882,43 @@ class TestValiditeDeLOrdonnance(TestCase):
 
         ordonnance = Ordonnance.objects.create(patient=self.patient)
         self.assertEqual(ordonnance.date_expiration, date_expiration_par_defaut())
+
+
+class TestStatutFacturee(TestCase):
+    """Une ordonnance facturée passe « Facturée » ; elle redevient « Émise »
+    si sa facture est annulée. Une ordonnance déjà servie ne bouge pas."""
+
+    def setUp(self):
+        from facturation.models import Facture
+        from patients.models import Patient
+        self.Facture = Facture
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-FACT-ORD')
+        self.patient = Patient.objects.create(
+            nom='Facturee', prenoms='Patient', date_naissance='1985-04-04',
+            sexe='F', telephone='0700000044', centre=self.centre)
+        self.ordonnance = Ordonnance.objects.create(patient=self.patient, statut='emise')
+
+    def _facturer(self, ordonnance):
+        return self.Facture.objects.create(
+            patient=self.patient, type_facture='pharmacie', statut='emise',
+            montant_total=Decimal('2500'), centre=self.centre, ordonnance=ordonnance)
+
+    def test_la_facture_passe_l_ordonnance_facturee(self):
+        self._facturer(self.ordonnance)
+        self.ordonnance.refresh_from_db()
+        self.assertEqual(self.ordonnance.statut, 'facturee')
+        self.assertEqual(self.ordonnance.get_statut_display(), 'Facturée')
+
+    def test_annuler_la_facture_la_remet_emise(self):
+        facture = self._facturer(self.ordonnance)
+        facture.statut = 'annulee'
+        facture.save()
+        self.ordonnance.refresh_from_db()
+        self.assertEqual(self.ordonnance.statut, 'emise')
+
+    def test_une_ordonnance_servie_reste_servie(self):
+        self.ordonnance.statut = 'delivree'
+        self.ordonnance.save()
+        self._facturer(self.ordonnance)
+        self.ordonnance.refresh_from_db()
+        self.assertEqual(self.ordonnance.statut, 'delivree')

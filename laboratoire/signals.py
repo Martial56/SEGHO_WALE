@@ -108,3 +108,37 @@ def _envoyer_si_demande(sender, instance, created, **kwargs):
 
     # Après commit pour ne pas transmettre une demande non persistée.
     transaction.on_commit(_faire_envoi)
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Statut « Facturée »
+# ──────────────────────────────────────────────────────────────────────────
+
+def synchroniser_statut_facturee(demandes):
+    """Brouillon → Facturée quand la demande porte une facture non annulée ;
+    Facturée → Brouillon si cette facture est annulée ou retirée. Les autres
+    statuts (déjà partie au laboratoire) ne bougent pas.
+
+    La condition porte sur le statut **en base**, pas sur celui de l'objet en
+    mémoire, qui peut être périmé : une demande envoyée entre-temps ne doit
+    pas repasser « Facturée ». update() ne redéclenche ni l'envoi HPRIM ni
+    aucun autre signal."""
+    for demande in demandes:
+        facturee = bool(demande.facture_id) and (
+            demande.facture is not None and demande.facture.statut != 'annulee')
+        ancien, nouveau = ('brouillon', 'facturee') if facturee else ('facturee', 'brouillon')
+        if DemandeExamen.all_objects.filter(pk=demande.pk, statut=ancien).update(statut=nouveau):
+            demande.statut = nouveau
+
+
+@receiver(post_save, sender=DemandeExamen)
+def _statut_facturee_demande(sender, instance, **kwargs):
+    """La caisse rattache la facture à la demande (demande.facture)."""
+    synchroniser_statut_facturee([instance])
+
+
+@receiver(post_save, sender='facturation.Facture')
+def _statut_facturee_facture(sender, instance, **kwargs):
+    """Annuler la facture remet ses demandes en brouillon."""
+    synchroniser_statut_facturee(
+        DemandeExamen.all_objects.filter(facture=instance).select_related('facture'))

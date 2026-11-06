@@ -16,6 +16,7 @@ from .models import (
     InventairePharmacie, LigneInventairePharmacie,
 )
 from stock.models import Produit, DemandePharmacie, LigneDemande, UniteMesure
+from consultations.models import Ordonnance
 
 PHARMACIES_DICT = dict(PHARMACIES_WALE)
 
@@ -193,7 +194,7 @@ def pharmacie_accueil(request):
             pharmacie=code, quantite__gt=0, quantite__lte=F('produit__stock_alerte')
         ).count()
         total   = StockPharmacie.objects.filter(pharmacie=code).count()
-        attente = _ordonnances_du_centre(code).filter(statut='emise').count()
+        attente = _ordonnances_du_centre(code).filter(statut__in=Ordonnance.STATUTS_A_SERVIR).count()
         pharmacies_data.append({
             'code':        code,
             'label':       label,
@@ -257,7 +258,7 @@ def pharmacie_dashboard(request, pharmacie):
     ).order_by('-qte')[:5])
 
     ordonnances_attente = _ordonnances_du_centre(pharmacie).filter(
-        statut='emise'
+        statut__in=Ordonnance.STATUTS_A_SERVIR
     ).select_related('consultation__patient', 'consultation__medecin').order_by('-date_emission')[:8]
 
     derniers_mvts = MouvementPharmacie.objects.filter(
@@ -573,7 +574,12 @@ def pharmacie_ordonnances(request, pharmacie):
         'consultation__patient', 'consultation__medecin', 'patient', 'medecin', 'dispensation'
     ).prefetch_related('lignes__produit').order_by('-date_emission')
 
-    if statut_filtre:
+    # « En attente » (?statut=emise) : tout ce qui reste à servir, y compris
+    # l'ordonnance déjà facturée — c'est précisément celle que le patient
+    # vient retirer après la caisse.
+    if statut_filtre == 'emise':
+        qs = qs.filter(statut__in=Ordonnance.STATUTS_A_SERVIR)
+    elif statut_filtre:
         qs = qs.filter(statut=statut_filtre)
     if q:
         qs = qs.filter(
@@ -589,7 +595,7 @@ def pharmacie_ordonnances(request, pharmacie):
     ords_jour = _ordonnances_du_centre(pharmacie).filter(date_emission__date=selected_date)
     stats = ords_jour.aggregate(
         total=Count('id'),
-        en_attente=Count('id', filter=Q(statut='emise')),
+        en_attente=Count('id', filter=Q(statut__in=Ordonnance.STATUTS_A_SERVIR)),
         servies=Count('id', filter=Q(dispensation__pharmacie=pharmacie)),
     )
 

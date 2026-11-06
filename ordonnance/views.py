@@ -57,12 +57,14 @@ def ordonnance_list(request):
     sommes = qs.order_by().aggregate(
         total=Count('id'),
         emises=Count('id', filter=Q(statut='emise')),
+        facturees=Count('id', filter=Q(statut='facturee')),
         delivrees=Count('id', filter=Q(statut='delivree')),
         expirees=Count('id', filter=Q(statut='expiree')),
     )
     stats = {
         'total':     sommes['total'],
         'emises':    sommes['emises'],
+        'facturees': sommes['facturees'],
         'delivrees': sommes['delivrees'],
         'expirees':  sommes['expirees'],
     }

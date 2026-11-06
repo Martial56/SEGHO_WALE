@@ -29,3 +29,25 @@ def sync_rdv_statut(sender, instance, created, **kwargs):
         elif instance.statut == 'annule' and rdv.statut not in TERMINAL:
             rdv.statut = 'annule'
             rdv.save(update_fields=['statut'])
+
+
+# ──────────────────────────────────────────────────────────────
+# Facture → statut « Facturée » de l'ordonnance
+# ──────────────────────────────────────────────────────────────
+
+@receiver(post_save, sender='facturation.Facture')
+def statut_facturee(sender, instance, **kwargs):
+    """Une ordonnance passe « Facturée » dès qu'une facture non annulée la
+    porte — la règle même qu'applique la caisse pour refuser de la facturer
+    deux fois — et redevient « Émise » si sa facture est annulée. Seuls ces
+    deux statuts bougent : une ordonnance déjà servie ou expirée le reste."""
+    if not instance.ordonnance_id:
+        return
+    from facturation.models import Facture
+    from .models import Ordonnance
+    facturee = (Facture.all_objects.filter(ordonnance_id=instance.ordonnance_id)
+                .exclude(statut='annulee').exists())
+    if facturee:
+        Ordonnance.objects.filter(pk=instance.ordonnance_id, statut='emise').update(statut='facturee')
+    else:
+        Ordonnance.objects.filter(pk=instance.ordonnance_id, statut='facturee').update(statut='emise')

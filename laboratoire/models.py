@@ -122,8 +122,11 @@ class ResultatAnalyse(models.Model):
 
 
 class DemandeExamen(ModeleCentre):
+    # « Facturée » : la demande porte une facture non annulée, elle attend
+    # d'être envoyée au laboratoire (posé par laboratoire.signals).
     STATUT = [
         ('brouillon', 'Brouillon'),
+        ('facturee', 'Facturée'),
         ('demande', 'Demandé'),
         ('accepte', 'Accepté'),
         ('en_cours', 'En cours'),
@@ -169,6 +172,10 @@ class DemandeExamen(ModeleCentre):
         super().save(*args, **kwargs)
 
     def __str__(self): return f"Demande {self.numero} - {self.patient}"
+
+    #: Pas encore partie au laboratoire : on peut encore l'y envoyer.
+    STATUTS_AVANT_ENVOI = ('brouillon', 'facturee')
+
     class Meta(ModeleCentre.Meta):
         verbose_name = "Demande d'examen"
         ordering = ['-date_creation']

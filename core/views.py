@@ -738,7 +738,7 @@ def laboratoire_list(request):
 
     now = timezone.now()
     stats = {
-        'en_attente': DemandeExamen.objects.filter(statut__in=['brouillon', 'demande']).count(),
+        'en_attente': DemandeExamen.objects.filter(statut__in=['brouillon', 'facturee', 'demande']).count(),
         'en_cours':   DemandeExamen.objects.filter(statut__in=['accepte', 'en_cours']).count(),
         'terminees':  DemandeExamen.objects.filter(statut='termine').count(),
         'ce_mois':    DemandeExamen.objects.filter(date_creation__month=now.month, date_creation__year=now.year).count(),
@@ -901,7 +901,7 @@ def laboratoire_detail(request, pk):
 
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action == 'envoyer_labo' and demande.facture and demande.statut == 'brouillon':
+        if action == 'envoyer_labo' and demande.facture and demande.statut in DemandeExamen.STATUTS_AVANT_ENVOI:
             from laboratoire.hprim.services import envoyer_demande
             try:
                 echange = envoyer_demande(demande)

@@ -58,7 +58,7 @@ def envoyer_demande(demande):
         echange.date_traitement = timezone.now()
         echange.message_log = "Demande transmise par FTP."
         # mettre à jour la demande métier
-        if demande.statut in ("brouillon", "demande"):
+        if demande.statut in ("brouillon", "facturee", "demande"):
             demande.statut = "demande"
             demande.save(update_fields=["statut"])
     except Exception as exc:   # noqa: BLE001 - on journalise toute erreur réseau

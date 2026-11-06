@@ -338,6 +338,17 @@
         color: var(--text-strong);
     }
 
+    .badge-facturee {
+        background: rgba(var(--violet-rgb), .12);
+        color: var(--violet);
+        border: 1px solid rgba(var(--violet-rgb), .35);
+    }
+
+    html[data-theme="dark"] .badge-facturee {
+        background: rgba(var(--violet-rgb), .22);
+        color: #c4a9f0;
+    }
+
     .badge-demande {
         background: rgba(var(--sky-rgb), .12);
         color: #1d4ed8;
@@ -520,7 +531,7 @@
                 Bulletin d'examens
             </a>
             {% endif %}
-            {% if demande.statut == 'brouillon' %}
+            {% if demande.statut == 'brouillon' or demande.statut == 'facturee' %}
             {% if not demande.facture %}
             {% if perms.facturation.add_facture %}
             <a href="{{ facture_url }}" class="btn-facturation">
@@ -572,6 +583,8 @@
                 <div class="status-bar">
                     {% with s=demande.statut %}
                     <div class="status-step {% if s == 'brouillon' %}active{% elif s != 'brouillon' %}done{% endif %}">Brouillon</div>
+                    <span class="status-sep">›</span>
+                    <div class="status-step {% if s == 'facturee' %}active{% elif s in 'demande accepte en_cours termine' %}done{% endif %}">Facturé</div>
                     <span class="status-sep">›</span>
                     <div class="status-step {% if s == 'demande' %}active{% elif s in 'accepte en_cours termine' %}done{% endif %}">Demandé</div>
                     <span class="status-sep">›</span>

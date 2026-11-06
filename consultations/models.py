@@ -90,7 +90,11 @@ def date_expiration_par_defaut():
 
 
 class Ordonnance(models.Model):
-    STATUT = [('emise','Émise'),('delivree','Délivrée'),('partielle','Partielle'),('expiree','Expirée')]
+    # « Facturée » : une facture non annulée porte l'ordonnance (posé par
+    # consultations.signals.statut_facturee). La pharmacie la sert ensuite.
+    STATUT = [('emise','Émise'),('facturee','Facturée'),('delivree','Délivrée'),('partielle','Partielle'),('expiree','Expirée')]
+    #: Ordonnances qui attendent encore la pharmacie.
+    STATUTS_A_SERVIR = ('emise', 'facturee')
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
     consultation = models.ForeignKey(Consultation, on_delete=models.CASCADE, related_name='ordonnances', null=True, blank=True)
@@ -111,6 +115,11 @@ class Ordonnance(models.Model):
             count = (int(last.numero[len(prefix):]) + 1) if last else 1
             self.numero = f"{prefix}{count:06d}"
         super().save(*args, **kwargs)
+
+    @property
+    def a_servir(self):
+        """Encore attendue à la pharmacie : émise, ou facturée et pas servie."""
+        return self.statut in self.STATUTS_A_SERVIR
 
     @property
     def patient_effectif(self):

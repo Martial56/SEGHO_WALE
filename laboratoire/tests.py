@@ -630,3 +630,55 @@ class NotificationResultatTests(TestCase):
         self.assertEqual(self._post(self.infirmiere, vus).json(), {'marques': 1, 'restants': 0})
         self.assertNotContains(self._get(self.infirmiere, reverse('patients:rdv_edit', args=[self.rdv.pk])),
                                'class="f-tab f-tab-resultats-nouveaux"')
+
+
+class StatutFactureeDemandeTests(TestCase):
+    """Brouillon → Facturée quand la caisse rattache la facture ; retour en
+    brouillon si elle est annulée ; l'envoi au laboratoire reste possible."""
+
+    def setUp(self):
+        from decimal import Decimal
+        from django.contrib.auth.models import User
+        from facturation.models import Facture
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-FACT-DEM')
+        with centre_actif(self.centre):
+            self.patient = Patient.objects.create(
+                nom='Koffi', prenoms='Ama', date_naissance=date(1991, 2, 2),
+                sexe='F', telephone='0700000077')
+            self.demande = DemandeExamen.objects.create(patient=self.patient)
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='NFS', prix=4000)
+            self.facture = Facture.objects.create(
+                patient=self.patient, type_facture='laboratoire', statut='emise',
+                montant_total=Decimal('4000'))
+        self.client.force_login(User.objects.create_superuser('caisse_dem', password='x'))
+
+    def _facturer(self):
+        # Ce que fait la caisse (facturation.views) : demande.facture = facture.
+        self.demande.facture = self.facture
+        self.demande.save(update_fields=['facture'])
+        self.demande.refresh_from_db()
+
+    def test_la_facture_passe_la_demande_facturee(self):
+        self._facturer()
+        self.assertEqual(self.demande.statut, 'facturee')
+        self.assertEqual(self.demande.get_statut_display(), 'Facturée')
+
+    def test_annuler_la_facture_la_remet_en_brouillon(self):
+        self._facturer()
+        self.facture.statut = 'annulee'
+        self.facture.save()
+        self.demande.refresh_from_db()
+        self.assertEqual(self.demande.statut, 'brouillon')
+
+    def test_une_demande_deja_envoyee_ne_bouge_pas(self):
+        DemandeExamen.all_objects.filter(pk=self.demande.pk).update(statut='demande')
+        self._facturer()
+        self.assertEqual(self.demande.statut, 'demande')
+
+    def test_le_bouton_envoyer_au_labo_reste_propose(self):
+        from django.urls import reverse
+        self._facturer()
+        with centre_actif(self.centre):
+            page = self.client.get(reverse('laboratoire_detail', args=[self.demande.pk]))
+        self.assertContains(page, 'value="envoyer_labo"')
+        self.assertContains(page, 'Facturé</div>')

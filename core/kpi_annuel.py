@@ -89,7 +89,8 @@ def _activites(**filtre_date):
         'gyn': rdv.filter(departement__code='GYN', cpn_type_visite__isnull=True),
         'cardio': rdv.filter(_Q_CARDIO),
         'labo': (LigneDemandeExamen.objects.filter(**sur('demande__date_creation'))
-                 .exclude(demande__statut='brouillon')),
+                 # Facturée mais pas encore envoyée = l'ancien brouillon payé.
+                 .exclude(demande__statut__in=['brouillon', 'facturee'])),
         'soins': (Soin.objects.filter(**sur('date_heure'))
                   .exclude(statut__in=['brouillon', 'annule'])),
         'mo': (Hospitalisation.objects.filter(**sur('date_admission'))
