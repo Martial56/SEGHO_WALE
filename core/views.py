@@ -305,11 +305,22 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
+    from core.modules_accueil import DOMAINES, tuiles_accueil
     from employer.views import can_manage_rh
 
+    pastilles_utilisateur = _pastilles(request.user)
+    can_manage_rh_presence = can_manage_rh(request.user)
+
+    # Les clés d'origine restent passées telles quelles : l'ancien gabarit
+    # (core/dashboard_ancien.html) doit pouvoir être remis en place sans
+    # toucher à cette vue.
     response = render(request, 'core/dashboard.html', {
+        'tuiles': tuiles_accueil(request.user, accessible_codes, stats,
+                                 pastilles_utilisateur, plannings_non_vus,
+                                 can_manage_rh_presence),
+        'domaines_accueil': DOMAINES,
         'stats': stats,
-        'pastilles': _pastilles(request.user),
+        'pastilles': pastilles_utilisateur,
         'rdv_auj': rdv_auj,
         'last_cons': last_cons,
         'today': today,
@@ -317,7 +328,7 @@ def dashboard(request):
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,
         'plannings_non_vus': plannings_non_vus,
-        'can_manage_rh_presence': can_manage_rh(request.user),
+        'can_manage_rh_presence': can_manage_rh_presence,
     })
     response['Cache-Control'] = 'no-store, no-cache, must-revalidate'
     response['Pragma'] = 'no-cache'

@@ -1,0 +1,331 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGE D'ACCUEIL — lanceur de modules (« Proposition C »)
+   Chargée par templates/core/dashboard.html uniquement : les règles qui
+   touchent au bandeau commun (.topbar) ne débordent donc sur aucune autre
+   page. Tuiles : core/modules_accueil.py. Comportement : static/js/accueil.js.
+   ═══════════════════════════════════════════════════════════════════════ */
+@import url('../vendor/fonts/inter.css');
+
+/* ── Jetons ─────────────────────────────────────────────────────────────── */
+:root {
+  --accueil-primaire: #1F5E40;
+  --accueil-fond: #F7F8F7;
+  --accueil-carte: #FFFFFF;
+  --accueil-bordure: #D5DDD8;
+  --accueil-texte: #17261E;
+  --accueil-texte-doux: #56655D;
+  --accueil-pastille-rouge: #C62828;
+  /* #B26A00 de la maquette assombri : texte blanc de 11 px ≥ 4.5:1. */
+  --accueil-pastille-orange: #9A5B00;
+  --accueil-focus: #1F5E40;
+  --accueil-ombre-survol: 0 6px 20px rgba(23, 38, 30, .10);
+  --accueil-police: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+html[data-theme="dark"] {
+  --accueil-fond: #0f1419;
+  --accueil-carte: #18212a;
+  --accueil-bordure: #2a3a4a;
+  --accueil-texte: #E6EEE9;
+  --accueil-texte-doux: #A3B3AA;
+  --accueil-focus: #7EE2A8;
+  --accueil-ombre-survol: 0 6px 20px rgba(0, 0, 0, .45);
+}
+
+/* ── Page ───────────────────────────────────────────────────────────────── */
+body,
+html[data-theme="dark"] body { background: var(--accueil-fond); }
+.content { padding: 0 0 40px; }
+
+.accueil {
+  font-family: var(--accueil-police);
+  color: var(--accueil-texte);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 24px 0;
+}
+
+/* Masqué à l'écran, lu par les lecteurs d'écran. */
+.visuellement-masque {
+  position: absolute !important;
+  width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ══ EN-TÊTE ══════════════════════════════════════════════════════════════
+   Le bandeau commun de base.html, repeint aux couleurs de l'accueil. Son
+   HTML n'est pas recopié : caisse, notifications, thème et menu du compte
+   gardent leurs liens et leurs scripts. Le bloc .accueil-entete, en tête du
+   contenu, prolonge ce bandeau avec la salutation et la recherche. */
+.topbar,
+html[data-theme="dark"] .topbar {
+  background: var(--accueil-primaire);
+  border-bottom: none;
+  font-family: var(--accueil-police);
+}
+html[data-theme="dark"] { --accueil-primaire: #174A32; }
+.topbar-inner,
+html[data-theme="dark"] .topbar-inner { border-bottom: none; padding: 0 24px; gap: 12px; }
+
+/* Marque : carré blanc arrondi avec le logo, nom et sous-titre en blanc. */
+.topbar .brand { gap: 12px; }
+.topbar .brand-logo {
+  width: 38px; height: 38px;
+  background: #fff; border-radius: 10px;
+  padding: 4px; box-sizing: border-box;
+}
+.topbar .brand-text h1,
+html[data-theme="dark"] .topbar .brand-text h1 {
+  font-size: 15px; font-weight: 700; letter-spacing: 0; color: #fff;
+}
+.topbar .brand-text p,
+html[data-theme="dark"] .topbar .brand-text p {
+  font-size: 11px; color: #CFE2D7; margin-top: 2px;
+}
+
+.topbar-right { gap: 10px; }
+
+/* Pastille de session de caisse. */
+.topbar .top-alert-badge,
+html[data-theme="dark"] .topbar .top-alert-badge {
+  background: rgba(255, 255, 255, .14);
+  border: 1px solid rgba(255, 255, 255, .18);
+  color: #fff; box-shadow: none;
+  height: 36px; padding: 0 14px; border-radius: 18px;
+  font-size: 12px; font-weight: 600;
+}
+.topbar .top-alert-badge:hover { background: rgba(255, 255, 255, .22); box-shadow: none; }
+/* Session ouverte : simple point vert (la lettre « F » s'efface). */
+.topbar .top-alert-badge .dot:not(.dot-amber) {
+  width: 8px; height: 8px; font-size: 0;
+  background: #7EE2A8 !important;
+}
+
+/* Boutons icônes : messagerie, notifications, thème. */
+.topbar .icon-btn,
+.topbar .theme-toggle,
+html[data-theme="dark"] .topbar .icon-btn,
+html[data-theme="dark"] .topbar .theme-toggle {
+  width: 40px; height: 40px; padding: 0;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 10px;
+  background: transparent; color: #fff;
+}
+.topbar .icon-btn:hover,
+.topbar .theme-toggle:hover,
+html[data-theme="dark"] .topbar .icon-btn:hover,
+html[data-theme="dark"] .topbar .theme-toggle:hover {
+  background: rgba(255, 255, 255, .14); color: #fff;
+}
+.topbar .icon-btn:focus-visible,
+.topbar .theme-toggle:focus-visible,
+.topbar .user-chip:focus-visible,
+.topbar .brand:focus-visible,
+.topbar .top-alert-badge:focus-visible {
+  outline: 2px solid #fff; outline-offset: 2px;
+}
+/* L'anneau du compteur de notifications reprend le vert du bandeau. */
+.topbar #notif-badge { border-color: var(--accueil-primaire) !important; }
+
+/* Bouton du compte : avatar blanc à initiale verte, puis le nom. */
+.topbar .user-chip,
+.topbar .user-chip:hover {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, .25);
+  border-radius: 22px; height: 40px; padding: 0 12px 0 4px;
+}
+.topbar .user-chip:hover { background: rgba(255, 255, 255, .14); }
+.topbar .user-avatar {
+  background: #fff; color: var(--accueil-primaire);
+  width: 30px; height: 30px; font-size: 13px; font-weight: 700;
+}
+.topbar .user-info .uname,
+html[data-theme="dark"] .topbar .user-info .uname { color: #fff; font-size: 13px; font-weight: 600; }
+.topbar .user-info .urole { display: none; }
+.topbar .user-chip-chevron,
+.topbar .user-chip:hover .user-chip-chevron { color: rgba(255, 255, 255, .8); }
+
+/* Salutation et recherche, dans le prolongement du bandeau. */
+.accueil-entete {
+  background: var(--accueil-primaire);
+  color: #fff;
+  font-family: var(--accueil-police);
+  padding: 20px 16px 32px;
+  text-align: center;
+}
+.accueil-entete h2 {
+  font-size: 24px; font-weight: 700; line-height: 1.25;
+  margin: 0 0 18px; color: #fff;
+}
+.accueil-recherche {
+  position: relative;
+  max-width: 560px; margin: 0 auto;
+}
+.accueil-recherche svg {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px;
+  fill: none; stroke: #56655D; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  pointer-events: none;
+}
+.accueil-recherche input {
+  width: 100%; height: 48px; box-sizing: border-box;
+  padding: 0 72px 0 46px;
+  border: none; border-radius: 14px;
+  background: #fff; color: #17261E;
+  font: 400 15px var(--accueil-police);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .14);
+  -webkit-appearance: none; appearance: none;
+}
+.accueil-recherche input::placeholder { color: #56655D; opacity: 1; }
+.accueil-recherche input:focus { outline: 3px solid #7EE2A8; outline-offset: 2px; }
+.accueil-recherche kbd {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  padding: 3px 7px; border-radius: 6px;
+  border: 1px solid #D5DDD8; background: #F7F8F7;
+  color: #56655D; font: 600 11px var(--accueil-police);
+  pointer-events: none;
+}
+
+/* ── Filtres par domaine ────────────────────────────────────────────────── */
+.accueil-filtres {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 8px; margin: 0 0 24px;
+}
+.accueil-filtre {
+  height: 36px; padding: 0 16px;
+  border-radius: 18px;
+  border: 1px solid var(--accueil-bordure);
+  background: var(--accueil-carte);
+  color: var(--accueil-texte);
+  font: 500 13px/1 var(--accueil-police);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.accueil-filtre:hover { border-color: var(--accueil-primaire); }
+.accueil-filtre[aria-pressed="true"] {
+  background: var(--accueil-primaire);
+  border-color: var(--accueil-primaire);
+  color: #fff;
+  font-weight: 600;
+}
+html[data-theme="dark"] .accueil-filtre[aria-pressed="true"] { border-color: #2f8a5f; }
+.accueil-filtre:focus-visible {
+  outline: 2px solid var(--accueil-focus); outline-offset: 2px;
+}
+
+/* ── Grille ─────────────────────────────────────────────────────────────── */
+.accueil-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px 12px;
+}
+
+/* ── Tuile ──────────────────────────────────────────────────────────────── */
+.tuile {
+  --fond-tuile: var(--accueil-fond);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px;
+  padding: 16px 8px 14px;
+  border-radius: 16px;
+  background: transparent;
+  text-decoration: none;
+  color: var(--accueil-texte);
+  transition: background .15s, box-shadow .15s;
+}
+.tuile[hidden] { display: none; }
+.tuile:hover {
+  --fond-tuile: var(--accueil-carte);
+  background: var(--accueil-carte);
+  box-shadow: var(--accueil-ombre-survol);
+}
+.tuile:focus-visible {
+  outline: 3px solid var(--accueil-focus);
+  outline-offset: 2px;
+  --fond-tuile: var(--accueil-carte);
+  background: var(--accueil-carte);
+}
+
+.tuile-icone {
+  position: relative;
+  width: 72px; height: 72px; flex-shrink: 0;
+  border-radius: 20px;
+  background: var(--couleur-module);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+  box-shadow: 0 2px 6px rgba(23, 38, 30, .16);
+  transition: transform .15s ease;
+}
+.tuile:hover .tuile-icone,
+.tuile:focus-visible .tuile-icone { transform: scale(1.05); }
+.tuile-icone svg {
+  width: 34px; height: 34px;
+  fill: none; stroke: #fff; stroke-width: 1.8;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.tuile-libelle {
+  font-size: 14px; font-weight: 600; line-height: 1.3;
+  color: var(--accueil-texte); text-align: center;
+}
+.tuile-sous {
+  font-size: 12px; line-height: 1.35;
+  color: var(--accueil-texte-doux); text-align: center;
+}
+.tuile-sous.est-accent { color: var(--accueil-pastille-rouge); font-weight: 600; }
+html[data-theme="dark"] .tuile-sous.est-accent { color: #FF8A80; }
+
+/* ── Pastille « à traiter » ─────────────────────────────────────────────── */
+.tuile-pastille {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: 11px;
+  border: 2px solid var(--fond-tuile);
+  background: var(--accueil-pastille-rouge);
+  color: #fff;
+  font: 700 11px/18px var(--accueil-police);
+  text-align: center;
+  box-sizing: border-box;
+  transition: border-color .15s;
+}
+.tuile-pastille[hidden] { display: none; }
+.tuile-pastille--orange { background: var(--accueil-pastille-orange); }
+
+/* ── Aucun résultat ─────────────────────────────────────────────────────── */
+.accueil-vide {
+  text-align: center; color: var(--accueil-texte-doux);
+  font-size: 14px; padding: 32px 16px;
+}
+
+/* ── Entrée en douceur, sauf si l'utilisateur la refuse ─────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .tuile { animation: accueil-apparition .3s ease both; }
+  @keyframes accueil-apparition {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* ── Petits écrans ──────────────────────────────────────────────────────── */
+/* L'en-tête passe à la ligne ; base.html recalcule --header-h au
+   redimensionnement, le contenu reste donc sous le bandeau fixe. */
+@media (max-width: 900px) {
+  .topbar-inner,
+  html[data-theme="dark"] .topbar-inner {
+    height: auto; min-height: 62px;
+    flex-wrap: wrap; padding: 10px 16px; row-gap: 10px;
+  }
+  .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
+  .topbar .user-info { display: none; }
+  .topbar .user-chip { padding: 0 8px 0 4px; }
+}
+@media (max-width: 600px) {
+  .topbar-right { width: 100%; justify-content: flex-start; }
+  .accueil-entete h2 { font-size: 20px; }
+  .accueil-recherche kbd { display: none; }
+  .accueil-recherche input { padding-right: 16px; }
+}
+@media (max-width: 480px) {
+  .accueil { padding: 16px 16px 0; }
+  .accueil-grille { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 4px 8px; }
+}

@@ -1,0 +1,436 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block topbar_title %}
+<span style="font-size:13px;font-weight:600;color:rgba(0,0,0,.4);padding-left:4px;" class="dash-topbar-title">Tableau de bord</span>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+<style>
+body { height: 100vh; overflow: hidden; }
+.content { padding-top: 0; min-height: 0; scrollbar-width: none; }
+.content::-webkit-scrollbar { display: none; }
+
+/* dark mode — titre topbar dashboard */
+html[data-theme="dark"] .dash-topbar-title { color:rgba(255,255,255,.35) !important; }
+
+/* ══ GRILLE MODULES ══ */
+.dash-wrap {
+  max-width:900px; margin:0 auto; padding:36px 32px;
+}
+.modules-grid {
+  display:grid; grid-template-columns:repeat(6,1fr);
+  /* gap:18px; */
+}
+.module-card {
+  border-radius:20px; padding:24px 12px 18px;
+  display:flex; flex-direction:column; align-items:center;
+  gap:10px;
+  text-decoration:none; color:var(--teal-900);
+  transition:all .2s ease; cursor:pointer;
+  position:relative; overflow:hidden;
+  animation:fadeUp .4s ease both;
+}
+.module-card:hover {
+  background:rgba(var(--teal-500-rgb), .06);
+  transform:translateY(-6px);
+  box-shadow:0 14px 36px rgba(0,0,0,.11);
+}
+html[data-theme="dark"] .module-card:hover { background: var(--surface); box-shadow:0 14px 36px rgba(0,0,0,.4); }
+
+/* ══ PASTILLE « À TRAITER » ══
+   Un compteur de travail en attente pour la personne connectée — jamais une
+   statistique. Elle n'apparaît que si le nombre est supérieur à zéro : c'est le
+   silence des autres cartes qui lui donne son sens. Voir core/pastilles.py. */
+.module-pastille {
+  position:absolute; top:12px; right:12px;
+  min-width:22px; height:22px; padding:0 6px;
+  border-radius:11px;
+  background:var(--rose); color:#fff;
+  font-size:11px; font-weight:800; line-height:22px;
+  text-align:center;
+  box-shadow:0 2px 8px rgba(var(--rose-rgb),.45);
+  z-index:2;
+}
+.module-icon-box {
+  width:80px; height:80px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:30px; transition:transform .2s;
+  /* box-shadow:0 6px 20px rgba(0,0,0,.22); */
+}
+.module-card:hover .module-icon-box { transform:scale(1.08) rotate(-3deg); }
+.module-name { font-size:15px; font-weight:700; color:var(--teal-800); text-align:center; line-height:1.3; }
+html[data-theme="dark"] .module-name { color: var(--text-strong); }
+.module-sub  { font-size:10px; color:rgba(0,0,0,.4); text-align:center; font-weight:500; }
+html[data-theme="dark"] .module-sub { color: var(--text-muted); }
+
+/* Couleurs icônes (fond retiré, images seules) */
+.ic-teal, .ic-green, .ic-violet, .ic-amber, .ic-rose, .ic-sky,
+.ic-coral, .ic-indigo, .ic-teal2, .ic-plum, .ic-slate, .ic-pink { background:none; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(20px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+    .module-card:nth-child(1)  { animation-delay: 0.03s; } .module-card:nth-child(2)  { animation-delay: 0.06s; }
+    .module-card:nth-child(3)  { animation-delay: 0.09s; } .module-card:nth-child(4)  { animation-delay: 0.12s; }
+    .module-card:nth-child(5)  { animation-delay: 0.15s; } .module-card:nth-child(6)  { animation-delay: 0.18s; }
+    .module-card:nth-child(7)  { animation-delay: 0.21s; } .module-card:nth-child(8)  { animation-delay: 0.24s; }
+    .module-card:nth-child(9)  { animation-delay: 0.27s; } .module-card:nth-child(10) { animation-delay: 0.30s; }
+    .module-card:nth-child(11) { animation-delay: 0.33s; } .module-card:nth-child(12) { animation-delay: 0.36s; }
+    .module-card:nth-child(13) { animation-delay: 0.39s; } .module-card:nth-child(14) { animation-delay: 0.42s; }
+    .module-card:nth-child(15) { animation-delay: 0.45s; } .module-card:nth-child(16) { animation-delay: 0.48s; }
+    .module-card:nth-child(17) { animation-delay: 0.51s; } .module-card:nth-child(18) { animation-delay: 0.54s; }
+    .module-card:nth-child(19) { animation-delay: 0.57s; } .module-card:nth-child(20) { animation-delay: 0.60s; }
+    .module-card:nth-child(21) { animation-delay: 0.63s; }
+
+@media(max-width:1280px){ .modules-grid{ grid-template-columns:repeat(4,1fr); } }
+@media(max-width:1024px){ .modules-grid{ grid-template-columns:repeat(3,1fr); } .dash-wrap{ padding:24px 20px; } }
+@media(max-width:768px) { .modules-grid{ grid-template-columns:repeat(2,1fr); } }
+@media(max-width:480px) { .modules-grid{ grid-template-columns:repeat(2,1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Grille des modules -->
+<div class="dash-wrap">
+  <div class="modules-grid">
+
+    <a href="{% url 'kpi_dashboard' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/speedometer.png' %}" alt="Tableau de bord" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Tableau de bord</div>
+      <div class="module-sub">Statistiques & KPIs</div>
+    </a>
+
+    {% if 'patients' in accessible_codes %}
+    <a href="{% url 'patients:list' %}" class="module-card">
+      <div class="module-icon-box ic-teal" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/dspa.png' %}" alt="Patients" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Patients</div>
+      <div class="module-sub"><span data-stat="patients_total">{{ stats.patients_total }}</span> enregistrés</div>
+    </a>
+    {% endif %}
+
+    {% if 'medecins' in accessible_codes %}
+    <a href="{% url 'medecin_dashboard' %}" class="module-card">
+      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/logchir.png' %}" alt="Docteurs" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Docteurs</div>
+      <div class="module-sub">Corps médical</div>
+    </a>
+    {% endif %}
+
+    {% if 'services' in accessible_codes %}
+    <a href="{% url 'services:list' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/ser1.png' %}" alt="Services" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Prestations</div>
+      <div class="module-sub">Unités de soins</div>
+    </a>
+    {% endif %}
+
+
+    {% if 'rendezvous' in accessible_codes %}
+    <a href="{% url 'patients:rdv_global' %}" class="module-card">
+      <div class="module-icon-box ic-green" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/stetoscop.png' %}" alt="Rendez-vous" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Rendez-vous</div>
+      <div class="module-sub"><span data-stat="rdv_today">{{ stats.rdv_today }}</span> du jour</div>
+    </a>
+    {% endif %}
+
+    {% if 'ordonnances' in accessible_codes %}
+    <a href="{% url 'ordonnance_list' %}" class="module-card">
+      <div class="module-icon-box ic-violet" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/ord.png' %}" alt="Ordonnances" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Ordonnances</div>
+      <div class="module-sub">Prescriptions</div>
+    </a>
+    {% endif %}
+
+    {% if 'hospitalisation' in accessible_codes %}
+    <a href="{% if pastilles.hospitalisation %}{{ pastilles.hospitalisation.url }}{% else %}{% url 'hospitalisation:list' %}{% endif %}" class="module-card">
+      {% if pastilles.hospitalisation %}<span class="module-pastille" data-pastille="hospitalisation" title="{{ pastilles.hospitalisation.total }} {{ pastilles.hospitalisation.libelle }}">{{ pastilles.hospitalisation.total }}</span>{% endif %}
+      <div class="module-icon-box ic-coral" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/hosp.png' %}" alt="Hospitalisation" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Meo</div>
+      <div class="module-sub"><span data-stat="hospitalisations">{{ stats.hospitalisations }}</span> en cours</div>
+    </a>
+    {% endif %}
+
+    {% if 'consultations' in accessible_codes %}
+    <a href="{% if pastilles.consultations %}{{ pastilles.consultations.url }}{% else %}{% url 'soins:list' %}{% endif %}" class="module-card">
+      {% if pastilles.consultations %}<span class="module-pastille" data-pastille="consultations" title="{{ pastilles.consultations.total }} {{ pastilles.consultations.libelle }}">{{ pastilles.consultations.total }}</span>{% endif %}
+      <div class="module-icon-box ic-amber" style="padding:0;overflow:hidden;/* border-radius:50%; */border-radius:0;">
+        <img src="{% static 'img/soin.png' %}" alt="Soins" style="width:90%;height:90%;object-fit:cover;/* border-radius:50%; */border-radius:0;">
+      </div>
+      <div class="module-name">Soins</div>
+      <div class="module-sub"><span data-stat="soins_aujourd_hui">{{ stats.soins_aujourd_hui }}</span> aujourd'hui</div>
+    </a>
+    {% endif %}
+
+    {% if 'laboratoire' in accessible_codes %}
+    <a href="{% url 'laboratoire_list' %}" class="module-card">
+      <div class="module-icon-box ic-indigo" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/lab.png' %}" alt="Laboratoire" style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Laboratoire</div>
+      <div class="module-sub"><span data-stat="analyses_pending">{{ stats.analyses_pending }}</span> en attente</div>
+    </a>
+    {% endif %}
+
+    {% if 'pharmacie' in accessible_codes %}
+    <a href="{% url 'pharmacie_accueil' %}" class="module-card">
+      <div class="module-icon-box ic-pink" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/phar.png' %}" alt="Pharmacie" style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Pharmacie</div>
+      <div class="module-sub" data-stat-pharmacie>{% if stats.medicaments_alerte > 0 %}⚠️ <span data-stat="medicaments_alerte">{{ stats.medicaments_alerte }}</span> alertes{% else %}Stock OK{% endif %}</div>
+    </a>
+    {% endif %}
+
+    {% if 'assurance' in accessible_codes %}
+    <a href="#" class="module-card">
+      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;/* border-radius:50%; */border-radius:0;">
+        <img src="{% static 'img/ass.png' %}" alt="Assurance" style="width:90%;height:90%;object-fit:cover;/* border-radius:50%; */border-radius:0;">
+      </div>
+      <div class="module-name">Assurance</div>
+      <div class="module-sub">Couvertures santé</div>
+    </a>
+    {% endif %}
+
+    {% if 'caisse' in accessible_codes %}
+    <a href="{% if pastilles.caisse %}{{ pastilles.caisse.url }}{% else %}{% url 'facturation:list' %}{% endif %}" class="module-card">
+      {% if pastilles.caisse %}<span class="module-pastille" data-pastille="caisse" title="{{ pastilles.caisse.total }} {{ pastilles.caisse.libelle }}">{{ pastilles.caisse.total }}</span>{% endif %}
+      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/sans-contact.png' %}" alt="Caisse" style="width:80%;height:80%;object-fit:contain;">
+      </div>
+      <div class="module-name">Caisse</div>
+      <div class="module-sub" data-stat-factures>{% if stats.factures_impayees > 0 %}<span data-stat="factures_impayees">{{ stats.factures_impayees }}</span> impayée(s){% else %}À jour{% endif %}</div>
+    </a>
+    {% endif %}
+
+    {% if 'facturation' in accessible_codes %}
+    <a href="{% url 'comptabilite:accueil' %}" class="module-card">
+      <div class="module-icon-box ic-teal" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/compp.png' %}" alt="Comptabilité" style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Comptabilité</div>
+      <div class="module-sub">Ventes, écritures, états</div>
+    </a>
+    {% endif %}
+
+    {% if 'gynecologie' in accessible_codes %}
+    <a href="{% url 'gynecologie_list' %}" class="module-card">
+      <div class="module-icon-box ic-plum" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/gyn.png' %}" alt="Gynécologie" style="width:103%;height:103%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Gynécologie</div>
+      <div class="module-sub">Consultations spécialisées</div>
+    </a>
+    {% endif %}
+
+    {% if 'planning' in accessible_codes %}
+    <a href="{% url 'planning_list' %}" class="module-card">
+      {% if plannings_non_vus %}
+      <span style="position:absolute;top:10px;right:10px;background:var(--teal-600);color:#fff;font-size:11px;font-weight:700;line-height:1;min-width:20px;height:20px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;box-shadow:0 2px 8px rgba(var(--teal-600-rgb),.5);z-index:10;">{{ plannings_non_vus }}</span>
+      {% endif %}
+      <div class="module-icon-box ic-green" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/calllll.jpg' %}" alt="Planning" style="width:150%;height:150%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Planning</div>
+      <div class="module-sub">{% if plannings_non_vus %}<span style="color:var(--rose);font-weight:600;">{{ plannings_non_vus }} nouveau{{ plannings_non_vus|pluralize }}</span>{% else %}Plannings hebdomadaires{% endif %}</div>
+    </a>
+    {% endif %}
+
+    {% if 'achats' in accessible_codes %}
+    <a href="{% url 'achats:dashboard' %}" class="module-card">
+      <div class="module-icon-box ic-coral" style="padding:0;overflow:hidden">
+        <img src="{% static 'img/cart33.jpg' %}" alt="Achats" style="width:140%;height:140%;object-fit:cover;border-radius:16px;">
+      </div>
+      <div class="module-name">Achats</div>
+      <div class="module-sub">Fournisseurs · Commandes</div>
+    </a>
+    {% endif %}
+
+    {% if 'stock' in accessible_codes %}
+    <a href="{% url 'stock_dashboard' %}" class="module-card">
+      <div class="module-icon-box" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/stockk.jpg' %}" alt="Stock" style="width:105%;height:105%;object-fit:cover;border-radius:16px;">
+      </div>
+      <div class="module-name">Stock</div>
+      <div class="module-sub">Gestion des stocks</div>
+    </a>
+    {% endif %}
+
+    {% if 'ressources_humaines' in accessible_codes %}
+    <a href="{% url 'ressources_humaines_list' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/emp.png' %}" alt="Employés" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Employés</div>
+      <div class="module-sub"><span data-stat="employes_actifs">{{ stats.employes_actifs }}</span> actifs</div>
+    </a>
+    {% endif %}
+
+    {% if 'evaluation' in accessible_codes %}
+    <a href="#" class="module-card">
+      <div class="module-icon-box ic-amber" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/etoil.png' %}" alt="Évaluation" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Évaluation</div>
+      <div class="module-sub">Performance du personnel</div>
+    </a>
+    {% endif %}
+
+    {% if 'presence' in accessible_codes %}
+    <a href="{% if can_manage_rh_presence %}{% url 'presence_registre' %}{% else %}{% url 'presence_pointage' %}{% endif %}" class="module-card">
+      <div class="module-icon-box ic-violet" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/pres.png' %}" alt="Présence" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Présence</div>
+      <div class="module-sub">Pointage & assiduité</div>
+    </a>
+    {% endif %}
+
+    {% if 'conges' in accessible_codes %}
+    <a href="/conges/" class="module-card">
+      <div class="module-icon-box ic-sky" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/beach.png' %}" alt="Congés" style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Congés & Absences</div>
+      <div class="module-sub">Demandes & planification</div>
+    </a>
+    {% endif %}
+
+    {% if 'rapports' in accessible_codes %}
+    <a href="{% url 'rapports:hub' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="padding:0;overflow:hidden;border-radius:14px;">
+        <img src="{% static 'img/visual-data.png' %}" alt="Rapports" style="width:105%;height:105%;object-fit:cover;border-radius:16px;">
+      </div>
+      <div class="module-name">Rapports</div>
+      <div class="module-sub">Rapports personnalisés</div>
+    </a>
+    {% endif %}
+
+    <a href="{% url 'guide:hub' %}" class="module-card">
+      <div class="module-icon-box ic-teal2" style="background:var(--teal-600);color:#fff;">
+        <i class="bi bi-book-half"></i>
+      </div>
+      <div class="module-name">Guide d'utilisation</div>
+      <div class="module-sub">Mode d'emploi des modules</div>
+    </a>
+
+    {% if request.user.is_superuser %}
+    <a href="{% url 'journal:list' %}" class="module-card">
+      <div class="module-icon-box ic-slate" style="background:var(--teal-600);color:#fff;">
+        <i class="bi bi-clock-history"></i>
+      </div>
+      <div class="module-name">Journal d'activité</div>
+      <div class="module-sub">Actions des utilisateurs</div>
+    </a>
+    {% endif %}
+
+    {% if 'admin' in accessible_codes %}
+    <a href="/admin/" class="module-card">
+      <div class="module-icon-box ic-slate" style="padding:0;overflow:hidden;">
+        <img src="{% static 'img/para.png' %}" alt="Paramètres" style="width:80%;height:80%;object-fit:cover;border-radius:50%;">
+      </div>
+      <div class="module-name">Paramètres</div>
+      <div class="module-sub">Administration</div>
+    </a>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const INTERVAL = 30000; // 30 secondes
+  const STATS_URL = '{% url "dashboard_stats_json" %}';
+  let timer = null;
+
+  function updateStat(key, val) {
+    document.querySelectorAll('[data-stat="' + key + '"]').forEach(el => {
+      if (el.textContent != val) el.textContent = val;
+    });
+  }
+
+  function refreshStats() {
+    fetch(STATS_URL, { credentials: 'same-origin', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+
+        updateStat('patients_total',      data.patients_total);
+        updateStat('rdv_today',           data.rdv_today);
+        updateStat('hospitalisations',    data.hospitalisations);
+        updateStat('consultations_today', data.consultations_today);
+        updateStat('analyses_pending',    data.analyses_pending);
+        updateStat('employes_actifs',     data.employes_actifs);
+
+        // Pharmacie (texte conditionnel)
+        const pharmSub = document.querySelector('[data-stat-pharmacie]');
+        if (pharmSub) {
+          pharmSub.innerHTML = data.medicaments_alerte > 0
+            ? '⚠️ <span data-stat="medicaments_alerte">' + data.medicaments_alerte + '</span> alertes'
+            : 'Stock OK';
+        }
+
+        // Comptabilité (texte conditionnel)
+        const factSub = document.querySelector('[data-stat-factures]');
+        if (factSub) {
+          factSub.innerHTML = data.factures_impayees > 0
+            ? '<span data-stat="factures_impayees">' + data.factures_impayees + '</span> impayée(s)'
+            : 'À jour';
+        }
+
+        // Pastilles « à traiter » des cartes : le serveur ne renvoie que les
+        // modules où il reste du travail, une carte absente de la réponse doit
+        // donc perdre la sienne.
+        const recus = data.pastilles || {};
+        document.querySelectorAll('[data-pastille]').forEach(function (p) {
+          const n = recus[p.dataset.pastille];
+          if (n) { p.textContent = n; p.style.display = ''; }
+          else   { p.style.display = 'none'; }
+        });
+      })
+      .catch(() => {});
+  }
+
+  function startPolling() {
+    clearInterval(timer);
+    timer = setInterval(refreshStats, INTERVAL);
+  }
+
+  // 1. Mise à jour immédiate au chargement
+  refreshStats();
+  startPolling();
+
+  // 2. Mise à jour quand l'onglet redevient visible (changement d'onglet)
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+      refreshStats();
+      startPolling();
+    } else {
+      clearInterval(timer);
+    }
+  });
+
+  // 3. Mise à jour quand la page est restaurée depuis le cache du navigateur (bouton Retour)
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) refreshStats();
+  });
+})();
+</script>
+{% endblock %}
