@@ -12,12 +12,12 @@
   <div class="cpt-head">
     <div>
       <h1 class="cpt-title">Codes journaux</h1>
-      <div class="cpt-sub">Journaux de l'expert-comptable (Sage 100). Une écriture qui mouvemente un compte de trésorerie va dans le journal de ce compte ; un compte sans journal (Mobile Money, assurance, bon) va en OD.</div>
+      <div class="cpt-sub">Journaux de l'expert-comptable (Sage 100). Une écriture qui mouvemente un compte de trésorerie va dans le journal de ce compte ; un compte sans journal (Mobile Money, assurance, bon) va en OD. Numérotation « Mensuelle » : les pièces repartent à 1 chaque mois (VTE-2026-11-0001) ; « Journal » : suite continue sur l'exercice.</div>
     </div>
   </div>
   <div class="cpt-card" style="padding:0;overflow-x:auto;">
     <table class="cpt-table">
-      <thead><tr><th>Code</th><th>Intitulé</th><th>Type</th><th>N° compte trésorerie</th><th class="num">Écritures</th><th>État</th></tr></thead>
+      <thead><tr><th>Code</th><th>Intitulé</th><th>Type</th><th>N° compte trésorerie</th><th>Numérotation des pièces</th><th class="num">Écritures</th><th>État</th></tr></thead>
       <tbody>
         {% for j in journaux %}
         <tr>
@@ -25,10 +25,11 @@
           <td>{{ j.libelle }}</td>
           <td>{{ j.get_type_display }}</td>
           <td>{% if j.compte_tresorerie %}<span class="jx-num">{{ j.compte_tresorerie.numero }}</span> <span class="cpt-note">{{ j.compte_tresorerie.intitule }}</span>{% else %}<span class="cpt-note">—</span>{% endif %}</td>
+          <td>{{ j.get_numerotation_display }}</td>
           <td class="num">{{ j.nb }}</td>
           <td>{% if j.actif %}<span class="cpt-badge ouverte">Actif</span>{% else %}<span class="cpt-badge cloturee">Inactif</span>{% endif %}</td>
         </tr>
-        {% empty %}<tr><td colspan="6" class="cpt-vide">Aucun journal.</td></tr>{% endfor %}
+        {% empty %}<tr><td colspan="7" class="cpt-vide">Aucun journal.</td></tr>{% endfor %}
       </tbody>
     </table>
   </div>

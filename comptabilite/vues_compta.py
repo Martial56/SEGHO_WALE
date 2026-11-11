@@ -533,3 +533,49 @@ def lettrage(request):
         'comptes': Compte.objects.imputables().filter(numero__startswith='4'),
         'plan_tiers': Tiers.objects.filter(actif=True),
     })
+
+
+@login_required(login_url='login')
+def cloture_journaux(request):
+    """Clôture des journaux : une grille journaux × mois de l'exercice ;
+    un clic clôture (ou rouvre) un mois, un bouton clôture tout jusqu'à un mois."""
+    from . import cloture_journaux as regles_cloture
+    from .models import Exercice
+
+    _exiger(request.user, 'comptabilite.view_exercice')
+    peut_cloturer = request.user.has_perm('comptabilite.cloturer_exercice')
+    exercice = (Exercice.objects.filter(pk=request.GET.get('exercice')).first() if request.GET.get('exercice', '').isdigit()
+                else None) or Exercice.objects.filter(date_debut__lte=timezone.localdate(),
+                                                      date_fin__gte=timezone.localdate()).first() \
+        or Exercice.objects.first()
+    if request.method == 'POST':
+        if not peut_cloturer:
+            raise PermissionDenied
+        action = request.POST.get('action')
+        mois = _date(request.POST.get('mois'), None)
+        journal_ = Journal.objects.filter(pk=request.POST.get('journal') or None).first()
+        try:
+            if mois is None:
+                raise moteur.ErreurCompta("Mois illisible.")
+            if action == 'cloturer' and journal_:
+                regles_cloture.cloturer(journal_, mois, request.user)
+                messages.success(request, f"Journal {journal_.code} clôturé pour {mois:%m/%Y}.")
+            elif action == 'rouvrir' and journal_:
+                regles_cloture.rouvrir(journal_, mois)
+                messages.success(request, f"Journal {journal_.code} rouvert pour {mois:%m/%Y}.")
+            elif action == 'cloturer_tout':
+                faites, refus = regles_cloture.cloturer_jusqu_a(mois, request.user)
+                messages.success(request, f"{faites} période(s) clôturée(s) jusqu'à {mois:%m/%Y}.")
+                for r in refus[:10]:
+                    messages.warning(request, r)
+                if len(refus) > 10:
+                    messages.warning(request, f"… et {len(refus) - 10} autre(s) période(s) non clôturée(s).")
+        except moteur.ErreurCompta as e:
+            messages.error(request, str(e))
+        return redirect(request.get_full_path())
+    mois, lignes = regles_cloture.grille(exercice) if exercice else ([], [])
+    return render(request, 'comptabilite/cloture_journaux.html', {
+        'exercice': exercice, 'exercices': Exercice.objects.all(), 'mois': mois, 'lignes': lignes,
+        'peut_cloturer': peut_cloturer and exercice is not None and exercice.statut == 'ouvert',
+        'mois_passes': [m for m in mois if m <= timezone.localdate()],
+    })

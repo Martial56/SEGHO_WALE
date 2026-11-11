@@ -269,6 +269,8 @@ def rouvrir(exercice, par):
         raise moteur.ErreurCompta(f"L'exercice {exercice} n'est pas clôturé.")
     if Exercice.objects.filter(date_debut__gt=exercice.date_fin, statut='cloture').exists():
         raise moteur.ErreurCompta("Un exercice suivant est déjà clôturé : rouvrez d'abord celui-là.")
+    for an in Ecriture.all_objects.filter(origine__startswith=f'an:{exercice.pk}:').select_related('journal'):
+        moteur.verifier_periode(an.journal, an.date)   # à-nouveaux dans un mois clôturé : on n'y touche plus
     with transaction.atomic():
         Ecriture.all_objects.filter(origine__startswith=f'an:{exercice.pk}:').delete()
         exercice.statut = 'ouvert'

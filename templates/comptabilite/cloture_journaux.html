@@ -1,0 +1,91 @@
+{% extends 'facturation/base.html' %}
+{% block topbar_title %}Clôture des journaux{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.cj-table th, .cj-table td { text-align: center; white-space: nowrap; padding: 6px 4px; }
+.cj-table td.cj-journal { text-align: left; font-family: var(--font-mono, monospace); font-weight: 700; }
+.cj-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 54px;
+           border: 1px solid var(--border); border-radius: 8px; padding: 4px 2px; background: none;
+           font: inherit; font-size: 11px; color: var(--text); cursor: default; }
+button.cj-cell { cursor: pointer; }
+.cj-cell.close { background: rgba(var(--teal-500-rgb), .12); border-color: transparent; }
+.cj-cell.brouillon { border-color: #d97706; }
+.cj-cell.futur { opacity: .35; }
+.cj-cell .i { font-size: 14px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Clôture des journaux</h1>
+      <div class="cpt-sub">Un mois clôturé est figé pour ce journal : aucune écriture n'y entre, n'y est validée ni supprimée (le lettrage reste possible). On ne clôture qu'un mois sans brouillon ; un oubli se passe dans un mois ouvert.</div>
+    </div>
+    <div class="cpt-actions">
+      <form method="get" class="cpt-actions">
+        <select name="exercice" class="cpt-input" onchange="this.form.submit()" style="font-size:13px;padding:6px 8px;">
+          {% for e in exercices %}<option value="{{ e.pk }}" {% if exercice and e.pk == exercice.pk %}selected{% endif %}>Exercice {{ e.libelle }}{% if e.statut == 'cloture' %} (clos){% endif %}</option>{% endfor %}
+        </select>
+      </form>
+      <a href="{% url 'comptabilite:ecritures' %}" class="cpt-btn">Écritures</a>
+    </div>
+  </div>
+
+  {% if not exercice %}
+  <div class="cpt-alerte">Aucun exercice comptable : il est créé avec la première écriture.</div>
+  {% else %}
+  {% if exercice.statut == 'cloture' %}<div class="cpt-alerte">L'exercice {{ exercice }} est clos : tous ses mois sont figés.</div>{% endif %}
+
+  {% if peut_cloturer and mois_passes %}
+  <form method="post" class="cpt-card" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="cloturer_tout">
+    <div class="cpt-field" style="margin:0;"><label>Clôturer tous les journaux jusqu'au mois</label>
+      <select name="mois" class="cpt-input" style="font-size:13px;padding:6px 8px;">
+        {% for m in mois_passes %}<option value="{{ m|date:'Y-m-d' }}" {% if forloop.revcounter == 2 %}selected{% endif %}>{{ m|date:"F Y" }}</option>{% endfor %}
+      </select></div>
+    <button class="cpt-btn primaire" onclick="return confirm('Clôturer tous les journaux jusqu\'à ce mois ? Les mois avec des brouillons resteront ouverts.')"><i class="bi bi-lock"></i> Clôturer</button>
+  </form>
+  {% endif %}
+
+  <form method="post" class="cpt-card" style="overflow-x:auto;">
+    {% csrf_token %}
+    <input type="hidden" name="journal"><input type="hidden" name="mois"><input type="hidden" name="action">
+    <table class="cpt-table cj-table">
+      <thead><tr><th style="text-align:left;">Journal</th>{% for m in mois %}<th>{{ m|date:"M y" }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for j, cellules in lignes %}
+        <tr>
+          <td class="cj-journal" title="{{ j.libelle }}">{{ j.code }}</td>
+          {% for c in cellules %}
+          <td>
+            {% if c.cloture %}
+              {% if peut_cloturer %}<button type="submit" class="cj-cell close" title="Clôturé le {{ c.cloture.cloturee_le|date:'d/m/Y' }}{% if c.cloture.cloturee_par %} par {{ c.cloture.cloturee_par.get_full_name|default:c.cloture.cloturee_par.username }}{% endif %} — cliquer pour rouvrir"
+                onclick="if(!confirm('Rouvrir {{ j.code }} pour {{ c.mois|date:'m/Y' }} ?'))return false;var f=this.form;f.journal.value='{{ j.pk }}';f.mois.value='{{ c.mois|date:'Y-m-d' }}';f.elements['action'].value='rouvrir';">
+              {% else %}<span class="cj-cell close" title="Clôturé le {{ c.cloture.cloturee_le|date:'d/m/Y' }}">{% endif %}
+                <span class="i">🔒</span>{{ c.ecritures }}
+              {% if peut_cloturer %}</button>{% else %}</span>{% endif %}
+            {% elif c.futur %}
+              <span class="cj-cell futur">—</span>
+            {% else %}
+              {% if peut_cloturer and not c.brouillons %}<button type="submit" class="cj-cell" title="Ouvert — cliquer pour clôturer"
+                onclick="var f=this.form;f.journal.value='{{ j.pk }}';f.mois.value='{{ c.mois|date:'Y-m-d' }}';f.elements['action'].value='cloturer';">
+              {% else %}<span class="cj-cell{% if c.brouillons %} brouillon{% endif %}" title="{% if c.brouillons %}{{ c.brouillons }} brouillon(s) : à valider avant de clôturer{% else %}Ouvert{% endif %}">{% endif %}
+                <span class="i">{% if c.brouillons %}⚠{% else %}🔓{% endif %}</span>{{ c.ecritures }}{% if c.brouillons %} ({{ c.brouillons }}){% endif %}
+              {% if peut_cloturer and not c.brouillons %}</button>{% else %}</span>{% endif %}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="cpt-note" style="margin-top:10px;">🔒 clôturé · 🔓 ouvert · ⚠ brouillons à valider (entre parenthèses) · le nombre est celui des écritures du mois.</p>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

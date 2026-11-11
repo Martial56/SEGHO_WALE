@@ -359,6 +359,11 @@ class Journal(models.Model):
     type = models.CharField(max_length=12, choices=TYPE)
     compte_tresorerie = models.ForeignKey('Compte', on_delete=models.PROTECT, null=True, blank=True,
                                           related_name='journaux', verbose_name="N° compte trésorerie")
+    # « Numérotation des pièces » de Sage : repartir à 1 chaque mois, ou
+    # numéroter en continu sur l'exercice.
+    NUMEROTATION = [('mensuelle', 'Mensuelle'), ('journal', 'Journal')]
+    numerotation = models.CharField(max_length=10, choices=NUMEROTATION, default='mensuelle',
+                                    verbose_name="Numérotation des pièces")
     actif = models.BooleanField(default=True)
 
     def __str__(self):
@@ -468,13 +473,34 @@ class Exercice(models.Model):
         ]
 
 
+class PeriodeCloturee(models.Model):
+    """Un mois d'un journal clôturé (« Clôture des journaux » de Sage) :
+    plus aucune écriture n'y entre, n'y est validée ni supprimée. On ne
+    clôture qu'un mois sans brouillon."""
+    journal = models.ForeignKey(Journal, on_delete=models.PROTECT, related_name='periodes_cloturees')
+    mois = models.DateField(help_text="Premier jour du mois clôturé.")
+    cloturee_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='periodes_cloturees')
+    cloturee_le = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.journal.code} — {self.mois:%m/%Y}"
+
+    class Meta:
+        verbose_name = "Période clôturée"
+        verbose_name_plural = "Périodes clôturées"
+        ordering = ['-mois', 'journal__code']
+        constraints = [models.UniqueConstraint(fields=['journal', 'mois'], name='periode_cloturee_unique')]
+
+
 class Ecriture(ModeleCentre):
     """Écriture comptable : un en-tête, des lignes équilibrées.
 
     Née en brouillon (générée depuis la facturation et la caisse, ou saisie en
-    opération diverse), elle reçoit son numéro **à la validation** — numérotation
-    continue et sans trou par journal et par exercice — et ne se modifie plus.
-    Une erreur se corrige par contre-passation.
+    opération diverse), elle reçoit son numéro **à la validation** — sans trou,
+    selon la numérotation de son journal : par mois (« Mensuelle ») ou sur
+    tout l'exercice (« Journal ») — et ne se modifie plus. Une erreur se
+    corrige par contre-passation.
     """
     STATUT = [('brouillon', 'Brouillon'), ('validee', 'Validée')]
 
@@ -482,6 +508,11 @@ class Ecriture(ModeleCentre):
     exercice = models.ForeignKey(Exercice, on_delete=models.PROTECT, related_name='ecritures')
     numero = models.PositiveIntegerField(null=True, blank=True,
                                          help_text="Attribué à la validation, sans trou.")
+    # Figés à la validation : la suite dans laquelle le numéro a été pris
+    # (« mensuelle » : celle du mois `periode` ; « journal » : celle de
+    # l'exercice). Une écriture garde sa référence si le journal change de mode.
+    numerotation = models.CharField(max_length=10, choices=Journal.NUMEROTATION, default='journal')
+    periode = models.DateField(null=True, blank=True, help_text="Premier jour du mois, en numérotation mensuelle.")
     date = models.DateField()
     libelle = models.CharField(max_length=255)
     piece = models.CharField(max_length=60, blank=True, verbose_name="Pièce")
@@ -502,6 +533,8 @@ class Ecriture(ModeleCentre):
     def reference(self):
         if self.numero is None:
             return 'Brouillon'
+        if self.numerotation == 'mensuelle' and self.periode:
+            return f"{self.journal.code}-{self.periode:%Y-%m}-{self.numero:04d}"
         return f"{self.journal.code}-{self.exercice.libelle}-{self.numero:05d}"
 
     def totaux(self):
@@ -518,7 +551,11 @@ class Ecriture(ModeleCentre):
         ordering = ['-date', '-pk']
         constraints = [
             models.UniqueConstraint(fields=['journal', 'exercice', 'numero'],
+                                    condition=models.Q(numerotation='journal'),
                                     name='numero_unique_par_journal_et_exercice'),
+            models.UniqueConstraint(fields=['journal', 'periode', 'numero'],
+                                    condition=models.Q(numerotation='mensuelle'),
+                                    name='numero_unique_par_journal_et_mois'),
         ]
 
 

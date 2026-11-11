@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Avoir, Bailleur, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
-                     LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse, Tiers, CorrespondanceTiers)
+                     LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse, Tiers, CorrespondanceTiers, PeriodeCloturee)
 
 
 class SessionInline(admin.TabularInline):
@@ -113,7 +113,7 @@ class CompteAdmin(admin.ModelAdmin):
 
 @admin.register(Journal)
 class JournalAdmin(admin.ModelAdmin):
-    list_display = ['code', 'libelle', 'type', 'compte_tresorerie', 'actif']
+    list_display = ['code', 'libelle', 'type', 'compte_tresorerie', 'numerotation', 'actif']
 
 
 @admin.register(Tiers)
@@ -127,6 +127,12 @@ class TiersAdmin(admin.ModelAdmin):
 @admin.register(CorrespondanceTiers)
 class CorrespondanceTiersAdmin(admin.ModelAdmin):
     list_display = ['cle', 'libelle', 'tiers']
+
+
+@admin.register(PeriodeCloturee)
+class PeriodeClotureeAdmin(admin.ModelAdmin):
+    list_display = ['journal', 'mois', 'cloturee_par', 'cloturee_le']
+    list_filter = ['journal']
 
 
 @admin.register(Correspondance)

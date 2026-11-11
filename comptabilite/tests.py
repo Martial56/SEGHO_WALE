@@ -2155,3 +2155,117 @@ class TestLettrage(TestCase):
                         {'periode': 'mois', 'tiers': '41250008'}).content.decode()
         self.assertIn('CLIENT CAISSE ACC', gl)
         self.assertIn('>A<', gl.replace(' ', ''))
+
+
+# ─── Clôture des journaux ─────────────────────────────────────────────────────
+
+from . import cloture_journaux  # noqa: E402
+from .models import PeriodeCloturee  # noqa: E402
+
+
+class TestClotureDesJournaux(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_cj', password='x')
+        self.jour = timezone.localdate()
+        self.od = Journal.objects.get(code='OD')
+
+    def _od(self, journal=None, jour=None):
+        return moteur.creer_ecriture(journal or self.od, jour or self.jour, 'Régularisation',
+                                     [(_compte('65880000'), None, Decimal('1000'), Decimal('0'), ''),
+                                      (_compte('57100004'), None, Decimal('0'), Decimal('1000'), '')], par=self.admin)
+
+    def test_un_mois_cloture_est_fige(self):
+        brouillon = self._od()
+        with self.assertRaises(moteur.ErreurCompta):
+            cloture_journaux.cloturer(self.od, self.jour, self.admin)      # brouillon à valider d'abord
+        moteur.valider([brouillon], self.admin)
+        cloture_journaux.cloturer(self.od, self.jour, self.admin)
+        with self.assertRaises(moteur.ErreurCompta):
+            self._od()                                                      # rien n'entre plus
+        with self.assertRaises(moteur.ErreurCompta):
+            moteur.contre_passer(Ecriture.objects.get(pk=brouillon.pk), self.admin)
+        self._od(Journal.objects.get(code='ACH'))                           # les autres journaux restent ouverts
+        cloture_journaux.rouvrir(self.od, self.jour)
+        self._od()
+
+    def test_mois_futur_refuse(self):
+        futur = (self.jour.replace(day=1) + timedelta(days=40))
+        with self.assertRaises(moteur.ErreurCompta):
+            cloture_journaux.cloturer(self.od, futur, self.admin)
+
+    def test_tout_cloturer_sauf_les_brouillons(self):
+        moteur.valider([self._od()], self.admin)
+        self._od(Journal.objects.get(code='ACH'))                           # reste en brouillon
+        faites, refus = cloture_journaux.cloturer_jusqu_a(self.jour, self.admin)
+        self.assertTrue(PeriodeCloturee.objects.filter(journal=self.od, mois=self.jour.replace(day=1)).exists())
+        self.assertFalse(PeriodeCloturee.objects.filter(journal__code='ACH', mois=self.jour.replace(day=1)).exists())
+        self.assertTrue(any('ACH' in r for r in refus))
+        self.assertGreater(faites, 0)
+
+    def test_generation_signale_un_mois_cloture(self):
+        caisse = _caisse(nom='Caisse Accueil', code='ACC')
+        awa = _caissiere('awa')
+        regles.ouvrir_session(awa, caisse, Decimal('0'))
+        facture = _facture(Decimal('5000'))
+        cloture_journaux.cloturer(Journal.objects.get(code='VTE'), self.jour, self.admin)
+        resultat = moteur.generer(self.jour, self.jour)
+        self.assertTrue(any(facture.numero in e and 'clôturé' in e for e in resultat['erreurs']))
+
+    def test_ecran(self):
+        moteur.valider([self._od()], self.admin)
+        client = _client(self.admin)
+        url = reverse('comptabilite:cloture_journaux')
+        self.assertContains(client.get(url), 'CAI AC')
+        client.post(url, {'action': 'cloturer', 'journal': self.od.pk, 'mois': self.jour.replace(day=1).isoformat()})
+        self.assertTrue(PeriodeCloturee.objects.filter(journal=self.od).exists())
+        client.post(url, {'action': 'rouvrir', 'journal': self.od.pk, 'mois': self.jour.replace(day=1).isoformat()})
+        self.assertFalse(PeriodeCloturee.objects.filter(journal=self.od).exists())
+        caissiere = _caissiere('lea')
+        self.assertEqual(_client(caissiere).get(url).status_code, 403)
+
+
+# ─── Numérotation des pièces ──────────────────────────────────────────────────
+
+class TestNumerotationDesPieces(TestCase):
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin_num', password='x')
+        self.jour = timezone.localdate()
+        # Un mois plus tôt dans le même exercice (ou le mois même en janvier).
+        self.avant = (self.jour.replace(day=1) - timedelta(days=1)).replace(day=1) \
+            if self.jour.month > 1 else self.jour
+
+    def _valider(self, code, jour):
+        e = moteur.creer_ecriture(Journal.objects.get(code=code), jour, 'Pièce',
+                                  [(_compte('65880000'), None, Decimal('500'), Decimal('0'), ''),
+                                   (_compte('57100004'), None, Decimal('0'), Decimal('500'), '')], par=self.admin)
+        moteur.valider([e], self.admin)
+        return Ecriture.objects.get(pk=e.pk)
+
+    def test_mensuelle_repart_a_un_chaque_mois(self):
+        self.assertEqual(Journal.objects.get(code='OD').numerotation, 'mensuelle')
+        a = self._valider('OD', self.avant)
+        b = self._valider('OD', self.jour)
+        c = self._valider('OD', self.jour)
+        if self.avant.month != self.jour.month:
+            self.assertEqual((a.numero, b.numero, c.numero), (1, 1, 2))
+        self.assertEqual(c.reference, f'OD-{self.jour:%Y-%m}-0002')
+
+    def test_journal_numerote_en_continu(self):
+        self.assertEqual(Journal.objects.get(code='RAN.').numerotation, 'journal')
+        a = self._valider('RAN.', self.avant)
+        b = self._valider('RAN.', self.jour)
+        self.assertEqual((a.numero, b.numero), (1, 2))
+        self.assertEqual(b.reference, f'RAN.-{b.exercice.libelle}-00002')
+
+    def test_changer_de_mode_ne_touche_pas_aux_numeros_deja_pris(self):
+        od = Journal.objects.get(code='OD')
+        od.numerotation = 'journal'
+        od.save()
+        ancienne = self._valider('OD', self.jour)
+        od.numerotation = 'mensuelle'
+        od.save()
+        nouvelle = self._valider('OD', self.jour)
+        self.assertEqual((ancienne.numero, nouvelle.numero), (1, 1))
+        self.assertNotEqual(Ecriture.objects.get(pk=ancienne.pk).reference, nouvelle.reference)

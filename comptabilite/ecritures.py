@@ -160,6 +160,19 @@ def exercice_pour(jour):
     return exercice
 
 
+def premier_du_mois(jour):
+    return jour.replace(day=1)
+
+
+def verifier_periode(journal_, jour):
+    """Refus si le mois de `jour` est clôturé pour ce journal (« Clôture des
+    journaux ») : on n'y crée, ne valide ni ne supprime plus rien."""
+    from .models import PeriodeCloturee
+    if PeriodeCloturee.objects.filter(journal=journal_, mois=premier_du_mois(jour)).exists():
+        raise ErreurCompta(f"Le journal {journal_.code} est clôturé pour {jour:%m/%Y} : aucune écriture "
+                           f"au {jour:%d/%m/%Y}. Passez-la dans un mois ouvert (opération diverse).")
+
+
 def _jour(dt):
     return timezone.localtime(dt).date() if timezone.is_aware(dt) else dt.date()
 
@@ -195,6 +208,7 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
         if getattr(l[4], 'compte', None) and l[0].classe != '4':
             raise ErreurCompta(f"Le compte tiers {l[4].compte.numero} ne va que sur un compte de tiers "
                                f"(classe 4), pas sur {l[0].numero}.")
+    verifier_periode(journal_, jour)
     with transaction.atomic():
         ecriture = Ecriture.objects.create(
             journal=journal_, exercice=exercice_pour(jour), date=jour, libelle=libelle[:255],
@@ -563,9 +577,10 @@ def generer(debut, fin):
 def valider(ecritures, par):
     """Valide des écritures en brouillon : contrôle, puis numéro définitif.
 
-    Le numéro suit, par journal et par exercice, le plus haut déjà attribué :
-    la numérotation reste continue et sans trou, puisqu'une écriture validée
-    ne se supprime jamais.
+    Le numéro suit le plus haut déjà attribué dans la suite de son journal :
+    celle du mois en numérotation « Mensuelle », celle de l'exercice en
+    « Journal ». Elle reste continue et sans trou, puisqu'une écriture
+    validée ne se supprime jamais.
     """
     valides = 0
     for ecriture in sorted(ecritures, key=lambda e: (e.date, e.pk)):
@@ -576,11 +591,18 @@ def valider(ecritures, par):
             raise ErreurCompta(f"Écriture « {ecriture.libelle} » déséquilibrée : validation refusée.")
         if ecriture.exercice.statut != 'ouvert':
             raise ErreurCompta(f"L'exercice {ecriture.exercice} est clôturé.")
+        verifier_periode(ecriture.journal, ecriture.date)
         with transaction.atomic():
-            dernier = (Ecriture.all_objects.select_for_update()
-                       .filter(journal=ecriture.journal, exercice=ecriture.exercice)
-                       .aggregate(m=Max('numero'))['m'] or 0)
-            ecriture.numero = dernier + 1
+            suite = Ecriture.all_objects.select_for_update().filter(
+                journal=ecriture.journal, numerotation=ecriture.journal.numerotation)
+            if ecriture.journal.numerotation == 'mensuelle':
+                ecriture.periode = premier_du_mois(ecriture.date)
+                suite = suite.filter(periode=ecriture.periode)
+            else:
+                ecriture.periode = None
+                suite = suite.filter(exercice=ecriture.exercice)
+            ecriture.numerotation = ecriture.journal.numerotation
+            ecriture.numero = (suite.aggregate(m=Max('numero'))['m'] or 0) + 1
             ecriture.statut = 'validee'
             ecriture.validee_par = par
             ecriture.date_validation = timezone.now()
@@ -606,4 +628,5 @@ def contre_passer(ecriture, par, jour=None):
 def supprimer_brouillon(ecriture):
     if ecriture.statut != 'brouillon':
         raise ErreurCompta("Une écriture validée ne se supprime pas : contre-passez-la.")
+    verifier_periode(ecriture.journal, ecriture.date)
     ecriture.delete()
