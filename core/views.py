@@ -305,11 +305,16 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
-    from core.modules_accueil import DOMAINES, tuiles_accueil
+    from core.modules_accueil import tuiles_accueil
     from employer.views import can_manage_rh
 
     pastilles_utilisateur = _pastilles(request.user)
     can_manage_rh_presence = can_manage_rh(request.user)
+
+    # Salutation sensible à l'heure : la page d'accueil n'affiche pas la même
+    # chose à 8h qu'à 20h, petit détail qui la rend un peu plus vivante.
+    heure_locale = timezone.localtime().hour
+    salutation = 'Bonsoir' if heure_locale >= 18 or heure_locale < 5 else 'Bonjour'
 
     # Les clés d'origine restent passées telles quelles : l'ancien gabarit
     # (core/dashboard_ancien.html) doit pouvoir être remis en place sans
@@ -318,12 +323,12 @@ def dashboard(request):
         'tuiles': tuiles_accueil(request.user, accessible_codes, stats,
                                  pastilles_utilisateur, plannings_non_vus,
                                  can_manage_rh_presence),
-        'domaines_accueil': DOMAINES,
         'stats': stats,
         'pastilles': pastilles_utilisateur,
         'rdv_auj': rdv_auj,
         'last_cons': last_cons,
         'today': today,
+        'salutation': salutation,
         'user': request.user,
         'user_modules': user_modules,
         'accessible_codes': accessible_codes,

@@ -1,23 +1,22 @@
 /* Page d'accueil — lanceur de modules.
    Gabarit : templates/core/dashboard.html ; tuiles : core/modules_accueil.py.
 
-   1. Rafraîchissement des compteurs (sous-titres et pastilles) toutes les
+   1. Recherche en direct : une tuile reste visible si elle contient tous les
+      mots tapés. Entrée ouvre le premier résultat, Ctrl+K place le curseur
+      dans la recherche, Échap la vide.
+   2. Vue « Icônes » ou « Liste », retenue par le navigateur.
+   3. Rafraîchissement des compteurs (sous-titres et pastilles) toutes les
       30 secondes, à partir de core.views.dashboard_stats_json.
-   2. Filtres par domaine et recherche en direct : une tuile reste visible si
-      elle appartient au domaine choisi ET contient tous les mots tapés.
-      Entrée ouvre le premier résultat, Ctrl+K place le curseur dans la
-      recherche, Échap la vide.
 */
 (function () {
   'use strict';
 
-  /* ══ 2. FILTRES ET RECHERCHE ════════════════════════════════════════════ */
+  /* ══ 1. RECHERCHE ═══════════════════════════════════════════════════════ */
 
   var champ = document.getElementById('accueil-recherche');
   var vide = document.getElementById('accueil-vide');
   var tuiles = Array.prototype.slice.call(document.querySelectorAll('.accueil-grille .tuile'));
-  var filtres = Array.prototype.slice.call(document.querySelectorAll('.accueil-filtre'));
-  var domaineActif = 'tous';
+  var grille = document.getElementById('accueil-grille');
 
   // « Évaluation », « evaluation » et « EVALUATION » se valent.
   function normaliser(texte) {
@@ -40,9 +39,7 @@
     var mots = normaliser(saisie).split(/\s+/).filter(Boolean);
 
     tuiles.forEach(function (t) {
-      var bonDomaine = domaineActif === 'tous' || t.getAttribute('data-domaine') === domaineActif;
-      var trouve = mots.every(function (m) { return t._recherche.indexOf(m) !== -1; });
-      t.hidden = !(bonDomaine && trouve);
+      t.hidden = !mots.every(function (m) { return t._recherche.indexOf(m) !== -1; });
     });
 
     if (!vide) return;
@@ -51,22 +48,9 @@
       vide.textContent = '';
     } else {
       vide.hidden = false;
-      vide.textContent = saisie.trim()
-        ? 'Aucun module ne correspond à « ' + saisie.trim() + ' »'
-          + (domaineActif !== 'tous' ? ' dans ce domaine.' : '.')
-        : 'Aucun module dans ce domaine.';
+      vide.textContent = 'Aucun module ne correspond à « ' + saisie.trim() + ' ».';
     }
   }
-
-  filtres.forEach(function (bouton) {
-    bouton.addEventListener('click', function () {
-      domaineActif = bouton.getAttribute('data-filtre');
-      filtres.forEach(function (b) {
-        b.setAttribute('aria-pressed', b === bouton ? 'true' : 'false');
-      });
-      appliquer();
-    });
-  });
 
   if (champ) {
     champ.addEventListener('input', appliquer);
@@ -97,13 +81,41 @@
     }
   });
 
+  /* ══ 2. VUE : « Icônes » ou « Liste » (lignes compactes) ═══════════════
+     Purement CSS (attribut data-vue de la grille) ; le choix est retenu par
+     le navigateur, et la page s'affiche normalement s'il n'est pas lisible. */
+
+  var VUES = ['icones', 'liste'];
+  var CLE_VUE = 'accueil-vue';
+  var boutonsVue = Array.prototype.slice.call(document.querySelectorAll('.accueil-mode[data-vue]'));
+
+  function appliquerVue(vue) {
+    if (!grille || VUES.indexOf(vue) === -1) return;
+    grille.setAttribute('data-vue', vue);
+    boutonsVue.forEach(function (b) {
+      b.setAttribute('aria-pressed', b.getAttribute('data-vue') === vue ? 'true' : 'false');
+    });
+  }
+
+  boutonsVue.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var vue = b.getAttribute('data-vue');
+      appliquerVue(vue);
+      try { localStorage.setItem(CLE_VUE, vue); } catch (e) {}
+    });
+  });
+
+  var vueMemorisee = null;
+  try { vueMemorisee = localStorage.getItem(CLE_VUE); } catch (e) {}
+  if (vueMemorisee) appliquerVue(vueMemorisee);
+
   // Retour arrière : le navigateur peut avoir gardé la saisie précédente.
   appliquer();
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) appliquer();
   });
 
-  /* ══ 1. RAFRAÎCHISSEMENT DES COMPTEURS ══════════════════════════════════ */
+  /* ══ 3. RAFRAÎCHISSEMENT DES COMPTEURS ══════════════════════════════════ */
 
   var INTERVALLE = 30000; // 30 secondes
   var URL_STATS = window.ACCUEIL_STATS_URL;
@@ -113,10 +125,22 @@
   var STATS_SIMPLES = ['patients_total', 'rdv_today', 'hospitalisations',
                        'soins_aujourd_hui', 'analyses_pending', 'employes_actifs'];
 
+  // Petit pulse visuel (CSS .stat-flash) pour signaler qu'un nombre vient de
+  // changer sous nos yeux. Sans effet si l'utilisateur refuse les animations
+  // (le mot-clé n'existe alors pas dans la feuille de style).
+  function declencherFlash(el) {
+    el.classList.remove('stat-flash');
+    void el.offsetWidth; // force le navigateur à « oublier » l'animation précédente
+    el.classList.add('stat-flash');
+  }
+
   function majStat(cle, valeur) {
     if (valeur === undefined) return;
     document.querySelectorAll('[data-stat="' + cle + '"]').forEach(function (el) {
-      if (el.textContent != valeur) el.textContent = valeur;
+      if (el.textContent != valeur) {
+        el.textContent = valeur;
+        declencherFlash(el);
+      }
     });
   }
 
@@ -125,6 +149,8 @@
   function majSousTitre(nom, valeur, cleStat, suite, texteSiZero) {
     var el = document.querySelector('[data-sous-titre="' + nom + '"]');
     if (!el || valeur === undefined) return;
+    var precedente = el.getAttribute('data-valeur-precedente');
+    el.setAttribute('data-valeur-precedente', valeur);
     el.textContent = '';
     if (valeur > 0) {
       var nombre = document.createElement('span');
@@ -135,6 +161,7 @@
     } else {
       el.textContent = texteSiZero;
     }
+    if (precedente !== null && Number(precedente) !== valeur) declencherFlash(el);
   }
 
   function majPastille(cle, total) {
@@ -142,8 +169,11 @@
     if (!p) return;
     var n = Number(total) || 0;
     var nombre = p.querySelector('[data-pastille-nombre]');
+    var precedent = nombre ? Number(nombre.textContent) || 0 : 0;
     if (nombre) nombre.textContent = n;
+    var etaitCachee = p.hidden;
     p.hidden = n <= 0;
+    if (n > 0 && (n !== precedent || etaitCachee)) declencherFlash(p);
   }
 
   function rafraichir() {
