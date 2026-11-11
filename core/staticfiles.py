@@ -29,6 +29,7 @@ changent.
 """
 import os
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import StaticFilesStorage
 from django.core.exceptions import SuspiciousFileOperation
@@ -59,6 +60,11 @@ class StockageStatiqueDate(StaticFilesStorage):
         return finders.find(nom)
 
     def _date(self, nom):
+        # En développement, un fichier statique modifié seul ne relance pas le
+        # serveur : la date mémorisée restait l'ancienne, l'adresse aussi, et
+        # le navigateur resservait l'ancienne version depuis son cache.
+        if settings.DEBUG:
+            self._dates.pop(nom, None)
         if nom not in self._dates:
             chemin = self._chemin_sur_disque(nom)
             try:

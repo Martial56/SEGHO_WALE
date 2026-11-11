@@ -14,34 +14,39 @@ toujours les mêmes variables).
 
 {% block content %}
 <section class="accueil-entete" aria-labelledby="accueil-salutation">
-  <h2 id="accueil-salutation">Bonjour {{ user.first_name|default:user.username }}, que voulez-vous ouvrir&nbsp;?</h2>
-  <div class="accueil-recherche" role="search">
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM20 20l-4-4"/></svg>
-    <label for="accueil-recherche" class="visuellement-masque">Rechercher un module</label>
-    <input type="search" id="accueil-recherche" placeholder="Tapez le nom d'un module…"
-           autocomplete="off" spellcheck="false"
-           aria-controls="accueil-grille" aria-keyshortcuts="Control+K">
-    <kbd aria-hidden="true">Ctrl K</kbd>
+  <div class="accueil-entete-contenu">
+    <div class="accueil-salut">
+      <p class="accueil-date">{{ today|date:"l j F Y"|capfirst }}</p>
+      <h2 id="accueil-salutation">{{ salutation }} {{ user.first_name|default:user.username }}, bienvenue sur SEGHO-WALE</h2>
+    </div>
+    <div class="accueil-recherche" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM20 20l-4-4"/></svg>
+      <label for="accueil-recherche" class="visuellement-masque">Rechercher un module</label>
+      <input type="search" id="accueil-recherche" placeholder="Tapez le nom d'un module…"
+             autocomplete="off" spellcheck="false"
+             aria-controls="accueil-grille" aria-keyshortcuts="Control+K">
+      <kbd aria-hidden="true">Ctrl K</kbd>
+    </div>
   </div>
 </section>
 
 <div class="accueil">
 
-  <div class="accueil-filtres" role="group" aria-label="Filtrer les modules par domaine">
-    <button type="button" class="accueil-filtre" data-filtre="tous" aria-pressed="true">Tous les modules</button>
-    {% for code, libelle in domaines_accueil %}
-    <button type="button" class="accueil-filtre" data-filtre="{{ code }}" aria-pressed="false">{{ libelle }}</button>
-    {% endfor %}
+  <div class="accueil-outils">
+    <span class="accueil-outils-libelle" id="accueil-vue-libelle">Vue</span>
+    <div class="accueil-modes" role="group" aria-labelledby="accueil-vue-libelle">
+      <button type="button" class="accueil-mode" data-vue="icones" aria-pressed="true">Icônes</button>
+      <button type="button" class="accueil-mode" data-vue="liste" aria-pressed="false">Liste</button>
+    </div>
   </div>
 
-  <nav class="accueil-grille" id="accueil-grille" aria-label="Modules">
+  <nav class="accueil-grille" id="accueil-grille" data-vue="icones" aria-label="Modules">
     {% for tuile in tuiles %}
     <a href="{{ tuile.href }}" class="tuile"
-       data-domaine="{{ tuile.domaine }}"
        data-recherche="{{ tuile.libelle }} {{ tuile.mots_cles }}"
-       style="--couleur-module:{{ tuile.couleur }};">
-      <span class="tuile-icone">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="{{ tuile.icone }}"/></svg>
+       style="--couleur-module:{{ tuile.couleur }}; --i:{{ forloop.counter0 }};">
+      <span class="tuile-image{% if tuile.recadrage %} tuile-image--{{ tuile.recadrage }}{% endif %}">
+        <img src="{% static tuile.image %}" alt="" loading="lazy" decoding="async">
         {% if tuile.pastille %}
         <span class="tuile-pastille tuile-pastille--{{ tuile.pastille.teinte }}"
               data-pastille="{{ tuile.pastille.cle }}"
