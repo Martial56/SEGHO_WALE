@@ -8,7 +8,11 @@
 
 /* ── Jetons ─────────────────────────────────────────────────────────────── */
 :root {
-  --accueil-primaire: #1F5E40;
+  /* Le bandeau suit la couleur choisie par l'utilisateur : la rampe --teal-*
+     est posée par base.html, et réécrite par core.utils.build_accent_css dès
+     qu'une couleur est enregistrée dans son profil. Palier 700, le plus proche
+     en clarté du vert d'origine (#1F5E40). */
+  --accueil-primaire: var(--teal-700);
   --accueil-fond: #F7F8F7;
   --accueil-carte: #FFFFFF;
   --accueil-bordure: #D5DDD8;
@@ -17,9 +21,9 @@
   --accueil-pastille-rouge: #C62828;
   /* #B26A00 de la maquette assombri : texte blanc de 11 px ≥ 4.5:1. */
   --accueil-pastille-orange: #9A5B00;
-  --accueil-focus: #1F5E40;
+  --accueil-focus: var(--teal-700);
   --accueil-blob1: rgba(255, 255, 255, .22);
-  --accueil-blob2: rgba(126, 226, 168, .32);
+  --accueil-blob2: color-mix(in srgb, var(--teal-300) 32%, transparent);
   --accueil-police: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 html[data-theme="dark"] {
@@ -28,9 +32,9 @@ html[data-theme="dark"] {
   --accueil-bordure: #2a3a4a;
   --accueil-texte: #E6EEE9;
   --accueil-texte-doux: #A3B3AA;
-  --accueil-focus: #7EE2A8;
+  --accueil-focus: var(--teal-300);
   --accueil-blob1: rgba(255, 255, 255, .08);
-  --accueil-blob2: rgba(126, 226, 168, .14);
+  --accueil-blob2: color-mix(in srgb, var(--teal-300) 14%, transparent);
 }
 
 /* ── Page ───────────────────────────────────────────────────────────────── */
@@ -66,7 +70,7 @@ html[data-theme="dark"] .topbar {
   border-bottom: none;
   font-family: var(--accueil-police);
 }
-html[data-theme="dark"] { --accueil-primaire: #174A32; }
+html[data-theme="dark"] { --accueil-primaire: color-mix(in srgb, var(--teal-700) 80%, #000 20%); }
 .topbar-inner,
 html[data-theme="dark"] .topbar-inner { border-bottom: none; padding: 0 24px; gap: 12px; }
 
@@ -131,23 +135,9 @@ html[data-theme="dark"] .topbar .theme-toggle:hover {
 /* L'anneau du compteur de notifications reprend le vert du bandeau. */
 .topbar #notif-badge { border-color: var(--accueil-primaire) !important; }
 
-/* Bouton du compte : avatar blanc à initiale verte, puis le nom. */
-.topbar .user-chip,
-.topbar .user-chip:hover {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, .25);
-  border-radius: 22px; height: 40px; padding: 0 12px 0 4px;
-}
-.topbar .user-chip:hover { background: rgba(255, 255, 255, .14); }
-.topbar .user-avatar {
-  background: #fff; color: var(--accueil-primaire);
-  width: 30px; height: 30px; font-size: 13px; font-weight: 700;
-}
-.topbar .user-info .uname,
-html[data-theme="dark"] .topbar .user-info .uname { color: #fff; font-size: 13px; font-weight: 600; }
-.topbar .user-info .urole { display: none; }
-.topbar .user-chip-chevron,
-.topbar .user-chip:hover .user-chip-chevron { color: rgba(255, 255, 255, .8); }
+/* Le bouton du compte n'est pas surchargé ici : il garde le style commun de
+   base.html — même pilule, même avatar, même ligne de rôle que sur toutes les
+   autres pages. */
 
 /* Salutation et recherche, dans le prolongement du bandeau. */
 .accueil-entete {
@@ -161,7 +151,7 @@ html[data-theme="dark"] .topbar .user-info .uname { color: #fff; font-size: 13px
   color: #fff;
   font-family: var(--accueil-police);
   padding: 20px 0 22px;
-  border-radius: 0 0 28px 28px;
+  /* border-radius: 0 0 16px 16px; */
   box-shadow: 0 12px 28px rgba(23, 38, 30, .16);
 }
 .accueil-entete::before,
@@ -235,7 +225,7 @@ html[data-theme="dark"] .topbar .user-info .uname { color: #fff; font-size: 13px
 }
 .accueil-recherche input::placeholder { color: #56655D; opacity: 1; }
 .accueil-recherche input:focus {
-  outline: 3px solid #7EE2A8; outline-offset: 2px;
+  outline: 3px solid var(--teal-300); outline-offset: 2px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
   transform: translateY(-1px);
 }
@@ -277,9 +267,9 @@ html[data-theme="dark"] .topbar .user-info .uname { color: #fff; font-size: 13px
 .accueil-mode[aria-pressed="true"] {
   background: var(--accueil-primaire);
   color: #fff;
-  box-shadow: 0 3px 10px rgba(31, 94, 64, .3);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--teal-700) 30%, transparent);
 }
-html[data-theme="dark"] .accueil-mode[aria-pressed="true"] { background: #2f8a5f; }
+html[data-theme="dark"] .accueil-mode[aria-pressed="true"] { background: var(--teal-600); }
 .accueil-mode:focus-visible { outline: 2px solid var(--accueil-focus); outline-offset: 2px; }
 
 /* ── Mode « Liste » : lignes compactes, image à gauche, texte à droite ──── */
@@ -345,6 +335,13 @@ html[data-theme="dark"] .accueil-mode[aria-pressed="true"] { background: #2f8a5f
   display: flex; align-items: center; justify-content: center;
   width: 76px; height: 76px; flex-shrink: 0;
   transition: transform .3s cubic-bezier(.22, 1, .36, 1);
+}
+/* Cadre intérieur : c'est lui qui rogne l'image (overflow + border-radius,
+   réglés tuile par tuile dans le gabarit). La pastille reste en dehors, sur
+   .tuile-image, sinon le rognage la couperait. */
+.tuile-cadre {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
 }
 .tuile-image img {
   width: 100%; height: 100%;
@@ -429,8 +426,6 @@ html[data-theme="dark"] .tuile-sous.est-accent { color: #FF8A80; }
     flex-wrap: wrap; padding: 10px 16px; row-gap: 10px;
   }
   .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
-  .topbar .user-info { display: none; }
-  .topbar .user-chip { padding: 0 8px 0 4px; }
 }
 @media (max-width: 760px) {
   .accueil-entete-contenu { grid-template-columns: minmax(0, 1fr); gap: 14px 0; }

@@ -30,13 +30,21 @@ SUPERUTILISATEUR = '__superutilisateur__'
 CODES_PASTILLES = ('hospitalisation', 'consultations', 'caisse')
 
 def _module(cle, libelle, sous_titre, couleur, image, url,
-            acces=TOUJOURS, mots_cles='', recadrage=''):
+            acces=TOUJOURS, mots_cles='', recadrage='', style=''):
     """Une entrée de `MODULES_ACCUEIL`.
 
     `image` est un chemin sous static/. `recadrage` : '' montre l'image
     entière (illustrations détourées ou déjà rondes), 'carre' recadre une
     image opaque en carré arrondi, 'zoom' ne garde que le centre d'une image
     large. `couleur` borde la tuile au survol, en vue « Liste ».
+
+    `style` est du CSS posé tel quel sur la balise `<img>` de cette tuile-là,
+    comme on l'écrivait à la main dans l'ancien gabarit. Il s'applique après
+    `accueil.css`, donc il l'écrase : c'est de quoi régler une image au cas par
+    cas sans toucher au CSS commun ni aux autres tuiles. Exemple :
+    `style='width:110%;height:110%;border-radius:50%;'`. À laisser vide quand
+    le rendu par défaut convient, et sans guillemets dedans (Django les
+    échapperait).
 
     `url` est un nom de route Django, ou un chemin brut s'il commence par « / »
     ou vaut « # » (modules sans page pour l'instant). `mots_cles` élargit la
@@ -46,6 +54,7 @@ def _module(cle, libelle, sous_titre, couleur, image, url,
     return {
         'cle': cle, 'libelle': libelle, 'sous_titre': sous_titre,
         'couleur': couleur, 'image': image, 'recadrage': recadrage,
+        'style': style,
         'url': url, 'acces': acces, 'mots_cles': mots_cles,
     }
 
@@ -85,7 +94,8 @@ MODULES_ACCUEIL = [
             'img/calllll.jpg', 'planning_list', acces='planning', recadrage='zoom'),
     _module('achats', 'Achats', 'Fournisseurs · Commandes', '#C62828',
             'img/cart33.jpg', 'achats:dashboard', acces='achats',
-            mots_cles='fournisseurs commandes', recadrage='carre'),
+            mots_cles='fournisseurs commandes',
+            style='width:140%;height:150%;object-fit:cover;border-radius:16px;'),
     _module('stock', 'Stock', 'Gestion des stocks', '#8D3B2F',
             'img/stockk.jpg', 'stock_dashboard', acces='stock', recadrage='carre'),
     _module('employes', 'Employés', 'Personnel', '#1565C0',

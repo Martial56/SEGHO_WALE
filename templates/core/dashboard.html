@@ -1,11 +1,33 @@
 {% extends 'base.html' %}
 {% load static %}
 {% comment %}
-Page d'accueil — lanceur de modules (« Proposition C »).
-Les tuiles viennent de core/modules_accueil.py (droits d'accès, sous-titres,
-pastilles) ; ce gabarit ne fait que les dessiner.
-Ancienne version conservée : core/dashboard_ancien.html (la vue lui fournit
-toujours les mêmes variables).
+Page d'accueil — lanceur de modules.
+
+Chaque tuile est écrite à la main ci-dessous, comme dans core/dashboard_ancien.html :
+pour régler un module, on modifie SA tuile, ici, sans toucher aux autres.
+
+Anatomie d'une tuile :
+  {% if 'code' in accessible_codes %}  → qui la voit (le code du module dans /admin/)
+  href                                 → où elle mène
+  --couleur-module                     → la couleur de bordure au survol, en vue « Liste »
+  --i                                  → le rang dans l'animation d'entrée (28 ms d'écart)
+  data-recherche                       → ce que la recherche du bandeau fait correspondre
+  <span class="tuile-cadre" style="…">  → le cadre qui rogne l'image :
+                                         overflow:hidden coupe ce qui dépasse,
+                                         border-radius donne la forme du rognage
+                                         (50% rond, 16px carré arrondi, 0 carré)
+  <img alt="…" style="…">              → la taille et la forme de l'image elle-même
+
+Tous ces réglages sont ceux de core/dashboard_ancien.html, repris tels quels.
+
+La pastille est posée sur .tuile-image, à côté du cadre et non dedans : elle
+dépasse exprès en haut à droite, et le overflow:hidden du cadre la couperait.
+
+À ne pas renommer, le script static/js/accueil.js s'en sert pour rafraîchir les
+nombres toutes les 30 secondes : data-stat, data-sous-titre, data-pastille et
+data-pastille-nombre.
+
+core/modules_accueil.py n'est plus lu par cette page.
 {% endcomment %}
 
 {% block extra_css %}
@@ -17,7 +39,7 @@ toujours les mêmes variables).
   <div class="accueil-entete-contenu">
     <div class="accueil-salut">
       <p class="accueil-date">{{ today|date:"l j F Y"|capfirst }}</p>
-      <h2 id="accueil-salutation">{{ salutation }} {{ user.first_name|default:user.username }}, bienvenue sur SEGHO-WALE</h2>
+      <h2 id="accueil-salutation">{{ salutation }} {{ user.first_name|default:user.username }}, Bienvenue sur SEGHO-WALE</h2>
     </div>
     <div class="accueil-recherche" role="search">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14zM20 20l-4-4"/></svg>
@@ -41,26 +63,423 @@ toujours les mêmes variables).
   </div>
 
   <nav class="accueil-grille" id="accueil-grille" data-vue="icones" aria-label="Modules">
-    {% for tuile in tuiles %}
-    <a href="{{ tuile.href }}" class="tuile"
-       data-recherche="{{ tuile.libelle }} {{ tuile.mots_cles }}"
-       style="--couleur-module:{{ tuile.couleur }}; --i:{{ forloop.counter0 }};">
-      <span class="tuile-image{% if tuile.recadrage %} tuile-image--{{ tuile.recadrage }}{% endif %}">
-        <img src="{% static tuile.image %}" alt="" loading="lazy" decoding="async">
-        {% if tuile.pastille %}
-        <span class="tuile-pastille tuile-pastille--{{ tuile.pastille.teinte }}"
-              data-pastille="{{ tuile.pastille.cle }}"
-              title="{{ tuile.pastille.libelle|capfirst }}"
-              {% if not tuile.pastille.total %}hidden{% endif %}><span data-pastille-nombre>{{ tuile.pastille.total }}</span><span class="visuellement-masque"> {{ tuile.pastille.libelle }}</span></span>
+
+    {% comment %}── Tableau de bord ─ visible par tout le monde ──{% endcomment %}
+    <a href="{% url 'kpi_dashboard' %}" class="tuile"
+       data-recherche="Tableau de bord kpi statistiques"
+       style="--couleur-module:#C25100; --i:0;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/speedometer.png' %}" alt="Tableau de bord" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Tableau de bord</span>
+      <span class="tuile-sous">Statistiques &amp; KPIs</span>
+    </a>
+
+    {% comment %}── Patients ──{% endcomment %}
+    {% if 'patients' in accessible_codes %}
+    <a href="{% url 'patients:list' %}" class="tuile"
+       data-recherche="Patients"
+       style="--couleur-module:#1F7A4D; --i:1;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/dspa.png' %}" alt="Patients" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Patients</span>
+      <span class="tuile-sous"><span data-stat="patients_total">{{ stats.patients_total }}</span> enregistrés</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Docteurs ──{% endcomment %}
+    {% if 'medecins' in accessible_codes %}
+    <a href="{% url 'medecin_dashboard' %}" class="tuile"
+       data-recherche="Docteurs médecins"
+       style="--couleur-module:#00695C; --i:2;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/logchir.png' %}" alt="Docteurs" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Docteurs</span>
+      <span class="tuile-sous">Corps médical</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Prestations ──{% endcomment %}
+    {% if 'services' in accessible_codes %}
+    <a href="{% url 'services:list' %}" class="tuile"
+       data-recherche="Prestations services"
+       style="--couleur-module:#3949AB; --i:3;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/ser1.png' %}" alt="Services" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Prestations</span>
+      <span class="tuile-sous">Unités de soins</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Rendez-vous ──{% endcomment %}
+    {% if 'rendezvous' in accessible_codes %}
+    <a href="{% url 'patients:rdv_global' %}" class="tuile"
+       data-recherche="Rendez-vous rdv"
+       style="--couleur-module:#37474F; --i:4;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/stetoscop.png' %}" alt="Rendez-vous" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Rendez-vous</span>
+      <span class="tuile-sous"><span data-stat="rdv_today">{{ stats.rdv_today }}</span> du jour</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Ordonnances ──{% endcomment %}
+    {% if 'ordonnances' in accessible_codes %}
+    <a href="{% url 'ordonnance_list' %}" class="tuile"
+       data-recherche="Ordonnances"
+       style="--couleur-module:#00796B; --i:5;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/ord.png' %}" alt="Ordonnances" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Ordonnances</span>
+      <span class="tuile-sous">Prescriptions</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Meo ─ la pastille mène à la liste déjà filtrée ──{% endcomment %}
+    {% if 'hospitalisation' in accessible_codes %}
+    <a href="{% if pastilles.hospitalisation %}{{ pastilles.hospitalisation.url }}{% else %}{% url 'hospitalisation:list' %}{% endif %}" class="tuile"
+       data-recherche="Meo hospitalisation"
+       style="--couleur-module:#00796B; --i:6;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/hosp.png' %}" alt="Hospitalisation" loading="lazy" decoding="async"
+               style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
+        </span>
+        <span class="tuile-pastille tuile-pastille--rouge" data-pastille="hospitalisation"
+              title="{{ pastilles.hospitalisation.libelle|default:'à traiter'|capfirst }}"
+              {% if not pastilles.hospitalisation.total %}hidden{% endif %}><span data-pastille-nombre>{{ pastilles.hospitalisation.total|default:0 }}</span><span class="visuellement-masque"> {{ pastilles.hospitalisation.libelle|default:'à traiter' }}</span></span>
+      </span>
+      <span class="tuile-libelle">Meo</span>
+      <span class="tuile-sous"><span data-stat="hospitalisations">{{ stats.hospitalisations }}</span> en cours</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Soins ──{% endcomment %}
+    {% if 'consultations' in accessible_codes %}
+    <a href="{% if pastilles.consultations %}{{ pastilles.consultations.url }}{% else %}{% url 'soins:list' %}{% endif %}" class="tuile"
+       data-recherche="Soins consultations"
+       style="--couleur-module:#C2185B; --i:7;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:0;">
+          <img src="{% static 'img/soin.png' %}" alt="Soins" loading="lazy" decoding="async"
+               style="width:90%;height:90%;object-fit:cover;border-radius:0;">
+        </span>
+        <span class="tuile-pastille tuile-pastille--rouge" data-pastille="consultations"
+              title="{{ pastilles.consultations.libelle|default:'à traiter'|capfirst }}"
+              {% if not pastilles.consultations.total %}hidden{% endif %}><span data-pastille-nombre>{{ pastilles.consultations.total|default:0 }}</span><span class="visuellement-masque"> {{ pastilles.consultations.libelle|default:'à traiter' }}</span></span>
+      </span>
+      <span class="tuile-libelle">Soins</span>
+      <span class="tuile-sous"><span data-stat="soins_aujourd_hui">{{ stats.soins_aujourd_hui }}</span> aujourd'hui</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Laboratoire ──{% endcomment %}
+    {% if 'laboratoire' in accessible_codes %}
+    <a href="{% url 'laboratoire_list' %}" class="tuile"
+       data-recherche="Laboratoire analyses examens"
+       style="--couleur-module:#00897B; --i:8;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/lab.png' %}" alt="Laboratoire" loading="lazy" decoding="async"
+               style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Laboratoire</span>
+      <span class="tuile-sous"><span data-stat="analyses_pending">{{ stats.analyses_pending }}</span> en attente</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Pharmacie ─ sous-titre et pastille réécrits par le script ──{% endcomment %}
+    {% if 'pharmacie' in accessible_codes %}
+    <a href="{% url 'pharmacie_accueil' %}" class="tuile"
+       data-recherche="Pharmacie médicaments"
+       style="--couleur-module:#0277BD; --i:9;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/phar.png' %}" alt="Pharmacie" loading="lazy" decoding="async"
+               style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+        </span>
+        <span class="tuile-pastille tuile-pastille--orange" data-pastille="pharmacie"
+              title="Produit(s) sous le seuil d'alerte"
+              {% if not stats.medicaments_alerte %}hidden{% endif %}><span data-pastille-nombre>{{ stats.medicaments_alerte|default:0 }}</span><span class="visuellement-masque"> produit(s) sous le seuil d'alerte</span></span>
+      </span>
+      <span class="tuile-libelle">Pharmacie</span>
+      <span class="tuile-sous" data-sous-titre="pharmacie">{% if stats.medicaments_alerte %}<span data-stat="medicaments_alerte">{{ stats.medicaments_alerte }}</span> alertes{% else %}Stock OK{% endif %}</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Assurance ─ pas encore de page ──{% endcomment %}
+    {% if 'assurance' in accessible_codes %}
+    <a href="#" class="tuile"
+       data-recherche="Assurance"
+       style="--couleur-module:#1565C0; --i:10;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:0;">
+          <img src="{% static 'img/ass.png' %}" alt="Assurance" loading="lazy" decoding="async"
+               style="width:90%;height:90%;object-fit:cover;border-radius:0;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Assurance</span>
+      <span class="tuile-sous">Couvertures santé</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Caisse ──{% endcomment %}
+    {% if 'caisse' in accessible_codes %}
+    <a href="{% if pastilles.caisse %}{{ pastilles.caisse.url }}{% else %}{% url 'facturation:list' %}{% endif %}" class="tuile"
+       data-recherche="Caisse factures facturation"
+       style="--couleur-module:#1565C0; --i:11;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/sans-contact.png' %}" alt="Caisse" loading="lazy" decoding="async"
+               style="width:80%;height:80%;object-fit:contain;">
+        </span>
+        <span class="tuile-pastille tuile-pastille--rouge" data-pastille="caisse"
+              title="{{ pastilles.caisse.libelle|default:'à traiter'|capfirst }}"
+              {% if not pastilles.caisse.total %}hidden{% endif %}><span data-pastille-nombre>{{ pastilles.caisse.total|default:0 }}</span><span class="visuellement-masque"> {{ pastilles.caisse.libelle|default:'à traiter' }}</span></span>
+      </span>
+      <span class="tuile-libelle">Caisse</span>
+      <span class="tuile-sous" data-sous-titre="factures">{% if stats.factures_impayees %}<span data-stat="factures_impayees">{{ stats.factures_impayees }}</span> impayée(s){% else %}À jour{% endif %}</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Comptabilité ──{% endcomment %}
+    {% if 'facturation' in accessible_codes %}
+    <a href="{% url 'comptabilite:accueil' %}" class="tuile"
+       data-recherche="Comptabilité"
+       style="--couleur-module:#B26A00; --i:12;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/compp.png' %}" alt="Comptabilité" loading="lazy" decoding="async"
+               style="width:105%;height:105%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Comptabilité</span>
+      <span class="tuile-sous">Ventes, écritures, états</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Gynécologie ──{% endcomment %}
+    {% if 'gynecologie' in accessible_codes %}
+    <a href="{% url 'gynecologie_list' %}" class="tuile"
+       data-recherche="Gynécologie cpn maternité"
+       style="--couleur-module:#1B4D47; --i:13;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/gyn.png' %}" alt="Gynécologie" loading="lazy" decoding="async"
+               style="width:103%;height:103%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Gynécologie</span>
+      <span class="tuile-sous">Consultations spécialisées</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Planning ──{% endcomment %}
+    {% if 'planning' in accessible_codes %}
+    <a href="{% url 'planning_list' %}" class="tuile"
+       data-recherche="Planning"
+       style="--couleur-module:#0277BD; --i:14;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/calllll.jpg' %}" alt="Planning" loading="lazy" decoding="async"
+               style="width:150%;height:150%;object-fit:cover;border-radius:50%;">
+        </span>
+        {% if plannings_non_vus %}
+        <span class="tuile-pastille tuile-pastille--rouge" data-pastille="planning"
+              title="Planning(s) non consulté(s)"><span data-pastille-nombre>{{ plannings_non_vus }}</span><span class="visuellement-masque"> planning(s) non consulté(s)</span></span>
         {% endif %}
       </span>
-      <span class="tuile-libelle">{{ tuile.libelle }}</span>
-      <span class="tuile-sous{% if tuile.sous_titre_accent %} est-accent{% endif %}"
-            {% if tuile.sous_titre_dynamique %}data-sous-titre="{{ tuile.sous_titre_dynamique }}"{% endif %}>
-        {% if tuile.sous_titre.stat %}<span data-stat="{{ tuile.sous_titre.stat }}">{{ tuile.sous_titre.valeur }}</span>{{ tuile.sous_titre.suite }}{% else %}{{ tuile.sous_titre }}{% endif %}
-      </span>
+      <span class="tuile-libelle">Planning</span>
+      {% if plannings_non_vus %}
+      <span class="tuile-sous est-accent">{{ plannings_non_vus }} nouveau{{ plannings_non_vus|pluralize:"x" }}</span>
+      {% else %}
+      <span class="tuile-sous">Plannings hebdomadaires</span>
+      {% endif %}
     </a>
-    {% endfor %}
+    {% endif %}
+
+    {% comment %}── Achats ──{% endcomment %}
+    {% if 'achats' in accessible_codes %}
+    <a href="{% url 'achats:dashboard' %}" class="tuile"
+       data-recherche="Achats fournisseurs commandes"
+       style="--couleur-module:#C62828; --i:15;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/cart33.jpg' %}" alt="Achats" loading="lazy" decoding="async"
+               style="width:140%;height:140%;object-fit:cover;border-radius:16px;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Achats</span>
+      <span class="tuile-sous">Fournisseurs · Commandes</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Stock ──{% endcomment %}
+    {% if 'stock' in accessible_codes %}
+    <a href="{% url 'stock_dashboard' %}" class="tuile"
+       data-recherche="Stock"
+       style="--couleur-module:#8D3B2F; --i:16;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/stockk.jpg' %}" alt="Stock" loading="lazy" decoding="async"
+               style="width:105%;height:105%;object-fit:cover;border-radius:16px;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Stock</span>
+      <span class="tuile-sous">Gestion des stocks</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Employés ──{% endcomment %}
+    {% if 'ressources_humaines' in accessible_codes %}
+    <a href="{% url 'ressources_humaines_list' %}" class="tuile"
+       data-recherche="Employés personnel rh"
+       style="--couleur-module:#1565C0; --i:17;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/emp.png' %}" alt="Employés" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Employés</span>
+      <span class="tuile-sous"><span data-stat="employes_actifs">{{ stats.employes_actifs }}</span> actifs</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Évaluation ─ pas encore de page ──{% endcomment %}
+    {% if 'evaluation' in accessible_codes %}
+    <a href="#" class="tuile"
+       data-recherche="Évaluation"
+       style="--couleur-module:#A86B00; --i:18;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/etoil.png' %}" alt="Évaluation" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Évaluation</span>
+      <span class="tuile-sous">Performance du personnel</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Présence ─ le registre pour qui gère les RH, sinon le pointage ──{% endcomment %}
+    {% if 'presence' in accessible_codes %}
+    <a href="{% if can_manage_rh_presence %}{% url 'presence_registre' %}{% else %}{% url 'presence_pointage' %}{% endif %}" class="tuile"
+       data-recherche="Présence pointage"
+       style="--couleur-module:#455A64; --i:19;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/pres.png' %}" alt="Présence" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Présence</span>
+      <span class="tuile-sous">Pointage &amp; assiduité</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Congés & Absences ──{% endcomment %}
+    {% if 'conges' in accessible_codes %}
+    <a href="/conges/" class="tuile"
+       data-recherche="Congés &amp; Absences"
+       style="--couleur-module:#C25100; --i:20;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/beach.png' %}" alt="Congés" loading="lazy" decoding="async"
+               style="width:110%;height:110%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Congés &amp; Absences</span>
+      <span class="tuile-sous">Demandes &amp; planification</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Rapports ──{% endcomment %}
+    {% if 'rapports' in accessible_codes %}
+    <a href="{% url 'rapports:hub' %}" class="tuile"
+       data-recherche="Rapports"
+       style="--couleur-module:#3949AB; --i:21;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:14px;">
+          <img src="{% static 'img/visual-data.png' %}" alt="Rapports" loading="lazy" decoding="async"
+               style="width:105%;height:105%;object-fit:cover;border-radius:16px;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Rapports</span>
+      <span class="tuile-sous">Rapports personnalisés</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Guide d'utilisation ─ visible par tout le monde ──{% endcomment %}
+    <a href="{% url 'guide:hub' %}" class="tuile"
+       data-recherche="Guide d'utilisation aide"
+       style="--couleur-module:#1F7A4D; --i:22;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/guide.png' %}" alt="Guide d'utilisation" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Guide d'utilisation</span>
+      <span class="tuile-sous">Mode d'emploi des modules</span>
+    </a>
+
+    {% comment %}── Journal d'activité ─ superutilisateurs seulement ──{% endcomment %}
+    {% if user.is_superuser %}
+    <a href="{% url 'journal:list' %}" class="tuile"
+       data-recherche="Journal d'activité historique"
+       style="--couleur-module:#1F7A4D; --i:23;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/logs.png' %}" alt="Journal d'activité" loading="lazy" decoding="async"
+               style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Journal d'activité</span>
+      <span class="tuile-sous">Actions des utilisateurs</span>
+    </a>
+    {% endif %}
+
+    {% comment %}── Paramètres ──{% endcomment %}
+    {% if 'admin' in accessible_codes %}
+    <a href="/admin/" class="tuile"
+       data-recherche="Paramètres administration réglages"
+       style="--couleur-module:#455A64; --i:24;">
+      <span class="tuile-image">
+        <span class="tuile-cadre" style="padding:0;overflow:hidden;border-radius:50%;">
+          <img src="{% static 'img/para.png' %}" alt="Paramètres" loading="lazy" decoding="async"
+               style="width:80%;height:80%;object-fit:cover;border-radius:50%;">
+        </span>
+      </span>
+      <span class="tuile-libelle">Paramètres</span>
+      <span class="tuile-sous">Administration</span>
+    </a>
+    {% endif %}
+
   </nav>
 
   <p class="accueil-vide" id="accueil-vide" role="status" hidden></p>

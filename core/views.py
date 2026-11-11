@@ -305,7 +305,6 @@ def dashboard(request):
     ).count()
 
     from core.pastilles import pastilles as _pastilles
-    from core.modules_accueil import tuiles_accueil
     from employer.views import can_manage_rh
 
     pastilles_utilisateur = _pastilles(request.user)
@@ -316,13 +315,10 @@ def dashboard(request):
     heure_locale = timezone.localtime().hour
     salutation = 'Bonsoir' if heure_locale >= 18 or heure_locale < 5 else 'Bonjour'
 
-    # Les clés d'origine restent passées telles quelles : l'ancien gabarit
-    # (core/dashboard_ancien.html) doit pouvoir être remis en place sans
-    # toucher à cette vue.
+    # Les clés d'origine restent passées telles quelles : le gabarit écrit ses
+    # tuiles à la main et pioche dedans, et l'ancien (core/dashboard_ancien.html)
+    # doit pouvoir être remis en place sans toucher à cette vue.
     response = render(request, 'core/dashboard.html', {
-        'tuiles': tuiles_accueil(request.user, accessible_codes, stats,
-                                 pastilles_utilisateur, plannings_non_vus,
-                                 can_manage_rh_presence),
         'stats': stats,
         'pastilles': pastilles_utilisateur,
         'rdv_auj': rdv_auj,
