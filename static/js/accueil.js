@@ -1,5 +1,5 @@
 /* Page d'accueil — lanceur de modules.
-   Gabarit : templates/core/dashboard.html ; tuiles : core/modules_accueil.py.
+   Gabarit : templates/core/dashboard.html, qui écrit ses tuiles à la main.
 
    1. Recherche en direct : une tuile reste visible si elle contient tous les
       mots tapés. Entrée ouvre le premier résultat, Ctrl+K place le curseur
