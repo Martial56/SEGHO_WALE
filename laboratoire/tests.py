@@ -717,3 +717,96 @@ class StatutFactureeDemandeTests(TestCase):
             page = self.client.get(reverse('laboratoire_detail', args=[self.demande.pk]))
         self.assertContains(page, 'value="envoyer_labo"')
         self.assertContains(page, 'Facturé</div>')
+
+
+class _FtpOpenVMS:
+    """Imite le FTP du laboratoire (OpenVMS) : chaque dépôt d'un même nom
+    crée une version « ;n » de plus."""
+
+    def __init__(self, fichiers):
+        self.fichiers = dict(fichiers)
+        self.supprimes = []
+
+    def cwd(self, _chemin):
+        pass
+
+    def nlst(self):
+        return list(self.fichiers)
+
+    def retrbinary(self, commande, callback):
+        callback(self.fichiers[commande.split(" ", 1)[1]])
+
+    def delete(self, nom):
+        self.supprimes.append(nom)
+        del self.fichiers[nom]
+
+    def quit(self):
+        pass
+
+
+class ReleveSurServeurOpenVMSTests(SimpleTestCase):
+    """Le FTP de SYSLAM nomme ses fichiers « WAA013.HPR;2 » : sans retirer le
+    numéro de version, aucun résultat n'était jamais relevé."""
+
+    def _relever(self, ftp):
+        from unittest import mock
+        from .hprim import transport
+        with mock.patch.object(transport, '_connecter_ftp', return_value=ftp):
+            return transport.recuperer_fichiers('h', 'u', 'p', repertoire_distant='/resultats')
+
+    def test_la_derniere_version_est_relevee_et_toutes_sont_effacees(self):
+        ftp = _FtpOpenVMS({
+            'WAA013.HPR;2': b'v2', 'WAA013.HPR;1': b'v1',
+            'WAA013.OK;2': b'', 'WAA013.OK;1': b'',
+            'WAACRP_X.PDF;1': b'%PDF', 'WAACRP_X.OK;1': b'',
+        })
+        self.assertEqual(self._relever(ftp), [('WAA013.HPR', b'v2')])
+        self.assertEqual(sorted(ftp.fichiers), ['WAACRP_X.OK;1', 'WAACRP_X.PDF;1'])
+
+    def test_sans_temoin_le_fichier_attend(self):
+        ftp = _FtpOpenVMS({'WAA015.HPR;1': b'x'})
+        self.assertEqual(self._relever(ftp), [])
+        self.assertEqual(list(ftp.fichiers), ['WAA015.HPR;1'])
+
+    def test_un_serveur_ordinaire_fonctionne_toujours(self):
+        ftp = _FtpOpenVMS({'LAB00001.HPR': b'r', 'LAB00001.ok': b''})
+        self.assertEqual(self._relever(ftp), [('LAB00001.HPR', b'r')])
+        self.assertEqual(ftp.fichiers, {})
+
+
+class RenvoiDuMemeResultatTests(TestCase):
+    """SYSLAM a renvoyé quatre fois le même compte rendu sous des noms
+    différents : une seule analyse doit en sortir."""
+
+    def setUp(self):
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-RNV')
+        with centre_actif(self.centre):
+            patient = Patient.objects.create(nom='Aba', prenoms='Israel', date_naissance=date(1997, 9, 30), sexe='M')
+            self.demande = DemandeExamen.objects.create(patient=patient, statut='demande')
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='GE', prix=2000)
+
+    def _oru(self, fichier, valeur):
+        identifiant = self.demande.numero.replace("DEM", "")
+        return (
+            f"H|~^\&|{fichier}||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|SYSLAM 64|P|H2.2~L|202611171625\r\n"
+            f"P|1|{self.demande.patient.code_patient}|ABA  IS1||ABA~ISRAEL~~~M||19970930|M\r\n"
+            f"OBR|1|{identifiant}~{identifiant}|{identifiant}~k1116061|GE\r\n"
+            f"OBX|1|CE|GE~Négative~L|1|{valeur}\r\n"
+            f"L|1||1|5|{fichier}\r\n"
+        ).encode("iso-8859-1")
+
+    def test_un_renvoi_identique_ne_cree_pas_de_doublon(self):
+        from .hprim.integration import integrer_oru
+        with centre_actif(self.centre):
+            integrer_oru(self._oru('WAA011.HPR', 'NEGATIF'), centre=self.centre)
+            _p, synthese = integrer_oru(self._oru('WAA014.HPR', 'NEGATIF'), centre=self.centre)
+        self.assertEqual(self.demande.analyses.count(), 1)
+        self.assertEqual(synthese["demandes"], 0)
+        self.assertIn("déjà reçu", synthese["details"][0])
+
+    def test_un_renvoi_corrige_est_integre(self):
+        from .hprim.integration import integrer_oru
+        with centre_actif(self.centre):
+            integrer_oru(self._oru('WAA011.HPR', 'NEGATIF'), centre=self.centre)
+            integrer_oru(self._oru('WAA012.HPR', 'POSITIF'), centre=self.centre)
+        self.assertEqual(self.demande.analyses.count(), 2)

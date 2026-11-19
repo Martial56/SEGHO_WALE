@@ -4,9 +4,10 @@
 from __future__ import annotations
 import io
 import os
+import re
 import ssl
 from ftplib import FTP, FTP_TLS, error_perm
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -160,31 +161,51 @@ def recuperer_fichiers(
         if repertoire_distant:
             _cd_ou_creer(ftp, repertoire_distant)
 
-        noms = ftp.nlst()
+        # Les serveurs OpenVMS (celui de SYSLAM) suffixent chaque nom d'un
+        # numéro de version : « WAA013.HPR;2 ». On regroupe les versions sous
+        # le nom nu, on ne lit que la plus récente et on les efface toutes.
+        versions: Dict[str, List[str]] = {}
+        for n in ftp.nlst():
+            n = n.rsplit("/", 1)[-1]
+            versions.setdefault(_sans_version(n).upper(), []).append(n)
         bases_pretes = {
             os.path.splitext(n)[0]
-            for n in noms
+            for n in versions
             if n.lower().endswith(extension_temoin.lower())
         }
 
-        for nom in noms:
+        for nom, distants in sorted(versions.items()):
             base, ext = os.path.splitext(nom)
             if ext.lower() != extension.lower():
                 continue
             if base not in bases_pretes:
                 continue  # pas encore de témoin -> message incomplet
+            distants.sort(key=_numero_de_version, reverse=True)
             buf = io.BytesIO()
-            ftp.retrbinary(f"RETR {nom}", buf.write)
-            resultats.append((nom, buf.getvalue()))
+            ftp.retrbinary(f"RETR {distants[0]}", buf.write)
+            resultats.append((_sans_version(distants[0]), buf.getvalue()))
             if supprimer_apres:
-                _supprimer_silencieux(ftp, nom)
-                _supprimer_silencieux(ftp, base + extension_temoin)
+                for n in distants + versions[(base + extension_temoin).upper()]:
+                    _supprimer_silencieux(ftp, n)
     finally:
         try:
             ftp.quit()
         except Exception:
             ftp.close()
     return resultats
+
+
+_VERSION = re.compile(r";\d*$")
+
+
+def _sans_version(nom: str) -> str:
+    """« WAA013.HPR;2 » -> « WAA013.HPR » (version de fichier OpenVMS)."""
+    return _VERSION.sub("", nom)
+
+
+def _numero_de_version(nom: str) -> int:
+    m = re.search(r";(\d+)$", nom)
+    return int(m.group(1)) if m else 0
 
 
 def _cd_ou_creer(ftp, chemin: str) -> None:

@@ -170,6 +170,23 @@ def _fiche_courante(patient, synthese=None):
     return patient
 
 
+def _valeurs_recues(d):
+    return sorted(((r.libelle_test or r.code_test)[:200], (r.valeur or "")[:200])
+                  for r in d.resultats)
+
+
+def _deja_recu(demande_obj, d) -> bool:
+    """Une analyse de cette demande porte déjà exactement ces résultats."""
+    from laboratoire.models import AnalyseLaboratoire
+
+    attendu = _valeurs_recues(d)
+    for analyse in AnalyseLaboratoire.objects.filter(
+            demande=demande_obj, code_examen=d.code_examen[:50]):
+        if sorted(analyse.resultats.values_list("parametre", "valeur")) == attendu:
+            return True
+    return False
+
+
 def integrer_oru(contenu: bytes, centre=None):
     """
     Analyse un message ORU et crée/complète les enregistrements de résultats.
@@ -239,6 +256,14 @@ def integrer_oru(contenu: bytes, centre=None):
                 synthese["details"].append(
                     f"Demande {d.id_demande} ignorée : patient introuvable "
                     f"(IPP={p.id_demandeur}).")
+                continue
+
+            # Le laboratoire renvoie parfois le même compte rendu sous un
+            # nouveau nom de fichier : on ne crée pas une seconde analyse
+            # identique. Un renvoi aux valeurs corrigées, lui, est intégré.
+            if demande_obj is not None and _deja_recu(demande_obj, d):
+                synthese["details"].append(
+                    f"Demande {d.id_demande} : résultat déjà reçu, renvoi ignoré.")
                 continue
 
             # Un OBR ORU -> une AnalyseLaboratoire (regroupe ses OBX)
