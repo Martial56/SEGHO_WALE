@@ -1,0 +1,20 @@
+# Relève des résultats de laboratoire (HPRIM / FTP) — un passage.
+# Lancé toutes les 10 minutes par segho-releve-hprim.timer.
+#
+# À adapter avant l'installation (voir laboratoire/hprim/README.md) :
+#   User              : l'utilisateur Linux qui fait tourner SEGHO-WALE
+#   WorkingDirectory  : le dossier du projet (celui qui contient manage.py et .env)
+#   ExecStart         : le python de l'environnement virtuel du projet
+
+[Unit]
+Description=SEGHO-WALE — relève des résultats de laboratoire (HPRIM / FTP)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=segho
+WorkingDirectory=/opt/SEGHO_WALE
+ExecStart=/opt/SEGHO_WALE/venv/bin/python manage.py relever_resultats_hprim
+# Un FTP qui ne répond plus ne bloque pas les passages suivants.
+TimeoutStartSec=300

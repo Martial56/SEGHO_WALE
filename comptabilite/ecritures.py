@@ -243,6 +243,28 @@ def nature_de_ligne(ligne, facture):
     return 'autre'
 
 
+def comptes_de_vente():
+    """{clé: compte} des correspondances de vente par famille : « vente:
+    categorie:EC » (catégorie d'article de service), « vente:famille:12 »
+    (famille de produits du stock), « vente:produit:consommable » (type de
+    produit). Elles priment sur le compte de la nature."""
+    return {c.cle: c.compte for c in Correspondance.objects.filter(cle__startswith='vente:').select_related('compte')}
+
+
+def compte_de_vente(ligne, facture, par_famille):
+    """Compte de produit d'une ligne : celui de sa famille s'il est désigné,
+    sinon celui de sa nature (pharmacie, laboratoire…)."""
+    if ligne.produit_id:
+        for cle in (f'vente:famille:{ligne.produit.categorie_id}', f'vente:produit:{ligne.produit.type}'):
+            if cle in par_famille:
+                return par_famille[cle]
+    elif ligne.article_id and ligne.article.categorie_id:
+        cle = f'vente:categorie:{ligne.article.categorie.code}'
+        if cle in par_famille:
+            return par_famille[cle]
+    return compte(f'nature:{nature_de_ligne(ligne, facture)}')
+
+
 def _nom_patient(facture):
     p = facture.patient
     return f'{p.nom} {p.prenoms} ({p.code_patient})'.strip()
@@ -252,16 +274,17 @@ def lignes_de_vente(facture):
     """Lignes de l'écriture de vente : produits au prix plein, remises à part,
     créance sur le patient (et l'assurance pour sa part)."""
     tiers = _patient(facture)
+    par_famille = comptes_de_vente()
     produits, remises = {}, ZERO
-    for ligne in facture.lignes.select_related('article__categorie'):
+    for ligne in facture.lignes.select_related('article__categorie', 'produit'):
         brut = (ligne.quantite * ligne.prix_unitaire).quantize(Decimal('0.01'))
-        nature = nature_de_ligne(ligne, facture)
-        produits[nature] = produits.get(nature, ZERO) + brut
+        c = compte_de_vente(ligne, facture, par_famille)
+        produits[c] = produits.get(c, ZERO) + brut
         remises += brut - ligne.montant_ligne
     if not produits and facture.montant_total:
         # Facture posée d'un bloc, sans lignes détaillées : son type dit la nature.
         nature = facture.type_facture if facture.type_facture not in ('mixte', 'autre') else 'autre'
-        produits[nature] = facture.montant_total
+        produits[compte(f'nature:{nature}')] = facture.montant_total
     total = sum(produits.values(), ZERO) - remises
     # Part de l'assureur : seulement si la facture désigne un assureur
     # (Facture.part_assurance) ; la créance porte alors son nom.
@@ -279,8 +302,8 @@ def lignes_de_vente(facture):
     if remises:
         motif = facture.motif_remise.libelle if facture.motif_remise_id else 'remise'
         lignes.append((compte('remise'), f'Remise — {motif}', remises, ZERO, str(tiers)))
-    for nature, montant in produits.items():
-        lignes.append((compte(f'nature:{nature}'), None, ZERO, montant, str(tiers)))
+    for c, montant in produits.items():
+        lignes.append((c, None, ZERO, montant, str(tiers)))
     return lignes
 
 
@@ -301,7 +324,8 @@ def ecriture_avoir(avoir):
     if _deja(origine):
         return None
     facture = avoir.facture
-    ecriture_facture(facture)            # la vente d'abord, si elle manque
+    if not vendue_en_journee(facture):
+        ecriture_facture(facture)        # la vente d'abord, si elle manque
     inverse = [(c, lib, cr, d, t) for c, lib, d, cr, t in lignes_de_vente(facture)]
     if not any(d or c for _, _, d, c, _ in inverse):
         return None
@@ -332,12 +356,9 @@ def ecriture_remboursement(avoir):
 
 # ─── Paiement, sortie, écart ───────────────────────────────────────────────────
 
-def ecriture_paiement(paiement):
-    origine = f'paiement:{paiement.pk}'
-    if _deja(origine) or not paiement.montant:
-        return None
-    if paiement.reglement_assurance_id:
-        return None          # compté avec le règlement de l'assureur (ecriture_reglement)
+def lignes_de_paiement(paiement):
+    """(lignes, journal) d'un encaissement : trésorerie au débit, créance du
+    patient au crédit."""
     facture = paiement.facture
     if paiement.operateur_id:
         # Mobile Money : sur le compte de l'opérateur (Wave, Orange Money…).
@@ -351,11 +372,116 @@ def ecriture_paiement(paiement):
     # créance sur l'assureur.
     debiteur = (_assureur(facture.assurance) if tresorerie.classe == '4' and facture.assurance_id
                 else str(tiers))
+    return [(tresorerie, None, paiement.montant, ZERO, debiteur),
+            (compte('patient'), None, ZERO, paiement.montant, tiers)], journal_
+
+
+def ecriture_paiement(paiement):
+    origine = f'paiement:{paiement.pk}'
+    if _deja(origine) or not paiement.montant:
+        return None
+    if paiement.reglement_assurance_id:
+        return None          # compté avec le règlement de l'assureur (ecriture_reglement)
+    lignes, journal_ = lignes_de_paiement(paiement)
     return creer_ecriture(journal_, _jour(paiement.date_paiement),
-                          f'Encaissement {paiement.numero} — facture {facture.numero}',
-                          [(tresorerie, None, paiement.montant, ZERO, debiteur),
-                           (compte('patient'), None, ZERO, paiement.montant, tiers)],
+                          f'Encaissement {paiement.numero} — facture {paiement.facture.numero}', lignes,
                           piece=paiement.numero, origine=origine, centre=paiement.centre)
+
+
+# ─── Journée de caisse : une seule écriture (schéma de l'expert-comptable) ─────
+#
+# Comme dans Sage, une journée de caisse est passée d'une seule écriture dans
+# le journal de sa caisse, au nom du client « CLIENT CAISSE … » : les produits
+# vendus ce jour-là (factures dont le premier encaissement est dans une session
+# de la journée, comme les documents des ventes), les remises, et l'argent reçu
+# par mode. Ce qui n'est pas encore payé reste au débit du client de la caisse
+# (et des assureurs pour leur part) ; un règlement d'une facture vendue un autre
+# jour solde ce client. Les factures et paiements qui ont déjà leur propre
+# écriture (générée avant ce schéma) n'y sont pas repris.
+
+def journee_comptabilisable(journee):
+    """Journée clôturée dont toutes les sessions sont validées par le superviseur."""
+    sessions = list(journee.sessions.values_list('statut', flat=True))
+    return journee.statut == 'cloturee' and bool(sessions) and all(s == 'validee' for s in sessions)
+
+
+def premieres_sessions(facture_ids):
+    """{facture_id: session_id} de leur premier encaissement en session."""
+    from facturation.models import Paiement
+    premiere = {}
+    for facture_id, session_id in (Paiement.all_objects.filter(facture_id__in=facture_ids, session__isnull=False)
+                                   .order_by('date_paiement', 'pk').values_list('facture_id', 'session_id')):
+        premiere.setdefault(facture_id, session_id)
+    return premiere
+
+
+def vendue_en_journee(facture):
+    """Vrai si la vente de cette facture passe par l'écriture d'une journée
+    de caisse (elle a un encaissement en session) plutôt que par la sienne."""
+    from facturation.models import Paiement
+    return Paiement.all_objects.filter(facture=facture, session__isnull=False).exists()
+
+
+def _factures_de_la_journee(journee):
+    """Factures vendues dans la journée : premier encaissement dans une de ses
+    sessions ; un brouillon, ou une annulée sans avoir, n'est pas une vente."""
+    from facturation.models import Facture, Paiement
+    sessions = set(journee.sessions.values_list('pk', flat=True))
+    candidates = set(Paiement.all_objects.filter(session__in=sessions).values_list('facture_id', flat=True))
+    ids = [f for f, s in premieres_sessions(candidates).items() if s in sessions]
+    return [f for f in Facture.all_objects.filter(pk__in=ids).exclude(statut='brouillon')
+            .select_related('patient', 'motif_remise', 'assurance').prefetch_related('avoirs').order_by('numero')
+            if not (f.statut == 'annulee' and not f.avoirs.exists())]
+
+
+def lignes_de_journee(journee):
+    """Lignes de l'écriture de la journée, regroupées par compte et compte
+    tiers (débit et crédit compensés)."""
+    from facturation.models import Paiement
+    deja = set(Ecriture.all_objects.filter(origine__regex=r'^(facture|paiement):')
+               .values_list('origine', flat=True))
+    brutes = []
+    for f in _factures_de_la_journee(journee):
+        if f'facture:{f.pk}' not in deja:
+            brutes += lignes_de_vente(f)
+    for p in (Paiement.all_objects.filter(session__journee=journee, reglement_assurance__isnull=True)
+              .exclude(montant=0).select_related('facture__patient', 'facture__assurance', 'caisse',
+                                                 'operateur__compte').order_by('date_paiement', 'pk')):
+        if f'paiement:{p.pk}' not in deja:
+            brutes += lignes_de_paiement(p)[0]
+    # Sur un compte de tiers sans compte tiers désigné (assureur, caisse non
+    # rattachée), le nom reste : chacun garde sa ligne.
+    soldes, comptes, tiers = {}, {}, {}
+    for c, _, d, cr, t in [l[:5] for l in brutes]:
+        compte_tiers = getattr(t, 'compte', None)
+        nom = str(t or '') if compte_tiers is None and c.classe == '4' else ''
+        cle = (c.pk, compte_tiers.pk if compte_tiers else None, nom)
+        comptes[cle], tiers[cle] = c, compte_tiers
+        soldes[cle] = soldes.get(cle, ZERO) + (d or ZERO) - (cr or ZERO)
+    lignes = []
+    for cle in sorted(soldes, key=lambda k: (soldes[k] < 0, comptes[k].numero, k[2])):
+        solde, t = soldes[cle], tiers[cle]
+        nom = NomTiers(t.intitule, t) if t else cle[2]
+        if solde > 0:
+            lignes.append((comptes[cle], None, solde, ZERO, nom))
+        elif solde < 0:
+            lignes.append((comptes[cle], None, ZERO, -solde, nom))
+    return lignes
+
+
+def ecriture_journee(journee):
+    origine = f'journee:{journee.pk}'
+    if _deja(origine) or not journee_comptabilisable(journee):
+        return None
+    lignes = lignes_de_journee(journee)
+    if len(lignes) < 2:
+        return None                      # rien vendu ni encaissé, ou tout déjà comptabilisé
+    caisse = journee.caisse
+    client = tiers_de_caisse(caisse)
+    numeros = ', '.join(journee.sessions.order_by('numero').values_list('numero', flat=True))
+    return creer_ecriture(journal_de_caisse(caisse), journee.date_journee,
+                          f'Ventes du {journee.date_journee:%d/%m/%Y} — {client.intitule if client else caisse.nom}',
+                          lignes, piece=numeros, origine=origine, centre=journee.centre)
 
 
 def ecriture_sortie(sortie):
@@ -459,7 +585,8 @@ def ecriture_rejet(rejet):
     if _deja(origine):
         return None
     facture = rejet.facture
-    ecriture_facture(facture)            # la vente d'abord, si elle manque
+    if not vendue_en_journee(facture):
+        ecriture_facture(facture)        # la vente d'abord, si elle manque
     debit = compte('patient') if rejet.decision == 'patient' else compte('perte_creance')
     tiers = _assureur(rejet.assurance)
     patient = _patient(facture) if debit.classe == '4' else _nom_patient(facture)
@@ -525,10 +652,16 @@ def generer(debut, fin):
         # les avoirs — ce n'était pas (ou plus) une vente.
         if f.statut == 'annulee' and not f.avoirs.exists():
             continue
+        if vendue_en_journee(f):
+            continue                     # dans l'écriture de sa journée de caisse
         taches.append((f'Facture {f.numero}', ecriture_facture, f))
-    for p in (Paiement.all_objects.filter(date_paiement__date__range=[debut, fin])
+    for p in (Paiement.all_objects.filter(date_paiement__date__range=[debut, fin], session__isnull=True)
               .select_related('facture__patient', 'caisse', 'operateur__compte')):
         taches.append((f'Paiement {p.numero}', ecriture_paiement, p))
+    from .models import JourneeCaisse
+    for j in (JourneeCaisse.all_objects.filter(date_journee__range=[debut, fin], statut='cloturee')
+              .select_related('caisse')):
+        taches.append((f'Journée {j.caisse} du {j.date_journee:%d/%m/%Y}', ecriture_journee, j))
     for a in (Avoir.all_objects.filter(date_creation__date__range=[debut, fin])
               .select_related('facture__patient', 'session__journee__caisse')):
         taches.append((f'Avoir {a.numero}', ecriture_avoir, a))

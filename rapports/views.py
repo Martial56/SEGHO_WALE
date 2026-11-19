@@ -19,6 +19,7 @@ from .maternite import calculer_rapport_maternite
 from .soins import calculer_rapport_soins
 from .gynecologie import calculer_rapport_gynecologie
 from .med_generale import calculer_rapport_med_generale
+from .sig import calculer_rapport_sig
 from .models import (ConfigurationFicheSoins, HistoriqueRapport,
                      LigneFicheSoins)
 from .registry import REPORT_CATALOGUE, REPORTS_BY_SLUG
@@ -450,6 +451,26 @@ def rapports_med_generale(request):
     rapport = calculer_rapport_med_generale(annee, mois)
     return _fiche(request, 'rapports/rapport_med_generale.html', rapport,
                   'med_generale', 'Médecine générale', paysage=True)
+
+
+@login_required(login_url='login')
+def rapports_sig(request):
+    """Rapport SIG : données de la médecine générale, une colonne par tranche
+    d'âge (F et M réunis) — voir rapports/sig.py."""
+    today = datetime.now().date()
+    try:
+        annee = int(request.GET.get('annee', today.year))
+    except ValueError:
+        annee = today.year
+    try:
+        mois = int(request.GET.get('mois', today.month))
+    except ValueError:
+        mois = today.month
+    mois = min(max(mois, 1), 12)
+
+    rapport = calculer_rapport_sig(annee, mois)
+    return _fiche(request, 'rapports/rapport_sig.html', rapport,
+                  'sig', 'Rapport SIG', paysage=True)
 
 
 @login_required(login_url='login')

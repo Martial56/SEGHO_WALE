@@ -200,6 +200,19 @@ FICHE_C = [
 ]
 
 
+#: Sections D (dépistage VIH des IST) et E (violences basées sur le genre) :
+#: aucun champ dans le registre curatif, cases à remplir à la main.
+VIH_LIGNES = [
+    "Nombre de personnes atteintes d'une IST dépisté au VIH",
+    "Nombre de personnes atteintes d'une IST dépisté positives au VIH",
+]
+VBG_LIGNES = [
+    'Nombre de survivants aux violences sexuelles ayant consulté dans les 72 heures',
+    "Nombre de survivants aux violences sexuelles pris en charge dans l'établissement",
+    'Nombre de survivants aux violences sexuelles référés vers une autre structure',
+]
+
+
 def _bracket(date_naissance, date_ref):
     if not date_naissance or not date_ref:
         return None
@@ -241,7 +254,18 @@ def _nouvelle_grille(brackets=BRACKETS):
     return {cle: {'F': 0, 'M': 0} for cle, _ in brackets}
 
 
-def calculer_rapport_med_generale(annee, mois):
+def collecter_med_generale(annee, mois):
+    """Comptages bruts du mois, partagés par la fiche de médecine générale
+    (calculer_rapport_med_generale) et le rapport SIG (sig.py), qui ne
+    diffèrent que par leur présentation.
+
+    Retourne {'pathos', 'patho_grilles', 'activites', 'milda'} :
+    * pathos : {catégorie: [Pathologie triées par pk]} ;
+    * patho_grilles : {pk: {'grille': tranche → {F, M}, 'grille_ist': tranche
+      IST → {F, M}, 'referes': {F, M}}} ;
+    * activites : {indicateur: tranche → {F, M}} ;
+    * milda : {'eligibles': {F, M}, 'recus': {F, M}}.
+    """
     from patients.models import Patient, Pathologie, RegistreCuratif
 
     premier_jour = date(annee, mois, 1)
@@ -328,6 +352,17 @@ def calculer_rapport_med_generale(annee, mois):
         if bracket:
             activites['nouveaux_clients'][bracket][patient.sexe] += 1
 
+    return {'pathos': pathos, 'patho_grilles': patho_grilles,
+            'activites': activites, 'milda': milda}
+
+
+def calculer_rapport_med_generale(annee, mois):
+    donnees = collecter_med_generale(annee, mois)
+    pathos = donnees['pathos']
+    patho_grilles = donnees['patho_grilles']
+    activites = donnees['activites']
+    milda = donnees['milda']
+
     def _total(grille):
         f = sum(v['F'] for v in grille.values())
         m = sum(v['M'] for v in grille.values())
@@ -388,13 +423,6 @@ def calculer_rapport_med_generale(annee, mois):
         'epidemiologie': epidemiologie,
         'milda': milda,
         # Sections D et E : pas de champ dans le registre curatif, cases vides à remplir à la main.
-        'vih_lignes': [
-            "Nombre de personnes atteintes d'une IST dépisté au VIH",
-            "Nombre de personnes atteintes d'une IST dépisté positives au VIH",
-        ],
-        'vbg_lignes': [
-            'Nombre de survivants aux violences sexuelles ayant consulté dans les 72 heures',
-            "Nombre de survivants aux violences sexuelles pris en charge dans l'établissement",
-            'Nombre de survivants aux violences sexuelles référés vers une autre structure',
-        ],
+        'vih_lignes': VIH_LIGNES,
+        'vbg_lignes': VBG_LIGNES,
     }

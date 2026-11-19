@@ -318,6 +318,10 @@ def correspondances(request):
     tiers_clients = list(Tiers.objects.filter(type='client', actif=True))
 
     lignes = list(Correspondance.objects.select_related('compte').order_by('cle'))
+    # Comptes de vente par famille : à part, une ligne par famille connue.
+    ventes_designees = {c.cle: c for c in lignes if c.cle.startswith('vente:')}
+    lignes = [c for c in lignes if not c.cle.startswith('vente:')]
+    familles = _familles_de_vente()
     # Une caisse sans compte n'est pas comptabilisée : l'expert-comptable crée
     # son sous-compte 571 dans le plan, puis on le désigne ici.
     designees = {corr.cle for corr in lignes}
@@ -339,6 +343,16 @@ def correspondances(request):
                 Correspondance.objects.create(cle=f'caisse:{caisse.code}', libelle=f'Caisse {caisse.nom}',
                                               compte=comptes[int(choix)])
                 changes += 1
+        produits = {str(c.pk): c for c in Compte.objects.imputables().filter(numero__startswith='7')}
+        for i, (cle, libelle) in enumerate(familles):
+            choix, actuel = request.POST.get(f'vente_{i}', ''), ventes_designees.get(cle)
+            if choix in produits and (actuel is None or str(actuel.compte_id) != choix):
+                Correspondance.objects.update_or_create(cle=cle, defaults={'libelle': f'Ventes — {libelle}',
+                                                                           'compte': produits[choix]})
+                changes += 1
+            elif f'vente_{i}' in request.POST and not choix and actuel:
+                actuel.delete()
+                changes += 1
         clients = {str(t.pk): t for t in tiers_clients}
         for i, (cle, libelle) in enumerate(clients_du_centre):
             choix, actuel = request.POST.get(f'tiers_{i}', ''), designes.get(cle)
@@ -356,8 +370,24 @@ def correspondances(request):
         'caisses_sans_compte': caisses_sans_compte,
         'clients_du_centre': [(cle, libelle, designes.get(cle)) for cle, libelle in clients_du_centre],
         'tiers_clients': tiers_clients,
+        'familles': [(cle, libelle, ventes_designees.get(cle)) for cle, libelle in familles],
+        'comptes_produits': Compte.objects.imputables().filter(numero__startswith='7'),
         'comptes_caisse': Compte.objects.imputables().filter(numero__startswith='57'),
     })
+
+
+def _familles_de_vente():
+    """[(clé, libellé)] des familles dont la vente peut avoir son propre
+    compte : catégories d'articles de service, types et familles de produits
+    du stock."""
+    from facturation.models import LigneFacture
+    from stock.models import CategorieStock, Produit
+    CategorieArticle = LigneFacture._meta.get_field('article').related_model._meta.get_field('categorie').related_model
+    familles = [(f'vente:categorie:{c.code}', f'Service — {c}') for c in CategorieArticle.objects.order_by('code')]
+    familles += [(f'vente:produit:{code}', f'Produits — {libelle}') for code, libelle in Produit.TYPE_CHOICES]
+    familles += [(f'vente:famille:{c.pk}', f'Famille — {c.nom} ({c.get_type_display()})')
+                 for c in CategorieStock.objects.order_by('type', 'nom')]
+    return familles
 
 
 @login_required(login_url='login')

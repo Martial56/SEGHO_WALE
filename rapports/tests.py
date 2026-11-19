@@ -265,6 +265,76 @@ class TestDispositionMedGenerale(TestCase):
         self.assertNotIn('Cas dePaludisme simple', [l['label'] for l in rapport['a_page3']])
 
 
+# ─── Rapport SIG : la médecine générale, une colonne par tranche d'âge ────────
+
+class TestRapportSIG(TestCase):
+    """Le rapport SIG lit les mêmes données que la fiche de médecine générale :
+    F et M réunis dans chaque tranche, puis total et cas référés."""
+
+    def setUp(self):
+        from medecins.models import Departement
+        from patients.models import Pathologie
+        self.Pathologie = Pathologie
+        self.dept, _ = Departement.objects.get_or_create(code='medg', defaults={'nom': 'Médecine Générale'})
+
+    def _consultation(self, patho, naissance, sexe, **donnees):
+        rdv = _rdv(None, patient=_patient(naissance=naissance, sexe=sexe, suffix=naissance + sexe))
+        rdv.departement = self.dept
+        rdv.save()
+        _curatif(rdv, cur_diagnostic=[str(patho.pk)], **donnees)
+
+    def test_f_et_m_sont_reunis_dans_la_tranche(self):
+        from .sig import calculer_rapport_sig
+        patho = self.Pathologie.objects.create(nom='Angine (IRA haute)', categorie='infectieuse',
+                                               departement=self.dept)
+        self._consultation(patho, '1990-01-01', 'F')
+        self._consultation(patho, '1991-01-01', 'M', cur_issue_consultation='refere_externe')
+        self._consultation(patho, '2023-01-01', 'M')
+        ligne = next(l for l in calculer_rapport_sig(2026, 8)['infectieuses']
+                     if l['label'] == 'Angine (IRA haute)')
+        # Tranches : 0-11 mois, 1-4 ans, 5-9, 10-14, 15-19, 20-24, 25-49, 50+.
+        self.assertEqual([c['val'] for c in ligne['cellules']], [0, 1, 0, 0, 0, 0, 2, 0])
+        self.assertEqual(ligne['total'], 3)
+        self.assertEqual(ligne['referes'], 1)
+
+    def test_memes_lignes_et_memes_totaux_que_la_medecine_generale(self):
+        from .med_generale import calculer_rapport_med_generale
+        from .sig import calculer_rapport_sig
+        patho = self.Pathologie.objects.create(nom='Hernie', categorie='non_infectieuse',
+                                               departement=self.dept)
+        self._consultation(patho, '1960-05-01', 'M')
+        mg = calculer_rapport_med_generale(2026, 8)
+        sig = calculer_rapport_sig(2026, 8)
+        lignes_mg = mg['a_page1'] + mg['a_page2'] + mg['a_page3']
+        self.assertEqual([l['label'] for l in sig['infectieuses']], [l['label'] for l in lignes_mg])
+        lignes_mg_b = mg['b_page3'] + mg['b_page4']
+        self.assertEqual([l['label'] for l in sig['non_infectieuses']], [l['label'] for l in lignes_mg_b])
+        for ligne_mg, ligne_sig in zip(lignes_mg_b, sig['non_infectieuses']):
+            # Cellules MG : 8 tranches × (F, M), puis Total F, Total M, Référés F, Référés M.
+            total_mg = ligne_mg['cellules'][16]['val'] + ligne_mg['cellules'][17]['val']
+            self.assertEqual(ligne_sig['total'], total_mg, ligne_sig['label'])
+        hernie = next(l for l in sig['non_infectieuses'] if l['label'] == 'Hernie')
+        self.assertEqual(hernie['cellules'][-1]['val'], 1)  # 50 ans et plus
+
+    def test_case_grisee_seulement_si_grisee_pour_les_deux_sexes(self):
+        from .sig import calculer_rapport_sig
+        rapport = calculer_rapport_sig(2026, 8)
+        fe = next(l for l in rapport['infectieuses'] if l['label'] == 'Cas suspect de paludisme FE')
+        self.assertEqual([c['grise'] for c in fe['cellules'][:3]], [True, True, False])
+        uretral = rapport['ist'][0]  # grisé côté F seulement sur la fiche
+        self.assertFalse(any(c['grise'] for c in uretral['cellules']))
+
+    def test_la_page_affiche_les_colonnes_du_sig(self):
+        from django.contrib.auth.models import User
+        from django.urls import reverse
+        self.client.force_login(User.objects.create_superuser('sig', password='x'))
+        reponse = self.client.get(reverse('rapports:sig'), {'mois': 8, 'annee': 2026})
+        self.assertEqual(reponse.status_code, 200)
+        for entete in ('0-11 mois', '50 ans et plus', 'TOTAL', 'CAS REFERES'):
+            self.assertContains(reponse, f'<th>{entete}</th>' if entete != 'TOTAL'
+                                else '<th class="rmg-total">TOTAL</th>')
+
+
 # ─── Disposition de la fiche de gynécologie ────────────────────────────────────
 
 class TestDispositionGynecologie(TestCase):
@@ -1409,6 +1479,7 @@ class TestExportDesFichesMensuelles(TestCase):
         'rapports:soins': 'Nombre de MO',
         'rapports:gynecologie': 'Nombre de consultant',
         'rapports:med_generale': 'Nombre de cas référés',
+        'rapports:sig': 'Nombre de cas référés',
     }
 
     def setUp(self):

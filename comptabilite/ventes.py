@@ -7,9 +7,10 @@ lignes celles des factures encaissées dans la session. Une facture payée en
 plusieurs fois appartient à la session de son premier encaissement, pour ne
 jamais être vendue deux fois ; une facture annulée n'est plus une vente.
 
-Le statut suit la comptabilité : « À comptabiliser » tant qu'une écriture de
-la session (factures, paiements) manque ou reste en brouillon, puis
-« Comptabilisé ».
+Le statut suit la comptabilité : « Comptabilisé » quand l'écriture de la
+journée de caisse est validée (ou, pour les ventes d'avant ce schéma, quand
+toutes les écritures des factures et paiements de la session le sont), sinon
+« À comptabiliser ».
 """
 from collections import OrderedDict
 from decimal import Decimal
@@ -42,9 +43,12 @@ def _factures_par_session(sessions):
 
 
 def _statut(session, facture_ids):
-    """« comptabilise » si toutes les écritures de la session sont validées."""
+    """« comptabilise » si l'écriture de la journée (ou, avant elle, toutes
+    les écritures de la session) est validée."""
     from facturation.models import Paiement
     from .models import Ecriture
+    if Ecriture.all_objects.filter(origine=f'journee:{session.journee_id}', statut='validee').exists():
+        return 'comptabilise'
     origines = {f'facture:{pk}' for pk in facture_ids}
     origines |= {f'paiement:{pk}' for pk in Paiement.all_objects.filter(session=session).values_list('pk', flat=True)}
     if not origines:

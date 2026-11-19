@@ -815,6 +815,15 @@ def laboratoire_create(request):
         from patients.models import RendezVous
         rdv_origine = RendezVous.objects.filter(pk=rdv_pk, patient=patient).first()
 
+    # Type de demande : une demande faite depuis une consultation est interne,
+    # quoi que poste le formulaire ; sinon, la valeur choisie si elle est connue.
+    if rdv_origine:
+        type_demande = 'interne'
+    else:
+        type_demande = request.POST.get('type_demande', '')
+        if type_demande not in dict(DemandeExamen.TYPE_DEMANDE):
+            type_demande = ''
+
     prefill_medecin = None
     medecin_pk = request.GET.get('medecin_id')
     if medecin_pk:
@@ -835,6 +844,7 @@ def laboratoire_create(request):
         action = request.POST.get('action', 'brouillon')
         demande = DemandeExamen(
             patient=patient,
+            type_demande=type_demande,
             type_test=request.POST.get('type_test', ''),
             urgent=request.POST.get('urgent') == 'on',
             commentaire=request.POST.get('commentaire', '').strip(),
@@ -901,6 +911,8 @@ def laboratoire_create(request):
         'prefill_medecin': prefill_medecin,
         'next': url_interne(request, request.GET.get('next')) or '',
         'type_test_choices': DemandeExamen.TYPE_TEST,
+        'type_demande_choices': DemandeExamen.TYPE_DEMANDE,
+        'type_demande': type_demande,
         'breadcrumb': [
             {'title': 'Accueil', 'url': '/'},
             {'title': 'Laboratoire', 'url': '/laboratoire/'},

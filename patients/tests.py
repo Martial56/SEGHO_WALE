@@ -6099,3 +6099,52 @@ class TestLaRechercheDesRdvLitLeTelephone(TestCase):
                     html = self._html(nom, saisie)
                     self.assertIn('<td class="td-name">KOUASSI Ama</td>', html)
                     self.assertNotIn('<td class="td-name">YAO Koffi</td>', html)
+
+
+class TestLaRechercheRetrouveUnNumeroQuelleQueSoitSonEcriture(TestCase):
+    """Un numéro se cherche par ses chiffres, qu'il ait été enregistré ou tapé
+    avec des espaces, des points, des barres obliques ou l'indicatif +225.
+
+    La recherche comparait le texte tel quel : « 0758899735 » ne trouvait pas
+    la fiche enregistrée « 07 58 89 97 35 », et « 07.79.58.28.86 » ne trouvait
+    pas la fiche « 0779582886 ».
+    """
+
+    def setUp(self):
+        from .patient_listing import listing_patients
+        self.listing = listing_patients(date.today())[0]
+        self.colle = self._creer('KOUASSI', '0779582886')
+        self.espaces = self._creer('KONAN', '07 58 89 97 35')
+        self.barres = self._creer('YAO', '01/73/31/12/42')
+        self.point = self._creer('BAMBA', '0.708359215')
+
+    def _creer(self, nom, telephone):
+        return Patient.objects.create(nom=nom, prenoms='Ama', date_naissance='1990-06-01',
+                                      sexe='F', telephone=telephone)
+
+    def _trouves(self, q):
+        return set(self.listing.appliquer_recherche(Patient.objects.all(), q))
+
+    def test_les_chiffres_seuls_trouvent_un_numero_enregistre_avec_separateurs(self):
+        self.assertEqual(self._trouves('0758899735'), {self.espaces})
+        self.assertEqual(self._trouves('0173311242'), {self.barres})
+        self.assertEqual(self._trouves('0708359215'), {self.point})
+
+    def test_un_numero_tape_avec_separateurs_ou_indicatif_est_trouve(self):
+        for saisie in ('07.79.58.28.86', '07-79-58-28-86', '07/79/58/28/86',
+                       '+225 0779582886', '+2250779582886', '002250779582886'):
+            with self.subTest(saisie=saisie):
+                self.assertIn(self.colle, self._trouves(saisie))
+
+    def test_une_fin_de_numero_suffit(self):
+        self.assertEqual(self._trouves('58899735'), {self.espaces})
+
+    def test_un_nom_se_cherche_toujours_comme_avant(self):
+        self.assertEqual(self._trouves('konan'), {self.espaces})
+
+    def test_moins_de_huit_chiffres_ne_declenche_pas_la_comparaison_normalisee(self):
+        """« 07 58 » cherché mot à mot, comme avant : pas de rapprochement sur
+        quatre chiffres, qui ramènerait une bonne part de la base."""
+        from .patient_listing import condition_telephone
+        self.assertIsNone(condition_telephone('0758'))
+        self.assertIsNone(condition_telephone('kouassi 0779582886'))

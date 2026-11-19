@@ -428,6 +428,41 @@ class OngletResultatsDeLaConsultationTests(TestCase):
     def test_la_demande_garde_sa_consultation(self):
         self.assertEqual(self._demande_depuis_la_consultation().rendez_vous, self.rdv)
 
+    def test_une_demande_depuis_la_consultation_est_interne(self):
+        self.assertEqual(self._demande_depuis_la_consultation().type_demande, 'interne')
+
+    def test_interne_meme_si_le_formulaire_poste_externe(self):
+        from django.urls import reverse
+        with centre_actif(self.centre):
+            self.client.post(reverse('laboratoire_create'), {
+                'patient_id': self.patient.pk, 'rdv_id': self.rdv.pk, 'type_demande': 'externe',
+                'ligne_examen_0': 'Hémogramme', 'ligne_prix_0': '4000',
+            })
+        self.assertEqual(DemandeExamen.all_objects.get(patient=self.patient).type_demande, 'interne')
+
+    def test_le_formulaire_depuis_la_consultation_affiche_interne(self):
+        from django.urls import reverse
+        with centre_actif(self.centre):
+            page = self.client.get(reverse('laboratoire_create'),
+                                   {'patient': self.patient.pk, 'rdv': self.rdv.pk})
+        self.assertContains(page, 'name="type_demande" id="id_type_demande"')
+        self.assertContains(page, '<option value="interne" selected>Interne</option>', html=True)
+        self.assertContains(page, '<input type="hidden" name="type_demande" value="interne">', html=True)
+
+    def test_hors_consultation_le_type_est_au_choix(self):
+        from django.urls import reverse
+        with centre_actif(self.centre):
+            page = self.client.get(reverse('laboratoire_create'), {'patient': self.patient.pk})
+            self.client.post(reverse('laboratoire_create'), {
+                'patient_id': self.patient.pk, 'type_demande': 'externe',
+                'ligne_examen_0': 'Hémogramme', 'ligne_prix_0': '4000',
+            })
+        self.assertNotContains(page, '<option value="interne" selected>Interne</option>', html=True)
+        self.assertNotContains(page, '<input type="hidden" name="type_demande" value="interne">', html=True)
+        demande = DemandeExamen.all_objects.get(patient=self.patient)
+        self.assertEqual(demande.type_demande, 'externe')
+        self.assertIsNone(demande.rendez_vous)
+
     def test_le_resultat_s_affiche_dans_l_onglet(self):
         from django.urls import reverse
         from .hprim.integration import integrer_oru

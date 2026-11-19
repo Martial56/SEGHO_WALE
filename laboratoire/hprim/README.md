@@ -124,9 +124,31 @@ Relève manuelle :
 python manage.py relever_resultats_hprim
 ```
 
-Relève automatique (cron, toutes les 10 min) :
+Relève automatique sur le serveur Ubuntu (systemd, toutes les 10 min) — les
+fichiers sont dans `deploy/systemd/` :
+
+1. Adapter dans `segho-releve-hprim.service` les lignes `User`,
+   `WorkingDirectory` et `ExecStart` (utilisateur de l'application, dossier du
+   projet, python de son environnement virtuel).
+2. Installer et démarrer :
+   ```bash
+   sudo cp deploy/systemd/segho-releve-hprim.* /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now segho-releve-hprim.timer
+   ```
+3. Vérifier :
+   ```bash
+   systemctl list-timers segho-releve-hprim.timer      # prochain passage
+   sudo systemctl start segho-releve-hprim.service     # un passage tout de suite
+   journalctl -u segho-releve-hprim.service -n 50      # ce que chaque passage a relevé
+   ```
+
+Pour arrêter la relève automatique : `sudo systemctl disable --now segho-releve-hprim.timer`.
+
+Faute de systemd, l'équivalent cron (sans protection contre deux passages
+simultanés) :
 ```cron
-*/10 * * * * cd /chemin/SEGHO_WALE && python manage.py relever_resultats_hprim
+*/10 * * * * cd /chemin/SEGHO_WALE && venv/bin/python manage.py relever_resultats_hprim
 ```
 
 Pour chaque fichier ORU dont le témoin `.ok` est présent, le module :

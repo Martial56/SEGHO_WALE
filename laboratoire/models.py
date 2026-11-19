@@ -142,8 +142,16 @@ class DemandeExamen(ModeleCentre):
         ('imagerie', 'Imagerie'),
         ('autre', 'Autre'),
     ]
+    # Interne : prescrite au centre (une demande faite depuis une consultation
+    # l'est toujours) ; externe : patient venu avec l'ordonnance d'ailleurs.
+    TYPE_DEMANDE = [
+        ('interne', 'Interne'),
+        ('externe', 'Externe'),
+    ]
 
     numero = models.CharField(max_length=20, unique=True, editable=False)
+    type_demande = models.CharField("Type de demande", max_length=10,
+                                    choices=TYPE_DEMANDE, blank=True)
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='demandes_examens')
     type_test = models.CharField(max_length=50, choices=TYPE_TEST, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT, default='brouillon')

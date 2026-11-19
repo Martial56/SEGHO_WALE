@@ -549,13 +549,23 @@ def controle(debut, fin, params):
     from facturation.models import Facture, Paiement
     from .models import Ecriture, SessionCaissiere
 
+    from .ecritures import premieres_sessions
     origines = set(Ecriture.all_objects.exclude(origine__isnull=True).values_list('origine', flat=True))
-    factures = [f for f in Facture.objects.filter(date_emission__date__range=[debut, fin])
-                .exclude(statut='brouillon').prefetch_related('avoirs')
-                if f'facture:{f.pk}' not in origines and f.montant_total
-                and not (f.statut == 'annulee' and not f.avoirs.exists())]
+    # Une vente encaissée en session est dans l'écriture de sa journée de caisse.
+    journee_de_session = dict(SessionCaissiere.all_objects.values_list('pk', 'journee_id'))
+
+    def _en_journee(session_id):
+        return session_id and f'journee:{journee_de_session.get(session_id)}' in origines
+
+    candidates = [f for f in Facture.objects.filter(date_emission__date__range=[debut, fin])
+                  .exclude(statut='brouillon').prefetch_related('avoirs')
+                  if f'facture:{f.pk}' not in origines and f.montant_total
+                  and not (f.statut == 'annulee' and not f.avoirs.exists())]
+    premieres = premieres_sessions([f.pk for f in candidates])
+    factures = [f for f in candidates if not _en_journee(premieres.get(f.pk))]
     paiements = [p for p in Paiement.objects.filter(date_paiement__date__range=[debut, fin])
-                 if f'paiement:{p.pk}' not in origines and p.montant]
+                 if f'paiement:{p.pk}' not in origines and p.montant and not p.reglement_assurance_id
+                 and not _en_journee(p.session_id)]
     sans_session = Paiement.objects.filter(date_paiement__date__range=[debut, fin], session__isnull=True).count()
     brouillons = Ecriture.objects.filter(statut='brouillon', date__range=[debut, fin]).count()
     desequilibrees = [e for e in Ecriture.objects.filter(date__range=[debut, fin]).prefetch_related('lignes')

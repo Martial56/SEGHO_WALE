@@ -327,6 +327,14 @@ def rouvrir_journee(journee, par):
         raise ErreurCaisse("Seul un superviseur peut rouvrir une journée.")
     if journee.est_ouverte:
         raise ErreurCaisse("Cette journée est déjà ouverte.")
+    # Son écriture de ventes ne verrait pas les sessions ajoutées : un
+    # brouillon est retiré (il sera refait), une écriture validée bloque.
+    from .models import Ecriture
+    ecriture = Ecriture.all_objects.filter(origine=f'journee:{journee.pk}').first()
+    if ecriture and ecriture.statut == 'validee':
+        raise ErreurCaisse("Les ventes de cette journée sont comptabilisées et validées : elle ne se rouvre plus.")
+    if ecriture:
+        ecriture.delete()
     journee.statut = 'ouverte'
     journee.date_cloture = None
     journee.cloturee_par = None

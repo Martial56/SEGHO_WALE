@@ -330,6 +330,18 @@
         transition: all .15s;
     }
 
+    /* Type de demande, sous le patient : même gabarit que la recherche patient. */
+    .type-demande-wrap {
+        margin-top: 14px;
+    }
+
+    .type-demande-wrap select:disabled {
+        opacity: 1;
+        cursor: default;
+        color: var(--accent-text);
+        font-weight: 600;
+    }
+
     .btn-change-pat:hover {
         border-color: var(--teal-400);
         color: var(--accent-text-soft);
@@ -891,6 +903,20 @@
                     </div>
                     <button type="button" class="btn-change-pat" onclick="resetPatient()">Changer</button>
                 </div>
+            </div>
+
+            {% comment %}Type de demande : une demande faite depuis une consultation
+            est toujours interne — la vue l'impose aussi à l'enregistrement.{% endcomment %}
+            <div class="patient-search-wrap type-demande-wrap">
+                <label class="psearch-label" for="id_type_demande">Type de demande</label>
+                <select name="type_demande" id="id_type_demande" class="field-ul"
+                        {% if rdv_origine %}disabled title="Demande faite depuis une consultation : interne"{% endif %}>
+                    <option value="">— Choisir —</option>
+                    {% for val, lbl in type_demande_choices %}
+                    <option value="{{ val }}" {% if type_demande == val %}selected{% endif %}>{{ lbl }}</option>
+                    {% endfor %}
+                </select>
+                {% if rdv_origine %}<input type="hidden" name="type_demande" value="interne">{% endif %}
             </div>
 
         </div>

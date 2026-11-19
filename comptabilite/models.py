@@ -816,9 +816,11 @@ class ReglementAssurance(ModeleCentre):
 # ─── Lot 7 : trésorerie, rapprochements, refus des assureurs ───────────────────
 
 class CompteTresorerie(models.Model):
-    """Compte bancaire ou porte-monnaie Mobile Money du centre, rattaché à son
-    compte comptable (classe 5). C'est sur lui qu'on rapproche le relevé."""
-    TYPE = [('banque', 'Banque'), ('mobile_money', 'Mobile Money')]
+    """Compte bancaire, porte-monnaie Mobile Money ou caisse hors guichet
+    (petite caisse, caisse principale) du centre, rattaché à son compte
+    comptable (classe 5). C'est sur lui qu'on rapproche le relevé, et vers lui
+    qu'une caisse remet ses espèces."""
+    TYPE = [('banque', 'Banque'), ('mobile_money', 'Mobile Money'), ('caisse', 'Caisse')]
     libelle = models.CharField(max_length=120, unique=True, verbose_name="Libellé")
     type = models.CharField(max_length=15, choices=TYPE, default='banque')
     compte = models.OneToOneField('Compte', on_delete=models.PROTECT, related_name='compte_tresorerie',

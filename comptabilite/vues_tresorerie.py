@@ -82,7 +82,7 @@ def comptes_tresorerie(request, pk=None):
 
 @login_required(login_url='login')
 def remises(request):
-    """Espèces des caisses déposées en banque."""
+    """Espèces des caisses remises en banque ou à une autre caisse (petite caisse…)."""
     from facturation.models import Caisse
     _exiger(request.user, 'comptabilite.view_remisebanque')
     aujourdhui = timezone.localdate()
@@ -108,13 +108,15 @@ def remises(request):
     soldes = {}
     for c in caisses:
         try:
-            soldes[c.pk] = regles.solde_comptable(moteur.compte_de_caisse(c), aujourdhui)
+            soldes[c.pk] = regles.disponible_sans_generer(c, aujourdhui)
         except moteur.ErreurCompta:
             soldes[c.pk] = None
     return render(request, 'comptabilite/remises.html', {
         'remises': RemiseBanque.objects.select_related('caisse', 'compte_tresorerie')[:200],
         'caisses': [(c, soldes[c.pk]) for c in caisses],
-        'comptes': CompteTresorerie.objects.filter(actif=True, type='banque') or CompteTresorerie.objects.filter(actif=True),
+        'comptes': (CompteTresorerie.objects.filter(actif=True, type__in=['banque', 'caisse'])
+                    .select_related('compte').order_by('type', 'libelle')),
+        'transit': moteur.compte('virement_interne'),
         'aujourdhui': aujourdhui, 'post': request.POST,
     })
 

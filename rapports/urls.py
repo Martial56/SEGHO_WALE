@@ -13,5 +13,6 @@ urlpatterns = [
          name='soins_configuration'),
     path('gynecologie/', views.rapports_gynecologie, name='gynecologie'),
     path('med-generale/', views.rapports_med_generale, name='med_generale'),
+    path('sig/', views.rapports_sig, name='sig'),
     path('<slug:slug>/', views.rapports_generer, name='generer'),
 ]

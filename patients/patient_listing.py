@@ -8,10 +8,14 @@ Utilisé par la liste des patientes de gynécologie, et réutilisable tel quel p
 toute autre liste de patients : seul le jeu de départ change.
 """
 
+import re
 from datetime import date
 
-from django.db.models import Case, CharField, Q, Value, When
+from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models.functions import Length, Replace
+from django.db.models.lookups import Contains, GreaterThan
 
+from .doublons import normaliser_telephone
 from .resolution import condition_reperes
 
 from core.utils import annees_avant
@@ -31,6 +35,59 @@ LIBELLE_SENIOR = 'Seniors (> 60 ans)'
 #: logiciel se cherchent encore par le numéro qu'ils y portaient.
 CHAMPS_RECHERCHE = ('nom', 'prenoms', 'code_patient', 'telephone',
                     'ancien_identifiant')
+
+
+# ── Recherche par numéro de téléphone ───────────────────────────────────────
+# La recherche libre compare le texte tel quel. Or un numéro s'écrit de dix
+# façons : « 07 58 89 97 35 », « 07/58/89/97/35 », « 0.758899735 », « +225
+# 0758899735 »… Une cinquantaine de fiches sont enregistrées avec des
+# séparateurs, et taper les chiffres seuls ne les trouvait pas ; à l'inverse,
+# taper le numéro avec points, tirets ou indicatif ne trouvait aucune fiche.
+# On compare donc aussi les chiffres seuls, des deux côtés.
+
+#: Caractères retirés du numéro enregistré avant comparaison.
+SEPARATEURS_TELEPHONE = (' ', '.', '-', '/', '+', '*', ',', '(', ')')
+#: Une saisie n'est un numéro que si, séparateurs ôtés, il ne reste que des chiffres.
+_SAISIE_TELEPHONE = re.compile(r'^[\d\s.\-/+*,()]+$')
+
+
+def _chiffres_seuls(champ):
+    """Expression SQL : `champ` sans ses séparateurs (SQLite comme PostgreSQL)."""
+    expression = F(champ)
+    for separateur in SEPARATEURS_TELEPHONE:
+        expression = Replace(expression, Value(separateur), Value(''))
+    return expression
+
+
+def condition_telephone(q):
+    """`Q` qui retrouve un numéro quelle que soit son écriture, ou None si la
+    saisie n'est pas un numéro (au moins 8 chiffres, rien d'autre que des
+    séparateurs)."""
+    if not q or not _SAISIE_TELEPHONE.match(q):
+        return None
+    chiffres = normaliser_telephone(q)
+    if not chiffres:
+        return None
+    condition = Q()
+    for champ in ('telephone', 'telephone2'):
+        # Un numéro écrit avec des séparateurs est forcément plus long que
+        # les chiffres cherchés : le nettoyage, coûteux, n'est appliqué qu'à
+        # ceux-là (quelques centaines de fiches) ; les autres se comparent
+        # directement.
+        condition |= Q(**{f'{champ}__contains': chiffres})
+        condition |= (Q(GreaterThan(Length(champ), len(chiffres)))
+                      & Q(Contains(_chiffres_seuls(champ), chiffres)))
+    return condition
+
+
+def condition_recherche_en_plus(q):
+    """Ce qui s'ajoute en OU à la recherche libre : repères d'une fiche
+    fusionnée (voir `patients.resolution`) et numéro de téléphone normalisé."""
+    condition = None
+    for en_plus in (condition_reperes(q), condition_telephone(q)):
+        if en_plus is not None:
+            condition = en_plus if condition is None else condition | en_plus
+    return condition
 
 
 def _bornes(aujourdhui):
@@ -186,8 +243,9 @@ def listing_patients(aujourdhui=None):
     listing = Listing(
         recherche=CHAMPS_RECHERCHE,
         # Le code et l'ancien identifiant d'une fiche fusionnée ramènent la
-        # fiche gardée : voir `patients.resolution`.
-        recherche_en_plus=condition_reperes,
+        # fiche gardée (voir `patients.resolution`) ; un numéro se retrouve
+        # quelle que soit son écriture (voir `condition_telephone`).
+        recherche_en_plus=condition_recherche_en_plus,
         familles=familles_patients(),
         dimensions=list(declarees.values()) + perso,
         par_page=100,

@@ -48,6 +48,28 @@
         {% endfor %}
       </tbody>
     </table>
+    <h2 style="margin-top:20px;">Comptes de vente par famille</h2>
+    <p class="cpt-note">Le compte de produit d'une vente : celui de sa famille s'il est choisi ici (échographies, ECG, vaccins, eaux minérales…), sinon celui de sa nature ci-dessus (« nature:… »). Pour un produit du stock, la famille prime sur le type.</p>
+    <div style="max-height:420px;overflow:auto;">
+    <table class="cpt-table">
+      <thead><tr><th>Famille</th><th>Clé</th><th style="width:45%;">Compte de produit</th></tr></thead>
+      <tbody>
+        {% for cle, libelle, designe in familles %}
+        <tr>
+          <td>{{ libelle }}</td>
+          <td class="cpt-note">{{ cle }}</td>
+          <td>{% if peut_modifier %}
+            <select name="vente_{{ forloop.counter0 }}" class="cpt-input" style="width:100%;font-size:13px;padding:6px 8px;">
+              <option value="">— Compte de la nature —</option>
+              {% for c in comptes_produits %}<option value="{{ c.pk }}" {% if designe and c.pk == designe.compte_id %}selected{% endif %}>{{ c.numero }} — {{ c.intitule }}</option>{% endfor %}
+            </select>
+            {% elif designe %}{{ designe.compte }}{% else %}<span class="cpt-note">Compte de la nature</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
     <h2 style="margin-top:20px;">Comptes tiers des caisses et des assurances</h2>
     <p class="cpt-note">Le client du <a href="{% url 'comptabilite:plan_tiers' %}">plan tiers</a> qui porte la créance : les patients d'une caisse sont le « CLIENT CAISSE … » de cette caisse ; un assureur, son propre compte client. Sans désignation, la ligne d'écriture garde seulement le nom.</p>
     <table class="cpt-table">

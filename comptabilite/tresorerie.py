@@ -67,11 +67,30 @@ def position(fin):
 
 # ─── Remise en banque ──────────────────────────────────────────────────────────
 
+def especes_en_attente(caisse, jour):
+    """Espèces encaissées en session dont la journée n'est pas encore
+    comptabilisée (son écriture ne naît qu'à la validation de la journée)."""
+    from facturation.models import Paiement
+    origines = set(Ecriture.all_objects.filter(origine__regex=r'^(journee|paiement):')
+                   .values_list('origine', flat=True))
+    return sum((p.montant for p in Paiement.all_objects.filter(
+        caisse=caisse, mode_paiement='especes', session__isnull=False, date_paiement__date__lte=jour,
+        reglement_assurance__isnull=True).select_related('session')
+        if f'journee:{p.session.journee_id}' not in origines and f'paiement:{p.pk}' not in origines), ZERO)
+
+
+def disponible_sans_generer(caisse, jour):
+    """Ce que contient la caisse : solde de son compte et espèces encore en
+    attente de comptabilisation."""
+    from . import ecritures as moteur
+    return solde_comptable(moteur.compte_de_caisse(caisse), jour) + especes_en_attente(caisse, jour)
+
+
 def disponible_en_caisse(caisse, jour):
-    """Espèces de la caisse selon les comptes, écritures du jour comprises."""
+    """Espèces de la caisse, écritures du jour générées d'abord."""
     from . import ecritures as moteur
     moteur.generer(jour.replace(month=1, day=1), jour)
-    return solde_comptable(moteur.compte_de_caisse(caisse), jour)
+    return disponible_sans_generer(caisse, jour)
 
 
 def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', observation=''):
@@ -79,6 +98,8 @@ def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', ob
     from . import ecritures as moteur
     if montant <= 0:
         raise ErreurTresorerie("Le montant déposé doit être positif.")
+    if compte_tresorerie.compte_id == moteur.compte_de_caisse(caisse).pk:
+        raise ErreurTresorerie("Une caisse ne se remet pas ses espèces à elle-même.")
     disponible = disponible_en_caisse(caisse, jour)
     if montant > disponible:
         raise ErreurTresorerie(f"La caisse {caisse} ne contient que {_francs(disponible)} F selon les comptes.")
@@ -90,7 +111,9 @@ def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', ob
 
 
 def ecritures_remise(remise):
-    """Sortie de la caisse vers 585, puis entrée en banque depuis 585."""
+    """Sortie de la caisse vers le compte de virements internes (58800000
+    chez l'expert), puis entrée sur le compte de destination — banque ou
+    autre caisse, chacun dans son journal."""
     from . import ecritures as moteur
     transit = moteur.compte('virement_interne')
     caisse = remise.caisse

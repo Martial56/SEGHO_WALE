@@ -1,0 +1,295 @@
+{% load static %}
+{% comment %}
+Rapport SIG : les données du rapport mensuel de médecine générale
+(rapport_med_generale.html), au format du SIG — une colonne par tranche d'âge,
+F et M réunis, puis TOTAL et CAS REFERES. Calcul : rapports/sig.py.
+Les sections se suivent sans reproduire les coupures de page de la fiche
+papier ; à l'impression, l'en-tête de chaque tableau se répète en haut de page.
+Les notes d'explication (.rm-note-ecran) ne s'impriment ni ne s'exportent.
+{% endcomment %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport SIG — {{ mois_nom }} {{ annee }}</title>
+<style>
+:root { --font-print: 'Segoe UI', Arial, sans-serif; --brand: #1a5c4a; --logo-vert: #4a8a3a; --gris: #a6a6a6; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-print); background: #e5e7eb; color: #111; font-size: 12px; }
+
+/* ── Contrôles écran ── */
+.print-toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--brand); color: #fff; padding: 10px 24px;
+  position: sticky; top: 0; z-index: 100;
+}
+.print-toolbar span.tb-title { font-size: 13px; font-weight: 600; margin-right: auto; }
+.periode-form { display: flex; align-items: center; gap: 6px; }
+.periode-form select, .periode-form input {
+  border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; font-family: inherit;
+}
+.toolbar-btn {
+  padding: 6px 16px; border-radius: 5px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; text-decoration: none;
+}
+.btn-appliquer { background: rgba(255,255,255,.2); color: #fff; }
+.btn-back { background: rgba(255,255,255,.15); color: #fff; }
+.btn-back:hover { background: rgba(255,255,255,.25); }
+
+/* ── Feuille A4 paysage ── */
+.rm-page {
+  position: relative; max-width: 1250px; margin: 24px auto; background: #fff;
+  border-radius: 4px; box-shadow: 0 4px 24px rgba(0,0,0,.12);
+  padding: 22px 30px 34px; overflow-x: auto;
+}
+.rm-header {
+  display: flex; align-items: flex-end; justify-content: center; gap: 8px;
+  width: 75%; margin: 0 auto 18px; padding-bottom: 3px; border-bottom: 1.5px solid var(--logo-vert);
+}
+.rm-logo-circle { width: 40px; height: 40px; flex-shrink: 0; }
+.rm-logo-circle img { width: 100%; height: 100%; object-fit: contain; }
+.rm-logo-name { font-size: 22px; color: var(--brand); letter-spacing: .3px; line-height: 1.1; }
+.rm-title { text-align: center; font-size: 13px; font-weight: 800; text-decoration: underline; margin: 4px 0 10px; }
+.rm-ligne-info { font-size: 12px; font-weight: 700; margin: 0 0 12px 30px; }
+.rm-ligne-info strong { color: var(--brand); }
+
+.rm-section-title { font-size: 12px; font-weight: 800; margin: 16px 0 4px 40px; }
+.rm-section-title.souligne { text-decoration: underline; }
+.rm-nb { font-size: 11px; font-weight: 800; margin: 6px 0 8px 40px; }
+.rm-legende-fiche { display: flex; justify-content: space-between; gap: 16px; font-size: 10px; font-weight: 800; margin: 2px 40px 10px; }
+
+/* ── Tableaux tranche d'âge ── */
+table.rmg-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 10px; }
+table.rmg-table th, table.rmg-table td {
+  border: 1px solid #333; padding: 3px 4px; text-align: center; vertical-align: middle; min-width: 52px;
+}
+table.rmg-table th.rmg-label-col, table.rmg-table td.rmg-label-col {
+  text-align: left; width: 30%; min-width: 240px; font-weight: 700;
+}
+table.rmg-table thead th { font-weight: 700; }
+table.rmg-table td.rmg-val { color: var(--brand); font-weight: 700; }
+table.rmg-table td.rmg-total, table.rmg-table th.rmg-total { background: #f3f4f6; }
+table.rmg-table td.rmg-grise { background: var(--gris); color: #111; font-weight: 700; }
+table.rmg-table td.rmg-noir { background: #000; }
+table.rmg-table tr.rmg-separateur td { border-top: 6px solid #000; }
+table.rmg-table.ist td.rmg-label-col { font-weight: 400; }
+.rm-blank { display: inline-block; min-width: 20px; height: 12px; }
+
+/* ── Petits tableaux de fin ── */
+.rm-encadres { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-top: 14px; }
+.rm-encadre { flex: 1; }
+.rm-encadre h3 { font-size: 13px; font-weight: 800; margin-bottom: 6px; text-align: center; }
+table.rm-petit { width: 100%; border-collapse: collapse; font-size: 9px; }
+table.rm-petit th, table.rm-petit td { border: 1px solid #333; padding: 3px 4px; text-align: center; vertical-align: middle; }
+table.rm-petit th { font-weight: 700; }
+table.rm-petit td.lib { text-align: left; font-weight: 700; }
+table.rm-petit td.val { color: var(--brand); font-weight: 700; min-width: 34px; }
+
+.rm-signatures { display: flex; justify-content: space-between; margin-top: 40px; gap: 16px; }
+.rm-signature-box { width: 36%; border: 1px solid #333; border-radius: 12px; padding: 8px 10px 46px; font-size: 10px; }
+
+.rm-note-ecran {
+  margin-top: 10px; font-size: 10px; color: #6b7280; font-style: italic; line-height: 1.6;
+  border-top: 1px dashed #d1d5db; padding-top: 8px;
+}
+
+@media print {
+  body { background: #fff; }
+  .print-toolbar, .rm-note-ecran { display: none !important; }
+  .rm-page {
+    margin: 0; padding: 8mm 8mm 10mm; box-shadow: none; border-radius: 0; max-width: 100%; overflow-x: visible;
+  }
+  table.rmg-table thead { display: table-header-group; }
+  table.rmg-table tr, .rm-encadres, .rm-signatures { break-inside: avoid; page-break-inside: avoid; }
+  .rm-section-title { break-after: avoid; page-break-after: avoid; }
+  table.rmg-table td.rmg-grise, table.rmg-table td.rmg-noir, table.rmg-table tr.rmg-separateur td,
+  table.rmg-table td.rmg-total, table.rmg-table th.rmg-total {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+}
+@page { size: A4 landscape; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- ── Barre d'outils (écran seulement) ── -->
+<div class="print-toolbar">
+  <span class="tb-title">Rapport SIG — {{ mois_nom }} {{ annee }}</span>
+  <form class="periode-form" method="get">
+    <select name="mois">
+      <option value="1" {% if mois == 1 %}selected{% endif %}>Janvier</option>
+      <option value="2" {% if mois == 2 %}selected{% endif %}>Février</option>
+      <option value="3" {% if mois == 3 %}selected{% endif %}>Mars</option>
+      <option value="4" {% if mois == 4 %}selected{% endif %}>Avril</option>
+      <option value="5" {% if mois == 5 %}selected{% endif %}>Mai</option>
+      <option value="6" {% if mois == 6 %}selected{% endif %}>Juin</option>
+      <option value="7" {% if mois == 7 %}selected{% endif %}>Juillet</option>
+      <option value="8" {% if mois == 8 %}selected{% endif %}>Août</option>
+      <option value="9" {% if mois == 9 %}selected{% endif %}>Septembre</option>
+      <option value="10" {% if mois == 10 %}selected{% endif %}>Octobre</option>
+      <option value="11" {% if mois == 11 %}selected{% endif %}>Novembre</option>
+      <option value="12" {% if mois == 12 %}selected{% endif %}>Décembre</option>
+    </select>
+    <input type="number" name="annee" value="{{ annee }}" min="2000" max="2100" style="width:80px;">
+    <button type="submit" class="toolbar-btn btn-appliquer">Appliquer</button>
+    {% include "rapports/_menu_export.html" %}
+  </form>
+  <a class="toolbar-btn btn-back" href="{% url 'rapports:hub' %}">← Fermer</a>
+</div>
+
+<div class="rm-page">
+  {% include "rapports/_rmg_entete.html" %}
+  <div class="rm-title">RAPPORT SIG — CONSULTATIONS DE MÉDECINE GÉNÉRALE</div>
+  <div class="rm-ligne-info">DATE (mois/ année) : <strong>{{ mois_nom }}</strong> / <strong>{{ annee }}</strong></div>
+
+  <!-- ── Activités ── -->
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="ACTIVITES" %}
+    <tbody>
+      {% for ligne in activites_lignes %}
+      <tr>
+        <td class="rmg-label-col">{{ ligne.label }}</td>
+        {% if ligne.cellules %}
+          {% for val in ligne.cellules %}<td class="rmg-val">{{ val }}</td>{% endfor %}
+          <td class="rmg-val rmg-total">{{ ligne.total }}</td>
+        {% else %}
+          {% for cle, label in brackets %}<td><span class="rm-blank"></span></td>{% endfor %}
+          <td class="rmg-total"><span class="rm-blank"></span></td>
+        {% endif %}
+        <td><span class="rm-blank"></span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="rm-note-ecran">
+    Mêmes données que le rapport mensuel de médecine générale (registre de consultation curative, département
+    « Médecine Générale »), F et M additionnés dans chaque tranche d'âge. « Nombre de cas contre référés » n'a pas
+    encore de champ dédié et se complète à la main ; la colonne « Cas référés » ne s'applique pas aux activités
+    (les cas référés y ont leur propre ligne).
+  </div>
+
+  <!-- ── A : maladies infectieuses ── -->
+  <div class="rm-section-title">A- Maladies infectieuses</div>
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="Maladies" %}
+    <tbody>{% include "rapports/_sig_lignes.html" with lignes=infectieuses %}</tbody>
+  </table>
+  <div class="rm-legende-fiche">
+    <span>FE= femme enceinte &nbsp;&nbsp; CS= cas suspect &nbsp;&nbsp; IRA= infection respiratoire aigue</span>
+    <span>CTA : combinaison thérapeutique à base d'artemisinine &nbsp;&nbsp; SRO = sel de réhydratation orale</span>
+  </div>
+
+  <!-- ── B : maladies non infectieuses ── -->
+  <div class="rm-section-title">B : Autres maladies non infectieuses et facteurs de risque cardiovasculaire</div>
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="Maladies" %}
+    <tbody>{% include "rapports/_sig_lignes.html" with lignes=non_infectieuses %}</tbody>
+  </table>
+
+  <!-- ── C : IST ── -->
+  <div class="rm-section-title">C : Infections sexuellement transmissibles</div>
+  <table class="rmg-table ist">
+    {% include "rapports/_sig_thead.html" with titre="Syndromes / Infections" %}
+    <tbody>{% include "rapports/_sig_lignes.html" with lignes=ist %}</tbody>
+  </table>
+  <div class="rm-note-ecran">
+    Section C : ventilée sur les mêmes tranches d'âge que le reste du rapport (la fiche papier n'a pas de colonne
+    entre 29 jours et 9 ans ; ici ces patients ont la leur).
+  </div>
+
+  <!-- ── D : dépistage VIH des IST (à remplir à la main) ── -->
+  <div class="rm-section-title">D : DEPISTAGE DU VIH CHEZ LES PATIENTS PRESENTANT UNE INFECTION SEXUELLEMENT TRANSMISSIBLES</div>
+  <div class="rm-nb">NB : Le nombre total de personne ayant une IST doit être égale au nombre total de personnes dépistées atteinte de IST ( C = D )</div>
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="" %}
+    <tbody>
+      {% for label in vih_lignes %}
+      <tr>
+        <td class="rmg-label-col">{{ label }}</td>
+        {% for cle, l in brackets %}<td><span class="rm-blank"></span></td>{% endfor %}
+        <td class="rmg-total"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- ── E : violences basées sur le genre (à remplir à la main) ── -->
+  <div class="rm-section-title souligne">E : Violences basées sur le genre</div>
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="" %}
+    <tbody>
+      {% for label in vbg_lignes %}
+      <tr>
+        <td class="rmg-label-col">{{ label }}</td>
+        {% for cle, l in brackets %}<td><span class="rm-blank"></span></td>{% endfor %}
+        <td class="rmg-total"><span class="rm-blank"></span></td><td><span class="rm-blank"></span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="rm-note-ecran">
+    Sections D et E : pas de champ dédié dans le registre curatif — à compléter à la main, comme sur la fiche papier.
+  </div>
+
+  {% if epidemiologie %}
+  <!-- ── Maladies à déclaration obligatoire (hors fiche papier) ── -->
+  <div class="rm-section-title">Maladies à déclaration obligatoire (surveillance épidémiologique)</div>
+  <table class="rmg-table">
+    {% include "rapports/_sig_thead.html" with titre="Maladies" %}
+    <tbody>{% include "rapports/_sig_lignes.html" with lignes=epidemiologie %}</tbody>
+  </table>
+  {% endif %}
+
+  <!-- ── Tableaux sans tranche d'âge : repris tels quels ── -->
+  <div class="rm-encadres">
+    <div class="rm-encadre">
+      <h3>Tétanos Néonatal</h3>
+      <table class="rm-petit">
+        <thead><tr><th></th><th>Enfant né de mère correctement vaccinée</th><th>Enfant né de mère incomplètement vaccinée</th><th>Enfant né mère non vaccinée</th></tr></thead>
+        <tbody>
+          <tr><td class="lib">Cas de tétanos néonatal</td><td></td><td></td><td></td></tr>
+          <tr><td class="lib">Décès liés au tétanos néonatal</td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rm-encadre">
+      <h3>DISTRIBUTION DE MILDA AUX ENFANTS<br>12-59 MOIS</h3>
+      <table class="rm-petit">
+        <thead>
+          <tr><th rowspan="2"></th><th colspan="2">Nombre</th></tr>
+          <tr><th>F</th><th>M</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="lib">Nombre d'enfants éligible à la MILDA vus en consultations et soins curatifs</td><td class="val">{{ milda.eligibles.F }}</td><td class="val">{{ milda.eligibles.M }}</td></tr>
+          <tr><td class="lib">Nombre d'enfants ayant reçu une MILDA vus en consultations et soins curatifs</td><td class="val">{{ milda.recus.F }}</td><td class="val">{{ milda.recus.M }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rm-encadre">
+      <h3>Ver de Guinée (Dracunculose)</h3>
+      <table class="rm-petit">
+        <thead><tr><th></th><th>Nombre</th></tr></thead>
+        <tbody>
+          <tr><td class="lib">Rumeurs de cas de ver de guinée signalés</td><td></td></tr>
+          <tr><td class="lib">Rumeurs de cas de ver de guinée investigués</td><td></td></tr>
+          <tr><td class="lib">Rumeurs de ver de guinée investigués dans 24 hrs</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rm-signatures">
+    <div class="rm-signature-box">Nom et signature du Médecin</div>
+    <div class="rm-signature-box">Nom et signature du gestionnaire de données</div>
+  </div>
+</div>
+
+<script>
+  if (window.location.search.indexOf('auto=1') !== -1) {
+    window.addEventListener('load', function() { window.print(); });
+  }
+</script>
+</body>
+</html>

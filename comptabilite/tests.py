@@ -656,8 +656,12 @@ class TestEcrituresAutomatiques(TestCase):
 
     def test_generation_sans_doublon_et_equilibree(self):
         _payer(self.awa, self._facture_avec_remise(), 8000)
+        self.assertEqual(moteur.generer(self.jour, self.jour)['crees'], 0)    # journée pas encore validée
+        regles.cloturer_session(self.session, self.awa, {}, Decimal('8000'))
+        regles.valider_session(self.session, _superviseur())
+        regles.cloturer_journee(self.session.journee, self.awa)
         premiere = moteur.generer(self.jour, self.jour)
-        self.assertEqual(premiere['crees'], 2)
+        self.assertEqual(premiere['crees'], 1)                                 # une écriture pour la journée
         self.assertEqual(moteur.generer(self.jour, self.jour)['crees'], 0)
         for e in Ecriture.objects.all():
             debit, credit = e.totaux()
@@ -672,8 +676,10 @@ class TestEcrituresAutomatiques(TestCase):
     def test_la_cloture_de_la_journee_prepare_les_ecritures(self):
         _payer(self.awa, _facture(Decimal('3000')), 3000)
         regles.cloturer_session(self.session, self.awa, {}, Decimal('3000'))
+        regles.valider_session(self.session, _superviseur())
         _client(self.awa).post(reverse('comptabilite:journee_cloturer', args=[self.session.journee_id]))
-        self.assertEqual(Ecriture.objects.filter(statut='brouillon').count(), 2)
+        self.assertEqual(list(Ecriture.objects.filter(statut='brouillon').values_list('origine', flat=True)),
+                         [f'journee:{self.session.journee_id}'])
 
 
 class TestPassageDesEcritures(TestCase):
@@ -745,6 +751,8 @@ class TestEtats(TestCase):
         _payer(self.awa, _facture(Decimal('2000')), 2000, mode='mobile_money')
         self.impayee = _facture(Decimal('7000'))
         regles.cloturer_session(session, self.awa, {}, Decimal('3500'), justification='Monnaie')
+        regles.valider_session(session, self.chef)
+        regles.cloturer_journee(session.journee, self.chef)
         jour = timezone.localdate()
         moteur.generer(jour, jour)
         moteur.valider(list(Ecriture.objects.all()), self.chef)
@@ -1057,11 +1065,17 @@ class TestAssurances(TestCase):
         _payer(self.awa, f, 2000)
         jour = timezone.localdate()
         tiers.enregistrer_reglement(self.mugef, Decimal('8000'), jour, 'virement', self.comptable)
+        session = SessionCaissiere.objects.get()
+        regles.cloturer_session(session, self.awa, {}, Decimal('2000'))
+        regles.valider_session(session, self.comptable)
+        regles.cloturer_journee(session.journee, self.comptable)
         resultat = moteur.generer(jour, jour)
         self.assertEqual(resultat['erreurs'], [])
-        vente = Ecriture.objects.get(origine=f'facture:{f.pk}')
+        # La journée : la part patient est encaissée (41250000 soldé dans l'écriture),
+        # la part de l'assureur reste due par lui.
+        vente = Ecriture.objects.get(origine=f'journee:{session.journee_id}')
         lignes = {l.compte.numero: l for l in vente.lignes.all()}
-        self.assertEqual(lignes['41250000'].debit, Decimal('2000'))
+        self.assertNotIn('41250000', lignes)
         self.assertEqual(lignes['41250001'].debit, Decimal('8000'))
         self.assertEqual(lignes['41250001'].tiers, 'MUGEF-CI')
         reglement = Ecriture.objects.get(origine__startswith='reglement:')
@@ -1149,9 +1163,20 @@ class TestTresorerie(TestCase):
         remise = treso.creer_remise(self.caisse, self.banque, Decimal('30000'), self.jour, self.admin, 'BV-1')
         self.assertTrue(remise.numero.startswith('REM'))
         caisse = moteur.compte_de_caisse(self.caisse)
+        # Les ventes du jour n'entrent qu'avec l'écriture de la journée.
+        self.assertEqual(treso.solde_comptable(caisse), Decimal('-30000'))
+        session = SessionCaissiere.objects.get()
+        regles.cloturer_session(session, self.awa, {}, Decimal('40000'))   # comptés à la clôture de session
+        regles.valider_session(session, self.admin)
+        regles.cloturer_journee(session.journee, self.admin)
+        moteur.generer(self.jour, self.jour)
         self.assertEqual(treso.solde_comptable(caisse), Decimal('10000'))
         self.assertEqual(treso.solde_comptable(self.banque.compte), Decimal('30000'))
         self.assertEqual(treso.solde_comptable(moteur.compte('virement_interne')), Decimal('0'))
+
+    def test_le_montant_propose_est_celui_de_la_caisse(self):
+        page = self.client_admin.get(reverse('comptabilite:remises')).content.decode()
+        self.assertIn(f'value="{self.caisse.pk}" data-montant="40000"', page)   # encaissé, pas encore comptabilisé
 
     def test_pas_de_remise_au_dela_de_la_caisse(self):
         with self.assertRaises(treso.ErreurTresorerie):
@@ -1838,6 +1863,7 @@ class TestDocumentsDesVentes(TestCase):
 
     def test_comptabilise_quand_les_ecritures_sont_validees(self):
         self._valider()
+        regles.cloturer_journee(self.session.journee, self.chef)
         jour = timezone.localdate()
         moteur.generer(jour, jour)
         moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
@@ -2086,11 +2112,19 @@ class TestLettrage(TestCase):
         self.admin = User.objects.create_superuser('admin_lt', password='x')
         self.jour = timezone.localdate()
 
+    def _comptabiliser(self):
+        """Une écriture par facture et par paiement : le schéma d'avant les
+        journées de caisse, que gardent les écritures déjà passées."""
+        for f in Facture.objects.exclude(statut='brouillon'):
+            moteur.ecriture_facture(f)
+        for p in Paiement.objects.all():
+            moteur.ecriture_paiement(p)
+
     def _vente(self, montant, paye):
         facture = _facture(Decimal(montant))
         if paye:
             _payer(self.awa, facture, paye)
-        moteur.generer(self.jour, self.jour)
+        self._comptabiliser()
         moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
         return facture
 
@@ -2107,7 +2141,7 @@ class TestLettrage(TestCase):
         self.assertEqual(self._client_ligne(f'facture:{partielle.pk}').lettre, '')
         # Le reste est payé : le document se lettre, lettre suivante.
         _payer(self.awa, partielle, 5000)
-        moteur.generer(self.jour, self.jour)
+        self._comptabiliser()
         moteur.valider(list(Ecriture.objects.filter(statut='brouillon')), self.admin)
         self.assertEqual(lettrage.lettrage_automatique(), 1)
         self.assertEqual(self._client_ligne(f'facture:{partielle.pk}').lettre, 'B')
@@ -2122,7 +2156,7 @@ class TestLettrage(TestCase):
         with self.assertRaises(lettrage.ErreurLettrage):
             lettrage.lettrer([la, lb])                      # deux débits : ne se soldent pas
         _payer(self.awa, a, 5000)
-        moteur.generer(self.jour, self.jour)               # paiement en brouillon
+        self._comptabiliser()               # paiement en brouillon
         lp = LigneEcriture.objects.get(ecriture__origine__startswith='paiement:', compte__numero='41250000')
         with self.assertRaises(lettrage.ErreurLettrage):
             lettrage.lettrer([la, lp])                      # brouillon : pas encore lettrable
@@ -2269,3 +2303,89 @@ class TestNumerotationDesPieces(TestCase):
         nouvelle = self._valider('OD', self.jour)
         self.assertEqual((ancienne.numero, nouvelle.numero), (1, 1))
         self.assertNotEqual(Ecriture.objects.get(pk=ancienne.pk).reference, nouvelle.reference)
+
+
+# ─── Une écriture par journée de caisse, comptes de vente par famille ─────────
+
+class TestEcritureDeLaJournee(TestCase):
+
+    def setUp(self):
+        self.caisse = _caisse(nom='Caisse Pharmacie', code='PH')
+        CorrespondanceTiers.objects.create(cle='caisse:PH', libelle='Caisse Pharmacie', tiers=_tiers('41250007'))
+        self.awa = _caissiere('awa')
+        self.chef = _superviseur()
+        self.admin = User.objects.create_superuser('admin_jr', password='x')
+        self.session = regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        self.jour = timezone.localdate()
+
+    def _facture(self, montant, produit=None):
+        f = _facture(Decimal(montant))
+        LigneFacture.objects.create(facture=f, libelle='Article', quantite=1, prix_unitaire=Decimal(montant),
+                                    produit=produit)
+        return f
+
+    def _fermer(self, especes):
+        regles.cloturer_session(self.session, self.awa, {}, Decimal(especes))
+        regles.valider_session(self.session, self.chef)
+        regles.cloturer_journee(self.session.journee, self.chef)
+
+    def test_une_seule_ecriture_au_nom_du_client_de_la_caisse(self):
+        a, b = self._facture(5000), self._facture(3000)
+        _payer(self.awa, a, 5000)
+        _payer(self.awa, b, 1000)                       # 2 000 restent dus
+        self.assertIsNone(moteur.ecriture_journee(self.session.journee))   # journée pas encore validée
+        self._fermer(6000)
+        resultat = moteur.generer(self.jour, self.jour)
+        self.assertEqual(resultat['erreurs'], [])
+        self.assertEqual(Ecriture.objects.count(), 1)
+        e = Ecriture.objects.get()
+        self.assertEqual((e.origine, e.journal.code), (f'journee:{self.session.journee.pk}', 'CAI AC'))
+        caisse = moteur.compte_de_caisse(self.caisse).numero
+        self.assertEqual(_lignes(e), {caisse: (Decimal('6000'), 0), '41250000': (Decimal('2000'), 0),
+                                      '70520100': (0, Decimal('8000'))})
+        self.assertEqual(LigneEcriture.objects.get(compte__numero='41250000').compte_tiers.numero, '41250007')
+        self.assertEqual(moteur.generer(self.jour, self.jour)['crees'], 0)       # jamais deux fois
+        from . import ventes
+        moteur.valider([e], self.admin)
+        self.assertEqual(ventes.documents(self.jour, self.jour)[0]['statut'], 'comptabilise')
+        self.assertEqual(ETATS['controle']['fonction'](self.jour, self.jour, {})['tableaux'][0]['lignes'][0]
+                         ['cellules'][1], 0)                                   # rien d'oublié
+
+    def test_compte_de_vente_par_famille(self):
+        from stock.models import CategorieStock, Produit
+        from .models import Correspondance
+        eau = CategorieStock.objects.create(nom='Eaux minérales', type='consommable')
+        produit = Produit.objects.create(nom='Eau 1,5 L', type='consommable', categorie=eau)
+        Correspondance.objects.create(cle=f'vente:famille:{eau.pk}', libelle='Eaux minérales',
+                                      compte=_compte('70512001'))
+        f = self._facture(500, produit)
+        self.assertEqual(_lignes(moteur.ecriture_facture(f))['70512001'], (0, Decimal('500')))
+
+    def test_rouvrir_une_journee_comptabilisee(self):
+        _payer(self.awa, self._facture(5000), 5000)
+        self._fermer(5000)
+        e = moteur.ecriture_journee(self.session.journee)
+        regles.rouvrir_journee(self.session.journee, self.chef)        # brouillon : retiré
+        self.assertFalse(Ecriture.objects.filter(pk=e.pk).exists())
+        regles.cloturer_journee(self.session.journee, self.chef)
+        moteur.valider([moteur.ecriture_journee(self.session.journee)], self.admin)
+        with self.assertRaises(regles.ErreurCaisse):
+            regles.rouvrir_journee(self.session.journee, self.chef)
+
+
+class TestRemiseALaPetiteCaisse(TestCase):
+
+    def test_remise_par_les_virements_internes(self):
+        from .models import CompteTresorerie, RemiseBanque
+        from .tresorerie import ecritures_remise
+        caisse = _caisse(nom='Caisse Pharmacie', code='PH')
+        petite = CompteTresorerie.objects.get(libelle='Petite caisse')
+        self.assertEqual((petite.type, petite.compte.numero), ('caisse', '57100005'))
+        self.assertEqual(moteur.compte('virement_interne').numero, '58800000')
+        remise = RemiseBanque.objects.create(caisse=caisse, compte_tresorerie=petite, montant=Decimal('273950'),
+                                             date=timezone.localdate())
+        sortie, entree = ecritures_remise(remise)
+        compte_caisse = moteur.compte_de_caisse(caisse).numero
+        self.assertEqual(_lignes(sortie), {'58800000': (Decimal('273950'), 0), compte_caisse: (0, Decimal('273950'))})
+        self.assertEqual(_lignes(entree), {'57100005': (Decimal('273950'), 0), '58800000': (0, Decimal('273950'))})
+        self.assertEqual(entree.journal.code, 'CAISPC')
