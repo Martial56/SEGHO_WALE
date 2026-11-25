@@ -135,3 +135,42 @@ def relever_resultats():
             echange.save()
             echanges.append(echange)
         return echanges
+
+
+def relever_comptes_rendus():
+    """
+    Joint aux analyses les comptes rendus PDF annoncés par le laboratoire
+    (OBX de type FIC) et déposés sur le FTP. Un PDF pas encore arrivé (ou
+    sans son témoin) sera cherché à la relève suivante.
+    Retourne la liste des analyses complétées.
+    """
+    from django.core.files.base import ContentFile
+    from laboratoire.models import AnalyseLaboratoire, ConfigurationHPRIM
+
+    config = ConfigurationHPRIM.all_objects.filter(actif=True).order_by('-date_modification').first()
+    if config is None or not config.ftp_host:
+        return []
+
+    attendues = list(AnalyseLaboratoire.objects
+                     .exclude(compte_rendu_nom="")
+                     .filter(compte_rendu=""))
+    if not attendues:
+        return []
+
+    noms = sorted({a.compte_rendu_nom for a in attendues})
+    fichiers = transport.recuperer_par_nom(
+        noms, host=config.ftp_host, port=config.ftp_port,
+        user=config.ftp_user, password=config.ftp_password,
+        repertoire_distant=config.repertoire_reception or config.repertoire_envoi,
+        extension_temoin=config.extension_temoin,
+        use_tls=config.ftp_tls,
+    )
+    completees = []
+    for analyse in attendues:
+        contenu = fichiers.get(analyse.compte_rendu_nom)
+        if contenu is None:
+            continue
+        analyse.compte_rendu.save(f"{analyse.numero}.pdf", ContentFile(contenu), save=False)
+        analyse.save(update_fields=["compte_rendu"])
+        completees.append(analyse)
+    return completees

@@ -430,6 +430,40 @@ def employe_vers_medecin(request, pk):
 
 # ── Liste ─────────────────────────────────────────────────────────────────────
 
+def _filtrer_recherche_employes(qs, q):
+    """Recherche plein texte de la liste des employés.
+
+    Chaque mot saisi doit se retrouver dans le nom, les prénoms, le matricule
+    ou l'un des deux téléphones : « kouassi jean » trouve Kouassi Jean comme
+    Jean Kouassi, ce qu'un seul icontains sur la chaîne entière ne permettait
+    pas. Pour les téléphones, on compare aussi les seuls chiffres, de sorte
+    que « 0701 » trouve « 07 01 23 45 67 » quel que soit le séparateur saisi.
+    """
+    from django.db.models import Value
+    from django.db.models.functions import Replace
+
+    mots = q.split()
+    if not mots:
+        return qs
+
+    def chiffres(champ):
+        expr = champ
+        for sep in (' ', '.', '-', '/', '(', ')', '+'):
+            expr = Replace(expr, Value(sep), Value(''))
+        return expr
+
+    qs = qs.annotate(_tel1=chiffres('telephone'), _tel2=chiffres('telephone2'))
+    for mot in mots:
+        cond = (Q(nom__icontains=mot) | Q(prenoms__icontains=mot)
+                | Q(matricule__icontains=mot)
+                | Q(telephone__icontains=mot) | Q(telephone2__icontains=mot))
+        num = re.sub(r'\D', '', mot)
+        if num:
+            cond |= Q(_tel1__contains=num) | Q(_tel2__contains=num)
+        qs = qs.filter(cond)
+    return qs
+
+
 @login_required(login_url='login')
 def employe_list(request):
     qs = Employe.objects.select_related('service', 'fonction', 'grade', 'type_contrat')
@@ -438,10 +472,7 @@ def employe_list(request):
     f_service = request.GET.get('service', '').strip()
     f_statut  = request.GET.get('statut', '').strip()
 
-    if q:
-        qs = qs.filter(
-            Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q)
-        )
+    qs = _filtrer_recherche_employes(qs, q)
     if f_service:
         qs = qs.filter(service_id=f_service)
     if f_statut:
@@ -733,8 +764,7 @@ def employe_export_excel(request):
     q         = request.GET.get('q', '').strip()
     f_service = request.GET.get('service', '').strip()
     f_statut  = request.GET.get('statut', '').strip()
-    if q:
-        qs = qs.filter(Q(nom__icontains=q) | Q(prenoms__icontains=q) | Q(matricule__icontains=q))
+    qs = _filtrer_recherche_employes(qs, q)
     if f_service:
         qs = qs.filter(service_id=f_service)
     if f_statut:

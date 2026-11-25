@@ -1827,6 +1827,26 @@ def patient_resultat_examen_detail(request, pk, analyse_pk):
 
 
 @login_required
+@permission_required('patients.view_patient', raise_exception=True)
+def patient_resultat_examen_compte_rendu(request, pk, analyse_pk):
+    """Compte rendu PDF du laboratoire, ouvert dans le navigateur. Servi par
+    l'application, derrière la connexion, plutôt que par un lien /media/
+    que n'importe qui pourrait ouvrir."""
+    from django.http import FileResponse, Http404
+    from laboratoire.models import AnalyseLaboratoire
+    patient = get_object_or_404(Patient, pk=pk)
+    analyse = get_object_or_404(AnalyseLaboratoire, pk=analyse_pk, patient=patient)
+    if not analyse.compte_rendu:
+        raise Http404("Compte rendu pas encore reçu.")
+    try:
+        fichier = analyse.compte_rendu.open('rb')
+    except FileNotFoundError:
+        raise Http404("Fichier du compte rendu introuvable.")
+    return FileResponse(fichier, content_type='application/pdf',
+                        filename=f"{analyse.numero}.pdf")
+
+
+@login_required
 @require_POST
 def rdv_resultats_vus(request, pk):
     """Appelé quand le médecin ouvre l'onglet « Résultats d'examens » d'une

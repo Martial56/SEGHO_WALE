@@ -161,13 +161,9 @@ def recuperer_fichiers(
         if repertoire_distant:
             _cd_ou_creer(ftp, repertoire_distant)
 
-        # Les serveurs OpenVMS (celui de SYSLAM) suffixent chaque nom d'un
-        # numéro de version : « WAA013.HPR;2 ». On regroupe les versions sous
-        # le nom nu, on ne lit que la plus récente et on les efface toutes.
-        versions: Dict[str, List[str]] = {}
-        for n in ftp.nlst():
-            n = n.rsplit("/", 1)[-1]
-            versions.setdefault(_sans_version(n).upper(), []).append(n)
+        # Versions OpenVMS regroupées sous le nom nu : on ne lit que la plus
+        # récente et on les efface toutes.
+        versions = _versions(ftp)
         bases_pretes = {
             os.path.splitext(n)[0]
             for n in versions
@@ -180,10 +176,7 @@ def recuperer_fichiers(
                 continue
             if base not in bases_pretes:
                 continue  # pas encore de témoin -> message incomplet
-            distants.sort(key=_numero_de_version, reverse=True)
-            buf = io.BytesIO()
-            ftp.retrbinary(f"RETR {distants[0]}", buf.write)
-            resultats.append((_sans_version(distants[0]), buf.getvalue()))
+            resultats.append((_sans_version(distants[0]), _lire(ftp, distants[0])))
             if supprimer_apres:
                 for n in distants + versions[(base + extension_temoin).upper()]:
                     _supprimer_silencieux(ftp, n)
@@ -193,6 +186,66 @@ def recuperer_fichiers(
         except Exception:
             ftp.close()
     return resultats
+
+
+def recuperer_par_nom(
+    noms: List[str],
+    host: str,
+    user: str,
+    password: str,
+    port: int = 21,
+    repertoire_distant: str = "",
+    extension_temoin: str = ".ok",
+    use_tls: bool = False,
+    timeout: int = 30,
+) -> Dict[str, bytes]:
+    """
+    Récupère des fichiers désignés par leur nom (ex. le compte rendu PDF
+    qu'annonce un message ORU), à condition que leur témoin soit déposé.
+    Retourne {nom demandé: contenu} pour ceux trouvés, puis les efface du
+    FTP avec leur témoin ; les autres seront cherchés au passage suivant.
+    """
+    trouves: Dict[str, bytes] = {}
+    if not noms:
+        return trouves
+    ftp = _connecter_ftp(host, port, user, password, use_tls, timeout)
+    try:
+        if repertoire_distant:
+            _cd_ou_creer(ftp, repertoire_distant)
+        versions = _versions(ftp)
+        for nom in noms:
+            distants = versions.get(nom.upper())
+            temoins = versions.get((os.path.splitext(nom)[0] + extension_temoin).upper())
+            if not distants or not temoins:
+                continue
+            trouves[nom] = _lire(ftp, distants[0])
+            for n in distants + temoins:
+                _supprimer_silencieux(ftp, n)
+    finally:
+        try:
+            ftp.quit()
+        except Exception:
+            ftp.close()
+    return trouves
+
+
+def _versions(ftp) -> Dict[str, List[str]]:
+    """{NOM SANS VERSION, en majuscules: [noms distants, plus récent d'abord]}.
+    Les serveurs OpenVMS (celui de SYSLAM) suffixent chaque nom d'un numéro
+    de version : « WAA013.HPR;2 »."""
+    versions: Dict[str, List[str]] = {}
+    for n in ftp.nlst():
+        n = n.rsplit("/", 1)[-1]
+        versions.setdefault(_sans_version(n).upper(), []).append(n)
+    for distants in versions.values():
+        distants.sort(key=_numero_de_version, reverse=True)
+    return versions
+
+
+def _lire(ftp, nom: str) -> bytes:
+    buf = io.BytesIO()
+    ftp.retrbinary(f"RETR {nom}", buf.write)
+    return buf.getvalue()
 
 
 _VERSION = re.compile(r";\d*$")

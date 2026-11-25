@@ -170,9 +170,18 @@ def _fiche_courante(patient, synthese=None):
     return patient
 
 
+def compte_rendu_joint(r) -> str:
+    """Nom du compte rendu PDF qu'annonce un OBX de type FIC
+    (« SYSLAM64~WAACRP_….PDF~ACROBAT »), vide pour un vrai résultat."""
+    if (r.type_resultat or "").upper() != "FIC":
+        return ""
+    morceaux = (r.valeur or "").split("~")
+    return (morceaux[1] if len(morceaux) > 1 else morceaux[0]).strip()
+
+
 def _valeurs_recues(d):
     return sorted(((r.libelle_test or r.code_test)[:200], (r.valeur or "")[:200])
-                  for r in d.resultats)
+                  for r in d.resultats if not compte_rendu_joint(r))
 
 
 def _deja_recu(demande_obj, d) -> bool:
@@ -295,6 +304,12 @@ def integrer_oru(contenu: bytes, centre=None):
             synthese["demandes"] += 1
 
             for r in d.resultats:
+                fichier = compte_rendu_joint(r)
+                if fichier:
+                    # Pas une valeur : le PDF est relevé à part, sur le FTP.
+                    analyse.compte_rendu_nom = fichier[:255]
+                    analyse.save(update_fields=["compte_rendu_nom"])
+                    continue
                 vmin = vmax = ""
                 if r.normales and "-" in r.normales:
                     gauche, droite = r.normales.split("-", 1)

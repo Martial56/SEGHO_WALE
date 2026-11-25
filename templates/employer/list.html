@@ -284,7 +284,7 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
   <div style="display:flex; gap:8px; align-items:center;">
     {% if perms.employer.view_employe %}
     <a href="{% url 'rh_export_excel' %}?q={{ q }}&service={{ f_service }}&statut={{ f_statut }}"
-       class="btn-rh-outline" title="Exporter en Excel">
+       class="btn-rh-outline" title="Exporter en Excel" onclick="return rhExporter(this)">
       <i class="bi bi-file-earmark-excel"></i> Excel
     </a>
     {% endif %}
@@ -299,8 +299,9 @@ html[data-theme="dark"] .rh-page-link.active { background: var(--rh-600); color:
 <!-- Filtres -->
 <form method="get" class="rh-filter-row" id="filterForm" onsubmit="return false;">
   <input type="search" name="q" id="search-input" value="{{ q|default:'' }}"
-         placeholder="Rechercher par nom, matricule…"
-         class="rh-input" style="min-width:220px; max-width:280px;"
+         placeholder="Nom, prénoms, matricule ou téléphone…"
+         autocomplete="off"
+         class="rh-input" style="min-width:260px; max-width:320px;"
          aria-label="Rechercher">
   <button type="button" class="btn-rh-outline" style="padding:8px 12px;" onclick="lancerRecherche()" title="Rechercher">
     <i class="bi bi-search"></i>
@@ -519,6 +520,16 @@ function rhAppliquerFiltres() {
   if (sta) { params.set('statut', sta); } else { params.delete('statut'); }
   params.delete('page');
   window.listeRafraichir(window.location.pathname + '?' + params.toString(), true);
+}
+/* La liste se rafraîchit en AJAX pendant la saisie : le lien d'export, rendu
+   au chargement, porterait l'ancienne recherche. On le recompose au clic. */
+function rhExporter(lien) {
+  var params = new URLSearchParams();
+  params.set('q', document.getElementById('search-input').value.trim());
+  params.set('service', document.querySelector('select[name="service"]').value);
+  params.set('statut', document.querySelector('select[name="statut"]').value);
+  window.location.href = lien.href.split('?')[0] + '?' + params.toString();
+  return false;
 }
 function rhEffacerFiltres() {
   document.getElementById('search-input').value = '';

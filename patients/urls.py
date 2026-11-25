@@ -49,6 +49,8 @@ urlpatterns = [
          name='resultat_examen_detail'),
     path('<int:pk>/examens-resultats/<int:analyse_pk>/bulletin/', views.patient_resultat_examen_bulletin,
          name='resultat_examen_bulletin'),
+    path('<int:pk>/examens-resultats/<int:analyse_pk>/compte-rendu/', views.patient_resultat_examen_compte_rendu,
+         name='resultat_examen_compte_rendu'),
     path('doublons/verifier/', views.doublons_verifier, name='doublons_verifier'),
     path('doublons/journaliser/', views.doublons_journaliser, name='doublons_journaliser'),
     # ── L'écran des doublons (étape 4a) ──────────────────────────────────

@@ -44,6 +44,12 @@ class AnalyseLaboratoire(models.Model):
     validateur = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='analyses_val')
     commentaire = models.TextField(blank=True)
     urgent = models.BooleanField(default=False)
+    # Compte rendu PDF du laboratoire. Le message ORU n'en porte que le nom
+    # (OBX de type FIC) ; le fichier est déposé à côté sur le FTP et relevé
+    # dès que son témoin est là. `compte_rendu_nom` non vide et fichier
+    # absent = compte rendu encore attendu.
+    compte_rendu_nom = models.CharField(max_length=255, blank=True)
+    compte_rendu = models.FileField(upload_to='laboratoire/comptes_rendus/%Y/%m/', blank=True)
 
     def save(self, *args, **kwargs):
         if not self.numero:

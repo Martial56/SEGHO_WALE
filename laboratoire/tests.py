@@ -810,3 +810,88 @@ class RenvoiDuMemeResultatTests(TestCase):
             integrer_oru(self._oru('WAA011.HPR', 'NEGATIF'), centre=self.centre)
             integrer_oru(self._oru('WAA012.HPR', 'POSITIF'), centre=self.centre)
         self.assertEqual(self.demande.analyses.count(), 2)
+
+
+class CompteRenduPdfTests(TestCase):
+    """SYSLAM annonce son compte rendu PDF par un OBX de type FIC : ce n'est
+    pas une valeur à afficher, c'est un fichier à relever et à joindre."""
+
+    def setUp(self):
+        import tempfile
+        from django.test import override_settings
+        self.media = tempfile.mkdtemp()
+        self.reglages = override_settings(MEDIA_ROOT=self.media)
+        self.reglages.enable()
+        self.centre = Centre.objects.create(nom='CMS WALE Yamoussoukro', code='WALE-PDF')
+        with centre_actif(self.centre):
+            ConfigurationHPRIM.objects.create(nom='Config', actif=True, ftp_host='labo',
+                                              repertoire_reception='/resultats')
+            patient = Patient.objects.create(nom='Aba', prenoms='Israel', date_naissance=date(1997, 9, 30), sexe='M')
+            self.demande = DemandeExamen.objects.create(patient=patient, statut='demande')
+            LigneDemandeExamen.objects.create(demande=self.demande, libelle='GE', prix=2000)
+
+    def tearDown(self):
+        import shutil
+        self.reglages.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+
+    def _integrer(self):
+        from .hprim.integration import integrer_oru
+        identifiant = self.demande.numero.replace("DEM", "")
+        oru = (
+            "H|~^\&|WAA011.HPR||WALE~CMS WALE||ORU|||ACCWAL~WALE Accueil Auto|SYSLAM 64|P|H2.2~L|202611171537\r\n"
+            f"P|1|{self.demande.patient.code_patient}|ABA  IS1||ABA~ISRAEL~~~M||19970930|M\r\n"
+            f"OBR|1|{identifiant}~{identifiant}|{identifiant}~k1116061|GE\r\n"
+            "OBX|1|CE|GE~Négative~L|1|NEGATIF\r\n"
+            "OBX|2|FIC|CRPFICPDF|LAB|SYSLAM64~WAACRP_K1.PDF~ACROBAT\r\n"
+            "L|1||1|6|WAA011\r\n"
+        ).encode("iso-8859-1")
+        with centre_actif(self.centre):
+            return integrer_oru(oru, centre=self.centre)[1]
+
+    def _relever(self, ftp):
+        from unittest import mock
+        from .hprim import services, transport
+        with mock.patch.object(transport, '_connecter_ftp', return_value=ftp):
+            return services.relever_comptes_rendus()
+
+    def test_la_reference_pdf_n_est_pas_une_ligne_de_resultat(self):
+        synthese = self._integrer()
+        analyse = self.demande.analyses.get()
+        self.assertEqual(synthese["resultats"], 1)
+        self.assertEqual(list(analyse.resultats.values_list('parametre', flat=True)), ['Négative'])
+        self.assertEqual(analyse.compte_rendu_nom, 'WAACRP_K1.PDF')
+
+    def test_le_pdf_est_releve_joint_et_efface_du_ftp(self):
+        self._integrer()
+        ftp = _FtpOpenVMS({'WAACRP_K1.PDF;2': b'%PDF-v2', 'WAACRP_K1.PDF;1': b'%PDF-v1',
+                           'WAACRP_K1.OK;2': b'', 'WAACRP_K1.OK;1': b''})
+        self.assertEqual(len(self._relever(ftp)), 1)
+        analyse = self.demande.analyses.get()
+        with analyse.compte_rendu.open('rb') as f:
+            self.assertEqual(f.read(), b'%PDF-v2')
+        self.assertEqual(ftp.fichiers, {})
+
+    def test_sans_temoin_le_pdf_reste_attendu(self):
+        self._integrer()
+        ftp = _FtpOpenVMS({'WAACRP_K1.PDF;1': b'%PDF'})
+        self.assertEqual(self._relever(ftp), [])
+        self.assertFalse(self.demande.analyses.get().compte_rendu)
+        self.assertIn('WAACRP_K1.PDF;1', ftp.fichiers)
+
+    def test_le_medecin_ouvre_le_pdf_depuis_la_fiche(self):
+        from django.contrib.auth.models import User
+        self._integrer()
+        self._relever(_FtpOpenVMS({'WAACRP_K1.PDF;1': b'%PDF-1.4', 'WAACRP_K1.OK;1': b''}))
+        analyse = self.demande.analyses.get()
+        patient = self.demande.patient
+        url_pdf = reverse('patients:resultat_examen_compte_rendu', args=[patient.pk, analyse.pk])
+        self.assertEqual(self.client.get(url_pdf).status_code, 302)   # connexion exigée
+        with centre_actif(self.centre):
+            self.client.force_login(User.objects.create_superuser('medecin_pdf', password='x'))
+            fiche = self.client.get(reverse('patients:resultat_examen_detail', args=[patient.pk, analyse.pk]))
+            pdf = self.client.get(url_pdf)
+        self.assertContains(fiche, url_pdf)
+        self.assertNotContains(fiche, 'CRPFICPDF')
+        self.assertEqual(pdf['Content-Type'], 'application/pdf')
+        self.assertEqual(b''.join(pdf.streaming_content), b'%PDF-1.4')
