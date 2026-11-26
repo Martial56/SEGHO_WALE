@@ -1,0 +1,73 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Bons de sortie{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>
+.bs-filtres { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.bs-filtres .cpt-field { margin-bottom: 0; }
+.bs-soldes { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.bs-solde { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.bs-solde .l { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.bs-solde .v { font-size: 18px; font-weight: 800; }
+.cpt-badge.brouillon { background: rgba(120,120,120,.14); color: var(--text-muted); }
+.cpt-badge.a_equilibrer { background: rgba(217,147,15,.14); color: #a8710a; }
+.cpt-badge.equilibre { background: rgba(22,169,107,.12); color: #0f8f59; }
+.cpt-badge.annule { background: rgba(192,57,43,.1); color: var(--rose-text, #c0392b); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Bons de sortie</h1>
+      <div class="cpt-sub">Dépenses payées en espèces depuis la petite caisse : le bon se saisit, se valide, puis son écriture est proposée à l'équilibrage dans le journal de la caisse.</div></div>
+    {% if perms.comptabilite.add_bonsortie %}
+    <div class="cpt-actions"><a href="{% url 'comptabilite:bon_sortie_nouveau' %}" class="cpt-btn primaire"><i class="bi bi-plus-lg"></i> Nouveau bon</a></div>
+    {% endif %}
+  </div>
+
+  <div class="bs-soldes">
+    {% for c, dispo in caisses %}
+    <div class="bs-solde"><div class="l">{{ c.libelle }} ({{ c.compte.numero }})</div>
+      <div class="v {% if dispo < 0 %}ecart-neg{% endif %}">{{ dispo|floatformat:0|intcomma }} F</div>
+      <div class="cpt-note">disponible aujourd'hui</div></div>
+    {% empty %}
+    <div class="cpt-alerte">Aucune caisse hors guichet : créez la petite caisse dans Trésorerie → Comptes de trésorerie (type « Caisse »).</div>
+    {% endfor %}
+  </div>
+
+  <form method="get" class="cpt-card bs-filtres">
+    <div class="cpt-field"><label>Mois</label><input type="month" name="mois" class="cpt-input" value="{{ mois|date:'Y-m' }}"></div>
+    <div class="cpt-field"><label>Caisse</label>
+      <select name="caisse" class="cpt-input"><option value="">Toutes</option>
+        {% for c, dispo in caisses %}<option value="{{ c.pk }}" {% if c == caisse %}selected{% endif %}>{{ c.libelle }}</option>{% endfor %}
+      </select></div>
+    <div class="cpt-field"><label>Étape</label>
+      <select name="etape" class="cpt-input"><option value="">Toutes</option>
+        {% for code, libelle in etapes.items %}<option value="{{ code }}" {% if code == etape %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+      </select></div>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  {% if a_equilibrer %}<div class="cpt-alerte">{{ a_equilibrer }} bon(s) validé(s) attendent leur équilibrage.</div>{% endif %}
+
+  <div class="cpt-card">
+    {% if bons %}
+    <table class="cpt-table">
+      <thead><tr><th>Date</th><th>N°</th><th>Caisse</th><th>Motif</th><th>Objet</th><th>Bénéficiaire</th><th class="num">Montant</th><th>Étape</th><th>Écriture</th></tr></thead>
+      <tbody>
+        {% for b in bons %}
+        <tr class="lien" onclick="location.href='{% url 'comptabilite:bon_sortie' b.pk %}'">
+          <td>{{ b.date|date:"d/m/Y" }}</td><td>{{ b.numero }}</td><td>{{ b.caisse.libelle }}</td><td>{{ b.motif }}</td>
+          <td>{{ b.libelle }}</td><td>{{ b.beneficiaire }}</td><td class="num">{{ b.montant|floatformat:0|intcomma }}</td>
+          <td><span class="cpt-badge {{ b.etape }}">{{ b.etape_libelle }}</span></td>
+          <td>{% if b.ecriture %}{{ b.ecriture.journal.code }} · {{ b.ecriture.reference }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="6">Total (hors annulés)</td><td class="num">{{ total|floatformat:0|intcomma }}</td><td colspan="2"></td></tr></tfoot>
+    </table>
+    {% else %}<div class="cpt-vide">Aucun bon de sortie sur ce mois.</div>{% endif %}
+  </div>
+</div>
+{% endblock %}

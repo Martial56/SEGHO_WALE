@@ -2389,3 +2389,112 @@ class TestRemiseALaPetiteCaisse(TestCase):
         self.assertEqual(_lignes(sortie), {'58800000': (Decimal('273950'), 0), compte_caisse: (0, Decimal('273950'))})
         self.assertEqual(_lignes(entree), {'57100005': (Decimal('273950'), 0), '58800000': (0, Decimal('273950'))})
         self.assertEqual(entree.journal.code, 'CAISPC')
+
+
+# ─── Bons de sortie de la petite caisse ────────────────────────────────────────
+
+from . import bons_sortie as bons  # noqa: E402
+from .models import BonSortie  # noqa: E402
+
+
+class TestBonsSortie(TestCase):
+    """L'assistant comptable saisit le bon, le valide lui-même, puis équilibre
+    son écriture, proposée d'après le bon, dans le journal de la petite caisse."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('assistant', password='x')
+        self.jour = timezone.localdate()
+        self.petite = CompteTresorerie.objects.get(libelle='Petite caisse')
+        self.motif = MotifSortie.objects.create(libelle='Fournitures (test)', compte=_compte('60580001'))
+        # Approvisionnement de la petite caisse : 50 000 F.
+        moteur.creer_ecriture(Journal.objects.get(code='OD'), self.jour, 'Fonds de petite caisse',
+                              [(self.petite.compte, None, Decimal('50000'), 0, ''),
+                               (_compte('58800000'), None, 0, Decimal('50000'), '')])
+
+    def _bon(self, montant='12000', valider=True):
+        bon = bons.enregistrer(self.admin, self.petite, self.jour, self.motif, 'Rames de papier',
+                               Decimal(montant), 'Librairie')
+        return bons.valider(bon, self.admin) if valider else bon
+
+    def test_circuit_complet(self):
+        bon = self._bon(valider=False)
+        self.assertTrue(bon.numero.startswith('BS'))
+        self.assertEqual(bon.etape, 'brouillon')
+        bon = bons.valider(bon, self.admin)
+        self.assertEqual(bon.etape, 'a_equilibrer')
+        # L'argent est sorti avant même que l'écriture soit passée.
+        self.assertEqual(bons.disponible(self.petite), Decimal('38000'))
+        ecriture = bons.equilibrer(bon, bons.lignes_proposees(bon), self.admin)
+        self.assertEqual(ecriture.journal.code, 'CAISPC')
+        self.assertEqual(ecriture.piece, bon.numero)
+        self.assertEqual(_lignes(ecriture), {'60580001': (Decimal('12000'), 0), '57100005': (0, Decimal('12000'))})
+        self.assertEqual(BonSortie.objects.get(pk=bon.pk).etape, 'equilibre')
+        self.assertEqual(bons.disponible(self.petite), Decimal('38000'))
+        with self.assertRaises(bons.ErreurBon):
+            bons.equilibrer(bon, bons.lignes_proposees(bon), self.admin)
+
+    def test_pas_au_dela_de_la_caisse(self):
+        self._bon('40000')
+        bon = self._bon('15000', valider=False)
+        with self.assertRaises(bons.ErreurBon):
+            bons.valider(bon, self.admin)        # 10 000 F seulement restent
+        self.assertEqual(BonSortie.objects.get(pk=bon.pk).statut, 'brouillon')
+
+    def test_equilibrage_controle(self):
+        bon = self._bon()
+        charge, transport, caisse = self.motif.compte, _compte('61830002'), self.petite.compte
+        # Pas de changement de total, pas d'oubli de la caisse, débit = crédit.
+        with self.assertRaises(bons.ErreurBon):
+            bons.equilibrer(bon, [(charge, '', Decimal('10000'), 0, ''), (caisse, '', 0, Decimal('10000'), '')],
+                            self.admin)
+        with self.assertRaises(bons.ErreurBon):
+            bons.equilibrer(bon, [(charge, '', Decimal('12000'), 0, ''),
+                                  (_compte('58800000'), '', 0, Decimal('12000'), '')], self.admin)
+        with self.assertRaises(moteur.ErreurCompta):
+            bons.equilibrer(bon, [(charge, '', Decimal('12000'), 0, ''), (caisse, '', 0, Decimal('12000'), ''),
+                                  (transport, '', 0, Decimal('1000'), '')], self.admin)
+        # Répartir la dépense sur deux comptes est permis.
+        ecriture = bons.equilibrer(bon, [(charge, '', Decimal('8000'), 0, ''), (transport, '', Decimal('4000'), 0, ''),
+                                         (caisse, '', 0, Decimal('12000'), '')], self.admin, valider_ecriture=True)
+        self.assertEqual(ecriture.statut, 'validee')
+
+    def test_annulation(self):
+        bon = self._bon()
+        ecriture = bons.equilibrer(bon, bons.lignes_proposees(bon), self.admin)
+        # Brouillon d'écriture supprimé à part : le bon redevient à équilibrer.
+        moteur.supprimer_brouillon(ecriture)
+        bon = BonSortie.objects.get(pk=bon.pk)
+        self.assertEqual(bon.etape, 'a_equilibrer')
+        ecriture = bons.equilibrer(bon, bons.lignes_proposees(bon), self.admin, valider_ecriture=True)
+        with self.assertRaises(bons.ErreurBon):
+            bons.annuler(BonSortie.objects.get(pk=bon.pk))   # écriture validée : contre-passer d'abord
+        moteur.valider([moteur.contre_passer(ecriture, self.admin)], self.admin)
+        bons.annuler(BonSortie.objects.get(pk=bon.pk))
+        self.assertEqual(bons.disponible(self.petite), Decimal('50000'))
+
+    def test_ecrans(self):
+        client = _client(self.admin)
+        self.assertEqual(client.get(reverse('comptabilite:bons_sortie')).status_code, 200)
+        page = client.get(reverse('comptabilite:bon_sortie_nouveau')).content.decode()
+        self.assertIn(f'value="{self.petite.pk}" selected', page)
+        reponse = client.post(reverse('comptabilite:bon_sortie_nouveau'), {
+            'caisse': self.petite.pk, 'date': self.jour.isoformat(), 'motif': self.motif.pk,
+            'libelle': 'Carburant', 'beneficiaire': 'Chauffeur', 'montant': '5000', 'action': 'valider'})
+        bon = BonSortie.objects.get(libelle='Carburant')
+        self.assertRedirects(reponse, reverse('comptabilite:bon_sortie_equilibrer', args=[bon.pk]))
+        page = client.get(reponse.url).content.decode()
+        self.assertIn('value="60580001 ', page)          # compte du motif prérempli
+        self.assertIn('value="57100005 ', page)          # la caisse au crédit
+        self.assertIn('value="5000"', page)
+        client.post(reponse.url, {
+            'compte_0': '60580001', 'libelle_0': 'Carburant', 'tiers_0': '', 'convention_0': '',
+            'debit_0': '5000', 'credit_0': '',
+            'compte_1': '57100005', 'libelle_1': 'Carburant', 'tiers_1': '', 'convention_1': '',
+            'debit_1': '', 'credit_1': '5000', 'action': 'valider'})
+        bon = BonSortie.objects.get(pk=bon.pk)
+        self.assertEqual(bon.etape, 'equilibre')
+        self.assertEqual(bon.ecriture.statut, 'validee')
+        self.assertEqual(client.get(reverse('comptabilite:bon_sortie', args=[bon.pk])).status_code, 200)
+        html = client.get(reverse('comptabilite:bons_sortie')).content.decode()
+        nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
+        self.assertIn(reverse('comptabilite:bons_sortie'), nav)

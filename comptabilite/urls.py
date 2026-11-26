@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import views, vues_compta, vues_etats, vues_financements as vf, vues_assurances as va, vues_tresorerie as vt
-from . import vues_achats as vac, vues_cloture as vcl, vues_ventes
+from . import vues_achats as vac, vues_cloture as vcl, vues_ventes, vues_bons_sortie as vbs
 
 app_name = 'comptabilite'
 
@@ -64,6 +64,12 @@ urlpatterns = [
     path('tresorerie/comptes/<int:pk>/', vt.comptes_tresorerie, name='compte_tresorerie_modifier'),
     path('tresorerie/comptes/<int:pk>/rapprochement/', vt.rapprochement, name='rapprochement'),
     path('tresorerie/remises/', vt.remises, name='remises'),
+    path('tresorerie/bons-sortie/', vbs.bons_sortie, name='bons_sortie'),
+    path('tresorerie/bons-sortie/nouveau/', vbs.bon_sortie_form, name='bon_sortie_nouveau'),
+    path('tresorerie/bons-sortie/<int:pk>/', vbs.bon_sortie, name='bon_sortie'),
+    path('tresorerie/bons-sortie/<int:pk>/modifier/', vbs.bon_sortie_form, name='bon_sortie_modifier'),
+    path('tresorerie/bons-sortie/<int:pk>/action/', vbs.bon_sortie_action, name='bon_sortie_action'),
+    path('tresorerie/bons-sortie/<int:pk>/equilibrage/', vbs.bon_sortie_equilibrer, name='bon_sortie_equilibrer'),
     path('assurances/factures/<int:pk>/refus/', vt.rejet_assurance, name='rejet_assurance'),
     path('achats/factures/', vac.factures_fournisseurs, name='factures_fournisseurs'),
     path('achats/factures/nouvelle/', vac.facture_fournisseur_form, name='facture_fournisseur_nouvelle'),

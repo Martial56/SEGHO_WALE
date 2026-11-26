@@ -870,6 +870,76 @@ class RemiseBanque(ModeleCentre):
         ordering = ['-date', '-pk']
 
 
+class BonSortie(ModeleCentre):
+    """Bon de sortie d'une caisse hors guichet (la petite caisse), saisi par
+    l'assistant comptable — à ne pas confondre avec `SortieCaisse`, qui sort
+    de la pochette d'une caissière pendant sa session.
+
+    Saisi en brouillon, puis validé ; vient ensuite l'équilibrage : l'écriture
+    est proposée d'après le bon (compte du motif, libellé, montant au débit ;
+    la caisse au crédit) et se passe dans le journal de la caisse. Le lien
+    avec l'écriture tient à son origine « bon_sortie:<pk> » : si le brouillon
+    d'écriture est supprimé, le bon redevient « à équilibrer »."""
+    STATUT = [('brouillon', 'Brouillon'), ('valide', 'Validé'), ('annule', 'Annulé')]
+
+    numero = models.CharField(max_length=20, unique=True, editable=False)
+    date = models.DateField()
+    caisse = models.ForeignKey(CompteTresorerie, on_delete=models.PROTECT, related_name='bons_sortie',
+                               limit_choices_to={'type': 'caisse'}, verbose_name="Caisse")
+    motif = models.ForeignKey(MotifSortie, on_delete=models.PROTECT, related_name='bons_sortie')
+    libelle = models.CharField(max_length=255, verbose_name="Objet de la dépense")
+    beneficiaire = models.CharField(max_length=150, blank=True, verbose_name="Bénéficiaire")
+    montant = models.DecimalField(max_digits=15, decimal_places=2)
+    justificatif = models.FileField(upload_to='caisse/bons_sortie/%Y/%m/', blank=True,
+                                    verbose_name="Justificatif")
+    convention = models.ForeignKey('Convention', on_delete=models.PROTECT, null=True, blank=True,
+                                   related_name='bons_sortie', verbose_name="Financée par la convention")
+    statut = models.CharField(max_length=10, choices=STATUT, default='brouillon')
+    cree_par = models.ForeignKey(User, on_delete=models.PROTECT, related_name='bons_sortie_crees')
+    cree_le = models.DateTimeField(auto_now_add=True)
+    valide_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='bons_sortie_valides')
+    valide_le = models.DateTimeField(null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.numero:
+            from core.numerotation import prochain_code
+            self.numero = prochain_code(BonSortie.all_objects, 'numero', f'BS{timezone.now().year}', 5)
+        super().save(*args, **kwargs)
+
+    @property
+    def origine(self):
+        return f'bon_sortie:{self.pk}'
+
+    @property
+    def ecriture(self):
+        if not hasattr(self, '_ecriture'):
+            self._ecriture = Ecriture.all_objects.filter(origine=self.origine).first() if self.pk else None
+        return self._ecriture
+
+    @property
+    def etape(self):
+        """Où en est le bon : brouillon, à équilibrer, équilibré, annulé."""
+        if self.statut != 'valide':
+            return self.statut
+        return 'equilibre' if self.ecriture else 'a_equilibrer'
+
+    ETAPES = {'brouillon': 'Brouillon', 'a_equilibrer': 'À équilibrer', 'equilibre': 'Équilibré',
+              'annule': 'Annulé'}
+
+    @property
+    def etape_libelle(self):
+        return self.ETAPES[self.etape]
+
+    def __str__(self):
+        return f"{self.numero} — {self.montant:,.0f} F".replace(',', ' ')
+
+    class Meta(ModeleCentre.Meta):
+        verbose_name = "Bon de sortie (petite caisse)"
+        verbose_name_plural = "Bons de sortie (petite caisse)"
+        ordering = ['-date', '-pk']
+
+
 class LigneReleve(models.Model):
     """Une ligne du relevé de la banque ou de l'opérateur Mobile Money.
 

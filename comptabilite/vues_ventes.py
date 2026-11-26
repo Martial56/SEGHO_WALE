@@ -19,6 +19,7 @@ def accueil(request):
                         ('facturation.view_facture', 'comptabilite:gratuites'),
                         ('comptabilite.superviser_caisse', 'comptabilite:gratuites'),
                         ('comptabilite.view_comptetresorerie', 'comptabilite:tresorerie'),
+                        ('comptabilite.view_bonsortie', 'comptabilite:bons_sortie'),
                         ('comptabilite.view_compte', 'comptabilite:plan_comptable')):
         if request.user.has_perm(perm):
             return redirect(route)

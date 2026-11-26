@@ -1,0 +1,35 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Bon de sortie{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:720px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">{% if bon %}Bon {{ bon.numero }}{% else %}Nouveau bon de sortie{% endif %}</h1>
+      <div class="cpt-sub">Disponible :
+        {% for c, dispo in disponibles %}<b>{{ c.libelle }} {{ dispo|floatformat:0|intcomma }} F</b>{% if not forloop.last %} · {% endif %}{% endfor %}</div></div>
+    <div class="cpt-actions"><a href="{% if bon %}{% url 'comptabilite:bon_sortie' bon.pk %}{% else %}{% url 'comptabilite:bons_sortie' %}{% endif %}" class="cpt-btn">Retour</a></div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="cpt-card">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="cpt-alerte">{{ form.non_field_errors.0 }}</div>{% endif %}
+    {% for champ in form %}
+    <div class="cpt-field">
+      <label for="{{ champ.id_for_label }}">{{ champ.label }}{% if champ.field.required %} <span style="color:#dc2626;">*</span>{% endif %}</label>
+      {{ champ }}
+      {% if champ.help_text %}<div class="cpt-note">{{ champ.help_text }}</div>{% endif %}
+      {% if champ.errors %}<div class="ecart-neg" style="font-size:12px;">{{ champ.errors.0 }}</div>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="cpt-note" style="margin-bottom:12px;">
+      « Valider » arrête le bon (il ne se modifie plus) et ouvre l'équilibrage de son écriture.
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="submit" name="action" value="valider" class="cpt-btn primaire"><i class="bi bi-check2-circle"></i> Valider et équilibrer</button>
+      <button type="submit" name="action" value="enregistrer" class="cpt-btn">Enregistrer en brouillon</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

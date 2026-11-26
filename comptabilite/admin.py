@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (Avoir, Bailleur, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
+from .models import (Avoir, Bailleur, BonSortie, FactureFournisseur, LigneDon, LigneFactureFournisseur, ReglementFournisseur, BordereauAssurance, CompteTresorerie, LigneReleve, RejetAssurance, RemiseBanque, Compte, Convention, Don, ReglementAssurance, Versement, Correspondance, Ecriture, Exercice, Journal, JourneeCaisse,
                      LigneEcriture, MotifGratuite, MotifSortie, SessionCaissiere, SortieCaisse, Tiers, CorrespondanceTiers, PeriodeCloturee)
 
 
@@ -246,6 +246,24 @@ class ReglementAssuranceAdmin(admin.ModelAdmin):
 @admin.register(CompteTresorerie)
 class CompteTresorerieAdmin(admin.ModelAdmin):
     list_display = ['libelle', 'type', 'compte', 'etablissement', 'actif']
+
+
+@admin.register(BonSortie)
+class BonSortieAdmin(admin.ModelAdmin):
+    """Consultation seule : un bon se saisit, se valide et s'équilibre depuis
+    l'écran Trésorerie → Bons de sortie."""
+    list_display = ['numero', 'date', 'caisse', 'motif', 'libelle', 'montant', 'statut']
+    list_filter = ['statut', 'caisse', 'motif']
+    search_fields = ['numero', 'libelle', 'beneficiaire']
+
+    def get_queryset(self, request):
+        return BonSortie.all_objects.select_related('caisse', 'motif')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(RemiseBanque)

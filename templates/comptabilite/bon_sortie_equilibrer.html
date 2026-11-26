@@ -1,0 +1,91 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Équilibrage du bon {{ bon.numero }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.od-table input { width: 100%; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; }
+.od-table input.num { text-align: right; }
+.od-table td { padding: 4px 6px; }
+.od-total { font-weight: 800; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Équilibrage du bon {{ bon.numero }}</h1>
+      <div class="cpt-sub">Journal <b>{{ journal.code }}</b> · {{ bon.date|date:"d/m/Y" }} · pièce {{ bon.numero }} · {{ bon.libelle }} — <b>{{ bon.montant|floatformat:0|intcomma }} F</b></div>
+    </div>
+    <div class="cpt-actions"><a href="{% url 'comptabilite:bon_sortie' bon.pk %}" class="cpt-btn">Retour au bon</a></div>
+  </div>
+
+  <div class="cpt-note" style="margin-bottom:10px;">
+    Les lignes reprennent le bon : compte du motif au débit, {{ bon.caisse.libelle }} au crédit. Contrôlez-les ; vous pouvez changer
+    le compte de charge ou répartir la dépense sur plusieurs comptes, mais le total reste {{ bon.montant|floatformat:0|intcomma }} F
+    et l'écriture ne passe que si le débit égale le crédit.
+  </div>
+
+  <form method="post" class="cpt-card">
+    {% csrf_token %}
+    <datalist id="liste-tiers">{% for t in plan_tiers %}<option value="{{ t.numero }} {{ t.intitule }}">{% endfor %}</datalist>
+    <datalist id="liste-comptes">{% for c in comptes %}<option value="{{ c.numero }} {{ c.intitule }}">{% endfor %}</datalist>
+    <table class="cpt-table od-table">
+      <thead><tr><th style="width:30%;">Compte</th><th>Libellé de ligne</th><th>Tiers</th><th>Convention</th><th class="num" style="width:12%;">Débit</th><th class="num" style="width:12%;">Crédit</th></tr></thead>
+      <tbody id="od-lignes">
+        {% for l in lignes %}
+        <tr>
+          <td><input list="liste-comptes" name="compte_{{ forloop.counter0 }}" value="{{ l.compte }}" placeholder="Numéro ou intitulé"></td>
+          <td><input name="libelle_{{ forloop.counter0 }}" value="{{ l.libelle }}"></td>
+          <td><input name="tiers_{{ forloop.counter0 }}" value="{{ l.tiers }}" list="liste-tiers" autocomplete="off" title="Compte tiers (classe 4) choisi dans la liste, ou un simple nom"></td>
+          <td><select name="convention_{{ forloop.counter0 }}" class="cpt-input" style="font-size:12px;padding:5px 6px;width:100%;">
+            <option value="">—</option>{% for c in conventions %}<option value="{{ c.pk }}" {% if l.convention == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.code }}</option>{% endfor %}</select></td>
+          <td><input class="num montant" data-sens="debit" name="debit_{{ forloop.counter0 }}" value="{{ l.debit }}" inputmode="decimal"></td>
+          <td><input class="num montant" data-sens="credit" name="credit_{{ forloop.counter0 }}" value="{{ l.credit }}" inputmode="decimal"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr><td colspan="4"><button type="button" class="cpt-btn" id="ajouter">+ Ligne</button> <span id="od-equilibre" class="cpt-note"></span></td>
+        <td class="num od-total" id="total-debit">0</td><td class="num od-total" id="total-credit">0</td></tr></tfoot>
+    </table>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      {% if peut_passer %}<button name="action" value="valider" class="cpt-btn primaire" data-equilibre>Passer et valider l'écriture</button>{% endif %}
+      <button name="action" value="brouillon" class="cpt-btn {% if not peut_passer %}primaire{% endif %}" data-equilibre>Passer l'écriture en brouillon</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  var fmt = new Intl.NumberFormat('fr-FR');
+  var corps = document.getElementById('od-lignes');
+  var montantBon = {{ bon.montant|floatformat:'0u' }};
+  function nombre(v) { return parseFloat(String(v || '0').replace(/\s/g, '').replace(',', '.')) || 0; }
+  function totaliser() {
+    var d = 0, c = 0;
+    corps.querySelectorAll('.montant').forEach(function (i) { if (i.dataset.sens === 'debit') d += nombre(i.value); else c += nombre(i.value); });
+    document.getElementById('total-debit').textContent = fmt.format(d);
+    document.getElementById('total-credit').textContent = fmt.format(c);
+    var e = document.getElementById('od-equilibre'), ok = d === c && d === montantBon;
+    e.textContent = d !== c ? 'Écart : ' + fmt.format(Math.abs(d - c))
+                  : (d !== montantBon ? 'Total différent du bon (' + fmt.format(montantBon) + ')' : 'Équilibrée');
+    e.className = ok ? 'ecart-nul' : 'ecart-neg';
+    document.querySelectorAll('[data-equilibre]').forEach(function (b) { b.disabled = !ok; });
+  }
+  corps.addEventListener('input', totaliser);
+  document.getElementById('ajouter').addEventListener('click', function () {
+    var n = corps.querySelectorAll('tr').length;
+    var tr = corps.querySelector('tr').cloneNode(true);
+    tr.querySelectorAll('input, select').forEach(function (i) { i.name = i.name.replace(/_\d+$/, '_' + n); i.value = ''; });
+    corps.appendChild(tr);
+  });
+  totaliser();
+})();
+</script>
+{% endblock %}

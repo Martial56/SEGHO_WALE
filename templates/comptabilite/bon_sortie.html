@@ -1,0 +1,70 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Bon de sortie{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>
+.bs-entete { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.bs-entete .l { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.bs-entete .v { font-size: 14px; font-weight: 600; }
+@media (max-width: 800px) { .bs-entete { grid-template-columns: 1fr 1fr; } }
+.cpt-badge.brouillon { background: rgba(120,120,120,.14); color: var(--text-muted); }
+.cpt-badge.a_equilibrer { background: rgba(217,147,15,.14); color: #a8710a; }
+.cpt-badge.equilibre { background: rgba(22,169,107,.12); color: #0f8f59; }
+.cpt-badge.annule { background: rgba(192,57,43,.1); color: var(--rose-text, #c0392b); }
+@media print { .cpt-actions, .o-nav { display: none !important; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page" style="max-width:900px;">
+  <div class="cpt-head">
+    <div><h1 class="cpt-title">Bon de sortie {{ bon.numero }} <span class="cpt-badge {{ bon.etape }}">{{ bon.etape_libelle }}</span></h1>
+      <div class="cpt-sub">{{ bon.caisse.libelle }} ({{ bon.caisse.compte.numero }}) · {{ bon.date|date:"d/m/Y" }}</div></div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:bons_sortie' %}?mois={{ bon.date|date:'Y-m' }}" class="cpt-btn"><i class="bi bi-arrow-left"></i> Bons de sortie</a>
+      <button type="button" class="cpt-btn" onclick="window.print()"><i class="bi bi-printer"></i> Imprimer</button>
+      {% if bon.etape == 'brouillon' and peut_saisir %}
+      <a href="{% url 'comptabilite:bon_sortie_modifier' bon.pk %}" class="cpt-btn">Modifier</a>
+      <form method="post" action="{% url 'comptabilite:bon_sortie_action' bon.pk %}" style="display:inline;">{% csrf_token %}
+        <button name="action" value="valider" class="cpt-btn primaire"><i class="bi bi-check2-circle"></i> Valider et équilibrer</button></form>
+      {% endif %}
+      {% if bon.etape == 'a_equilibrer' and peut_saisir %}
+      <a href="{% url 'comptabilite:bon_sortie_equilibrer' bon.pk %}" class="cpt-btn primaire"><i class="bi bi-distribute-vertical"></i> Équilibrer</a>
+      {% endif %}
+      {% if bon.etape != 'annule' and peut_annuler %}
+      <form method="post" action="{% url 'comptabilite:bon_sortie_action' bon.pk %}" style="display:inline;"
+            onsubmit="return confirm('Annuler le bon {{ bon.numero }} ?{% if ecriture and ecriture.statut == 'brouillon' %} Le brouillon de son écriture sera supprimé.{% endif %}');">{% csrf_token %}
+        <button name="action" value="annuler" class="cpt-btn danger">Annuler le bon</button></form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cpt-card bs-entete">
+    <div><div class="l">Motif</div><div class="v">{{ bon.motif }}</div></div>
+    <div><div class="l">Objet</div><div class="v">{{ bon.libelle }}</div></div>
+    <div><div class="l">Bénéficiaire</div><div class="v">{{ bon.beneficiaire|default:"—" }}</div></div>
+    <div><div class="l">Montant</div><div class="v">{{ bon.montant|floatformat:0|intcomma }} F</div></div>
+    <div><div class="l">Convention</div><div class="v">{{ bon.convention.code|default:"Fonds propres" }}</div></div>
+    <div><div class="l">Justificatif</div><div class="v">{% if bon.justificatif %}<a href="{{ bon.justificatif.url }}" target="_blank">Ouvrir</a>{% else %}—{% endif %}</div></div>
+    <div><div class="l">Saisi par</div><div class="v">{{ bon.cree_par.get_full_name|default:bon.cree_par.username }}</div></div>
+    <div><div class="l">Validé par</div><div class="v">{% if bon.valide_par %}{{ bon.valide_par.get_full_name|default:bon.valide_par.username }} le {{ bon.valide_le|date:"d/m/Y H:i" }}{% else %}—{% endif %}</div></div>
+  </div>
+
+  <div class="cpt-card">
+    <h2>{% if ecriture %}Écriture{% if ecriture.statut == 'validee' %} {{ ecriture.reference }}{% else %} (brouillon){% endif %} — journal {{ ecriture.journal.code }}{% else %}Écriture proposée{% endif %}</h2>
+    <table class="cpt-table">
+      <thead><tr><th>Compte</th><th>Libellé</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead>
+      <tbody>
+        {% if ecriture %}
+        {% for l in lignes %}<tr><td>{{ l.compte.numero }} {{ l.compte.intitule }}</td><td>{{ l.libelle }}</td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td><td class="num">{% if l.credit %}{{ l.credit|floatformat:0|intcomma }}{% endif %}</td></tr>{% endfor %}
+        {% else %}
+        {% for l in lignes %}<tr><td>{{ l.0.numero }} {{ l.0.intitule }}</td><td>{{ l.1 }}</td>
+          <td class="num">{% if l.2 %}{{ l.2|floatformat:0|intcomma }}{% endif %}</td><td class="num">{% if l.3 %}{{ l.3|floatformat:0|intcomma }}{% endif %}</td></tr>{% endfor %}
+        {% endif %}
+      </tbody>
+    </table>
+    {% if ecriture and perms.comptabilite.view_ecriture %}<div style="margin-top:10px;"><a href="{% url 'comptabilite:ecriture' ecriture.pk %}" class="cpt-btn">Voir l'écriture</a></div>{% endif %}
+  </div>
+</div>
+{% endblock %}

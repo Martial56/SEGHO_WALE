@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import MotifGratuite, MotifSortie
+from .models import BonSortie, MotifGratuite, MotifSortie
 
 
 class _Champs:
@@ -164,3 +164,26 @@ class DonForm(_Champs, forms.ModelForm):
         if donnees.get('nature') == 'nature' and not (donnees.get('description') or '').strip():
             self.add_error('description', "Décrivez ce qui a été reçu (nature, quantités).")
         return donnees
+
+
+class BonSortieForm(_Champs, forms.ModelForm):
+    """Bon de sortie de la petite caisse, saisi par l'assistant comptable."""
+    montant = forms.DecimalField(min_value=1, max_digits=15, decimal_places=0, label="Montant (F CFA)")
+
+    class Meta:
+        model = BonSortie
+        fields = ['caisse', 'date', 'motif', 'libelle', 'beneficiaire', 'montant', 'justificatif', 'convention']
+        widgets = {'date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d')}
+        labels = {'justificatif': "Justificatif (reçu, facture…)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from . import bons_sortie
+        from .models import Convention
+        self.fields['caisse'].queryset = bons_sortie.caisses()
+        self.fields['caisse'].empty_label = None
+        self.fields['motif'].queryset = MotifSortie.objects.filter(actif=True)
+        self.fields['motif'].empty_label = "— Choisir —"
+        self.fields['convention'].queryset = Convention.objects.filter(statut='active')
+        self.fields['convention'].empty_label = "— Fonds propres du centre —"
+        self.fields['convention'].help_text = "Si la dépense relève d'un projet financé, elle sera imputée à sa convention."
