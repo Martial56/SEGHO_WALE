@@ -1,7 +1,16 @@
 {% extends 'facturation/base.html' %}
 {% load humanize %}
 {% block topbar_title %}Remises d'espèces{% endblock %}
-{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>
+.rem-sel { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.rem-sel .cpt-field { margin: 0; }
+.rem-totaux { display: flex; gap: 18px; flex-wrap: wrap; margin: 8px 0 12px; font-size: 13px; }
+.rem-totaux b { font-size: 15px; }
+.rem-liste { max-height: 340px; overflow: auto; margin-bottom: 12px; }
+.rem-liste td, .rem-liste th { padding: 4px 8px; font-size: 12.5px; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="cpt-page">
@@ -9,39 +18,92 @@
     <div><h1 class="cpt-title">Remises d'espèces</h1>
       <div class="cpt-sub">Les espèces d'une caisse remises à la banque ou à une autre caisse (petite caisse, caisse principale) : elles sortent de la caisse et entrent sur le compte de destination, via les virements internes ({{ transit.numero }}).</div></div>
   </div>
-  <div class="cpt-grid2" style="align-items:start;">
-    {% if perms.comptabilite.add_remisebanque %}
-    <form method="post" class="cpt-card">{% csrf_token %}
-      <h2>Nouvelle remise</h2>
-      <div class="cpt-field"><label>Caisse</label><select name="caisse" class="cpt-input" id="rem-caisse">
-        {% for c, solde in caisses %}<option value="{{ c.pk }}" data-montant="{% if solde is not None and solde > 0 %}{{ solde|floatformat:'0u' }}{% endif %}" {% if post.caisse == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.nom }}{% if solde is not None %} — {{ solde|floatformat:0|intcomma }} F en caisse{% endif %}</option>{% endfor %}</select></div>
+
+  {% if perms.comptabilite.add_remisebanque %}
+  <form method="get" class="cpt-card rem-sel">
+    <div style="flex-basis:100%;"><h2 style="margin:0;">Sélection des règlements à remettre</h2>
+      <div class="cpt-note">Choisissez la caisse et la période : ses encaissements en espèces pas encore remis s'affichent, tous cochés. Décochez ceux qui ne partent pas.</div></div>
+    <div class="cpt-field"><label>Caisse</label><select name="caisse" class="cpt-input" id="rem-caisse">
+      <option value="">— Choisir —</option>
+      {% for c, solde in caisses %}<option value="{{ c.pk }}" data-montant="{% if solde is not None and solde > 0 %}{{ solde|floatformat:'0u' }}{% endif %}" {% if c == caisse %}selected{% endif %}>{{ c.nom }}{% if solde is not None %} — {{ solde|floatformat:0|intcomma }} F en caisse{% endif %}</option>{% endfor %}</select></div>
+    <div class="cpt-field"><label>Encaissements du</label><input type="date" name="du" class="cpt-input" value="{{ du|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>au</label><input type="date" name="au" class="cpt-input" value="{{ au|date:'Y-m-d' }}"></div>
+    <div class="cpt-field"><label>Mode de règlement</label><input class="cpt-input" value="Espèces" disabled title="Seules les espèces sont sur le compte de la caisse"></div>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  {% if caisse %}
+  <form method="post" class="cpt-card" id="rem-form">{% csrf_token %}
+    <input type="hidden" name="caisse" value="{{ caisse.pk }}">
+    <input type="hidden" name="du" value="{{ du|date:'Y-m-d' }}"><input type="hidden" name="au" value="{{ au|date:'Y-m-d' }}">
+    <h2>Nouvelle remise — {{ caisse.nom }}</h2>
+    {% if encaissements %}
+    <div class="rem-liste">
+      <table class="cpt-table">
+        <thead><tr><th><input type="checkbox" id="rem-tout" checked title="Tout cocher"></th><th>Date</th><th>N°</th><th>Facture</th><th>Patient</th><th>Caissière</th><th class="num">Montant</th></tr></thead>
+        <tbody>{% for p in encaissements %}
+          <tr><td><input type="checkbox" name="paiement" value="{{ p.pk }}" data-montant="{{ p.montant|floatformat:'0u' }}" class="rem-case" {% if p.coche %}checked{% endif %}></td>
+            <td>{{ p.date_paiement|date:"d/m/Y H:i" }}</td><td>{{ p.numero }}</td><td>{{ p.facture.numero }}</td>
+            <td>{{ p.facture.patient|default:"" }}</td><td>{{ p.session.caissiere.get_full_name|default:p.session.caissiere.username|default:"" }}</td>
+            <td class="num">{{ p.montant|floatformat:0|intcomma }}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+    </div>
+    <div class="rem-totaux">
+      <span>Total règlements à remettre : <b>{{ total_a_remettre|floatformat:0|intcomma }} F</b></span>
+      <span>Total règlements sélectionnés : <b id="rem-selection">0</b> F</span>
+    </div>
+    {% else %}
+    <div class="cpt-alerte">Aucun encaissement en espèces à remettre pour {{ caisse.nom }} du {{ du|date:"d/m/Y" }} au {{ au|date:"d/m/Y" }}. Vous pouvez remettre un montant libre.</div>
+    {% endif %}
+    <div class="cpt-grid2" style="grid-template-columns:repeat(4,1fr);">
       <div class="cpt-field"><label>Remis à</label><select name="compte_tresorerie" class="cpt-input">
         {% for c in comptes %}{% ifchanged c.type %}{% if not forloop.first %}</optgroup>{% endif %}<optgroup label="{% if c.type == 'caisse' %}Caisses{% else %}Banques{% endif %}">{% endifchanged %}<option value="{{ c.pk }}" {% if post.compte_tresorerie == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.libelle }} ({{ c.compte.numero }})</option>{% if forloop.last %}</optgroup>{% endif %}{% endfor %}</select></div>
-      <div class="cpt-grid2">
-        <div class="cpt-field"><label>Date</label><input type="date" name="date" class="cpt-input" value="{% if post.date %}{{ post.date }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}"></div>
-        <div class="cpt-field"><label>Montant (F CFA)</label><input type="number" min="1" name="montant" id="rem-montant" class="cpt-input" value="{{ post.montant }}" required></div>
-      </div>
-      <div class="cpt-field"><label>N° du bordereau de versement</label><input type="text" name="reference" class="cpt-input" value="{{ post.reference }}"></div>
-      <div class="cpt-field"><label>Observation</label><textarea name="observation" class="cpt-textarea">{{ post.observation }}</textarea></div>
-      <button class="cpt-btn primaire">Enregistrer la remise</button>
-    </form>
-    <script>
-    (function () {
-      // Le montant reprend ce que contient la caisse choisie ; on peut le baisser.
-      var caisse = document.getElementById('rem-caisse'), montant = document.getElementById('rem-montant');
-      function remplir() { montant.value = caisse.options[caisse.selectedIndex].dataset.montant || ''; }
-      caisse.addEventListener('change', remplir);
-      if (!montant.value) remplir();
-    })();
-    </script>
-    {% endif %}
-    <div class="cpt-card">
-      <h2>Remises enregistrées</h2>
-      {% if remises %}
-      <table class="cpt-table"><thead><tr><th>Date</th><th>N°</th><th>Caisse</th><th>Remis à</th><th class="num">Montant</th></tr></thead>
-        <tbody>{% for r in remises %}<tr><td>{{ r.date|date:"d/m/Y" }}</td><td>{{ r.numero }}{% if r.reference %}<div class="cpt-note">{{ r.reference }}</div>{% endif %}</td><td>{{ r.caisse.nom }}</td><td>{{ r.compte_tresorerie }}</td><td class="num">{{ r.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
-      {% else %}<div class="cpt-vide">Aucune remise.</div>{% endif %}
+      <div class="cpt-field"><label>Date de remise</label><input type="date" name="date" class="cpt-input" value="{% if post.date %}{{ post.date }}{% else %}{{ aujourdhui|date:'Y-m-d' }}{% endif %}"></div>
+      <div class="cpt-field"><label>Montant (F CFA)</label><input type="number" min="1" name="montant" id="rem-montant" class="cpt-input" value="{{ post.montant }}"
+        title="Total des encaissements cochés ; sans encaissement coché, montant libre"></div>
+      <div class="cpt-field"><label>N° du bordereau</label><input type="text" name="reference" class="cpt-input" value="{{ post.reference }}"></div>
     </div>
+    <div class="cpt-field"><label>Observation</label><textarea name="observation" class="cpt-textarea">{{ post.observation }}</textarea></div>
+    <button class="cpt-btn primaire">Enregistrer la remise</button>
+  </form>
+  <script>
+  (function () {
+    // Le montant suit les encaissements cochés ; sans case cochée, il est libre
+    // (on propose alors ce que contient la caisse).
+    var cases = document.querySelectorAll('.rem-case'), montant = document.getElementById('rem-montant');
+    var total = document.getElementById('rem-selection'), tout = document.getElementById('rem-tout');
+    var caisse = document.getElementById('rem-caisse'), fmt = new Intl.NumberFormat('fr-FR');
+    function maj() {
+      var s = 0, n = 0;
+      cases.forEach(function (c) { if (c.checked) { s += parseFloat(c.dataset.montant); n++; } });
+      if (total) total.textContent = fmt.format(s);
+      if (n) { montant.value = s; montant.readOnly = true; }
+      else { montant.readOnly = false; if (!montant.value) montant.value = caisse.options[caisse.selectedIndex].dataset.montant || ''; }
+    }
+    cases.forEach(function (c) { c.addEventListener('change', maj); });
+    if (tout) tout.addEventListener('change', function () { cases.forEach(function (c) { c.checked = tout.checked; }); maj(); });
+    maj();
+  })();
+  </script>
+  {% endif %}
+  {% endif %}
+
+  <div class="cpt-card">
+    <h2>Remises enregistrées</h2>
+    {% if remises %}
+    <table class="cpt-table"><thead><tr><th>Date</th><th>N°</th><th>Caisse</th><th>Remis à</th><th>Encaissements</th><th>Écritures (via {{ transit.numero }})</th><th class="num">Montant</th></tr></thead>
+      <tbody>{% for r in remises %}<tr>
+        <td>{{ r.date|date:"d/m/Y" }}</td>
+        <td>{{ r.numero }}{% if r.reference %}<div class="cpt-note">{{ r.reference }}</div>{% endif %}</td>
+        <td>{{ r.caisse.nom }}</td><td>{{ r.compte_tresorerie }}</td>
+        <td>{% with n=r.paiements.all|length %}{% if n %}<span title="{% for p in r.paiements.all %}{{ p.numero }} {% endfor %}">{{ n }} encaissement{{ n|pluralize }}</span>{% else %}<span class="cpt-note">montant libre</span>{% endif %}{% endwith %}</td>
+        <td class="cpt-note">
+          {% if r.ecriture_sortie %}<a href="{% url 'comptabilite:ecriture' r.ecriture_sortie.pk %}">{{ r.ecriture_sortie.journal.code }} {{ r.ecriture_sortie.reference }}</a>{% endif %}
+          {% if r.ecriture_entree %} → <a href="{% url 'comptabilite:ecriture' r.ecriture_entree.pk %}">{{ r.ecriture_entree.journal.code }} {{ r.ecriture_entree.reference }}</a>{% endif %}
+        </td>
+        <td class="num">{{ r.montant|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table>
+    {% else %}<div class="cpt-vide">Aucune remise.</div>{% endif %}
   </div>
 </div>
 {% endblock %}

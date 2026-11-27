@@ -93,10 +93,39 @@ def disponible_en_caisse(caisse, jour):
     return disponible_sans_generer(caisse, jour)
 
 
-def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', observation=''):
+def encaissements_a_remettre(caisse, debut, fin):
+    """Encaissements en espèces de la caisse sur la période, pas encore
+    remis — la liste « Règlements à remettre en banque » de Sage. Seules les
+    espèces sont sur le compte de la caisse : chèques et Mobile Money ont
+    leurs propres comptes."""
+    from facturation.models import Paiement
+    return (Paiement.objects.filter(caisse=caisse, mode_paiement='especes', reglement_assurance__isnull=True,
+                                    date_paiement__date__range=[debut, fin], remises__isnull=True)
+            .select_related('facture__patient', 'session__caissiere').order_by('date_paiement', 'pk'))
+
+
+def _paiements_remis(caisse, paiements):
+    """Contrôle des encaissements cochés : de cette caisse, en espèces, pas
+    encore remis. Rend leur total."""
+    total = ZERO
+    for p in paiements:
+        if p.caisse_id != caisse.pk or p.mode_paiement != 'especes' or p.reglement_assurance_id:
+            raise ErreurTresorerie(f"L'encaissement {p.numero} n'est pas un encaissement en espèces de {caisse}.")
+        if p.remises.exists():
+            raise ErreurTresorerie(f"L'encaissement {p.numero} a déjà été remis ({p.remises.first().numero}).")
+        total += p.montant
+    return total
+
+
+def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', observation='', paiements=None):
+    """Remise d'un montant libre, ou des encaissements cochés (`paiements`) :
+    le montant est alors leur total."""
     from .models import RemiseBanque
     from . import ecritures as moteur
-    if montant <= 0:
+    paiements = list(paiements or [])
+    if paiements:
+        montant = _paiements_remis(caisse, paiements)
+    if montant is None or montant <= 0:
         raise ErreurTresorerie("Le montant déposé doit être positif.")
     if compte_tresorerie.compte_id == moteur.compte_de_caisse(caisse).pk:
         raise ErreurTresorerie("Une caisse ne se remet pas ses espèces à elle-même.")
@@ -106,6 +135,8 @@ def creer_remise(caisse, compte_tresorerie, montant, jour, par, reference='', ob
     with transaction.atomic():
         remise = RemiseBanque.objects.create(caisse=caisse, compte_tresorerie=compte_tresorerie, montant=montant,
                                              date=jour, reference=reference, observation=observation, cree_par=par)
+        if paiements:
+            remise.paiements.set(paiements)
         ecritures_remise(remise)
     return remise
 

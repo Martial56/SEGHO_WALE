@@ -1,6 +1,15 @@
 {% extends 'facturation/base.html' %}
 {% block topbar_title %}Convention de financement{% endblock %}
-{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}{% endblock %}
+{% block extra_css %}{{ block.super }}{% include 'comptabilite/includes/styles.html' %}
+<style>
+.budget-scroll { overflow-x: auto; }
+.budget-table { table-layout: fixed; min-width: 640px; }
+.budget-table td { padding: 6px 6px; }
+.budget-table .cpt-input { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.budget-table select.cpt-input { text-overflow: ellipsis; }
+.budget-table input[type="number"].cpt-input { text-align: right; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="cpt-page cpt-etroite" style="max-width:1000px;">
@@ -16,19 +25,22 @@
       <div class="cpt-note" style="margin-bottom:8px;">Les lignes autorisées par le bailleur. Les dépenses imputées à la convention sur un compte (ou un de ses sous-comptes) se rattachent à sa ligne.</div>
       {{ budget.management_form }}
       {% if budget.non_form_errors %}<div class="cpt-alerte">{{ budget.non_form_errors.0 }}</div>{% endif %}
-      <table class="cpt-table">
-        <thead><tr><th>Ligne budgétaire</th><th>Compte</th><th class="num">Montant prévu</th><th>Supprimer</th></tr></thead>
+      <div class="budget-scroll">
+      <table class="cpt-table budget-table">
+        <colgroup><col style="width:34%"><col style="width:38%"><col style="width:18%"><col style="width:10%"></colgroup>
+        <thead><tr><th>Ligne budgétaire</th><th>Compte</th><th class="num">Montant prévu</th><th style="text-align:center;">Supprimer</th></tr></thead>
         <tbody>
           {% for f in budget %}
           <tr>
             <td>{{ f.id }}{{ f.libelle }}{% if f.libelle.errors %}<div class="ecart-neg" style="font-size:11px;">{{ f.libelle.errors.0 }}</div>{% endif %}</td>
             <td>{{ f.compte }}{% if f.compte.errors %}<div class="ecart-neg" style="font-size:11px;">{{ f.compte.errors.0 }}</div>{% endif %}</td>
             <td>{{ f.montant_prevu }}</td>
-            <td>{% if f.instance.pk %}{{ f.DELETE }}{% endif %}</td>
+            <td style="text-align:center;">{% if f.instance.pk %}{{ f.DELETE }}{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      </div>
       <div class="cpt-note">Trois lignes vides sont proposées à chaque enregistrement : enregistrez pour en ajouter d'autres.</div>
     </div>
     <button class="cpt-btn primaire">Enregistrer</button>

@@ -2498,3 +2498,184 @@ class TestBonsSortie(TestCase):
         html = client.get(reverse('comptabilite:bons_sortie')).content.decode()
         nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
         self.assertIn(reverse('comptabilite:bons_sortie'), nav)
+
+
+# ─── Saisie des journaux (journal × mois, comme Sage) ──────────────────────────
+
+from . import saisie_journaux as sj  # noqa: E402
+
+
+class TestSaisieDesJournaux(TestCase):
+
+    def setUp(self):
+        from .tresorerie import ecritures_remise
+        self.admin = User.objects.create_superuser('compta', password='x')
+        self.client_admin = _client(self.admin)
+        self.jour = timezone.localdate()
+        self.mois = self.jour.replace(day=1)
+        self.caispc = Journal.objects.get(code='CAISPC')
+        self.petite = CompteTresorerie.objects.get(libelle='Petite caisse')
+        caisse = _caisse(nom='Caisse Pharmacie', code='PH')
+        self.remise = RemiseBanque.objects.create(caisse=caisse, compte_tresorerie=self.petite,
+                                                  montant=Decimal('30000'), date=self.jour, numero='REMT0001')
+        self.sortie_caisse, self.entree = ecritures_remise(self.remise)
+
+    def _url(self, journal=None, mois=None):
+        mois = mois or self.mois
+        return reverse('comptabilite:journal_mois', args=[(journal or self.caispc).pk, mois.year, mois.month])
+
+    def _saisie(self, debit='5000', credit='5000', jour=None, **extra):
+        return {'date': (jour or self.jour).isoformat(), 'piece': 'P1', 'libelle': 'Achat de timbres',
+                'compte_0': '60580001 Fournitures', 'libelle_0': '', 'tiers_0': '', 'convention_0': '',
+                'debit_0': debit, 'credit_0': '',
+                'compte_1': '57100005', 'libelle_1': '', 'tiers_1': '', 'convention_1': '',
+                'debit_1': '', 'credit_1': credit, **extra}
+
+    def test_une_ligne_par_journal_et_par_mois(self):
+        exercice = Exercice.objects.get(date_debut__lte=self.jour, date_fin__gte=self.jour)
+        lignes = sj.periodes(exercice)
+        self.assertEqual(len(lignes), Journal.objects.filter(actif=True).count() * 12)
+        caispc = next(l for l in lignes if l['journal'] == self.caispc and l['mois'] == self.mois)
+        self.assertEqual((caispc['ecritures'], caispc['brouillons'], caispc['etat']), (1, 1, 'brouillon'))
+        self.assertEqual(caispc['debit'], Decimal('30000'))
+        mouvementes = sj.periodes(exercice, mouvementes=True)
+        self.assertEqual({(l['journal'].code, l['mois']) for l in mouvementes},
+                         {('CAISPC', self.mois), (self.sortie_caisse.journal.code, self.mois)})
+        page = self.client_admin.get(reverse('comptabilite:saisie_journaux')).content.decode()
+        self.assertIn(self._url(), page)
+
+    def test_journal_de_la_caisse_montre_la_remise(self):
+        page = self.client_admin.get(self._url()).content.decode()
+        self.assertIn('Remise REMT0001 : Caisse Pharmacie → Petite caisse, via le compte 58800000', page)
+        self.assertIn(reverse('comptabilite:ecriture', args=[self.sortie_caisse.pk]), page)   # l'autre côté
+        contenu = sj.journal_du_mois(self.caispc, self.mois)
+        self.assertEqual((contenu['solde_debut'], contenu['solde_fin']), (Decimal('0'), Decimal('30000')))
+        self.assertEqual(contenu['autres_journaux'], Decimal('0'))
+
+    def test_saisie_dans_le_journal(self):
+        r = self.client_admin.post(self._url(), self._saisie(action='valider'))
+        ecriture = Ecriture.objects.get(libelle='Achat de timbres')
+        self.assertRedirects(r, f'{self._url()}#e{ecriture.pk}', fetch_redirect_response=False)
+        self.assertEqual((ecriture.journal, ecriture.statut, ecriture.piece), (self.caispc, 'validee', 'P1'))
+        self.assertEqual(_lignes(ecriture), {'60580001': (Decimal('5000'), 0), '57100005': (0, Decimal('5000'))})
+        self.assertEqual(sj.journal_du_mois(self.caispc, self.mois)['solde_fin'], Decimal('25000'))
+
+    def test_saisie_par_le_jour_comme_sage(self):
+        donnees = self._saisie()
+        del donnees['date']
+        self.client_admin.post(self._url(), {**donnees, 'jour': '1'})
+        self.assertEqual(Ecriture.objects.get(libelle='Achat de timbres').date, self.mois)
+        self.client_admin.post(self._url(), {**donnees, 'jour': '32', 'libelle': 'Jour impossible'})
+        self.assertFalse(Ecriture.objects.filter(libelle='Jour impossible').exists())
+
+    def test_grille_a_plat_et_solde_par_compte(self):
+        page = self.client_admin.get(self._url()).content.decode()
+        self.assertIn('N° compte général', page)
+        self.assertIn('data-compte="57100005 ', page)
+        self.assertIn('data-solde="30', page)          # solde de la petite caisse : 30 000
+
+    def test_saisie_refusee(self):
+        # Débit ≠ crédit.
+        self.client_admin.post(self._url(), self._saisie(credit='4000'))
+        # Date hors du mois du journal.
+        self.client_admin.post(self._url(), self._saisie(jour=self.mois - timedelta(days=1)))
+        self.assertFalse(Ecriture.objects.filter(libelle='Achat de timbres').exists())
+
+    def test_mois_cloture(self):
+        from . import cloture_journaux
+        moteur.valider([self.entree], self.admin)
+        cloture_journaux.cloturer(self.caispc, self.mois, self.admin)
+        page = self.client_admin.get(self._url()).content.decode()
+        self.assertNotIn('id="saisie"', page)
+        self.assertIn('Mois clôturé', page)
+        self.client_admin.post(self._url(), self._saisie())
+        self.assertFalse(Ecriture.objects.filter(libelle='Achat de timbres').exists())
+        lignes = sj.periodes(self.entree.exercice, code='CAISPC')
+        self.assertEqual(next(l for l in lignes if l['mois'] == self.mois)['etat'], 'cloture')
+
+    def test_filtre_d_etat_comme_sage(self):
+        exercice = self.entree.exercice
+        def etats(filtre):
+            return {l['etat'] for l in sj.periodes(exercice, filtre=filtre)}
+        self.assertEqual(etats('ouverts'), {'brouillon'})
+        self.assertEqual(etats('non_ouverts'), {'vide'})
+        self.assertEqual(len(sj.periodes(exercice, filtre='brouillons')), 2)   # les deux côtés de la remise
+        self.assertEqual(etats('clotures'), set())
+        page = self.client_admin.get(reverse('comptabilite:saisie_journaux') + '?etat=ouverts').content.decode()
+        self.assertEqual(page.count('class="lien'), 2)
+
+    def test_numero_de_facture(self):
+        donnees = self._saisie(numero_facture='FA 0985', action='valider')
+        self.client_admin.post(self._url(), donnees)
+        ecriture = Ecriture.objects.get(libelle='Achat de timbres')
+        self.assertEqual(ecriture.numero_facture, 'FA 0985')
+        page = self.client_admin.get(self._url()).content.decode()
+        self.assertIn('<th>N° facture</th>', page)
+        self.assertIn('<td>FA 0985</td>', page)
+        inverse = moteur.contre_passer(ecriture, self.admin)
+        self.assertEqual(inverse.numero_facture, 'FA 0985')
+
+    def test_menu(self):
+        html = self.client_admin.get(reverse('comptabilite:ecritures')).content.decode()
+        nav = html[html.index('<nav class="o-nav">'):html.index('</nav>')]
+        for nom in ('saisie_journaux', 'ecritures', 'od_saisie', 'lettrage', 'cloture_journaux'):
+            self.assertIn(reverse(f'comptabilite:{nom}'), nav, nom)
+
+
+class TestRemiseParEncaissements(TestCase):
+    """« Règlements à remettre en banque » : on coche les encaissements en
+    espèces de la caisse ; la remise vaut leur total, et ils ne repartent plus."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser('admin8', password='x')
+        self.client_admin = _client(self.admin)
+        self.caisse = _caisse(nom='Caisse Pharmacie', code='PH')
+        self.awa = _caissiere('awa8')
+        regles.ouvrir_session(self.awa, self.caisse, Decimal('0'))
+        _payer(self.awa, _facture(Decimal('10000')), 10000)
+        _payer(self.awa, _facture(Decimal('4000')), 4000)
+        _payer(self.awa, _facture(Decimal('2500')), 2500, mode='mobile_money')
+        self.jour = timezone.localdate()
+        self.petite = CompteTresorerie.objects.get(libelle='Petite caisse')
+
+    def test_liste_des_encaissements_a_remettre(self):
+        a_remettre = list(treso.encaissements_a_remettre(self.caisse, self.jour, self.jour))
+        self.assertEqual(sorted(p.montant for p in a_remettre), [Decimal('4000'), Decimal('10000')])   # pas le Mobile Money
+        page = self.client_admin.get(reverse('comptabilite:remises'),
+                                     {'caisse': self.caisse.pk, 'du': self.jour, 'au': self.jour}).content.decode()
+        self.assertEqual(page.count('class="rem-case" checked'), 2)
+        self.assertIn('14 000 F', page.replace(' ', ' ').replace('\xa0', ' '))
+
+    def test_remise_des_encaissements_coches(self):
+        dix_mille = Paiement.objects.get(montant=10000)
+        self.client_admin.post(reverse('comptabilite:remises'), {
+            'caisse': self.caisse.pk, 'compte_tresorerie': self.petite.pk, 'date': self.jour.isoformat(),
+            'paiement': [dix_mille.pk], 'montant': '99999'})           # le montant suit la sélection
+        remise = RemiseBanque.objects.get()
+        self.assertEqual(remise.montant, Decimal('10000'))
+        self.assertEqual(list(remise.paiements.all()), [dix_mille])
+        sortie = Ecriture.objects.get(origine=f'remise_sortie:{remise.pk}')
+        self.assertEqual(_lignes(sortie)['58800000'], (Decimal('10000'), 0))
+        # Remis une fois, il ne se représente plus.
+        self.assertEqual([p.montant for p in treso.encaissements_a_remettre(self.caisse, self.jour, self.jour)],
+                         [Decimal('4000')])
+        with self.assertRaises(treso.ErreurTresorerie):
+            treso.creer_remise(self.caisse, self.petite, None, self.jour, self.admin, paiements=[dix_mille])
+
+    def test_le_mobile_money_ne_se_remet_pas_depuis_la_caisse(self):
+        mm = Paiement.objects.get(mode_paiement='mobile_money')
+        with self.assertRaises(treso.ErreurTresorerie):
+            treso.creer_remise(self.caisse, self.petite, None, self.jour, self.admin, paiements=[mm])
+
+    def test_montant_libre_toujours_possible(self):
+        treso.creer_remise(self.caisse, self.petite, Decimal('3000'), self.jour, self.admin)
+        self.assertEqual(RemiseBanque.objects.get().paiements.count(), 0)
+
+    def test_numero_de_facture_de_l_ecriture_de_journee(self):
+        session = SessionCaissiere.objects.get()
+        regles.cloturer_session(session, self.awa, {}, Decimal('14000'))
+        regles.valider_session(session, self.admin)
+        regles.cloturer_journee(session.journee, self.admin)
+        moteur.generer(self.jour, self.jour)
+        ecriture = Ecriture.objects.get(origine=f'journee:{session.journee_id}')
+        self.assertEqual(ecriture.numero_facture, session.numero)

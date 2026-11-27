@@ -1,0 +1,87 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Saisie des journaux{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+.sj-filtres { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.sj-filtres .cpt-field { margin: 0; }
+.sj-filtres .cpt-input { font-size: 13px; padding: 6px 8px; }
+.sj-table td { padding: 5px 10px; }
+.sj-table td.code { font-family: var(--font-mono, monospace); font-weight: 700; white-space: nowrap; }
+.sj-table tr.nouveau-journal td { border-top: 2px solid var(--border); }
+.sj-table tr.courant td { background: rgba(var(--teal-500-rgb), .06); }
+.sj-table tr.futur td { opacity: .5; }
+.sj-pos { display: inline-flex; gap: 4px; font-size: 14px; min-width: 40px; }
+.sj-pos .mouvemente { color: var(--teal-600); }
+.sj-pos .brouillon { color: #d97706; }
+.sj-pos .cloture { color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Saisie des journaux</h1>
+      <div class="cpt-sub">Un journal par mois : ouvrez la ligne voulue pour consulter le journal du mois et y saisir. Un mois clôturé se consulte seulement.</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:ecritures' %}" class="cpt-btn"><i class="bi bi-check2-all"></i> Passage des écritures</a>
+    </div>
+  </div>
+
+  <form method="get" class="cpt-card sj-filtres">
+    <div class="cpt-field"><label>Exercice</label>
+      <select name="exercice" class="cpt-input">
+        {% for e in exercices %}<option value="{{ e.pk }}" {% if exercice and e.pk == exercice.pk %}selected{% endif %}>{{ e.libelle }}{% if e.statut == 'cloture' %} (clos){% endif %}</option>{% endfor %}
+      </select></div>
+    <div class="cpt-field"><label>Journal</label>
+      <select name="journal" class="cpt-input"><option value="">Tous</option>
+        {% for j in journaux %}<option value="{{ j.code }}" {% if j.code == code %}selected{% endif %}>{{ j.code }} — {{ j.libelle }}</option>{% endfor %}
+      </select></div>
+    <div class="cpt-field"><label>État</label>
+      <select name="etat" class="cpt-input" onchange="this.form.submit()"><option value="">Tous</option>
+        {% for cle, libelle in filtres %}<option value="{{ cle }}" {% if cle == filtre %}selected{% endif %}>{{ libelle }}</option>{% endfor %}
+      </select></div>
+    <button class="cpt-btn">Afficher</button>
+  </form>
+
+  <div class="cpt-card">
+    {% if not exercice %}
+    <div class="cpt-vide">Aucun exercice comptable : il est créé avec la première écriture.</div>
+    {% elif lignes %}
+    <table class="cpt-table sj-table">
+      <thead><tr><th>Position</th><th>Période</th><th>Code</th><th>Intitulé du journal</th><th class="num">Écritures</th><th class="num">Mouvements</th></tr></thead>
+      <tbody>
+        {% for l in lignes %}
+        <tr class="lien{% ifchanged l.journal.pk %}{% if not forloop.first %} nouveau-journal{% endif %}{% endifchanged %}{% if l.mois == mois_courant %} courant{% endif %}{% if l.futur and not l.ecritures %} futur{% endif %}"
+            onclick="location.href='{% url 'comptabilite:journal_mois' l.journal.pk l.mois.year l.mois.month %}'"
+            title="{{ l.etat_libelle }}">
+          <td><span class="sj-pos">
+            {% if l.etat == 'cloture' %}<i class="bi bi-lock-fill cloture" title="Clôturé"></i>
+            {% elif l.etat == 'brouillon' %}<i class="bi bi-journal-text brouillon" title="{{ l.brouillons }} brouillon(s) à valider"></i><i class="bi bi-pencil brouillon"></i>
+            {% elif l.etat == 'mouvemente' %}<i class="bi bi-journal-text mouvemente" title="Mouvementé"></i><i class="bi bi-pencil mouvemente" title="Ouvert"></i>
+            {% endif %}</span></td>
+          <td>{{ l.mois|date:"M y" }}</td>
+          <td class="code">{{ l.journal.code }}</td>
+          <td>{{ l.journal.libelle }}{% if not l.journal.actif %} <span class="cpt-note">(inactif)</span>{% endif %}</td>
+          <td class="num">{% if l.ecritures %}{{ l.ecritures }}{% if l.brouillons %} <span class="cpt-note">dont {{ l.brouillons }} brouillon{{ l.brouillons|pluralize }}</span>{% endif %}{% endif %}</td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="cpt-note" style="margin-top:10px;">
+      <i class="bi bi-journal-text" style="color:var(--teal-600);"></i><i class="bi bi-pencil" style="color:var(--teal-600);"></i> mouvementé, ouvert ·
+      <i class="bi bi-journal-text" style="color:#d97706;"></i> brouillons à valider ·
+      <i class="bi bi-lock-fill"></i> clôturé · sans icône : aucune écriture. {{ lignes|length }} période{{ lignes|length|pluralize }}.
+    </p>
+    {% else %}
+    <div class="cpt-vide">Aucun journal pour ces critères.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

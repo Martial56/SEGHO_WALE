@@ -165,7 +165,7 @@ class EcritureAdmin(admin.ModelAdmin):
     depuis les écrans de comptabilité, jamais ici."""
     list_display = ['date', 'journal', 'numero', 'libelle', 'statut']
     list_filter = ['statut', 'journal']
-    search_fields = ['libelle', 'piece']
+    search_fields = ['libelle', 'piece', 'numero_facture']
     inlines = [LigneEcritureInline]
 
     def get_queryset(self, request):

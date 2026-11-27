@@ -66,11 +66,35 @@
   {% endif %}
   {% endif %}
 
+  {% comment %}Menu « Écritures », comme dans Sage : la saisie des journaux
+  (journal × mois) d'abord, puis le passage, l'OD, le lettrage, la clôture.{% endcomment %}
   {% if perms.comptabilite.view_ecriture and 'comptabilite.ecritures' not in hidden_navitem_codes %}
-  <a href="{% url 'comptabilite:ecritures' %}"
-    class="o-nav-link {% if uname == 'ecritures' or uname == 'ecriture' or uname == 'od_saisie' or uname == 'lettrage' or uname == 'cloture_journaux' %}active{% endif %}">
-    Écritures
-  </a>
+  <div class="o-nav-dropdown" data-nav-dropdown>
+    <button type="button"
+            class="o-nav-link {% if uname == 'ecritures' or uname == 'ecriture' or uname == 'od_saisie' or uname == 'lettrage' or uname == 'cloture_journaux' or uname == 'saisie_journaux' or uname == 'journal_mois' %}active{% endif %}"
+            style="background:none;border:none;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;">
+      Écritures
+      <i class="bi bi-chevron-down" style="font-size:10px;"></i>
+    </button>
+    <div class="o-nav-dropdown-menu">
+      <div class="o-nav-dd-section">Saisie</div>
+      <a href="{% url 'comptabilite:saisie_journaux' %}" class="{% if uname == 'saisie_journaux' or uname == 'journal_mois' %}active{% endif %}">
+        <i class="bi bi-journals" style="font-size:12px;"></i> Saisie des journaux</a>
+      {% if perms.comptabilite.add_ecriture %}
+      <a href="{% url 'comptabilite:od_saisie' %}" class="{% if uname == 'od_saisie' %}active{% endif %}">
+        <i class="bi bi-plus-lg" style="font-size:12px;"></i> Opération diverse</a>
+      {% endif %}
+      <div class="o-nav-dd-section">Traitement</div>
+      <a href="{% url 'comptabilite:ecritures' %}" class="{% if uname == 'ecritures' or uname == 'ecriture' %}active{% endif %}">
+        <i class="bi bi-check2-all" style="font-size:12px;"></i> Génération et passage des écritures</a>
+      <a href="{% url 'comptabilite:lettrage' %}" class="{% if uname == 'lettrage' %}active{% endif %}">
+        <i class="bi bi-link-45deg" style="font-size:12px;"></i> Lettrage</a>
+      {% if perms.comptabilite.view_exercice %}
+      <a href="{% url 'comptabilite:cloture_journaux' %}" class="{% if uname == 'cloture_journaux' %}active{% endif %}">
+        <i class="bi bi-lock" style="font-size:12px;"></i> Clôture des journaux</a>
+      {% endif %}
+    </div>
+  </div>
   {% endif %}
 
   {% comment %}Menu « Assurances » : tiers payants (lot 6) — créances,

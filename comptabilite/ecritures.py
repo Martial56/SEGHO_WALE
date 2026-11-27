@@ -188,7 +188,7 @@ def exclure_exercices_clos(qs, jour, champ='ecriture__exercice'):
 # ─── Création ──────────────────────────────────────────────────────────────────
 
 def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, centre=None, par=None,
-                   contre_passation_de=None):
+                   contre_passation_de=None, numero_facture=''):
     """Écriture en brouillon. `lignes` : [(compte, libellé, débit, crédit, tiers)],
     avec en option un sixième élément : la convention qui finance la ligne.
 
@@ -212,7 +212,7 @@ def creer_ecriture(journal_, jour, libelle, lignes, piece='', origine=None, cent
     with transaction.atomic():
         ecriture = Ecriture.objects.create(
             journal=journal_, exercice=exercice_pour(jour), date=jour, libelle=libelle[:255],
-            piece=piece[:60], origine=origine, centre=centre, cree_par=par,
+            piece=piece[:60], numero_facture=(numero_facture or '')[:120], origine=origine, centre=centre, cree_par=par,
             contre_passation_de=contre_passation_de)
         LigneEcriture.objects.bulk_create([
             LigneEcriture(ecriture=ecriture, compte=l[0], libelle=(l[1] or libelle)[:255],
@@ -316,7 +316,7 @@ def ecriture_facture(facture):
         return None                      # facture à 0 F : rien à comptabiliser
     return creer_ecriture(journal(VENTES), _jour(facture.date_emission),
                           f'Facture {facture.numero} — {_nom_patient(facture)}',
-                          lignes, piece=facture.numero, origine=origine, centre=facture.centre)
+                          lignes, piece=facture.numero, numero_facture=facture.numero, origine=origine, centre=facture.centre)
 
 
 def ecriture_avoir(avoir):
@@ -331,7 +331,7 @@ def ecriture_avoir(avoir):
         return None
     return creer_ecriture(journal(VENTES), _jour(avoir.date_creation),
                           f'Avoir {avoir.numero} sur facture {facture.numero}', inverse,
-                          piece=avoir.numero, origine=origine, centre=avoir.centre)
+                          piece=avoir.numero, numero_facture=avoir.numero, origine=origine, centre=avoir.centre)
 
 
 def _tresorerie(mode, caisse):
@@ -351,7 +351,7 @@ def ecriture_remboursement(avoir):
                           f'Remboursement avoir {avoir.numero}',
                           [(compte('patient'), None, avoir.montant_rembourse, ZERO, tiers),
                            (tresorerie, None, ZERO, avoir.montant_rembourse, str(tiers))],
-                          piece=avoir.numero, origine=origine, centre=avoir.centre)
+                          piece=avoir.numero, numero_facture=avoir.numero, origine=origine, centre=avoir.centre)
 
 
 # ─── Paiement, sortie, écart ───────────────────────────────────────────────────
@@ -385,7 +385,8 @@ def ecriture_paiement(paiement):
     lignes, journal_ = lignes_de_paiement(paiement)
     return creer_ecriture(journal_, _jour(paiement.date_paiement),
                           f'Encaissement {paiement.numero} — facture {paiement.facture.numero}', lignes,
-                          piece=paiement.numero, origine=origine, centre=paiement.centre)
+                          piece=paiement.numero, numero_facture=paiement.facture.numero, origine=origine,
+                          centre=paiement.centre)
 
 
 # ─── Journée de caisse : une seule écriture (schéma de l'expert-comptable) ─────
@@ -481,7 +482,7 @@ def ecriture_journee(journee):
     numeros = ', '.join(journee.sessions.order_by('numero').values_list('numero', flat=True))
     return creer_ecriture(journal_de_caisse(caisse), journee.date_journee,
                           f'Ventes du {journee.date_journee:%d/%m/%Y} — {client.intitule if client else caisse.nom}',
-                          lignes, piece=numeros, origine=origine, centre=journee.centre)
+                          lignes, numero_facture=numeros, origine=origine, centre=journee.centre)
 
 
 def ecriture_sortie(sortie):
@@ -594,7 +595,7 @@ def ecriture_rejet(rejet):
                           f'Refus {rejet.numero} de {tiers} — facture {facture.numero} ({rejet.get_decision_display().lower()})',
                           [(debit, None, rejet.montant, ZERO, patient),
                            (compte('tiers_payant'), None, ZERO, rejet.montant, tiers)],
-                          piece=rejet.numero, origine=origine, centre=rejet.centre)
+                          piece=rejet.numero, numero_facture=rejet.facture.numero, origine=origine, centre=rejet.centre)
 
 
 # ─── Achats (lot 8) ────────────────────────────────────────────────────────────
@@ -610,7 +611,8 @@ def ecriture_facture_fournisseur(facture):
     lignes.append((compte_fournisseur(facture), None, ZERO, facture.montant_total, tiers))
     return creer_ecriture(journal(ACHATS), facture.date,
                           f'Facture {facture.reference or facture.numero} — {tiers}', lignes,
-                          piece=facture.reference or facture.numero, origine=origine, centre=facture.centre)
+                          piece=facture.reference or facture.numero, numero_facture=facture.reference or facture.numero,
+                          origine=origine, centre=facture.centre)
 
 
 def ecriture_reglement_fournisseur(reglement):
@@ -627,8 +629,9 @@ def ecriture_reglement_fournisseur(reglement):
                           f'Règlement {reglement.numero} — {tiers} (facture {reglement.facture.numero})',
                           [(compte_fournisseur(reglement.facture), None, reglement.montant, ZERO, tiers),
                            (tresorerie, None, ZERO, reglement.montant, str(tiers))],
-                          piece=reglement.reference or reglement.numero, origine=origine,
-                          centre=reglement.centre)
+                          piece=reglement.reference or reglement.numero,
+                          numero_facture=reglement.facture.reference or reglement.facture.numero,
+                          origine=origine, centre=reglement.centre)
 
 
 # ─── Génération d'une période ──────────────────────────────────────────────────
@@ -754,7 +757,7 @@ def contre_passer(ecriture, par, jour=None):
               for l in ecriture.lignes.select_related('compte', 'compte_tiers')]
     return creer_ecriture(ecriture.journal, jour or timezone.localdate(),
                           f'Contre-passation de {ecriture.reference} — {ecriture.libelle}', lignes,
-                          piece=ecriture.piece, centre=ecriture.centre, par=par,
+                          piece=ecriture.piece, numero_facture=ecriture.numero_facture, centre=ecriture.centre, par=par,
                           contre_passation_de=ecriture)
 
 

@@ -516,6 +516,9 @@ class Ecriture(ModeleCentre):
     date = models.DateField()
     libelle = models.CharField(max_length=255)
     piece = models.CharField(max_length=60, blank=True, verbose_name="Pièce")
+    # « N° facture » de Sage : le document commercial de l'écriture (document
+    # des ventes de la journée, facture, avoir, facture du fournisseur).
+    numero_facture = models.CharField(max_length=120, blank=True, verbose_name="N° facture")
     statut = models.CharField(max_length=10, choices=STATUT, default='brouillon')
     # Clé de l'événement d'origine (« paiement:12 », « facture:7 »…) : une
     # génération relancée ne crée jamais deux fois la même écriture.
@@ -852,6 +855,11 @@ class RemiseBanque(ModeleCentre):
     montant = models.DecimalField(max_digits=15, decimal_places=2)
     reference = models.CharField(max_length=100, blank=True, verbose_name="N° du bordereau de versement")
     observation = models.TextField(blank=True)
+    # Encaissements remis, quand la remise est faite en les cochant (comme
+    # « Règlements à remettre en banque » de Sage) ; vide pour une remise
+    # d'un montant libre. Un encaissement n'est remis qu'une fois.
+    paiements = models.ManyToManyField('facturation.Paiement', blank=True, related_name='remises',
+                                       verbose_name="Encaissements remis")
     cree_par = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     cree_le = models.DateTimeField(auto_now_add=True)
 

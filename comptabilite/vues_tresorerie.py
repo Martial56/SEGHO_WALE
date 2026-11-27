@@ -14,7 +14,7 @@ from django.utils import timezone
 from . import assurances as tiers
 from . import ecritures as moteur
 from . import tresorerie as regles
-from .models import Compte, CompteTresorerie, LigneEcriture, LigneReleve, RemiseBanque
+from .models import Compte, CompteTresorerie, Ecriture, LigneEcriture, LigneReleve, RemiseBanque
 
 
 def _exiger(user, perm):
@@ -82,38 +82,60 @@ def comptes_tresorerie(request, pk=None):
 
 @login_required(login_url='login')
 def remises(request):
-    """Espèces des caisses remises en banque ou à une autre caisse (petite caisse…)."""
-    from facturation.models import Caisse
+    """Espèces des caisses remises en banque ou à une autre caisse (petite
+    caisse…). Comme « Règlements à remettre en banque » de Sage : on choisit
+    la caisse et la période, on coche les encaissements à remettre ; sans
+    encaissement coché, on remet un montant libre."""
+    from facturation.models import Caisse, Paiement
     _exiger(request.user, 'comptabilite.view_remisebanque')
     aujourdhui = timezone.localdate()
+    donnees = request.POST if request.method == 'POST' else request.GET
+    caisses = list(Caisse.objects.filter(actif=True).order_by('nom'))
+    caisse = next((c for c in caisses if str(c.pk) == donnees.get('caisse')), None)
+    du = _date(donnees.get('du'), aujourdhui)
+    au = _date(donnees.get('au'), aujourdhui)
     if request.method == 'POST':
         _exiger(request.user, 'comptabilite.add_remisebanque')
-        caisse = Caisse.objects.filter(pk=request.POST.get('caisse')).first()
         ct = CompteTresorerie.objects.filter(pk=request.POST.get('compte_tresorerie')).first()
+        coches = list(Paiement.objects.filter(pk__in=[p for p in request.POST.getlist('paiement') if p.isdigit()]))
         montant = _montant(request.POST.get('montant'))
         jour = _date(request.POST.get('date'), aujourdhui)
-        if caisse is None or ct is None or montant is None:
-            messages.error(request, "Caisse, compte de dépôt et montant sont obligatoires.")
+        if caisse is None or ct is None or (montant is None and not coches):
+            messages.error(request, "Caisse, compte de dépôt et montant (ou encaissements cochés) sont obligatoires.")
         else:
             try:
                 remise = regles.creer_remise(caisse, ct, montant, jour, request.user,
                                              request.POST.get('reference', '').strip(),
-                                             request.POST.get('observation', ''))
+                                             request.POST.get('observation', ''), paiements=coches)
             except (regles.ErreurTresorerie, moteur.ErreurCompta) as e:
                 messages.error(request, str(e))
             else:
-                messages.success(request, f"Remise {remise.numero} enregistrée ; ses deux écritures sont préparées.")
+                messages.success(request, f"Remise {remise.numero} enregistrée"
+                                          + (f" ({len(coches)} encaissement(s))" if coches else "")
+                                          + " ; ses deux écritures sont préparées.")
                 return redirect('comptabilite:remises')
-    caisses = list(Caisse.objects.filter(actif=True).order_by('nom'))
     soldes = {}
     for c in caisses:
         try:
             soldes[c.pk] = regles.disponible_sans_generer(c, aujourdhui)
         except moteur.ErreurCompta:
             soldes[c.pk] = None
+    encaissements = list(regles.encaissements_a_remettre(caisse, du, au)) if caisse else []
+    coches = set(request.POST.getlist('paiement')) if request.method == 'POST' else None
+    for p in encaissements:
+        p.coche = coches is None or str(p.pk) in coches     # tout coché d'office, comme Sage
+    liste = list(RemiseBanque.objects.select_related('caisse', 'compte_tresorerie')
+                 .prefetch_related('paiements')[:200])
+    origines = {e.origine: e for e in Ecriture.objects.select_related('journal').filter(
+        origine__in=[f'remise_{c}:{r.pk}' for r in liste for c in ('sortie', 'entree')])}
+    for r in liste:
+        r.ecriture_sortie = origines.get(f'remise_sortie:{r.pk}')
+        r.ecriture_entree = origines.get(f'remise_entree:{r.pk}')
     return render(request, 'comptabilite/remises.html', {
-        'remises': RemiseBanque.objects.select_related('caisse', 'compte_tresorerie')[:200],
-        'caisses': [(c, soldes[c.pk]) for c in caisses],
+        'remises': liste,
+        'caisses': [(c, soldes[c.pk]) for c in caisses], 'caisse': caisse, 'du': du, 'au': au,
+        'encaissements': encaissements,
+        'total_a_remettre': sum((p.montant for p in encaissements), Decimal('0')),
         'comptes': (CompteTresorerie.objects.filter(actif=True, type__in=['banque', 'caisse'])
                     .select_related('compte').order_by('type', 'libelle')),
         'transit': moteur.compte('virement_interne'),

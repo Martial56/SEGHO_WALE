@@ -1,7 +1,7 @@
 from django.urls import path
 
 from . import views, vues_compta, vues_etats, vues_financements as vf, vues_assurances as va, vues_tresorerie as vt
-from . import vues_achats as vac, vues_cloture as vcl, vues_ventes, vues_bons_sortie as vbs
+from . import vues_achats as vac, vues_cloture as vcl, vues_ventes, vues_bons_sortie as vbs, vues_saisie_journaux as vsj
 
 app_name = 'comptabilite'
 
@@ -27,6 +27,8 @@ urlpatterns = [
     path('ecritures/operation-diverse/', vues_compta.od_saisie, name='od_saisie'),
     path('ecritures/lettrage/', vues_compta.lettrage, name='lettrage'),
     path('ecritures/cloture-journaux/', vues_compta.cloture_journaux, name='cloture_journaux'),
+    path('ecritures/journaux/', vsj.saisie_journaux, name='saisie_journaux'),
+    path('ecritures/journaux/<int:pk>/<int:annee>/<int:mois>/', vsj.journal_mois, name='journal_mois'),
     path('configuration/plan-comptable/', vues_compta.plan_comptable, name='plan_comptable'),
     path('configuration/plan-comptable/<int:pk>/', vues_compta.plan_comptable, name='compte_modifier'),
     path('configuration/plan-comptable/export/', vues_compta.plan_comptable_export, name='plan_comptable_export'),

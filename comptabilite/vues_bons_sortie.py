@@ -15,7 +15,7 @@ from . import bons_sortie as regles
 from . import ecritures as moteur
 from .forms import BonSortieForm
 from .models import BonSortie, Compte, Convention, Tiers
-from .vues_compta import _montant, _tiers_saisi
+from .vues_compta import lignes_ecriture, lignes_postees
 
 
 def _exiger(user, perm):
@@ -155,25 +155,9 @@ def bon_sortie_equilibrer(request, pk):
     peut_passer = request.user.has_perm('comptabilite.passer_ecritures')
     lignes_saisies = []
     if request.method == 'POST':
-        n = 0
-        while f'compte_{n}' in request.POST:
-            lignes_saisies.append({k: request.POST.get(f'{k}_{n}', '') for k in
-                                   ('compte', 'libelle', 'tiers', 'debit', 'credit', 'convention')})
-            n += 1
+        lignes_saisies = lignes_postees(request.POST)
         try:
-            lignes = []
-            for l in lignes_saisies:
-                if not l['compte'] and not l['debit'] and not l['credit']:
-                    continue
-                c = Compte.objects.imputables().filter(numero=l['compte'].split(' ')[0].strip()).first()
-                if c is None:
-                    raise moteur.ErreurCompta(f"Compte inconnu : « {l['compte']} ».")
-                d, cr = _montant(l['debit']), _montant(l['credit'])
-                if d and cr:
-                    raise moteur.ErreurCompta(f"Compte {c.numero} : une ligne est au débit ou au crédit, pas les deux.")
-                convention = (Convention.objects.filter(pk=l['convention']).first()
-                              if l['convention'].isdigit() else None)
-                lignes.append((c, l['libelle'], d, cr, _tiers_saisi(l['tiers']), convention))
+            lignes = lignes_ecriture(lignes_saisies)
             valider = peut_passer and request.POST.get('action') == 'valider'
             ecriture = regles.equilibrer(bon, lignes, request.user, valider_ecriture=valider)
         except (regles.ErreurBon, moteur.ErreurCompta) as e:

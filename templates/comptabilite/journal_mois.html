@@ -1,0 +1,143 @@
+{% extends 'facturation/base.html' %}
+{% load humanize %}
+{% block topbar_title %}Journal : {{ journal.libelle }} / {{ mois|date:"M y" }}{% endblock %}
+
+{% block extra_css %}
+{{ block.super }}
+{% include 'comptabilite/includes/styles.html' %}
+<style>
+/* Présentation de Sage 100 : en-tête des soldes, puis une ligne par ligne d'écriture. */
+.jm-entete { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(320px, 2fr); gap: 14px; margin-bottom: 12px; }
+@media (max-width: 800px) { .jm-entete { grid-template-columns: 1fr; } }
+.jm-soldes { border-collapse: collapse; width: 100%; font-size: 13px; }
+.jm-soldes th { text-align: left; font-weight: 600; color: var(--text-muted); padding: 3px 10px; border: 1px solid var(--border); background: var(--bg); width: 34%; }
+.jm-soldes td { text-align: right; padding: 3px 10px; border: 1px solid var(--border); font-variant-numeric: tabular-nums; font-weight: 700; }
+.jm-compte { font-size: 13px; }
+.jm-compte .l { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.jm-compte .v { font-weight: 700; min-height: 1.4em; }
+.jm-grille { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.jm-grille th { position: sticky; top: 0; background: var(--surface); z-index: 1; font-size: 11px; font-weight: 700; color: var(--text-muted); text-align: left; padding: 5px 6px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+.jm-grille td { padding: 3px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.jm-grille td.lib { white-space: normal; min-width: 260px; }
+.jm-grille td.num, .jm-grille th.num { text-align: right; }
+.jm-grille td.cpte { font-family: var(--font-mono, monospace); }
+.jm-grille tbody.alt td { background: rgba(127,127,127,.05); }
+.jm-grille tbody { cursor: pointer; }
+.jm-grille tbody.brouillon td { color: #a8710a; }
+.jm-grille tr.choisie td { background: rgba(var(--teal-500-rgb), .16) !important; }
+.jm-grille tbody:target td { background: rgba(var(--teal-500-rgb), .08); }
+.jm-grille tfoot td { font-weight: 800; border-top: 2px solid var(--border); border-bottom: none; padding: 6px; }
+.jm-origine { color: var(--teal-600); margin-left: 4px; }
+.jm-defile { max-height: 62vh; overflow: auto; }
+.jm-saisie .cpt-field { margin-bottom: 8px; }
+@media print { .cpt-actions, .o-nav, .jm-saisie { display: none !important; } .jm-defile { max-height: none; overflow: visible; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cpt-page">
+  <div class="cpt-head">
+    <div>
+      <h1 class="cpt-title">Journal : {{ journal.libelle }} / {{ mois|date:"M y" }}
+        {% if cloture %}<span class="cpt-badge cloturee"><i class="bi bi-lock-fill"></i> clôturé</span>{% endif %}</h1>
+      <div class="cpt-sub">{{ journal.code }} · journal {{ journal.get_type_display|lower }}{% if compte %} du compte {{ compte.numero }}{% endif %} · du {{ mois|date:"d/m/Y" }} au {{ fin|date:"d/m/Y" }} · montants en F CFA</div>
+    </div>
+    <div class="cpt-actions">
+      <a href="{% url 'comptabilite:saisie_journaux' %}?journal={{ journal.code|urlencode }}" class="cpt-btn"><i class="bi bi-list-ul"></i> Saisie des journaux</a>
+      <a href="{% url 'comptabilite:journal_mois' journal.pk precedent.year precedent.month %}" class="cpt-btn" title="{{ precedent|date:'F Y' }}"><i class="bi bi-chevron-left"></i> Précédent</a>
+      <a href="{% url 'comptabilite:journal_mois' journal.pk suivant.year suivant.month %}" class="cpt-btn" title="{{ suivant|date:'F Y' }}">Suivant <i class="bi bi-chevron-right"></i></a>
+      <button type="button" class="cpt-btn" onclick="window.print()"><i class="bi bi-printer"></i></button>
+    </div>
+  </div>
+
+  <div class="cpt-card jm-entete">
+    <div class="jm-compte">
+      <div class="l">Compte</div>
+      <div class="v" id="jm-compte">—</div>
+      <div class="cpt-note">Cliquez une ligne pour voir son compte et son solde ; double-cliquez pour ouvrir l'écriture.</div>
+      {% if brouillons %}<div class="cpt-note ecart-pos" style="margin-top:6px;">{{ brouillons }} écriture{{ brouillons|pluralize }} en brouillon (en orange), sans numéro de pièce.</div>{% endif %}
+    </div>
+    <table class="jm-soldes">
+      {% if compte %}<tr><th>Ancien solde</th><td>{{ solde_debut|floatformat:0|intcomma }}</td><td></td></tr>{% endif %}
+      <tr><th>Totaux journal</th><td>{{ debit|floatformat:0|intcomma }}</td><td>{{ credit|floatformat:0|intcomma }}</td></tr>
+      {% if compte %}<tr><th>Nouveau solde</th><td>{{ solde_fin|floatformat:0|intcomma }}</td><td></td></tr>{% endif %}
+      <tr><th>Solde compte</th><td id="jm-solde-compte"></td><td></td></tr>
+    </table>
+  </div>
+  {% if compte and autres_journaux %}
+  <div class="cpt-alerte">Le compte {{ compte.numero }} a aussi bougé de {{ autres_journaux|floatformat:0|intcomma }} F dans d'autres journaux sur la période : son solde comptable au {{ fin|date:"d/m/Y" }} est de {{ solde_compte|floatformat:0|intcomma }} F.</div>
+  {% endif %}
+  {% if cloture %}<div class="cpt-alerte">Mois clôturé le {{ cloture.cloturee_le|date:"d/m/Y" }}{% if cloture.cloturee_par %} par {{ cloture.cloturee_par.get_full_name|default:cloture.cloturee_par.username }}{% endif %} : il se consulte, on n'y saisit plus.</div>{% endif %}
+
+  {% if saisie_ouverte %}
+  <form method="post" class="cpt-card jm-saisie" id="saisie">
+    {% csrf_token %}
+    <div class="cpt-grid2" style="grid-template-columns:90px 160px 160px 1fr;">
+      <div class="cpt-field"><label>Jour</label><input type="number" name="jour" class="cpt-input" min="1" max="{{ fin.day }}" required
+        value="{% if post.jour %}{{ post.jour }}{% else %}{{ date_defaut.day }}{% endif %}"></div>
+      <div class="cpt-field"><label>N° facture</label><input type="text" name="numero_facture" class="cpt-input" value="{{ post.numero_facture }}"></div>
+      <div class="cpt-field"><label>Référence</label><input type="text" name="piece" class="cpt-input" value="{{ post.piece }}" placeholder="Ex. BC 11657"></div>
+      <div class="cpt-field"><label>Libellé écriture</label><input type="text" name="libelle" class="cpt-input" value="{{ post.libelle }}" required></div>
+    </div>
+    {% include 'comptabilite/includes/lignes_saisie.html' %}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      {% if peut_passer %}<button name="action" value="valider" class="cpt-btn primaire" data-equilibre>Enregistrer et valider</button>{% endif %}
+      <button name="action" value="brouillon" class="cpt-btn {% if not peut_passer %}primaire{% endif %}" data-equilibre>Enregistrer en brouillon</button>
+      {% if compte %}<span class="cpt-note">Journal de trésorerie : une ligne porte normalement le compte {{ compte.numero }} {{ compte.intitule }}.</span>{% endif %}
+    </div>
+  </form>
+  {% endif %}
+
+  <div class="cpt-card">
+    {% if ecritures %}
+    <div class="jm-defile">
+    <table class="jm-grille">
+      <thead><tr><th>Jour</th><th>N° pièce</th><th>N° facture</th><th>Référence</th><th>N° compte général</th><th>N° compte tiers</th><th>Libellé écriture</th><th>Let.</th><th class="num">Débit</th><th class="num">Crédit</th></tr></thead>
+      {% for e in ecritures %}
+      <tbody id="e{{ e.pk }}" class="{% cycle '' 'alt' %}{% if e.statut == 'brouillon' %} brouillon{% endif %}" data-url="{% url 'comptabilite:ecriture' e.pk %}">
+        {% for l in e.lignes.all %}
+        <tr data-compte="{{ l.compte.numero }} {{ l.compte.intitule }}" data-solde="{{ l.solde_compte|floatformat:0|intcomma }}">
+          <td>{{ e.date|date:"d" }}</td>
+          <td>{% if e.numero %}{{ e.numero }}{% else %}<i class="bi bi-hourglass-split" title="Brouillon : numéro attribué à la validation"></i>{% endif %}</td>
+          <td>{{ e.numero_facture }}</td>
+          <td>{{ e.piece }}</td>
+          <td class="cpte">{{ l.compte.numero }}</td>
+          <td class="cpte">{% if l.compte_tiers %}{{ l.compte_tiers.numero }}{% endif %}</td>
+          <td class="lib">{% if l.libelle %}{{ l.libelle }}{% else %}{{ e.libelle }}{% endif %}{% if forloop.first %}{% if e.origine_info %}<a class="jm-origine" href="{{ e.origine_info.url }}" title="{{ e.origine_info.libelle }}{% if e.origine_info.soeur %} — autre côté : {{ e.origine_info.soeur.journal.code }} {{ e.origine_info.soeur.reference }}{% endif %}" onclick="event.stopPropagation()"><i class="bi bi-diagram-2"></i></a>{% if e.origine_info.soeur %}<a class="jm-origine" href="{% url 'comptabilite:ecriture' e.origine_info.soeur.pk %}" title="Autre côté : {{ e.origine_info.soeur.journal.code }} {{ e.origine_info.soeur.reference }}" onclick="event.stopPropagation()"><i class="bi bi-arrow-left-right"></i></a>{% endif %}{% elif e.contre_passation_de %} <span class="cpt-note">(contre-passation de {{ e.contre_passation_de.reference }})</span>{% endif %}{% endif %}</td>
+          <td>{{ l.lettre }}</td>
+          <td class="num">{% if l.debit %}{{ l.debit|floatformat:0|intcomma }}{% endif %}</td>
+          <td class="num">{% if l.credit %}{{ l.credit|floatformat:0|intcomma }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% endfor %}
+      <tfoot><tr><td colspan="8">Totaux journal{% if debit != debit_valide %} <span class="cpt-note">(dont validées : {{ debit_valide|floatformat:0|intcomma }} / {{ credit_valide|floatformat:0|intcomma }})</span>{% endif %}</td>
+        <td class="num">{{ debit|floatformat:0|intcomma }}</td><td class="num">{{ credit|floatformat:0|intcomma }}</td></tr></tfoot>
+    </table>
+    </div>
+    <p class="cpt-note" style="margin-top:8px;"><i class="bi bi-diagram-2"></i> pièce d'origine (remise : caisse source → destination via le compte de virements internes ; bon de sortie ; journée de caisse) · <i class="bi bi-arrow-left-right"></i> écriture de l'autre côté d'une remise · <i class="bi bi-hourglass-split"></i> brouillon.</p>
+    {% else %}
+    <div class="cpt-vide">Aucune écriture dans ce journal en {{ mois|date:"F Y" }}.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function () {
+  // Comme Sage : la ligne choisie affiche son compte et le solde de ce compte.
+  var compte = document.getElementById('jm-compte'), solde = document.getElementById('jm-solde-compte');
+  document.querySelectorAll('.jm-grille tbody tr').forEach(function (tr) {
+    tr.addEventListener('click', function () {
+      document.querySelectorAll('.jm-grille tr.choisie').forEach(function (t) { t.classList.remove('choisie'); });
+      tr.classList.add('choisie');
+      compte.textContent = tr.dataset.compte;
+      solde.textContent = tr.dataset.solde;
+    });
+    tr.addEventListener('dblclick', function () { location.href = tr.parentNode.dataset.url; });
+  });
+})();
+</script>
+{% endblock %}

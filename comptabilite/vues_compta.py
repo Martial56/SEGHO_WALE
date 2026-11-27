@@ -131,6 +131,41 @@ def _montant(valeur):
     return m
 
 
+def lignes_postees(post):
+    """Lignes saisies dans la table commune (includes/lignes_saisie.html),
+    telles que tapées : [{compte, libelle, tiers, debit, credit, convention}]."""
+    lignes, n = [], 0
+    while f'compte_{n}' in post:
+        lignes.append({k: post.get(f'{k}_{n}', '') for k in
+                       ('compte', 'libelle', 'tiers', 'debit', 'credit', 'convention')})
+        n += 1
+    return lignes
+
+
+def lignes_ecriture(lignes_saisies):
+    """Lignes saisies → lignes de `creer_ecriture` ; les lignes vides sont
+    ignorées. ErreurCompta sur un compte inconnu ou un montant illisible."""
+    lignes = []
+    for l in lignes_saisies:
+        if not l['compte'] and not l['debit'] and not l['credit']:
+            continue
+        c = Compte.objects.imputables().filter(numero=l['compte'].split(' ')[0].strip()).first()
+        if c is None:
+            raise moteur.ErreurCompta(f"Compte inconnu : « {l['compte']} ».")
+        d, cr = _montant(l['debit']), _montant(l['credit'])
+        if d and cr:
+            raise moteur.ErreurCompta(f"Compte {c.numero} : une ligne est au débit ou au crédit, pas les deux.")
+        convention = (Convention.objects.filter(pk=l['convention']).first()
+                      if l['convention'].isdigit() else None)
+        lignes.append((c, l['libelle'], d, cr, _tiers_saisi(l['tiers']), convention))
+    return lignes
+
+
+def lignes_vides(n=4):
+    return [{'compte': '', 'libelle': '', 'tiers': '', 'debit': '', 'credit': '', 'convention': ''}
+            for _ in range(n)]
+
+
 @login_required(login_url='login')
 def od_saisie(request):
     """Saisie d'une opération diverse (salaires, loyers, régularisations…)."""
@@ -138,11 +173,7 @@ def od_saisie(request):
     aujourdhui = timezone.localdate()
     lignes_saisies = []
     if request.method == 'POST':
-        n = 0
-        while f'compte_{n}' in request.POST:
-            lignes_saisies.append({k: request.POST.get(f'{k}_{n}', '') for k in
-                                   ('compte', 'libelle', 'tiers', 'debit', 'credit', 'convention')})
-            n += 1
+        lignes_saisies = lignes_postees(request.POST)
         try:
             jour = _date(request.POST.get('date'), None)
             if jour is None:
@@ -151,29 +182,16 @@ def od_saisie(request):
             if not libelle:
                 raise moteur.ErreurCompta("Indiquez le libellé de l'opération.")
             journal_ = get_object_or_404(Journal, pk=request.POST.get('journal'))
-            lignes = []
-            for l in lignes_saisies:
-                if not l['compte'] and not l['debit'] and not l['credit']:
-                    continue
-                c = Compte.objects.imputables().filter(numero=l['compte'].split(' ')[0].strip()).first()
-                if c is None:
-                    raise moteur.ErreurCompta(f"Compte inconnu : « {l['compte']} ».")
-                d, cr = _montant(l['debit']), _montant(l['credit'])
-                if d and cr:
-                    raise moteur.ErreurCompta(f"Compte {c.numero} : une ligne est au débit ou au crédit, pas les deux.")
-                convention = (Convention.objects.filter(pk=l['convention']).first()
-                              if l['convention'].isdigit() else None)
-                lignes.append((c, l['libelle'], d, cr, _tiers_saisi(l['tiers']), convention))
+            lignes = lignes_ecriture(lignes_saisies)
             ecriture = moteur.creer_ecriture(journal_, jour, libelle, lignes,
-                                             piece=request.POST.get('piece', '').strip(), par=request.user)
+                                             piece=request.POST.get('piece', '').strip(), par=request.user,
+                                             numero_facture=request.POST.get('numero_facture', '').strip())
         except moteur.ErreurCompta as e:
             messages.error(request, str(e))
         else:
             messages.success(request, "Opération enregistrée en brouillon : validez-la au passage des écritures.")
             return redirect('comptabilite:ecriture', pk=ecriture.pk)
-    while len(lignes_saisies) < 4:
-        lignes_saisies.append({'compte': '', 'libelle': '', 'tiers': '', 'debit': '', 'credit': '',
-                               'convention': ''})
+    lignes_saisies += lignes_vides(4 - len(lignes_saisies))
     return render(request, 'comptabilite/od_saisie.html', {
         'journaux': Journal.objects.filter(actif=True).order_by('code'),
         'journal_defaut': Journal.objects.filter(code='OD').first(),
